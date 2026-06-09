@@ -232,7 +232,8 @@ __marimo__/
 
 
 # Obisidian 
-/.smart-env/
+**/.smart-env/
 .smart-env/
 .ajson
+knowledge-base/
 
