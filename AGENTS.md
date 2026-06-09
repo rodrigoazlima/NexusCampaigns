@@ -167,36 +167,36 @@ Do not generate lore that contradicts existing approved entities in `02-Library/
 
 ## Agent Definitions
 
-### Ingestion Agent (`06-classify-images.ps1`)
+### Ingestion Agent
 - Detects new files in `00-Inbox/images/`
 - Generates slug name, metadata, companion `.md` in same folder
 - Updates `01-Processing/Images Index.md`
 - Cannot modify `02-Library/`
 
-### NPC Agent (`09-generate-npcs.py`)
+### NPC Agent
 - Reads image + scenario from `00-Inbox/images/`
 - Generates NPC markdown draft in `01-Processing/`
 - Tracks processed pairs in `.system/processed-npcs.json`
 - Cannot approve content
 
-### Token Agent (`10-generate-tokens.py`)
+### Token Agent
 - Generates circular portrait tokens from character images
 - Reads from `00-Inbox/images/`, writes `*-token.png` alongside source
 - Tracks in `.system/generated-tokens.json`
 - Cannot modify `02-Library/`
 
-### Compile Agent (`03-compile-wiki.ps1`)
+### Compile Agent
 - Reads `00-Inbox/` markdown notes
 - Generates synthesized pages in `01-Processing/`
 - Tracks in `.system/processed.txt`
 - Cannot approve content
 
-### Enrich Agent (`04-enrich-tags.ps1`)
+### Enrich Agent
 - Enriches `00-Inbox/` notes with additional tags via LLM
 - Modifies frontmatter in-place
 - Only touches notes with ≤5 tags
 
-### Wiki Agent (future)
+### Wiki Agent
 - Generates cross-links between `02-Library/` entities
 - Updates `04-Relationships/` indexes
 - Cannot modify metadata standards
