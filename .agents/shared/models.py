@@ -1,0 +1,416 @@
+"""Data contracts for the Vault Knowledge Factory pipeline.
+
+Pydantic v2 models only — no logic, no I/O, no side effects.
+All validation is declarative (field constraints + allowed enums).
+"""
+
+from __future__ import annotations
+
+from datetime import date, datetime
+from enum import Enum
+from typing import Annotated, Literal, Optional
+
+from pydantic import BaseModel, Field
+
+
+# ---------------------------------------------------------------------------
+# Enumerations
+# ---------------------------------------------------------------------------
+
+class EntityType(str, Enum):
+    npc            = "npc"
+    character      = "character"
+    faction        = "faction"
+    location       = "location"
+    city           = "city"
+    village        = "village"
+    dungeon        = "dungeon"
+    item           = "item"
+    artifact       = "artifact"
+    quest          = "quest"
+    encounter      = "encounter"
+    creature       = "creature"
+    monster        = "monster"
+    event          = "event"
+    religion       = "religion"
+    organization   = "organization"
+    timeline       = "timeline"
+    lore           = "lore"
+
+
+class EntityStatus(str, Enum):
+    draft    = "draft"
+    review   = "review"
+    approved = "approved"
+    archived = "archived"
+
+
+class ImageType(str, Enum):
+    portrait  = "portrait"
+    body      = "body"
+    battlemap = "battlemap"
+    scene     = "scene"
+    token     = "token"
+
+
+# Race/CharClass removed as strict enums — PF2e has hundreds of ancestries and
+# classes. Open strings are used in VisionClassification instead, validated
+# against PF2e vocabulary constants defined below.
+
+# ---------------------------------------------------------------------------
+# PF2e open vocabulary constants (used for prompt generation + soft validation)
+# ---------------------------------------------------------------------------
+
+PF2E_ANCESTRIES: frozenset[str] = frozenset({
+    # Core
+    "human", "elf", "dwarf", "halfling", "gnome", "goblin", "leshy",
+    "lizardfolk", "ratfolk", "tengu", "catfolk", "orc", "shoony", "anadi",
+    "grippli", "automaton", "fleshwarp", "fetchling", "sprite", "kitsune",
+    "kobold", "android", "strix", "vanara", "gnoll", "goloma", "hobgoblin",
+    "poppet", "shisk", "conrasu", "beastkin", "azarketi",
+    # Versatile heritages
+    "dhampir", "aasimar", "tiefling", "changeling", "half-elf", "half-orc",
+    "duskwalker", "geniekin", "ifrit", "oread", "sylph", "undine",
+    "nagaji", "vishkanya", "dark-elf",
+    "none",
+})
+
+PF2E_CLASSES: frozenset[str] = frozenset({
+    "alchemist", "barbarian", "bard", "champion", "cleric", "druid",
+    "fighter", "gunslinger", "inventor", "investigator", "kineticist",
+    "magus", "monk", "oracle", "psychic", "ranger", "rogue", "sorcerer",
+    "summoner", "swashbuckler", "thaumaturge", "witch", "wizard",
+    "animist", "exemplar", "commander",
+    "none",
+})
+
+PF2E_CREATURE_TYPES: frozenset[str] = frozenset({
+    "aberration", "animal", "astral", "beast", "celestial", "construct",
+    "dragon", "dream", "elemental", "fey", "fiend", "fungus", "giant",
+    "humanoid", "monitor", "ooze", "phantom", "plant", "spirit",
+    "time", "undead",
+    "none",
+})
+
+
+class Element(str, Enum):
+    fire     = "fire"
+    water    = "water"
+    earth    = "earth"
+    air      = "air"
+    metal    = "metal"
+    wood     = "wood"
+    nature   = "nature"
+    dark     = "dark"
+    light    = "light"
+    void     = "void"
+    vitality = "vitality"
+    none     = "none"
+
+
+class Environment(str, Enum):
+    dungeon    = "dungeon"
+    cave       = "cave"
+    forest     = "forest"
+    city       = "city"
+    tavern     = "tavern"
+    desert     = "desert"
+    snow       = "snow"
+    sea        = "sea"
+    swamp      = "swamp"
+    ruins      = "ruins"
+    temple     = "temple"
+    castle     = "castle"
+    plains     = "plains"
+    mountain   = "mountain"
+    volcano    = "volcano"
+    underwater = "underwater"
+    sky        = "sky"
+    astral     = "astral"
+    shadow     = "shadow"
+    abyss      = "abyss"
+    interior   = "interior"
+    exterior   = "exterior"
+    none       = "none"
+
+
+class AgentSlotStatus(str, Enum):
+    pending = "pending"
+    done    = "done"
+    skip    = "skip"
+
+
+class ImageProcessStatus(str, Enum):
+    ok       = "ok"
+    failed   = "failed"
+    migrated = "migrated"
+
+
+class NPCProcessStatus(str, Enum):
+    ok           = "ok"
+    error_llm    = "error-llm"
+    error_image  = "error-image"
+    error_write  = "error-write"
+
+
+# ---------------------------------------------------------------------------
+# LLM response contracts
+# ---------------------------------------------------------------------------
+
+class VisionClassification(BaseModel):
+    """Shape returned by the vision LLM for image classification.
+
+    ancestry / char_class / creature_type are open strings against PF2e vocabulary
+    (PF2E_ANCESTRIES / PF2E_CLASSES / PF2E_CREATURE_TYPES).
+    Strict enum validation removed — PF2e has too many options to enumerate.
+    """
+    type:          ImageType
+    ancestry:      str       = "none"   # PF2E_ANCESTRIES
+    char_class:    str       = Field("none", alias="class")  # PF2E_CLASSES
+    creature_type: str       = "none"   # PF2E_CREATURE_TYPES; "none" for PCs/NPCs
+    element:       Element   = Element.none
+    environment:   Environment = Environment.none
+    description:   str       = ""
+
+    model_config = {"populate_by_name": True}
+
+
+class NPCLLMOutput(BaseModel):
+    """Shape returned by the lore LLM for NPC generation."""
+    name:       str
+    ancestry:   str
+    heritage:   str         = ""
+    char_class: str         = Field("", alias="class")
+    level:      Annotated[int, Field(ge=1, le=20)]     = 1
+    background: str         = ""
+    str_mod:    Annotated[int, Field(ge=-5, le=5, alias="str")]  = 0
+    dex_mod:    Annotated[int, Field(ge=-5, le=5, alias="dex")]  = 0
+    con_mod:    Annotated[int, Field(ge=-5, le=5, alias="con")]  = 0
+    int_mod:    Annotated[int, Field(ge=-5, le=5, alias="int")]  = 0
+    wis_mod:    Annotated[int, Field(ge=-5, le=5, alias="wis")]  = 0
+    cha_mod:    Annotated[int, Field(ge=-5, le=5, alias="cha")]  = 0
+    abilities:  list[str]   = Field(default_factory=list)
+    trait:      str         = ""
+    ideal:      str         = ""
+    bond:       str         = ""
+    flaw:       str         = ""
+    role:       str         = ""
+    relationships: list[str] = Field(default_factory=list)
+    description:   str      = ""
+
+    model_config = {"populate_by_name": True}
+
+
+class TagEnrichmentOutput(BaseModel):
+    """Shape returned by the classification LLM."""
+    tags: list[str]       = Field(default_factory=list)
+    type: Optional[str]   = None
+
+
+# ---------------------------------------------------------------------------
+# Vault entity frontmatter
+# ---------------------------------------------------------------------------
+
+class EntityFrontmatter(BaseModel):
+    """AGENTS.md-compliant frontmatter for all vault entities."""
+    id:            str
+    type:          EntityType
+    status:        EntityStatus                = EntityStatus.draft
+    quality:       Annotated[int, Field(ge=0, le=10)] = 0
+    created:       date
+    updated:       date
+    tags:          list[str]                   = Field(default_factory=list)
+    source:        list[str]                   = Field(default_factory=list)
+    sha256:        Optional[str]               = None
+    reviewed:      bool                        = False   # agents never set True
+    relationships: list[str]                   = Field(default_factory=list)
+
+
+class NPCFrontmatter(EntityFrontmatter):
+    """Extended frontmatter for NPC entities."""
+    type:       EntityType  = EntityType.npc
+    name:       str         = ""
+    ancestry:   str         = ""
+    heritage:   str         = ""
+    char_class: str         = Field("", alias="class")
+    level:      Annotated[int, Field(ge=1, le=20)]    = 1
+    background: str         = ""
+    str_mod:    Annotated[int, Field(ge=-5, le=5, alias="str")] = 0
+    dex_mod:    Annotated[int, Field(ge=-5, le=5, alias="dex")] = 0
+    con_mod:    Annotated[int, Field(ge=-5, le=5, alias="con")] = 0
+    int_mod:    Annotated[int, Field(ge=-5, le=5, alias="int")] = 0
+    wis_mod:    Annotated[int, Field(ge=-5, le=5, alias="wis")] = 0
+    cha_mod:    Annotated[int, Field(ge=-5, le=5, alias="cha")] = 0
+    abilities:  list[str]   = Field(default_factory=list)
+    trait:      str         = ""
+    ideal:      str         = ""
+    bond:       str         = ""
+    flaw:       str         = ""
+    role:       str         = ""
+
+    model_config = {"populate_by_name": True}
+
+
+# ---------------------------------------------------------------------------
+# Queue / shared state schemas
+# ---------------------------------------------------------------------------
+
+class AgentSlots(BaseModel):
+    """Per-file agent processing slots inside inbox-queue.json."""
+    vision:         AgentSlotStatus = AgentSlotStatus.pending
+    lore:           AgentSlotStatus = AgentSlotStatus.pending
+    classification: AgentSlotStatus = AgentSlotStatus.pending
+    wiki:           AgentSlotStatus = AgentSlotStatus.pending
+
+
+class InboxQueueEntry(BaseModel):
+    ingestedAt: datetime
+    type:       Literal["image", "document", "other"]
+    agents:     AgentSlots
+
+
+# Type alias — the full queue is a str→entry dict
+InboxQueue = dict[str, InboxQueueEntry]
+
+
+# ---------------------------------------------------------------------------
+# Vision agent state
+# ---------------------------------------------------------------------------
+
+class ProcessedImageEntry(BaseModel):
+    path:         str
+    processedAt:  datetime
+    originalName: str
+    type:          str
+    ancestry:      str               = "none"   # open PF2e ancestry
+    char_class:    str               = Field("none", alias="class")
+    creature_type: str               = "none"   # PF2e creature trait
+    element:       str               = "none"
+    environment:   str               = "none"
+    description:   str               = ""
+    sha256:        str
+    isToken:       bool              = False
+    status:        ImageProcessStatus = ImageProcessStatus.ok
+
+    model_config = {"populate_by_name": True}
+
+
+class ProcessedImagesState(BaseModel):
+    """Root schema for processed-images.json (v2)."""
+    version:   int                              = 2
+    images:    dict[str, ProcessedImageEntry]   = Field(default_factory=dict)
+    pathIndex: dict[str, str]                   = Field(default_factory=dict)
+
+
+# ---------------------------------------------------------------------------
+# Lore agent state
+# ---------------------------------------------------------------------------
+
+class ProcessedNPCEntry(BaseModel):
+    imageKey:     str
+    scenarioId:   str
+    outputPath:   str
+    processedAt:  datetime
+    status:       NPCProcessStatus
+
+
+ProcessedNPCs = dict[str, ProcessedNPCEntry]
+
+
+class ScenarioEntry(BaseModel):
+    id:          str
+    name:        str
+    description: str
+    arc:         str
+    active:      bool = True
+
+
+# ---------------------------------------------------------------------------
+# Token agent state
+# ---------------------------------------------------------------------------
+
+class GeneratedTokenEntry(BaseModel):
+    sourcePath:   str
+    tokenPath:    str
+    generatedAt:  datetime
+
+
+GeneratedTokens = dict[str, GeneratedTokenEntry]
+
+
+# ---------------------------------------------------------------------------
+# Orchestrator / task scheduler
+# ---------------------------------------------------------------------------
+
+class TaskConfig(BaseModel):
+    id:              str
+    script:          str
+    intervalSeconds: int
+    description:     str
+
+
+class TasksConfig(BaseModel):
+    cleanupDays: int             = 90
+    tasks:       list[TaskConfig]
+
+
+class TaskStateEntry(BaseModel):
+    lastRun: datetime
+
+
+TasksState = dict[str, TaskStateEntry]
+
+
+# ---------------------------------------------------------------------------
+# Metrics
+# ---------------------------------------------------------------------------
+
+class RunMetrics(BaseModel):
+    startedAt:      datetime
+    finishedAt:     datetime
+    durationMs:     int
+    itemsProcessed: int = 0
+    itemsFailed:    int = 0
+
+
+class AgentMetricsEntry(BaseModel):
+    runs: list[RunMetrics] = Field(default_factory=list)
+
+
+AgentMetrics = dict[str, AgentMetricsEntry]
+
+
+# ---------------------------------------------------------------------------
+# Report models
+# ---------------------------------------------------------------------------
+
+class AgentLogSummary(BaseModel):
+    runs:          int                  = 0
+    completedRuns: int                  = 0
+    errors:        int                  = 0
+    warnings:      int                  = 0
+    firstRun:      Optional[datetime]   = None
+    lastRun:       Optional[datetime]   = None
+
+
+class VaultHealthReport(BaseModel):
+    pendingReview: list[str]            = Field(default_factory=list)
+    orphans:       list[str]            = Field(default_factory=list)
+    qualityScores: dict[str, int]       = Field(default_factory=dict)
+    queueDepth:    int                  = 0
+    queuePending:  int                  = 0
+    queueDone:     int                  = 0
+
+
+class DailyReport(BaseModel):
+    generatedAt:    datetime
+    date:           str
+    agentSummaries: dict[str, AgentLogSummary] = Field(default_factory=dict)
+    vaultHealth:    VaultHealthReport          = Field(default_factory=VaultHealthReport)
+
+
+class RepairReport(BaseModel):
+    date:               str
+    generatedAt:        datetime
+    fixLabelsDetected:  list[str] = Field(default_factory=list)
+    repairsApplied:     int       = 0

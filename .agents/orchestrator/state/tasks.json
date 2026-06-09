@@ -1,0 +1,65 @@
+{
+  "cleanupDays": 90,
+  "tasks": [
+    {
+      "id": "repair-agent",
+      "script": ".agents/repair/tools/12_repair_agent.py",
+      "intervalSeconds": 900,
+      "description": "Fix stale locks, missing dirs, orphan image refs"
+    },
+    {
+      "id": "review-agent",
+      "script": ".agents/review/tools/08_daily_report.py",
+      "intervalSeconds": 900,
+      "description": "Vault health report + log aggregation"
+    },
+    {
+      "id": "ingestion-agent",
+      "script": ".agents/ingestion/tools/11_ingestion_agent.py",
+      "intervalSeconds": 3600,
+      "description": "Emoji cleanup, DOCX conversion, queue registration"
+    },
+    {
+      "id": "vision-agent",
+      "script": ".agents/vision/tools/06_classify_images.py",
+      "intervalSeconds": 3600,
+      "description": "Image classification via Qwen3-VL"
+    },
+    {
+      "id": "lore-agent",
+      "script": ".agents/lore/tools/09_generate_npcs.py",
+      "intervalSeconds": 3600,
+      "description": "NPC sheet generation from images × scenarios"
+    },
+    {
+      "id": "token-agent",
+      "script": ".agents/token/tools/10_generate_tokens.py",
+      "intervalSeconds": 3600,
+      "description": "Circular token generation from portrait/body images"
+    },
+    {
+      "id": "wiki-agent",
+      "script": ".agents/wiki/tools/03_compile_wiki.py",
+      "intervalSeconds": 3600,
+      "description": "Synthesise entity pages from raw Inbox docs"
+    },
+    {
+      "id": "classification-agent",
+      "script": ".agents/classification/tools/04_enrich_tags.py",
+      "intervalSeconds": 3600,
+      "description": "Tag enrichment and type inference for sparse notes"
+    },
+    {
+      "id": "review-agent-short-files",
+      "script": ".agents/review/tools/15_flag_short_files.py",
+      "intervalSeconds": 3600,
+      "description": "Flag Processing drafts with < 10 body lines"
+    },
+    {
+      "id": "wikilink-agent",
+      "script": ".agents/wikilink/tools/14_wikilink_library.py",
+      "intervalSeconds": 3600,
+      "description": "Insert cross-links into ## Related sections of Library notes"
+    }
+  ]
+}

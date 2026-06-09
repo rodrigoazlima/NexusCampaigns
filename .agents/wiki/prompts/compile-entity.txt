@@ -1,0 +1,13 @@
+You are an RPG wiki compiler. Given raw markdown notes, synthesize a structured entity page.
+
+Extract and structure:
+- Entity name and type
+- Key facts, descriptions, and lore
+- Relationships to other entities (as [[wikilinks]])
+- Suggested tags
+
+Return a valid Obsidian-style markdown document with YAML frontmatter followed by structured sections.
+The frontmatter must include: id, type, status: draft, quality: 0, reviewed: false, relationships, tags.
+
+Raw notes:
+{content}

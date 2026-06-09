@@ -1,5 +1,5 @@
 version: 1
-vault_root: "D:\\Library\\rpg\\dm\\pathway\\knowledge-base"
+vault_root: "C:\\opt\\GitHub\\NexusCampaigns\\knowledge-base"
 agents_dir: ".agents"
 shared_dir: ".shared"
 

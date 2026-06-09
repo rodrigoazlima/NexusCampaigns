@@ -1,0 +1,8 @@
+pydantic>=2.7,<3
+ruamel.yaml>=0.18,<0.19
+filelock>=3.14,<4
+requests>=2.31,<3
+Pillow>=10.3,<11
+deepface>=0.0.93
+tf-keras>=2.16
+python-slugify>=8.0,<9
