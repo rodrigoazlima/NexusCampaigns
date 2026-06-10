@@ -4,7 +4,7 @@
 
 ## Overview
 
-LLM calls are declared in each agent's `agent.json` dispatch config, not in the orchestrator
+LLM calls are declared in each agent's `agent.json` dispatch config, not in the runtime
 or shared code. Provider selection, endpoint, model, and auth are agent-local decisions.
 
 See [agent-dispatch.spec.md](agent-dispatch.spec.md) for the full provider config schema

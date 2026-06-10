@@ -66,7 +66,7 @@ token
 
 | Agent | Interval | LLM | Purpose |
 |-------|----------|-----|---------|
-| [orchestrator](orchestrator/AGENT.md) | 1 min | none | Dispatches all agents, git commit/push |
+| [runtime](orchestrator/AGENT.md) | 1 min | none | Dispatches all agents, git commit/push |
 | [ingestion](ingestion/AGENT.md) | 1 h | none | Normalize inbox, DOCX→MD, queue registration |
 | [vision](vision/AGENT.md) | 1 h | Qwen3-VL @ :1234 | Image classification, slug rename, draft entity |
 | [lore](lore/AGENT.md) | 1 h | Qwen3-VL @ :1234 | PF2e NPC generation from images × scenarios |
@@ -168,8 +168,8 @@ To swap a model: update `registry.yaml` `llm_endpoints` section. No script chang
 1. Create `.agents/{name}/` with standard subdirs (`skills/`, `prompts/`, `tools/`, `generated-tools/`, `state/`, `state/logs/`)
 2. Write `AGENT.md` following the schema above
 3. Add entry to `registry.yaml` under `agents:`
-4. If agent runs on a schedule: add entry to `.agents/orchestrator/state/tasks.json`
-5. Add entry to `.agents/orchestrator/state/tasks-state.json` with `lastRun: "1970-01-01T00:00:00.0000000Z"`
+4. If agent runs on a schedule: add entry to `.agents/runtime/state/agent.json`
+5. Add entry to `.agents/runtime/state/tasks-state.json` with `lastRun: "1970-01-01T00:00:00.0000000Z"`
 6. Place tool scripts in `tools/`
 7. Do **not** modify any existing agent's files
 
@@ -203,10 +203,10 @@ New agents can be added without touching existing agents.
 | `processed.txt` | wiki | `.agents/wiki/state/` |
 | `bad-wiki-docs.txt` | wiki | `.agents/wiki/state/` |
 | `processed-docx.txt` | ingestion | `.agents/ingestion/state/` |
-| `tasks.json` | orchestrator | `.agents/orchestrator/state/` |
-| `tasks-state.json` | orchestrator | `.agents/orchestrator/state/` |
+| `agent.json` | orchestrator | `.agents/runtime/state/` |
+| `tasks-state.json` | orchestrator | `.agents/runtime/state/` |
 | `reports/` | review | `.agents/review/state/` |
-| `logs/automation.log` | orchestrator | `.agents/orchestrator/state/logs/` |
+| `logs/automation.log` | orchestrator | `.agents/runtime/state/logs/` |
 
 ---
 
@@ -214,8 +214,8 @@ New agents can be added without touching existing agents.
 
 ```
 Windows Task Scheduler  (every 1 min)
-  └─ runner.ps1  [orchestrator]
-       ├─ load tasks.json + tasks-state.json
+  └─ runner.ps1  [runtime]
+       ├─ load agent.json discovery + tasks-state.json
        ├─ for each due task:
        │    ├─ invoke tool script
        │    ├─ write logs
@@ -231,7 +231,7 @@ Windows Task Scheduler  (every 1 min)
 |-------|-------------|--------|
 | Phase 0 | Directory scaffold + AGENT.md files + registry | ✅ Done |
 | Phase 1 | State files copied to agent state dirs, scripts path-updated | ⬜ Pending |
-| Phase 2 | Scripts moved to agent tools dirs, tasks.json updated | ⬜ Pending |
+| Phase 2 | Scripts moved to agent tools dirs, agent.json updated | ⬜ Pending |
 | Phase 3 | LLM prompts extracted to prompts/ files | ⬜ Pending |
 | Phase 4 | Shared PS utilities extracted to .shared/utils/ | ⬜ Pending |
 | Phase 5 | Future agent skeletons completed | ⬜ Pending |

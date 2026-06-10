@@ -1,7 +1,7 @@
 # Agent Spec — Repair (`12-repair-agent.ps1`)
 
 **Trigger:** every 15 minutes  
-**Input:** `.system/logs/automation.log` (last 24h), `tasks.json`, `tasks-state.json`, `runner.lock`, `agent-metrics.json`  
+**Input:** `.system/logs/automation.log` (last 24h), `agent.json`, `tasks-state.json`, `runner.lock`, `agent-metrics.json`  
 **Output:** `.system/reports/repair-YYYY-MM-DD.json`
 
 ---

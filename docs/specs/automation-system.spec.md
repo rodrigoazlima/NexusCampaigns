@@ -8,7 +8,7 @@
 NSSM Windows Service
   └─ daemon.ps1                  # persistent loop (PS 7+)
        └─ runner.py              # dispatched every 60s
-            └─ foreach task in tasks.json
+            └─ foreach task in agent.json
                  if (now - lastRun) >= intervalSeconds:
                      load .agents/{name}/agent.json
                      get_runner(dispatch.type)
@@ -18,14 +18,14 @@ NSSM Windows Service
                      git commit (scoped to commit_scope) if changes exist
 ```
 
-**Lock file:** `.agents/orchestrator/state/runner.lock` — prevents concurrent runner instances.
+**Lock file:** `.agents/runtime/state/runner.lock` — prevents concurrent runner instances.
 Auto-cleared after 30 minutes (stale lock recovery handled by Repair Agent).
 
 ---
 
 ## Task Configuration
 
-**`tasks.json`** — static task registry (`tasks.json` does not hold script paths;
+**`agent.json`** — static task registry (`agent.json` does not hold script paths;
 dispatch config lives in each agent's `agent.json`):
 
 ```json
@@ -51,13 +51,13 @@ dispatch config lives in each agent's `agent.json`):
 }
 ```
 
-Both files live at `.agents/orchestrator/state/`.
+Both files live at `.agents/runtime/state/`.
 
 ---
 
 ## Agent Resolution
 
-The orchestrator derives the agent folder from `task.id`:
+the runtime derives the agent folder from `task.id`:
 
 ```
 repair-agent              → .agents/repair/agent.json
@@ -121,7 +121,7 @@ Keywords: `classified|enriched|repairs|processed|converted|generated|linked` and
    - Emit `--- START ---` and `--- DONE (key: N, elapsed: Ns) ---` log lines
    - Use shared log file + per-task log file
    - Never write to `02-Library/` without `reviewed: true`
-6. Add entry to `tasks.json`:
+6. Add entry to `agent.json`:
    ```json
    { "id": "agent-id", "intervalSeconds": 3600, "description": "..." }
    ```

@@ -4,9 +4,9 @@
 
 ## Overview
 
-The orchestrator dispatches **agents**, not scripts. Each agent folder contains an `agent.json`
-that declares how the orchestrator must invoke it. Dispatch type and provider config are isolated
-per agent — the orchestrator never hardcodes invocation details.
+the runtime dispatches **agents**, not scripts. Each agent folder contains an `agent.json`
+that declares how the runtime must invoke it. Dispatch type and provider config are isolated
+per agent — the runtime never hardcodes invocation details.
 
 ---
 
@@ -24,7 +24,7 @@ task.id → strip "-agent[-*]" suffix → .agents/{name}/ → agent.json
 | `ingestion-agent` | `.agents/ingestion/` |
 | `vision-agent` | `.agents/vision/` |
 
-If `.agents/{name}/agent.json` does not exist the orchestrator logs an error and skips the task.
+If `.agents/{name}/agent.json` does not exist the runtime logs an error and skips the task.
 `lastRun` is **not** updated on a skip.
 
 ---
@@ -49,7 +49,7 @@ both map to `.agents/review/`). The `tasks` dict is keyed by task ID.
 }
 ```
 
-The orchestrator looks up `task_id` in `tasks`. If the key is absent the task is skipped.
+the runtime looks up `task_id` in `tasks`. If the key is absent the task is skipped.
 
 ---
 

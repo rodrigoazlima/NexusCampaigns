@@ -8,12 +8,12 @@ The pipeline runs as a long-lived OS service that executes one scheduling loop:
 
 ```
 OS service supervisor
-  └─ python .agents/orchestrator/tools/runner.py
-       └─ every 60s: check tasks.json → dispatch due agents → git commit
+  └─ python .agents/runtime/tools/runner.py
+       └─ every 60s: check agent.json → dispatch due agents → git commit
 ```
 
-The orchestrator is the only process the service manages. All agents are
-spawned as subprocesses by the orchestrator and run to completion.
+the runtime is the only process the service manages. All agents are
+spawned as subprocesses by the runtime and run to completion.
 
 ---
 
@@ -35,11 +35,11 @@ pip install -r requirements.txt
 Verify the runner executes successfully once before installing:
 
 ```sh
-python .agents/orchestrator/tools/runner.py --once
+python .agents/runtime/tools/runner.py --once
 ```
 
 A clean run produces `--- START ---` and `--- DONE ---` in
-`.agents/orchestrator/state/logs/automation.log`.
+`.agents/runtime/state/logs/automation.log`.
 
 ---
 
@@ -50,7 +50,7 @@ A clean run produces `--- START ---` and `--- DONE ---` in
 | **Name** | `vault-knowledge-factory` |
 | **Display name** | Vault Knowledge Factory |
 | **Description** | DM pipeline — ingests, classifies, and links vault entities on schedule |
-| **Entry command** | `python <project_root>/.agents/orchestrator/tools/runner.py` |
+| **Entry command** | `python <project_root>/.agents/runtime/tools/runner.py` |
 | **Working directory** | `<project_root>` (repo root, not `.agents/`) |
 | **Restart policy** | Always; delay 30s on failure |
 | **Start type** | Automatic (start on boot) |
@@ -95,7 +95,7 @@ reference by absolute path.
 REM Run as Administrator
 nssm install vault-knowledge-factory python
 nssm set vault-knowledge-factory AppParameters ^
-    "<project_root>\.agents\orchestrator\tools\runner.py"
+    "<project_root>\.agents\runtime\tools\runner.py"
 nssm set vault-knowledge-factory AppDirectory "<project_root>"
 nssm set vault-knowledge-factory DisplayName "Vault Knowledge Factory"
 nssm set vault-knowledge-factory Description ^
@@ -103,9 +103,9 @@ nssm set vault-knowledge-factory Description ^
 nssm set vault-knowledge-factory Start SERVICE_AUTO_START
 nssm set vault-knowledge-factory AppRestartDelay 30000
 nssm set vault-knowledge-factory AppStdout ^
-    "<project_root>\.agents\orchestrator\state\logs\service-stdout.log"
+    "<project_root>\.agents\runtime\state\logs\service-stdout.log"
 nssm set vault-knowledge-factory AppStderr ^
-    "<project_root>\.agents\orchestrator\state\logs\service-stderr.log"
+    "<project_root>\.agents\runtime\state\logs\service-stderr.log"
 
 REM Set environment variables
 nssm set vault-knowledge-factory AppEnvironmentExtra ^
@@ -125,10 +125,10 @@ nssm start vault-knowledge-factory
 For environments where installing NSSM is not permitted, use Task Scheduler
 with a wrapper script.
 
-Create `.agents/orchestrator/tools/daemon.ps1`:
+Create `.agents/runtime/tools/daemon.ps1`:
 ```powershell
 while ($true) {
-    python "<project_root>/.agents/orchestrator/tools/runner.py" --once
+    python "<project_root>/.agents/runtime/tools/runner.py" --once
     Start-Sleep -Seconds 60
 }
 ```
@@ -136,7 +136,7 @@ while ($true) {
 Register via `schtasks`:
 ```bat
 schtasks /create /tn "VaultKnowledgeFactory" ^
-    /tr "powershell -NonInteractive -File <project_root>\.agents\orchestrator\tools\daemon.ps1" ^
+    /tr "powershell -NonInteractive -File <project_root>\.agents\runtime\tools\daemon.ps1" ^
     /sc ONSTART /ru SYSTEM /f
 ```
 
@@ -159,7 +159,7 @@ Wants=network.target
 Type=simple
 User=<service_user>
 WorkingDirectory=<project_root>
-ExecStart=/usr/bin/python3 <project_root>/.agents/orchestrator/tools/runner.py
+ExecStart=/usr/bin/python3 <project_root>/.agents/runtime/tools/runner.py
 Restart=always
 RestartSec=30
 
@@ -171,8 +171,8 @@ Environment=LLM_VISION_MODEL=llava:13b
 Environment=GIT_AUTHOR_NAME=Vault Bot
 Environment=GIT_AUTHOR_EMAIL=bot@localhost
 
-StandardOutput=append:<project_root>/.agents/orchestrator/state/logs/service-stdout.log
-StandardError=append:<project_root>/.agents/orchestrator/state/logs/service-stderr.log
+StandardOutput=append:<project_root>/.agents/runtime/state/logs/service-stdout.log
+StandardError=append:<project_root>/.agents/runtime/state/logs/service-stderr.log
 
 [Install]
 WantedBy=multi-user.target
@@ -206,7 +206,7 @@ Create `~/Library/LaunchAgents/com.vaultknowledgefactory.plist`
     <key>ProgramArguments</key>
     <array>
         <string>/usr/bin/python3</string>
-        <string><project_root>/.agents/orchestrator/tools/runner.py</string>
+        <string><project_root>/.agents/runtime/tools/runner.py</string>
     </array>
 
     <key>WorkingDirectory</key>
@@ -229,9 +229,9 @@ Create `~/Library/LaunchAgents/com.vaultknowledgefactory.plist`
     <true/>
 
     <key>StandardOutPath</key>
-    <string><project_root>/.agents/orchestrator/state/logs/service-stdout.log</string>
+    <string><project_root>/.agents/runtime/state/logs/service-stdout.log</string>
     <key>StandardErrorPath</key>
-    <string><project_root>/.agents/orchestrator/state/logs/service-stderr.log</string>
+    <string><project_root>/.agents/runtime/state/logs/service-stderr.log</string>
 
     <key>ThrottleInterval</key>
     <integer>30</integer>
@@ -265,22 +265,22 @@ tasklist | findstr python
 
 ```sh
 # Should exist while running:
-<project_root>/.agents/orchestrator/state/runner.lock
+<project_root>/.agents/runtime/state/runner.lock
 ```
 
 **3 — Log output:**
 
 ```sh
 # Tail the master log
-tail -f <project_root>/.agents/orchestrator/state/logs/automation.log
+tail -f <project_root>/.agents/runtime/state/logs/automation.log
 ```
 
 Expected output pattern on each cycle:
 ```
-[2026-06-10 08:00:01] [orchestrator] INFO: --- START ---
-[2026-06-10 08:00:01] [orchestrator] INFO: Skip ingestion-agent — not yet due
-[2026-06-10 08:00:02] [orchestrator] INFO: Dispatching review-agent (...)
-[2026-06-10 08:00:04] [orchestrator] INFO: --- DONE --- processed=1 failed=0 elapsed=2.1s
+[2026-06-10 08:00:01] [runtime] INFO: --- START ---
+[2026-06-10 08:00:01] [runtime] INFO: Skip ingestion-agent — not yet due
+[2026-06-10 08:00:02] [runtime] INFO: Dispatching review-agent (...)
+[2026-06-10 08:00:04] [runtime] INFO: --- DONE --- processed=1 failed=0 elapsed=2.1s
 ```
 
 **4 — Service status per platform:**
@@ -340,11 +340,11 @@ rm ~/Library/LaunchAgents/com.vaultknowledgefactory.plist
 1. Stop the service.
 2. Pull or deploy the new code.
 3. Install any new dependencies: `pip install -r requirements.txt`.
-4. Run `python .agents/orchestrator/tools/runner.py --once` manually to
+4. Run `python .agents/runtime/tools/runner.py --once` manually to
    verify the new version starts cleanly.
 5. Start the service.
 
-If `tasks.json` gained new tasks, add matching entries to `tasks-state.json`
+If `agent.json` gained new tasks, add matching entries to `tasks-state.json`
 with `lastRun: "1970-01-01T00:00:00+00:00"` before starting (forces
 immediate first run of the new agent).
 
@@ -359,14 +359,14 @@ intervention is required.
 To force-clear a stale lock manually:
 
 ```sh
-rm <project_root>/.agents/orchestrator/state/runner.lock
+rm <project_root>/.agents/runtime/state/runner.lock
 ```
 
 ---
 
 ## Log Rotation
 
-Log files accumulate under `.agents/orchestrator/state/logs/`. The Cleanup
+Log files accumulate under `.agents/runtime/state/logs/`. The Cleanup
 Agent (daily) purges files older than `cleanupDays` (default: 90 days).
 
 If the Cleanup Agent has not run, rotate manually:

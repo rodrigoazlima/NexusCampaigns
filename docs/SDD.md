@@ -1,7 +1,7 @@
 # Software Design Document — Pathway DM Knowledge Factory
 
-**Version:** 1.2  
-**Date:** 2026-06-09  
+**Version:** 1.3  
+**Date:** 2026-06-10  
 **Vault Root:** `knowledge-base/`
 
 ---
@@ -19,9 +19,9 @@ Audience: contributors, automation developers, Claude Code agents.
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                        Windows Service (NSSM)                       │
-│  daemon → runner (every 60s)                                        │
+│  daemon → runtime/runner (every 60s)                                │
 │         ↓                                                           │
-│   tasks.json + tasks-state.json → dispatch scheduled agents         │
+│   agent.json discovery + tasks-state.json → dispatch Claude agents  │
 └─────────────────────────────────────────────────────────────────────┘
          ↓
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -168,7 +168,7 @@ Agents are defined by their **actions** — discrete, named operations each agen
 
 ### Repair
 
-**Trigger:** every 15 min | **Reads:** `automation.log`, `tasks.json`, `tasks-state.json`, `runner.lock`, `agent-metrics.json` | **Writes:** `reports/repair-YYYY-MM-DD.json`
+**Trigger:** every 15 min | **Reads:** `automation.log`, `tasks-state.json`, `runner.lock`, `agent-metrics.json` | **Writes:** `reports/repair-YYYY-MM-DD.json`
 
 | Action | Description |
 |--------|-------------|
@@ -217,4 +217,4 @@ Agents are defined by their **actions** — discrete, named operations each agen
 | 3 | Face matching — no formal spec for distance threshold or match method | Open |
 | 4 | Dashboard API (`/review/<sha256>` routes) — not documented | Open |
 | 5 | `scenarios.json` schema for Lore Agent arc context — not formally specified | Open |
-| 6 | `agent.json` files not yet created for any agent — required before orchestrator can dispatch | Open |
+| 6 | Face matching — distance threshold and match method unspecified | Open |

@@ -2,7 +2,7 @@
 
 **Trigger:** daily  
 **Input:** `.system/logs/`, `.system/reports/`, `.system/agent-metrics.json`  
-**Config:** `cleanupDays` from `tasks.json` (default: 90)
+**Config:** `cleanupDays` from `agent.json` (default: 90)
 
 ---
 

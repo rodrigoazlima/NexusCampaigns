@@ -121,19 +121,24 @@ The system reads configuration from environment variables and JSON files in `.sy
 
 ### Task Configuration
 
-Tasks are defined in `.system/tasks.json`:
+Tasks are defined in each agent's `agent.json`. The runtime discovers them automatically:
 
 ```json
 {
-  "cleanupDays": 90,
-  "tasks": [
-    {
-      "id": "agent-id",
-      "script": "NN-name.ps1 | NN-name.py",
+  "tasks": {
+    "agent-id": {
       "intervalSeconds": 3600,
-      "description": "Agent description"
+      "description": "Agent description",
+      "dispatch": {
+        "type": "claude-api",
+        "claude_api": {
+          "model": "claude-haiku-4-5-20251001",
+          "system_file": "prompts/system.md",
+          "tools_module": "agent.tools.agent_name"
+        }
+      }
     }
-  ]
+  }
 }
 ```
 
