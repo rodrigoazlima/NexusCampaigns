@@ -199,8 +199,9 @@ Agents are defined by their **actions** — discrete, named operations each agen
 | Topic | Spec |
 |-------|------|
 | Automation system (process model, task config, metrics, adding agents) | [automation-system.spec.md](specs/automation-system.spec.md) |
+| Agent dispatch (agent.json schema, dispatch types, shared runners, auth) | [agent-dispatch.spec.md](specs/agent-dispatch.spec.md) |
 | Data contracts (frontmatter, naming, logging, encoding) | [data-contracts.spec.md](specs/data-contracts.spec.md) |
-| LLM integration (endpoints, call parameters) | [llm-integration.spec.md](specs/llm-integration.spec.md) |
+| LLM integration (providers, model assignments, call parameters) | [llm-integration.spec.md](specs/llm-integration.spec.md) |
 | Linking rules (required links, wikilink syntax) | [linking-rules.spec.md](specs/linking-rules.spec.md) |
 | Security constraints (quality gate, human-only fields) | [security.spec.md](specs/security.spec.md) |
 | Service installation and uninstallation (Windows, Linux, macOS) | [service-install.spec.md](specs/service-install.spec.md) |
@@ -212,7 +213,8 @@ Agents are defined by their **actions** — discrete, named operations each agen
 | # | Item | Status |
 |---|------|--------|
 | 1 | Wiki Agent cross-link generation for `04-Relationships/` — implementation scope partial | Open |
-| 2 | Classification Agent uses separate LLM port (8080) — consolidate or document reason | Open |
+| 2 | Classification/Wiki Agent use LocalRouter port 8080 — migrate per-agent to `agent.json` dispatch config | Open |
 | 3 | Face matching — no formal spec for distance threshold or match method | Open |
 | 4 | Dashboard API (`/review/<sha256>` routes) — not documented | Open |
 | 5 | `scenarios.json` schema for Lore Agent arc context — not formally specified | Open |
+| 6 | `agent.json` files not yet created for any agent — required before orchestrator can dispatch | Open |

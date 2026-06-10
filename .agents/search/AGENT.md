@@ -15,12 +15,7 @@ outputs:
 dependencies:
   - ingestion
   - classification
-allowed_clis:
-  - claude-code
-  - opencode
-preferred_models:
-  primary: none
-  fallbacks: []
+dispatch_config: agent.json
 owned_tools:
   - tools/search_agent.py
 responsibilities:

@@ -21,12 +21,7 @@ outputs:
 dependencies:
   - ingestion
   - vision
-allowed_clis:
-  - claude-code
-  - opencode
-preferred_models:
-  primary: qwen3-vl-4b-instruct @ localhost:1234
-  fallbacks: []
+dispatch_config: agent.json
 owned_tools:
   - tools/09-generate-npcs.ps1
   - tools/09-generate-npcs.py

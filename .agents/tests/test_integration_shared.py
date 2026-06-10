@@ -84,7 +84,7 @@ def logger_setup(vault):
     master_log = vault / ".agents" / "orchestrator" / "state" / "logs" / "automation.log"
     logger = Logger(
         task_id        = "ingestion-agent",
-        script_basename= "11_ingestion_agent.py",
+        script_basename= "ingestion_agent.py",
         logs_dir       = logs_dir,
         master_log     = master_log,
     )
@@ -568,7 +568,7 @@ class TestMinimalAgentRunSimulation:
         master = cfg.system_paths.logs_dir / "automation.log"
         logger = Logger(
             task_id        = "vision-agent",
-            script_basename= "06_classify_images.py",
+            script_basename= "classify_images.py",
             logs_dir       = cfg.system_paths.agent_state("vision") / "logs",
             master_log     = master,
         )

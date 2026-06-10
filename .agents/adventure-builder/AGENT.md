@@ -10,12 +10,7 @@ dependencies:
   - lore
   - canon
   - relationship
-allowed_clis:
-  - claude-code
-  - opencode
-preferred_models:
-  primary: TBD
-  fallbacks: []
+dispatch_config: agent.json
 owned_tools: []
 responsibilities: []
 restrictions:

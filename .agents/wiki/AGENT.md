@@ -18,12 +18,7 @@ outputs:
   - state/logs/03-compile-wiki_YYYY-MM-DD.log
 dependencies:
   - ingestion
-allowed_clis:
-  - claude-code
-  - opencode
-preferred_models:
-  primary: auto @ localhost:8080
-  fallbacks: []
+dispatch_config: agent.json
 owned_tools:
   - tools/03-compile-wiki.ps1
 responsibilities:

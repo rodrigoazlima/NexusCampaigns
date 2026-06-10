@@ -19,12 +19,7 @@ outputs:
 dependencies:
   - ingestion
   - wiki
-allowed_clis:
-  - claude-code
-  - opencode
-preferred_models:
-  primary: auto @ localhost:8080
-  fallbacks: []
+dispatch_config: agent.json
 owned_tools:
   - tools/04-enrich-tags.ps1
 responsibilities:

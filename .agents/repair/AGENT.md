@@ -13,14 +13,9 @@ outputs:
   - .agents/*/state/ (missing dirs created)
   - state/logs/12-repair-agent_YYYY-MM-DD.log
 dependencies: []
-allowed_clis:
-  - claude-code
-  - opencode
-preferred_models:
-  primary: none
-  fallbacks: []
+dispatch_config: agent.json
 owned_tools:
-  - tools/12_repair_agent.py
+  - tools/repair_agent.py
 responsibilities:
   - Remove runner.lock if older than 1800 seconds (stale)
   - Ensure all directories listed in shared.defaults.REQUIRED_DIRS exist

@@ -13,12 +13,7 @@ outputs:
   - .agents/canon/state/reports/canon-{YYYY-MM-DD}.json
   - state/logs/canon_YYYY-MM-DD.log
 dependencies: []
-allowed_clis:
-  - claude-code
-  - opencode
-preferred_models:
-  primary: none
-  fallbacks: []
+dispatch_config: agent.json
 owned_tools:
   - tools/canon_agent.py
 responsibilities:

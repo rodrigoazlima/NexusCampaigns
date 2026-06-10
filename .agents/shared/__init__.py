@@ -39,6 +39,7 @@ from .defaults import (
 )
 from .interfaces import (
     BaseAgent,
+    DispatchError,
     IAgent,
     ICanonValidator,
     ICleaner,
@@ -52,7 +53,9 @@ from .interfaces import (
     INPCGenerator,
     IOrchestrator,
     IQualityGate,
+    IRelationshipBuilder,
     IReportBuilder,
+    IRunner,
     ISearchIndexer,
     IStateStore,
     ITagEnricher,
@@ -60,12 +63,14 @@ from .interfaces import (
     IVaultGuard,
     IWikiCompiler,
     IWikilinkResolver,
-    IRelationshipBuilder,
     LLMOfflineError,
     LLMResponseError,
     VaultWriteError,
 )
+from .runners import get_runner
 from .models import (
+    AgentDispatchConfig,
+    AgentFolderConfig,
     AgentLogSummary,
     AgentMetrics,
     AgentMetricsEntry,
@@ -75,6 +80,8 @@ from .models import (
     CanonViolation,
     CanonViolationType,
     CleanupReport,
+    CliDispatchConfig,
+    ClaudeApiConfig,
     CuratorReport,
     CuratorSuggestion,
     DailyReport,
@@ -86,6 +93,7 @@ from .models import (
     EntityStatus,
     EntityType,
     Environment,
+    GeminiApiConfig,
     GeneratedTokenEntry,
     GeneratedTokens,
     ImageProcessStatus,
@@ -95,6 +103,8 @@ from .models import (
     NPCFrontmatter,
     NPCLLMOutput,
     NPCProcessStatus,
+    OpenAIApiConfig,
+    OpenRouterApiConfig,
     PF2E_ANCESTRIES,
     PF2E_CLASSES,
     PF2E_CREATURE_TYPES,
@@ -107,12 +117,14 @@ from .models import (
     RepairReport,
     ReviewItem,
     RunMetrics,
+    RunResult,
     ScenarioEntry,
     SearchEntry,
     SearchIndex,
     SearchIndexState,
     TagEnrichmentOutput,
     TaskConfig,
+    TaskDispatchEntry,
     TasksConfig,
     TasksState,
     TaskStateEntry,
@@ -135,11 +147,13 @@ __all__ = [
     "BaseAgent", "IAgent", "ICanonValidator", "ICleaner", "ICurator",
     "IDedupAnalyzer", "IFaceMatcher", "IFrontmatterIO", "IImageClassifier",
     "ILLMClient", "ILogger", "INPCGenerator", "IOrchestrator", "IQualityGate",
-    "IReportBuilder", "ISearchIndexer", "IStateStore", "ITagEnricher",
-    "ITokenRenderer", "IVaultGuard", "IWikiCompiler", "IWikilinkResolver",
-    "IRelationshipBuilder",
+    "IRelationshipBuilder", "IReportBuilder", "IRunner", "ISearchIndexer",
+    "IStateStore", "ITagEnricher", "ITokenRenderer", "IVaultGuard",
+    "IWikiCompiler", "IWikilinkResolver",
     # Exceptions
-    "LLMOfflineError", "LLMResponseError", "VaultWriteError",
+    "DispatchError", "LLMOfflineError", "LLMResponseError", "VaultWriteError",
+    # Runners
+    "get_runner",
     # Models — enums
     "AgentSlotStatus", "CanonViolationType", "DedupMatchReason", "Element",
     "EntityStatus", "EntityType", "Environment", "ImageProcessStatus",
@@ -157,6 +171,10 @@ __all__ = [
     "GeneratedTokenEntry", "GeneratedTokens",
     "ScenarioEntry",
     "WikilinkProcessedEntry", "WikilinkProcessedState",
+    # Models — dispatch config
+    "AgentDispatchConfig", "AgentFolderConfig", "CliDispatchConfig",
+    "ClaudeApiConfig", "GeminiApiConfig", "OpenAIApiConfig", "OpenRouterApiConfig",
+    "RunResult", "TaskDispatchEntry",
     # Models — orchestrator
     "TaskConfig", "TasksConfig", "TasksState", "TaskStateEntry",
     # Models — metrics

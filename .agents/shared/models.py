@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from enum import Enum
-from typing import Annotated, Literal, Optional
+from typing import Annotated, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -341,12 +341,89 @@ GeneratedTokens = dict[str, GeneratedTokenEntry]
 
 
 # ---------------------------------------------------------------------------
+# Agent dispatch configuration (agent.json)
+# ---------------------------------------------------------------------------
+
+class CliDispatchConfig(BaseModel):
+    command:         str
+    args:            list[str]            = Field(default_factory=list)
+    cwd:             Literal["project_root", "agent_dir"] = "project_root"
+    timeout_seconds: int                  = 300
+    env:             dict[str, str]       = Field(default_factory=dict)
+
+
+class OpenAIApiConfig(BaseModel):
+    base_url:        str
+    model:           str
+    prompt_file:     Optional[str]        = None
+    system_file:     Optional[str]        = None
+    max_tokens:      int                  = 1024
+    temperature:     float                = 0.0
+    timeout_seconds: int                  = 120
+
+
+class ClaudeApiConfig(BaseModel):
+    model:           str
+    prompt_file:     Optional[str]        = None
+    system_file:     Optional[str]        = None
+    max_tokens:      int                  = 4096
+    temperature:     float                = 0.0
+    timeout_seconds: int                  = 120
+
+
+class GeminiApiConfig(BaseModel):
+    model:           str
+    prompt_file:     Optional[str]        = None
+    system_file:     Optional[str]        = None
+    max_tokens:      int                  = 2048
+    temperature:     float                = 0.0
+    timeout_seconds: int                  = 120
+
+
+class OpenRouterApiConfig(BaseModel):
+    model:           str
+    prompt_file:     Optional[str]        = None
+    system_file:     Optional[str]        = None
+    max_tokens:      int                  = 4096
+    temperature:     float                = 0.0
+    timeout_seconds: int                  = 180
+
+
+class AgentDispatchConfig(BaseModel):
+    type:           Literal["cli", "openai-api", "claude-api", "gemini-api", "openrouter-api"]
+    cli:            Optional[CliDispatchConfig]      = None
+    openai_api:     Optional[OpenAIApiConfig]        = None
+    claude_api:     Optional[ClaudeApiConfig]        = None
+    gemini_api:     Optional[GeminiApiConfig]        = None
+    openrouter_api: Optional[OpenRouterApiConfig]    = None
+
+
+class TaskDispatchEntry(BaseModel):
+    dispatch: AgentDispatchConfig
+
+
+class AgentFolderConfig(BaseModel):
+    """Root schema for agent.json — keyed by task ID."""
+    tasks: dict[str, TaskDispatchEntry]
+
+
+# ---------------------------------------------------------------------------
+# Runner result
+# ---------------------------------------------------------------------------
+
+class RunResult(BaseModel):
+    exit_code:   int
+    output:      str            = ""
+    error:       Optional[str]  = None
+    duration_ms: int            = 0
+
+
+# ---------------------------------------------------------------------------
 # Orchestrator / task scheduler
 # ---------------------------------------------------------------------------
 
 class TaskConfig(BaseModel):
     id:              str
-    script:          str
     intervalSeconds: int
     description:     str
 

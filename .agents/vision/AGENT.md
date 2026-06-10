@@ -21,12 +21,7 @@ outputs:
   - state/logs/06-classify-images_YYYY-MM-DD.log
 dependencies:
   - ingestion
-allowed_clis:
-  - claude-code
-  - opencode
-preferred_models:
-  primary: qwen3-vl-4b-instruct @ localhost:1234
-  fallbacks: []
+dispatch_config: agent.json
 owned_tools:
   - tools/06-classify-images.ps1
   - tools/06-match-token.py

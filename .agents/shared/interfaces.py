@@ -12,6 +12,8 @@ from typing import Any, Optional, Protocol, runtime_checkable
 
 from .config import VaultConfig
 from .models import (
+    AgentDispatchConfig,
+    AgentFolderConfig,
     AgentMetrics,
     CanonReport,
     CuratorSuggestion,
@@ -24,6 +26,7 @@ from .models import (
     RelationshipGraph,
     RepairReport,
     ReviewItem,
+    RunResult,
     SearchEntry,
     SearchIndexState,
     TagEnrichmentOutput,
@@ -344,6 +347,24 @@ class IReportBuilder(ABC):
 
 
 # ---------------------------------------------------------------------------
+# IRunner — dispatch abstraction
+# ---------------------------------------------------------------------------
+
+@runtime_checkable
+class IRunner(Protocol):
+    """Structural protocol for all dispatch runners."""
+
+    def run(self, dispatch_config: dict, context: dict) -> RunResult:
+        """Execute agent via the runner's transport.
+
+        dispatch_config — the type-specific sub-config dict (e.g. cli, openai_api).
+        context — runtime values: {"project_root": str, "agent_dir": str}.
+        Returns RunResult; never raises on transport errors (captures to .error).
+        """
+        ...
+
+
+# ---------------------------------------------------------------------------
 # IOrchestrator
 # ---------------------------------------------------------------------------
 
@@ -356,13 +377,18 @@ class IOrchestrator(ABC):
         ...
 
     @abstractmethod
+    def load_agent_dispatch(self, task_id: str) -> Optional[AgentDispatchConfig]:
+        """Load dispatch config for task_id from its agent.json. Returns None if absent."""
+        ...
+
+    @abstractmethod
     def dispatch(self, task_id: str) -> int:
-        """Run the agent for task_id as a subprocess. Return exit code."""
+        """Resolve agent.json, select runner, execute. Return exit code."""
         ...
 
     @abstractmethod
     def commit_changes(self, task_id: str) -> None:
-        """git add -A && git commit after a successful agent run."""
+        """Stage commit_scope paths and git commit after a successful agent run."""
         ...
 
 
@@ -533,3 +559,7 @@ class LLMResponseError(Exception):
 
 class VaultWriteError(PermissionError):
     """Attempted write to a protected vault directory."""
+
+
+class DispatchError(Exception):
+    """Orchestrator could not dispatch an agent — unknown type, missing config, etc."""

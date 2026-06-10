@@ -15,12 +15,7 @@ outputs:
 dependencies:
   - review
   - classification
-allowed_clis:
-  - claude-code
-  - opencode
-preferred_models:
-  primary: none
-  fallbacks: []
+dispatch_config: agent.json
 owned_tools:
   - tools/curator_agent.py
 responsibilities:

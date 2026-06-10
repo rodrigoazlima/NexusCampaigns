@@ -13,20 +13,17 @@ outputs:
   - state/logs/automation.log
   - git commits after each agent run
 dependencies: []
-allowed_clis:
-  - claude-code
-  - opencode
-preferred_models:
-  primary: none
-  fallbacks: []
+dispatch_config: agent.json
 owned_tools:
   - tools/runner.ps1
   - tools/register-tasks.ps1
   - tools/deregister-tasks.ps1
 responsibilities:
-  - Check elapsed vs intervalSeconds per task; run due tasks sequentially
+  - Check elapsed vs intervalSeconds per task; dispatch due agents sequentially
+  - Resolve agent folder from task.id; load agent.json; select runner via dispatch.type
+  - Delegate execution to shared runner (cli, openai-api, claude-api, gemini-api, openrouter-api)
   - Write per-task daily log + master automation.log
-  - git add -A + commit + push after each agent run with vault changes
+  - git add scoped to commit_scope + commit after each successful agent run
   - Maintain runner.lock (30-min stale timeout)
 restrictions:
   - Must not run agents in parallel

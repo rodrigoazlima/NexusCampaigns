@@ -373,7 +373,7 @@ class TestGeneratedTokenEntry:
 
 class TestTaskConfig:
     def test_fields(self):
-        t = TaskConfig(id="ingestion-agent", script="11_agent.py", intervalSeconds=3600, description="x")
+        t = TaskConfig(id="ingestion-agent", intervalSeconds=3600, description="x")
         assert t.intervalSeconds == 3600
 
 
@@ -383,7 +383,7 @@ class TestTasksConfig:
         assert cfg.cleanupDays == 90
 
     def test_with_tasks(self):
-        t = TaskConfig(id="a", script="a.py", intervalSeconds=900, description="d")
+        t = TaskConfig(id="a", intervalSeconds=900, description="d")
         cfg = TasksConfig(tasks=[t])
         assert len(cfg.tasks) == 1
 

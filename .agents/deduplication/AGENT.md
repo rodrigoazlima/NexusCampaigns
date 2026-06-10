@@ -16,12 +16,7 @@ outputs:
   - state/logs/deduplication_YYYY-MM-DD.log
 dependencies:
   - classification
-allowed_clis:
-  - claude-code
-  - opencode
-preferred_models:
-  primary: none
-  fallbacks: []
+dispatch_config: agent.json
 owned_tools:
   - tools/deduplication_agent.py
 responsibilities:

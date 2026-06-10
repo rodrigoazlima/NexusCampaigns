@@ -15,12 +15,7 @@ outputs:
   - vault://01-Processing/**/*.md (suggestedQuality field injected if quality: 0)
   - state/logs/08-daily-report_YYYY-MM-DD.log
 dependencies: []
-allowed_clis:
-  - claude-code
-  - opencode
-preferred_models:
-  primary: none
-  fallbacks: []
+dispatch_config: agent.json
 owned_tools:
   - tools/08-daily-report.ps1
 responsibilities:

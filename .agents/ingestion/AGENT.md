@@ -15,12 +15,7 @@ outputs:
   - state/processed-docx.txt
   - state/logs/11-ingestion-agent_YYYY-MM-DD.log
 dependencies: []
-allowed_clis:
-  - claude-code
-  - opencode
-preferred_models:
-  primary: none
-  fallbacks: []
+dispatch_config: agent.json
 owned_tools:
   - tools/11-ingestion-agent.ps1
 responsibilities:

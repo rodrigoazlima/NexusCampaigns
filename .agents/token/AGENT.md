@@ -16,12 +16,7 @@ outputs:
   - state/logs/10-generate-tokens_YYYY-MM-DD.log
 dependencies:
   - vision
-allowed_clis:
-  - claude-code
-  - opencode
-preferred_models:
-  primary: none
-  fallbacks: []
+dispatch_config: agent.json
 owned_tools:
   - tools/10-generate-tokens.ps1
   - tools/10-generate-tokens.py

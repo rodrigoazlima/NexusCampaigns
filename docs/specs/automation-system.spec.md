@@ -7,22 +7,26 @@
 ```
 NSSM Windows Service
   └─ daemon.ps1                  # persistent loop (PS 7+)
-       └─ runner.ps1             # dispatched every 60s (PS 5.1+)
+       └─ runner.py              # dispatched every 60s
             └─ foreach task in tasks.json
                  if (now - lastRun) >= intervalSeconds:
-                     execute script
+                     load .agents/{name}/agent.json
+                     get_runner(dispatch.type)
+                     runner.run(dispatch_config)
                      update tasks-state.json
                      update agent-metrics.json
-                     git commit + push if changes exist
+                     git commit (scoped to commit_scope) if changes exist
 ```
 
-**Lock file:** `.system/runner.lock` — prevents concurrent runner instances. Auto-cleared after 30 minutes (stale lock recovery handled by Repair Agent).
+**Lock file:** `.agents/orchestrator/state/runner.lock` — prevents concurrent runner instances.
+Auto-cleared after 30 minutes (stale lock recovery handled by Repair Agent).
 
 ---
 
 ## Task Configuration
 
-**`tasks.json`** — static task registry:
+**`tasks.json`** — static task registry (`tasks.json` does not hold script paths;
+dispatch config lives in each agent's `agent.json`):
 
 ```json
 {
@@ -30,7 +34,6 @@ NSSM Windows Service
   "tasks": [
     {
       "id": "string",
-      "script": "NN-name.ps1 | NN-name.py",
       "intervalSeconds": 900,
       "description": "string"
     }
@@ -47,6 +50,26 @@ NSSM Windows Service
   }
 }
 ```
+
+Both files live at `.agents/orchestrator/state/`.
+
+---
+
+## Agent Resolution
+
+The orchestrator derives the agent folder from `task.id`:
+
+```
+repair-agent              → .agents/repair/agent.json
+review-agent              → .agents/review/agent.json
+review-agent-short-files  → .agents/review/agent.json
+ingestion-agent           → .agents/ingestion/agent.json
+```
+
+Rule: strip the trailing `-agent[-*]` suffix; the remainder is the agent folder name.
+
+If `agent.json` is missing the task is skipped and `lastRun` is not updated.
+See [agent-dispatch.spec.md](agent-dispatch.spec.md) for the full `agent.json` schema.
 
 ---
 
@@ -87,16 +110,22 @@ Keywords: `classified|enriched|repairs|processed|converted|generated|linked` and
 
 ## Adding a New Agent
 
-1. Create `.system/NN-{name}.ps1` or `.py` following existing conventions.
-2. Script must:
+1. Create agent folder `.agents/{name}/`.
+2. Create `AGENT.md` in the folder following the existing schema (purpose, inputs, outputs,
+   responsibilities, restrictions, commit_scope).
+3. Create `agent.json` in the folder declaring the dispatch type and config.
+   See [agent-dispatch.spec.md](agent-dispatch.spec.md) for full schema.
+4. If dispatch type is `cli`: create the implementation script(s) under `tools/`.
+   If dispatch type is an API type: create prompt files under `prompts/`.
+5. The implementation must:
    - Emit `--- START ---` and `--- DONE (key: N, elapsed: Ns) ---` log lines
    - Use shared log file + per-task log file
    - Never write to `02-Library/` without `reviewed: true`
-3. Add entry to `tasks.json`:
+6. Add entry to `tasks.json`:
    ```json
-   { "id": "agent-id", "script": "NN-name.ps1", "intervalSeconds": 3600, "description": "..." }
+   { "id": "agent-id", "intervalSeconds": 3600, "description": "..." }
    ```
-4. Add entry to `tasks-state.json`:
+7. Add entry to `tasks-state.json`:
    ```json
    { "agent-id": { "lastRun": "1970-01-01T00:00:00.0000000-00:00" } }
    ```

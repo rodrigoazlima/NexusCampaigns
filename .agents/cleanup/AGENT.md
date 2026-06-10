@@ -17,12 +17,7 @@ outputs:
   - state/reports/cleanup-{YYYY-MM-DD}.json
   - state/logs/cleanup_YYYY-MM-DD.log
 dependencies: []
-allowed_clis:
-  - claude-code
-  - opencode
-preferred_models:
-  primary: none
-  fallbacks: []
+dispatch_config: agent.json
 owned_tools:
   - tools/cleanup_agent.py
 responsibilities:

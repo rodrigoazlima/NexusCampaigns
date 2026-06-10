@@ -17,12 +17,7 @@ outputs:
 dependencies:
   - ingestion
   - classification
-allowed_clis:
-  - claude-code
-  - opencode
-preferred_models:
-  primary: none
-  fallbacks: []
+dispatch_config: agent.json
 owned_tools:
   - tools/relationship_agent.py
 responsibilities:
