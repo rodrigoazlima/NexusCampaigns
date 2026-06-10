@@ -203,6 +203,7 @@ Agents are defined by their **actions** — discrete, named operations each agen
 | LLM integration (endpoints, call parameters) | [llm-integration.spec.md](specs/llm-integration.spec.md) |
 | Linking rules (required links, wikilink syntax) | [linking-rules.spec.md](specs/linking-rules.spec.md) |
 | Security constraints (quality gate, human-only fields) | [security.spec.md](specs/security.spec.md) |
+| Service installation and uninstallation (Windows, Linux, macOS) | [service-install.spec.md](specs/service-install.spec.md) |
 
 ---
 
