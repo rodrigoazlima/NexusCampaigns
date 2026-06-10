@@ -1,8 +1,9 @@
-# Agent Spec — Repair (`12-repair-agent.ps1`)
+# Agent Spec — Repair
 
 **Trigger:** every 15 minutes  
-**Input:** `.system/logs/automation.log` (last 24h), `agent.json`, `tasks-state.json`, `runner.lock`, `agent-metrics.json`  
-**Output:** `.system/reports/repair-YYYY-MM-DD.json`
+**Input:** `.agents/runtime/state/logs/automation.log` (last 24h), `.agents/*/agent.json`, `.agents/runtime/state/tasks-state.json`, `.agents/runtime/state/runner.lock`, `.agents/runtime/state/agent-metrics.json`  
+**Output:** `.agents/review/state/reports/repair-YYYY-MM-DD.json`  
+**Dispatch:** `claude-api` · `claude-haiku-4-5-20251001` · `tools_module: repair.tools.repair_agent`
 
 ---
 

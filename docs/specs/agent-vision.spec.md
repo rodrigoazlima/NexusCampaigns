@@ -1,9 +1,10 @@
-# Agent Spec — Vision (`06-classify-images.ps1`)
+# Agent Spec — Vision
 
 **Trigger:** hourly  
-**Input:** `00-Inbox/images/**/*.{png,jpg,jpeg,webp}` not yet in `processed-images.json` (path index)  
-**Output:** renamed image files, `01-Processing/*.md` drafts, `01-Processing/Images Index.md`, `processed-images.json`  
-**Dependency:** LM Studio at `http://localhost:1234` with model `qwen3-vl-4b-instruct`
+**Input:** `00-Inbox/images/**/*.{png,jpg,jpeg,webp}` not yet in `.agents/vision/state/processed-images.json`  
+**Output:** renamed image files, `01-Processing/*.md` drafts, `01-Processing/Images Index.md`, `.agents/vision/state/processed-images.json`  
+**Dependency:** LM Studio at `http://localhost:1234` with model `qwen3-vl-4b-instruct`  
+**Dispatch:** `claude-api` · `claude-sonnet-4-6` · `tools_module: vision.tools.classify_images`
 
 ---
 

@@ -67,17 +67,16 @@ source shell init files):
 
 | Variable | Example | Purpose |
 |----------|---------|---------|
-| `VAULT_ROOT` | `/opt/campaigns/knowledge-base` | Absolute path to `knowledge-base/` |
-| `LLM_TEXT_URL` | `http://localhost:11434` | Text LLM base URL |
-| `LLM_VISION_URL` | `http://localhost:11435` | Vision LLM base URL |
-| `LLM_TEXT_MODEL` | `mistral:7b` | Text model identifier |
-| `LLM_VISION_MODEL` | `llava:13b` | Vision model identifier |
 | `GIT_AUTHOR_NAME` | `Vault Bot` | Git identity for auto-commits |
 | `GIT_AUTHOR_EMAIL` | `bot@localhost` | Git identity for auto-commits |
+| `ANTHROPIC_API_KEY` | `sk-ant-...` | Required if any agent uses `claude-api` dispatch |
+| `OPENAI_API_KEY` | `lm-studio` | Required for `openai-api` dispatch (set to any non-empty string for local endpoints) |
+| `GEMINI_API_KEY` | `...` | Required if any agent uses `gemini-api` dispatch |
+| `OPENROUTER_API_KEY` | `...` | Required if any agent uses `openrouter-api` dispatch |
 
-Variables are consumed by `shared.loaders.load_vault_config()` at agent
-startup. Missing required variables cause the agent to exit with code 1
-before processing any files.
+**LLM endpoints and model identifiers** are configured in `registry.yaml` under `llm_endpoints` — not environment variables. Only API authentication keys come from env vars.
+
+`vault_root` is configured in `registry.yaml`. It does not need to be set as an env var unless you want to override the registry value.
 
 ---
 
@@ -109,13 +108,9 @@ nssm set vault-knowledge-factory AppStderr ^
 
 REM Set environment variables
 nssm set vault-knowledge-factory AppEnvironmentExtra ^
-    "VAULT_ROOT=<vault_root>" ^
-    "LLM_TEXT_URL=http://localhost:11434" ^
-    "LLM_VISION_URL=http://localhost:11435" ^
-    "LLM_TEXT_MODEL=mistral:7b" ^
-    "LLM_VISION_MODEL=llava:13b" ^
     "GIT_AUTHOR_NAME=Vault Bot" ^
-    "GIT_AUTHOR_EMAIL=bot@localhost"
+    "GIT_AUTHOR_EMAIL=bot@localhost" ^
+    "ANTHROPIC_API_KEY=<your-key>"
 
 nssm start vault-knowledge-factory
 ```
@@ -163,13 +158,9 @@ ExecStart=/usr/bin/python3 <project_root>/.agents/runtime/tools/runner.py
 Restart=always
 RestartSec=30
 
-Environment=VAULT_ROOT=<vault_root>
-Environment=LLM_TEXT_URL=http://localhost:11434
-Environment=LLM_VISION_URL=http://localhost:11435
-Environment=LLM_TEXT_MODEL=mistral:7b
-Environment=LLM_VISION_MODEL=llava:13b
 Environment=GIT_AUTHOR_NAME=Vault Bot
 Environment=GIT_AUTHOR_EMAIL=bot@localhost
+Environment=ANTHROPIC_API_KEY=<your-key>
 
 StandardOutput=append:<project_root>/.agents/runtime/state/logs/service-stdout.log
 StandardError=append:<project_root>/.agents/runtime/state/logs/service-stderr.log
@@ -214,13 +205,9 @@ Create `~/Library/LaunchAgents/com.vaultknowledgefactory.plist`
 
     <key>EnvironmentVariables</key>
     <dict>
-        <key>VAULT_ROOT</key>       <string><vault_root></string>
-        <key>LLM_TEXT_URL</key>     <string>http://localhost:11434</string>
-        <key>LLM_VISION_URL</key>   <string>http://localhost:11435</string>
-        <key>LLM_TEXT_MODEL</key>   <string>mistral:7b</string>
-        <key>LLM_VISION_MODEL</key> <string>llava:13b</string>
         <key>GIT_AUTHOR_NAME</key>  <string>Vault Bot</string>
         <key>GIT_AUTHOR_EMAIL</key> <string>bot@localhost</string>
+        <key>ANTHROPIC_API_KEY</key> <string><your-key></string>
     </dict>
 
     <key>RunAtLoad</key>

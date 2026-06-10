@@ -133,7 +133,32 @@ Auth: `OPENAI_API_KEY` env var. For local endpoints set to any non-empty string 
 
 ### `claude-api`
 
-Anthropic Claude API.
+Anthropic Claude API. Supports two patterns:
+
+**Tool-use pattern** (primary — all active agents): Claude operates as an AI agent that calls tools defined in `tools_module`. The runtime runs a loop until the agent signals completion or `max_tool_rounds` is reached.
+
+**Prompt pattern** (simple): Claude receives a prompt and returns a single text response. Used for one-shot generation tasks.
+
+#### Tool-use pattern (active agents)
+
+```json
+{
+  "dispatch": {
+    "type": "claude-api",
+    "claude_api": {
+      "model": "claude-haiku-4-5-20251001",
+      "system_file": "prompts/system.md",
+      "tools_module": "ingestion.tools.ingestion_agent",
+      "history_file": "ingestion-agent-history.json",
+      "max_tokens": 2048,
+      "timeout_seconds": 600,
+      "max_tool_rounds": 15
+    }
+  }
+}
+```
+
+#### Prompt pattern (simple generation)
 
 ```json
 {
@@ -141,10 +166,9 @@ Anthropic Claude API.
     "type": "claude-api",
     "claude_api": {
       "model": "claude-sonnet-4-6",
-      "prompt_file": ".agents/lore/prompts/npc.md",
-      "system_file": ".agents/lore/prompts/system.md",
-      "max_tokens": 8192,
-      "temperature": 0,
+      "system_file": "prompts/system.md",
+      "prompt_file": "prompts/main.md",
+      "max_tokens": 4096,
       "timeout_seconds": 120
     }
   }
@@ -153,9 +177,12 @@ Anthropic Claude API.
 
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `model` | string | yes | — | Model ID (e.g. `claude-sonnet-4-6`, `claude-opus-4-8`) |
-| `prompt_file` | string | no | — | Path to user prompt `.md` |
-| `system_file` | string | no | — | Path to system prompt `.md` |
+| `model` | string | yes | — | Model ID (e.g. `claude-haiku-4-5-20251001`, `claude-sonnet-4-6`) |
+| `system_file` | string | no | — | System prompt `.md` path, relative to agent dir (e.g. `prompts/system.md`) |
+| `tools_module` | string | no | — | Python module path providing agent tools (e.g. `ingestion.tools.ingestion_agent`). Enables tool-use loop. |
+| `history_file` | string | no | — | JSON file for conversation history, relative to agent state dir. Only used with `tools_module`. |
+| `max_tool_rounds` | int | no | 10 | Max agent loop iterations before forced stop. Only used with `tools_module`. |
+| `prompt_file` | string | no | — | User prompt `.md` path, relative to agent dir. Used in prompt pattern only (no `tools_module`). |
 | `max_tokens` | int | no | 4096 | Max completion tokens |
 | `temperature` | float | no | 0 | Sampling temperature |
 | `timeout_seconds` | int | no | 120 | HTTP request timeout |
@@ -291,7 +318,7 @@ Local endpoints require `OPENAI_API_KEY` set to any non-empty value (e.g. `"lm-s
 
 ## Prompt Files
 
-`prompt_file` and `system_file` paths in API dispatch configs are relative to the project root.
+`prompt_file` and `system_file` paths in API dispatch configs are relative to the **agent directory** (e.g. `prompts/system.md` resolves to `.agents/{name}/prompts/system.md`).
 
 - Files are plain Markdown (`.md`). Read fresh at dispatch time — not cached.
 - `prompt_file` absent → runner sends empty user message.
@@ -299,8 +326,8 @@ Local endpoints require `OPENAI_API_KEY` set to any non-empty value (e.g. `"lm-s
 
 Standard locations:
 ```
-.agents/{name}/prompts/system.md   # system prompt
-.agents/{name}/prompts/main.md     # user prompt
+prompts/system.md   # system prompt (relative to agent dir)
+prompts/main.md     # user prompt (relative to agent dir)
 ```
 
 ---

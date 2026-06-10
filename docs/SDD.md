@@ -47,10 +47,10 @@ Audience: contributors, automation developers, Claude Code agents.
          ↓
 ┌─────────────────────────────────────────────────────────────────────┐
 │                      Health & Observability                         │
-│  [Review Agent]  → .system/reports/report-YYYY-MM-DD.json          │
-│  [Repair Agent]  → .system/reports/repair-YYYY-MM-DD.json          │
+│  [Review Agent]  → .agents/review/state/reports/report-YYYY-MM-DD.json │
+│  [Repair Agent]  → .agents/review/state/reports/repair-YYYY-MM-DD.json │
 │  [Cleanup Agent] → purge logs/reports older than cleanupDays        │
-│  agent-metrics.json → per-agent run history (last 100 runs)         │
+│  .agents/runtime/state/agent-metrics.json → per-agent run history   │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -200,10 +200,13 @@ Agents are defined by their **actions** — discrete, named operations each agen
 |-------|------|
 | Automation system (process model, task config, metrics, adding agents) | [automation-system.spec.md](specs/automation-system.spec.md) |
 | Agent dispatch (agent.json schema, dispatch types, shared runners, auth) | [agent-dispatch.spec.md](specs/agent-dispatch.spec.md) |
+| Agent registry (registry.yaml schema, active/planned agents, LLM endpoints) | [agent-registry.spec.md](specs/agent-registry.spec.md) |
 | Data contracts (frontmatter, naming, logging, encoding) | [data-contracts.spec.md](specs/data-contracts.spec.md) |
+| State files (all JSON/text state file schemas and locations) | [state-files.spec.md](specs/state-files.spec.md) |
+| Shared Python library (.agents/shared/ modules and interfaces) | [shared-library.spec.md](specs/shared-library.spec.md) |
 | LLM integration (providers, model assignments, call parameters) | [llm-integration.spec.md](specs/llm-integration.spec.md) |
 | Linking rules (required links, wikilink syntax) | [linking-rules.spec.md](specs/linking-rules.spec.md) |
-| Security constraints (quality gate, human-only fields) | [security.spec.md](specs/security.spec.md) |
+| Security constraints (quality gate, human-only fields, API keys) | [security.spec.md](specs/security.spec.md) |
 | Service installation and uninstallation (Windows, Linux, macOS) | [service-install.spec.md](specs/service-install.spec.md) |
 
 ---
@@ -213,8 +216,8 @@ Agents are defined by their **actions** — discrete, named operations each agen
 | # | Item | Status |
 |---|------|--------|
 | 1 | Wiki Agent cross-link generation for `04-Relationships/` — implementation scope partial | Open |
-| 2 | Classification/Wiki Agent use LocalRouter port 8080 — migrate per-agent to `agent.json` dispatch config | Open |
+| 2 | Classification/Wiki Agent use LocalRouter port 8080 — these are configured in `registry.yaml` `llm_endpoints`; `agent.json` dispatch still references legacy path | Partially Resolved |
 | 3 | Face matching — no formal spec for distance threshold or match method | Open |
 | 4 | Dashboard API (`/review/<sha256>` routes) — not documented | Open |
-| 5 | `scenarios.json` schema for Lore Agent arc context — not formally specified | Open |
-| 6 | Face matching — distance threshold and match method unspecified | Open |
+| 5 | `scenarios.json` schema — now documented in [state-files.spec.md](specs/state-files.spec.md); default scenario in `.agents/lore/state/scenarios.json` | Resolved |
+| 7 | Planned agents (canon, relationship, deduplication, curator, search, adventure-builder, session-builder, encounter-builder) — all `status: planned` in registry.yaml | Tracking |

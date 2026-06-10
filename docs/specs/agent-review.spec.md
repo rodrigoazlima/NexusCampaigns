@@ -1,8 +1,9 @@
-# Agent Spec — Review (`08-daily-report.ps1`)
+# Agent Spec — Review
 
 **Trigger:** every 15 minutes  
-**Input:** `01-Processing/*.md`, `02-Library/*.md`, `inbox-queue.json`, `.system/logs/automation.log` (last 24h)  
-**Output:** `.system/reports/report-YYYY-MM-DD.json`
+**Input:** `01-Processing/*.md`, `02-Library/*.md`, `.shared/state/inbox-queue.json`, `.agents/runtime/state/logs/automation.log` (last 24h)  
+**Output:** `.agents/review/state/reports/report-YYYY-MM-DD.json`  
+**Dispatch:** `claude-api` · `claude-haiku-4-5-20251001` · `tools_module: review.tools.daily_report`
 
 ---
 
@@ -16,9 +17,10 @@
 
 ---
 
-## Sub-agent: Short-File Flagging (`15-flag-short-files.py`)
+## Task Variant: Short-File Flagging (`review-agent-short-files`)
 
 **Trigger:** hourly  
+**Dispatch:** `claude-api` · `claude-haiku-4-5-20251001` · `tools_module: review.tools.flag_short_files`  
 Scans `01-Processing/*.md` for files with <10 body lines.  
 Sets `needs_reprocessing: true` in frontmatter.
 

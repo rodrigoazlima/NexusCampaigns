@@ -1,8 +1,9 @@
-# Agent Spec — Token (`10-generate-tokens.ps1` → `10-generate-tokens.py`)
+# Agent Spec — Token
 
 **Trigger:** hourly  
-**Input:** classified character images (`portrait`, `body`) in `processed-images.json` not yet in `generated-tokens.json`  
-**Output:** `*-token.png` alongside source image in `00-Inbox/images/`
+**Input:** classified character images (`portrait`, `body`) in `.agents/vision/state/processed-images.json` not yet in `.agents/token/state/generated-tokens.json`  
+**Output:** `*-token.png` alongside source image in `00-Inbox/images/`  
+**Dispatch:** `claude-api` · `claude-haiku-4-5-20251001` · `tools_module: token.tools.generate_tokens`
 
 ---
 

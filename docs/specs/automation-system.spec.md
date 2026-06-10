@@ -51,7 +51,7 @@ dispatch config lives in each agent's `agent.json`):
 }
 ```
 
-Both files live at `.agents/runtime/state/`.
+Both files live at `.agents/runtime/state/`. See [state-files.spec.md](state-files.spec.md) for full schemas.
 
 ---
 
@@ -110,22 +110,19 @@ Keywords: `classified|enriched|repairs|processed|converted|generated|linked` and
 
 ## Adding a New Agent
 
-1. Create agent folder `.agents/{name}/`.
-2. Create `AGENT.md` in the folder following the existing schema (purpose, inputs, outputs,
-   responsibilities, restrictions, commit_scope).
-3. Create `agent.json` in the folder declaring the dispatch type and config.
-   See [agent-dispatch.spec.md](agent-dispatch.spec.md) for full schema.
-4. If dispatch type is `cli`: create the implementation script(s) under `tools/`.
-   If dispatch type is an API type: create prompt files under `prompts/`.
-5. The implementation must:
-   - Emit `--- START ---` and `--- DONE (key: N, elapsed: Ns) ---` log lines
-   - Use shared log file + per-task log file
-   - Never write to `02-Library/` without `reviewed: true`
-6. Add entry to `agent.json`:
-   ```json
-   { "id": "agent-id", "intervalSeconds": 3600, "description": "..." }
-   ```
-7. Add entry to `tasks-state.json`:
+1. Create `.agents/{name}/` with subdirs: `prompts/`, `tools/`, `generated-tools/`, `state/`, `state/logs/`
+2. Create `AGENT.md` following the schema in `.agents/README.md` (purpose, inputs, outputs, responsibilities, restrictions, commit_scope).
+3. Add entry to `registry.yaml` under `agents:` with `status: active`.
+   See [agent-registry.spec.md](agent-registry.spec.md) for the full schema.
+4. Create `agent.json` under `.agents/{name}/` declaring the dispatch config.
+   See [agent-dispatch.spec.md](agent-dispatch.spec.md) for the full schema.
+5. Place tool scripts under `tools/`. For `claude-api` tool-use dispatch, define a `tools_module` pointing to the Python module.
+6. The implementation must:
+   - Emit `--- START ---` and `--- DONE (key: N, elapsed: Ns) ---` log lines via `shared.logger`
+   - Use `shared.vault_guard.assert_writable()` before any vault write
+   - Never write to `02-Library/` or set `reviewed: true`
+7. Add entry to `.agents/runtime/state/tasks-state.json`:
    ```json
    { "agent-id": { "lastRun": "1970-01-01T00:00:00.0000000-00:00" } }
    ```
+8. Add `agent-id` to `execution_order` in `registry.yaml` at the appropriate position.
