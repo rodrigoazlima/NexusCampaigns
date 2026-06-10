@@ -1,18 +1,19 @@
-"""classification.tools.04_enrich_tags
+"""classification.tools.enrich_tags
 
-Enriches .md files in 00-Inbox/ and 01-Processing/ with DM-domain tags
-and entity type inference via LocalRouter LLM.
-Only processes files with <= 5 existing tags or missing type field.
-No LLM → skip gracefully.
+Actions: EnrichTags · InferType · FlagDuplicates
+Reads:   00-Inbox/**/*.md, 01-Processing/**/*.md
+Writes:  enriched frontmatter in-place (never 02-Library/)
+LLM:     LocalRouter http://localhost:8080 (openai-compat, model=auto)
 """
 
 from __future__ import annotations
 
+import json as _json
 import sys
 import time
-from datetime import datetime
+from difflib import SequenceMatcher
 from pathlib import Path
-from typing import Any
+from typing import Optional
 
 _TOOLS_DIR    = Path(__file__).resolve().parent
 _AGENTS_DIR   = _TOOLS_DIR.parents[1]
@@ -26,12 +27,15 @@ from shared import (  # noqa: E402
     LLMClient,
     LLMOfflineError,
     LLMResponseError,
+    Logger,
     TagEnrichmentOutput,
+    VaultWriteError,
 )
 from shared.config import LLMEndpointConfig  # noqa: E402
 
 TASK_ID         = "classification-agent"
 SCRIPT_BASENAME = "enrich_tags.py"
+BATCH_SIZE      = 20
 
 _VAULT_ROOT  = _PROJECT_ROOT / "knowledge-base"
 _INBOX       = _VAULT_ROOT / "00-Inbox"
@@ -43,13 +47,13 @@ _MASTER_LOG  = _AGENTS_DIR / "runtime" / "state" / "logs" / "automation.log"
 _BAD_DOCS    = _AGENT_STATE / "bad-docs.txt"
 _PROMPT_FILE = _AGENTS_DIR / "classification" / "prompts" / "enrich-tags.txt"
 
-_ALLOWED_TAGS = frozenset({
+_ALLOWED_TAGS: frozenset[str] = frozenset({
     "npc", "creature", "monster", "location", "dungeon", "city", "village",
     "faction", "quest", "encounter", "item", "artifact", "lore", "religion",
     "event", "organization", "timeline", "undead", "dark", "fire", "light",
     "none", "portrait", "battlemap", "scene", "token", "images", "pathfinder2e",
 })
-_ALLOWED_TYPES = frozenset({
+_ALLOWED_TYPES: frozenset[str] = frozenset({
     "npc", "character", "faction", "location", "city", "village", "dungeon",
     "item", "artifact", "quest", "encounter", "creature", "monster", "event",
     "religion", "organization", "timeline", "lore",
@@ -62,40 +66,37 @@ _LLM_CFG = LLMEndpointConfig(
     provider = "lmstudio",
 )
 
+# Minimum difflib ratio to flag a slug as similar-to a library slug
+_SIMILARITY_THRESHOLD = 0.85
 
-class _Logger:
-    def __init__(self) -> None:
-        _LOGS_DIR.mkdir(parents=True, exist_ok=True)
-        today = datetime.now().strftime("%Y-%m-%d")
-        self._daily  = _LOGS_DIR / f"enrich-tags_{today}.log"
-        self._master = _MASTER_LOG
+_TYPE_PROMPT = (
+    "Return ONLY valid JSON with the entity type for this RPG note.\n"
+    "Allowed types: npc, character, faction, location, city, village, dungeon, "
+    "item, artifact, quest, encounter, creature, monster, event, religion, "
+    "organization, timeline, lore\n"
+    "Format: {{\"type\": \"<value_or_null>\"}}\n\n"
+    "Title: {title}\nContent: {content}"
+)
 
-    def _write(self, level: str, msg: str) -> None:
-        ts   = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        line = f"[{ts}] [{TASK_ID}] {level}: {msg}"
-        print(line, flush=True)
-        self._master.parent.mkdir(parents=True, exist_ok=True)
-        for p in (self._master, self._daily):
-            with open(p, "a", encoding="utf-8") as fh:
-                fh.write(line + "\n")
 
-    def info(self, m: str)    -> None: self._write("INFO",  m)
-    def warning(self, m: str) -> None: self._write("WARN",  m)
-    def error(self, m: str)   -> None: self._write("ERROR", m)
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
-    def start(self) -> float:
-        self._write("INFO", "--- START ---")
-        return time.monotonic()
-
-    def done(self, t0: float, count: int = 0, failed: int = 0) -> None:
-        elapsed = round(time.monotonic() - t0, 2)
-        self._write("INFO", f"--- DONE --- processed={count} failed={failed} elapsed={elapsed}s")
+def _make_logger() -> Logger:
+    _LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    _MASTER_LOG.parent.mkdir(parents=True, exist_ok=True)
+    return Logger(TASK_ID, SCRIPT_BASENAME, _LOGS_DIR, _MASTER_LOG)
 
 
 def _load_bad_docs() -> set[str]:
     if not _BAD_DOCS.exists():
         return set()
-    return {ln.strip() for ln in _BAD_DOCS.read_text(encoding="utf-8").splitlines() if ln.strip()}
+    return {
+        ln.strip()
+        for ln in _BAD_DOCS.read_text(encoding="utf-8").splitlines()
+        if ln.strip()
+    }
 
 
 def _append_bad(rel: str) -> None:
@@ -122,7 +123,23 @@ def _candidate_files(bad_docs: set[str]) -> list[Path]:
     return paths
 
 
-def _write_with_retry(path: Path, fm: dict, body: str, fio: FrontmatterIO, retries: int = 5) -> bool:
+def _assert_not_library(path: Path) -> None:
+    """Raise VaultWriteError if path is inside 02-Library/."""
+    try:
+        path.resolve().relative_to(_LIBRARY.resolve())
+        raise VaultWriteError(f"Agents may not modify 02-Library/: {path}")
+    except ValueError:
+        pass  # not under library — safe to write
+
+
+def _write_with_retry(
+    path: Path,
+    fm: dict,
+    body: str,
+    fio: FrontmatterIO,
+    retries: int = 5,
+) -> bool:
+    _assert_not_library(path)
     for attempt in range(retries):
         try:
             fio.write(path, fm, body)
@@ -133,26 +150,37 @@ def _write_with_retry(path: Path, fm: dict, body: str, fio: FrontmatterIO, retri
     return False
 
 
+def _load_prompt_template() -> str:
+    if _PROMPT_FILE.exists():
+        return _PROMPT_FILE.read_text(encoding="utf-8")
+    return 'Tag this note. Return JSON: {"tags": [], "type": null}'
+
+
+def _slug_similarity(a: str, b: str) -> float:
+    return SequenceMatcher(None, a, b).ratio()
+
+
+# ---------------------------------------------------------------------------
+# EnrichTags action — main entry point
+# ---------------------------------------------------------------------------
+
 def main() -> None:
-    log = _Logger()
+    """EnrichTags + InferType in one LLM call per sparse file."""
+    log = _make_logger()
     t0  = log.start()
     _AGENT_STATE.mkdir(parents=True, exist_ok=True)
 
     client = LLMClient(_LLM_CFG)
     if not client.is_available():
         log.warning("LocalRouter (localhost:8080) offline — skipping batch")
-        log.done(t0)
+        log.done(t0, key="classified", count=0, failed=0)
         sys.exit(0)
 
-    bad_docs    = _load_bad_docs()
-    lib_slugs   = _library_slugs()
-    fio         = FrontmatterIO()
-    prompt_tpl  = (
-        _PROMPT_FILE.read_text(encoding="utf-8") if _PROMPT_FILE.exists()
-        else "Tag this note. Return JSON: {\"tags\": [], \"type\": null}"
-    )
-    count  = 0
-    failed = 0
+    bad_docs   = _load_bad_docs()
+    fio        = FrontmatterIO()
+    prompt_tpl = _load_prompt_template()
+    count      = 0
+    failed     = 0
 
     for md_path in _candidate_files(bad_docs):
         rel = md_path.relative_to(_PROJECT_ROOT).as_posix()
@@ -175,8 +203,7 @@ def main() -> None:
 
         title   = fm.get("id") or md_path.stem
         excerpt = body[:500]
-
-        prompt = (
+        prompt  = (
             prompt_tpl
             .replace("{title}", title)
             .replace("{current_tags}", ", ".join(existing_tags) if existing_tags else "none")
@@ -184,10 +211,8 @@ def main() -> None:
         )
 
         try:
-            import json as _json
-            raw = client.chat([{"role": "user", "content": prompt}], max_tokens=80)
-            result = _json.loads(raw)
-            enrichment = TagEnrichmentOutput.model_validate(result)
+            raw        = client.chat([{"role": "user", "content": prompt}], max_tokens=80)
+            enrichment = TagEnrichmentOutput.model_validate(_json.loads(raw))
         except LLMOfflineError:
             log.warning("LLM offline — aborting batch")
             break
@@ -201,17 +226,16 @@ def main() -> None:
         changed = False
 
         if needs_tags and enrichment.tags:
-            valid_new = [t for t in enrichment.tags if t in _ALLOWED_TAGS and t not in existing_tags]
+            valid_new = [
+                t for t in enrichment.tags
+                if t in _ALLOWED_TAGS and t not in existing_tags
+            ]
             if valid_new:
                 fm["tags"] = list(existing_tags) + valid_new
                 changed = True
 
         if needs_type and enrichment.type and enrichment.type in _ALLOWED_TYPES:
             fm["type"] = enrichment.type
-            changed = True
-
-        if fm.get("id") and fm["id"].lower() in lib_slugs:
-            fm["duplicate_of"] = fm["id"]
             changed = True
 
         if changed:
@@ -227,12 +251,118 @@ def main() -> None:
 
         time.sleep(0.3)
 
-    log.done(t0, count=count, failed=failed)
+    log.done(t0, key="classified", count=count, failed=failed)
     sys.exit(0 if failed == 0 else 1)
 
 
-if __name__ == "__main__":
-    main()
+# ---------------------------------------------------------------------------
+# InferType action — type-only pass (targeted)
+# ---------------------------------------------------------------------------
+
+def _run_infer_type() -> tuple[int, int]:
+    """InferType: process only files with missing type field (max_tokens=10)."""
+    log    = _make_logger()
+    client = LLMClient(_LLM_CFG)
+    if not client.is_available():
+        log.warning("LocalRouter offline — InferType skipped")
+        return 0, 0
+
+    bad_docs = _load_bad_docs()
+    fio      = FrontmatterIO()
+    count    = 0
+    failed   = 0
+
+    for md_path in _candidate_files(bad_docs):
+        try:
+            fm, body = fio.read(md_path)
+        except Exception:
+            continue
+
+        if fm.get("type"):
+            continue
+
+        title   = fm.get("id") or md_path.stem
+        excerpt = body[:300]
+        prompt  = _TYPE_PROMPT.replace("{title}", title).replace("{content}", excerpt)
+
+        try:
+            raw           = client.chat([{"role": "user", "content": prompt}], max_tokens=10)
+            inferred_type = _json.loads(raw).get("type")
+        except LLMOfflineError:
+            log.warning("LLM offline — aborting InferType")
+            break
+        except Exception as exc:
+            log.error(f"InferType LLM error for {md_path.name}: {exc}")
+            failed += 1
+            time.sleep(0.3)
+            continue
+
+        if inferred_type and inferred_type in _ALLOWED_TYPES:
+            fm["type"] = inferred_type
+            ok = _write_with_retry(md_path, fm, body, fio)
+            if ok:
+                log.info(f"InferType: {md_path.name} type={inferred_type}")
+                count += 1
+            else:
+                log.error(f"Write failed (InferType): {md_path.name}")
+                failed += 1
+
+        time.sleep(0.3)
+
+    return count, failed
+
+
+# ---------------------------------------------------------------------------
+# FlagDuplicates action — exact + similarity-based slug comparison
+# ---------------------------------------------------------------------------
+
+def _run_flag_duplicates() -> int:
+    """FlagDuplicates: exact slug match then difflib similarity against 02-Library/."""
+    lib_slugs = _library_slugs()
+    if not lib_slugs:
+        return 0
+
+    fio     = FrontmatterIO()
+    flagged = 0
+
+    for scope in (_INBOX, _PROCESSING):
+        if not scope.is_dir():
+            continue
+        for md_path in sorted(scope.glob("**/*.md")):
+            try:
+                fm, body = fio.read(md_path)
+            except Exception:
+                continue
+
+            doc_slug = (fm.get("id") or md_path.stem).lower()
+            if not doc_slug:
+                continue
+
+            # Exact match takes priority
+            if doc_slug in lib_slugs:
+                if fm.get("duplicate_of") != doc_slug:
+                    fm["duplicate_of"] = doc_slug
+                    try:
+                        _write_with_retry(md_path, fm, body, fio)
+                        flagged += 1
+                    except VaultWriteError:
+                        pass
+                continue
+
+            # Similarity-based: flag near-duplicates
+            best_slug  = max(lib_slugs, key=lambda s: _slug_similarity(doc_slug, s))
+            best_score = _slug_similarity(doc_slug, best_slug)
+            if best_score >= _SIMILARITY_THRESHOLD:
+                sim_value = f"similar_to:{best_slug}({best_score:.2f})"
+                if fm.get("duplicate_of") != sim_value:
+                    fm["duplicate_of"] = sim_value
+                    try:
+                        _write_with_retry(md_path, fm, body, fio)
+                        flagged += 1
+                    except VaultWriteError:
+                        pass
+
+    return flagged
 
 
 # ---------------------------------------------------------------------------
@@ -247,17 +377,27 @@ TOOLS = SELF_MANAGEMENT_TOOLS + [
     {
         "name": "enrich_tags",
         "description": (
-            "Process up to BATCH_SIZE notes in 00-Inbox/ and 01-Processing/ that have "
-            "5 or fewer tags or a missing type field. Calls local LLM to suggest tags and type. "
-            "Returns count of enriched files."
+            "Process notes in 00-Inbox/ and 01-Processing/ that have ≤5 tags or a missing "
+            "type field. Calls LocalRouter LLM to suggest DM-domain tags and infer entity "
+            "type in one pass. Returns count of enriched files."
+        ),
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "infer_type",
+        "description": (
+            "Targeted pass: process only notes with a missing type field. "
+            "Uses a shorter prompt (max_tokens=10) for efficient type inference. "
+            "Call when enrich_tags has already handled tags but type is still missing."
         ),
         "input_schema": {"type": "object", "properties": {}},
     },
     {
         "name": "flag_duplicates",
         "description": (
-            "Check processed files for IDs that match existing 02-Library/ slugs "
-            "and mark them with duplicate_of in frontmatter."
+            "Scan 00-Inbox/ and 01-Processing/ for entities whose slug exactly matches "
+            "or is highly similar (≥0.85 difflib ratio) to a 02-Library/ slug. "
+            "Sets duplicate_of field in frontmatter. Returns count flagged."
         ),
         "input_schema": {"type": "object", "properties": {}},
     },
@@ -272,31 +412,26 @@ def call_tool(name: str, args: dict, context: dict) -> str:
         return result
 
     if name == "enrich_tags":
-        # Delegate to main() logic via a fresh run
-        import io
         import contextlib
-        buf = io.StringIO()
+        import io as _io
+        buf = _io.StringIO()
         try:
             with contextlib.redirect_stdout(buf):
                 main()
         except SystemExit:
             pass
-        return buf.getvalue() or "Enrichment run complete"
+        return buf.getvalue() or "EnrichTags run complete"
+
+    if name == "infer_type":
+        count, failed = _run_infer_type()
+        return f"InferType complete: inferred={count} failed={failed}"
 
     if name == "flag_duplicates":
-        lib_slugs = _library_slugs()
-        fio = FrontmatterIO()
-        flagged = 0
-        for scope in (_INBOX, _PROCESSING):
-            for md_path in sorted(scope.glob("**/*.md")):
-                try:
-                    fm, body = fio.read(md_path)
-                    if fm.get("id") and fm["id"].lower() in lib_slugs:
-                        fm["duplicate_of"] = fm["id"]
-                        fio.write(md_path, fm, body)
-                        flagged += 1
-                except Exception:
-                    continue
-        return f"Flagged {flagged} potential duplicate(s)"
+        flagged = _run_flag_duplicates()
+        return f"FlagDuplicates complete: flagged={flagged}"
 
     raise ValueError(f"Unknown tool: {name!r}")
+
+
+if __name__ == "__main__":
+    main()
