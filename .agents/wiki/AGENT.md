@@ -50,4 +50,7 @@ restrictions:
 state_files:
   - state/processed.txt
   - state/bad-wiki-docs.txt
+commit_scope:
+  - knowledge-base/01-Processing
+  - .agents/wiki/state
 ---

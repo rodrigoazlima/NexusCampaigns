@@ -76,18 +76,77 @@ TASKS_STATE_DEFAULT: dict[str, Any] = {
 """tasks-state.json — last-run timestamps, reset to epoch forces immediate first run."""
 
 # ---------------------------------------------------------------------------
+# Wikilink agent state
+# ---------------------------------------------------------------------------
+
+WIKILINK_STATE_DEFAULT: dict[str, Any] = {}
+"""wikilink-state.json — keyed by relative path, tracks processed files."""
+
+# ---------------------------------------------------------------------------
+# Relationship agent state
+# ---------------------------------------------------------------------------
+
+RELATIONSHIP_GRAPH_DEFAULT: dict[str, Any] = {
+    "version":     1,
+    "generatedAt": "1970-01-01T00:00:00+00:00",
+    "edges":       [],
+}
+"""relationship-graph.json — populated by relationship agent."""
+
+# ---------------------------------------------------------------------------
+# Canon agent state
+# ---------------------------------------------------------------------------
+
+CANON_REPORT_DEFAULT: dict[str, Any] = {
+    "date":             "",
+    "generatedAt":      "1970-01-01T00:00:00+00:00",
+    "violations":       [],
+    "entities_scanned": 0,
+    "entities_clean":   0,
+}
+"""canon-report-latest.json — most recent canon integrity report."""
+
+# ---------------------------------------------------------------------------
+# Search agent state
+# ---------------------------------------------------------------------------
+
+SEARCH_INDEX_DEFAULT: dict[str, Any] = {
+    "version":    1,
+    "indexed_at": "1970-01-01T00:00:00+00:00",
+    "entries":    {},
+}
+"""search-index.json — full-text entity index built by search agent."""
+
+# ---------------------------------------------------------------------------
+# Deduplication agent state
+# ---------------------------------------------------------------------------
+
+DEDUP_REPORT_DEFAULT: dict[str, Any] = {
+    "date":          "",
+    "generatedAt":   "1970-01-01T00:00:00+00:00",
+    "candidates":    [],
+    "files_scanned": 0,
+}
+"""dedup-report-latest.json — most recent deduplication candidates."""
+
+# ---------------------------------------------------------------------------
 # Mapping: canonical relative path → default value
 # Used by implementations to resolve which default to write.
 # ---------------------------------------------------------------------------
 
 STATE_FILE_DEFAULTS: dict[str, Any] = {
-    ".shared/state/inbox-queue.json":                      INBOX_QUEUE_DEFAULT,
-    ".agents/vision/state/processed-images.json":          PROCESSED_IMAGES_DEFAULT,
-    ".agents/vision/state/token-links.json":               TOKEN_LINKS_DEFAULT,
-    ".agents/lore/state/processed-npcs.json":              PROCESSED_NPCS_DEFAULT,
-    ".agents/lore/state/scenarios.json":                   SCENARIOS_DEFAULT,
-    ".agents/token/state/generated-tokens.json":           GENERATED_TOKENS_DEFAULT,
-    ".agents/orchestrator/state/tasks-state.json":         TASKS_STATE_DEFAULT,
+    ".shared/state/inbox-queue.json":                           INBOX_QUEUE_DEFAULT,
+    ".agents/vision/state/processed-images.json":               PROCESSED_IMAGES_DEFAULT,
+    ".agents/vision/state/token-links.json":                    TOKEN_LINKS_DEFAULT,
+    ".agents/lore/state/processed-npcs.json":                   PROCESSED_NPCS_DEFAULT,
+    ".agents/lore/state/scenarios.json":                        SCENARIOS_DEFAULT,
+    ".agents/token/state/generated-tokens.json":                GENERATED_TOKENS_DEFAULT,
+    ".agents/orchestrator/state/tasks-state.json":              TASKS_STATE_DEFAULT,
+    ".agents/wikilink/state/wikilink-state.json":               WIKILINK_STATE_DEFAULT,
+    ".agents/relationship/state/relationship-graph.json":       RELATIONSHIP_GRAPH_DEFAULT,
+    ".agents/canon/state/canon-report-latest.json":             CANON_REPORT_DEFAULT,
+    ".agents/search/state/search-index.json":                   SEARCH_INDEX_DEFAULT,
+    ".agents/deduplication/state/dedup-report-latest.json":     DEDUP_REPORT_DEFAULT,
 }
 
 # Directories that must exist before any agent runs
@@ -106,4 +165,13 @@ REQUIRED_DIRS: list[str] = [
     ".agents/review/state/logs",
     ".agents/repair/state",
     ".agents/wikilink/state",
+    ".agents/relationship/state",
+    ".agents/canon/state",
+    ".agents/canon/state/reports",
+    ".agents/search/state",
+    ".agents/deduplication/state",
+    ".agents/deduplication/state/reports",
+    ".agents/cleanup/state",
+    ".agents/cleanup/state/reports",
+    ".agents/curator/state",
 ]

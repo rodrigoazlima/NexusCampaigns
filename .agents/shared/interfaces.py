@@ -13,12 +13,19 @@ from typing import Any, Optional, Protocol, runtime_checkable
 from .config import VaultConfig
 from .models import (
     AgentMetrics,
+    CanonReport,
+    CuratorSuggestion,
     DailyReport,
+    DedupCandidate,
     EntityFrontmatter,
     InboxQueue,
     ProcessedImagesState,
     ProcessedNPCs,
+    RelationshipGraph,
     RepairReport,
+    ReviewItem,
+    SearchEntry,
+    SearchIndexState,
     TagEnrichmentOutput,
     VisionClassification,
     NPCLLMOutput,
@@ -356,6 +363,159 @@ class IOrchestrator(ABC):
     @abstractmethod
     def commit_changes(self, task_id: str) -> None:
         """git add -A && git commit after a successful agent run."""
+        ...
+
+
+# ---------------------------------------------------------------------------
+# IQualityGate (shared quality scoring contract)
+# ---------------------------------------------------------------------------
+
+class IQualityGate(ABC):
+    """Contract for computing and enforcing quality scores.
+
+    Scoring formula (0–10, +2 each):
+      description section present · relationships with [[links]] ·
+      ≥3 tags · type field set · source field set.
+    """
+
+    @abstractmethod
+    def score(self, frontmatter: dict, body: str) -> int:
+        """Compute quality score 0–10. Pure — no I/O."""
+        ...
+
+    @abstractmethod
+    def is_library_ready(self, frontmatter: dict) -> bool:
+        """Return True if quality ≥ 7, reviewed=True, and relationships non-empty."""
+        ...
+
+
+# ---------------------------------------------------------------------------
+# IWikilinkResolver (wikilink agent contract)
+# ---------------------------------------------------------------------------
+
+class IWikilinkResolver(ABC):
+    """Contract for resolving and inserting [[wikilinks]] in vault files."""
+
+    @abstractmethod
+    def build_slug_index(self, library_dir: Path) -> dict[str, Path]:
+        """Return {slug: path} for every .md in library_dir."""
+        ...
+
+    @abstractmethod
+    def insert_wikilinks(
+        self,
+        target: Path,
+        slug_index: dict[str, Path],
+    ) -> int:
+        """Insert missing [[slug]] into ## Related section. Return count inserted."""
+        ...
+
+
+# ---------------------------------------------------------------------------
+# IRelationshipBuilder (relationship agent contract)
+# ---------------------------------------------------------------------------
+
+class IRelationshipBuilder(ABC):
+    """Contract for building entity relationship graphs from 02-Library/."""
+
+    @abstractmethod
+    def build_graph(self, library_dir: Path) -> RelationshipGraph:
+        """Scan library entities and compute a weighted relationship graph."""
+        ...
+
+    @abstractmethod
+    def write_pages(
+        self,
+        graph: RelationshipGraph,
+        relationships_dir: Path,
+    ) -> int:
+        """Write faction/NPC/location sub-graphs to 04-Relationships/. Return count."""
+        ...
+
+
+# ---------------------------------------------------------------------------
+# ICanonValidator (canon agent contract)
+# ---------------------------------------------------------------------------
+
+class ICanonValidator(ABC):
+    """Contract for validating consistency of approved 02-Library/ entities."""
+
+    @abstractmethod
+    def validate(self, library_dir: Path) -> CanonReport:
+        """Scan all entities and return canon violations. Read-only."""
+        ...
+
+
+# ---------------------------------------------------------------------------
+# ICleaner (cleanup agent contract)
+# ---------------------------------------------------------------------------
+
+class ICleaner(ABC):
+    """Contract for log/report rotation and metrics trimming."""
+
+    @abstractmethod
+    def purge_logs(self, logs_dir: Path, keep_days: int) -> int:
+        """Delete log files older than keep_days. Return count deleted."""
+        ...
+
+    @abstractmethod
+    def purge_reports(self, reports_dir: Path, keep_days: int) -> int:
+        """Delete report files older than keep_days. Return count deleted."""
+        ...
+
+    @abstractmethod
+    def trim_metrics(self, metrics_path: Path, max_runs: int) -> int:
+        """Trim each agent's run history to max_runs entries. Return runs removed."""
+        ...
+
+
+# ---------------------------------------------------------------------------
+# ICurator (curator agent contract)
+# ---------------------------------------------------------------------------
+
+class ICurator(ABC):
+    """Contract for scoring drafts for Library promotion readiness."""
+
+    @abstractmethod
+    def assess(self, path: Path, frontmatter: dict, body: str) -> CuratorSuggestion:
+        """Return promotion readiness assessment for one draft. No I/O."""
+        ...
+
+
+# ---------------------------------------------------------------------------
+# ISearchIndexer (search agent contract)
+# ---------------------------------------------------------------------------
+
+class ISearchIndexer(ABC):
+    """Contract for building and querying a vault entity index."""
+
+    @abstractmethod
+    def build(self, dirs: list[Path]) -> SearchIndexState:
+        """Index all .md entities in the given vault directories."""
+        ...
+
+    @abstractmethod
+    def query(
+        self,
+        index: SearchIndexState,
+        q: str,
+        *,
+        tags: Optional[list[str]] = None,
+    ) -> list[SearchEntry]:
+        """Return matching entries ranked by keyword relevance."""
+        ...
+
+
+# ---------------------------------------------------------------------------
+# IDedupAnalyzer (deduplication agent contract)
+# ---------------------------------------------------------------------------
+
+class IDedupAnalyzer(ABC):
+    """Contract for detecting duplicate/near-duplicate vault entities."""
+
+    @abstractmethod
+    def find_candidates(self, paths: list[Path]) -> list[DedupCandidate]:
+        """Return merge candidates above similarity threshold. Read-only."""
         ...
 
 

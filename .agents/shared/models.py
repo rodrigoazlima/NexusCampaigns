@@ -213,17 +213,19 @@ class TagEnrichmentOutput(BaseModel):
 
 class EntityFrontmatter(BaseModel):
     """AGENTS.md-compliant frontmatter for all vault entities."""
-    id:            str
-    type:          EntityType
-    status:        EntityStatus                = EntityStatus.draft
-    quality:       Annotated[int, Field(ge=0, le=10)] = 0
-    created:       date
-    updated:       date
-    tags:          list[str]                   = Field(default_factory=list)
-    source:        list[str]                   = Field(default_factory=list)
-    sha256:        Optional[str]               = None
-    reviewed:      bool                        = False   # agents never set True
-    relationships: list[str]                   = Field(default_factory=list)
+    id:                  str
+    type:                EntityType
+    status:              EntityStatus                = EntityStatus.draft
+    quality:             Annotated[int, Field(ge=0, le=10)] = 0
+    created:             date
+    updated:             date
+    tags:                list[str]                   = Field(default_factory=list)
+    source:              list[str]                   = Field(default_factory=list)
+    sha256:              Optional[str]               = None
+    reviewed:            bool                        = False   # agents never set True
+    relationships:       list[str]                   = Field(default_factory=list)
+    needs_reprocessing:  bool                        = False
+    suggested_quality:   Optional[int]               = None   # set by review agent only
 
 
 class NPCFrontmatter(EntityFrontmatter):
@@ -414,3 +416,172 @@ class RepairReport(BaseModel):
     generatedAt:        datetime
     fixLabelsDetected:  list[str] = Field(default_factory=list)
     repairsApplied:     int       = 0
+
+
+# ---------------------------------------------------------------------------
+# Review agent — ReviewItem
+# ---------------------------------------------------------------------------
+
+class ReviewItem(BaseModel):
+    """Per-draft review record produced by the review agent."""
+    path:              str
+    filename:          str
+    id:                str
+    type:              EntityType
+    status:            EntityStatus
+    quality:           Annotated[int, Field(ge=0, le=10)]
+    suggested_quality: Optional[int]  = None
+    tags:              list[str]       = Field(default_factory=list)
+    source:            list[str]       = Field(default_factory=list)
+    reviewed:          bool            = False
+    relationships:     list[str]       = Field(default_factory=list)
+    has_relationships: bool            = False   # len(relationships) > 0
+    is_orphan:         bool            = False   # no [[wikilinks]] in body
+    needs_reprocessing: bool           = False
+    created:           date
+    updated:           date
+    description:       Optional[str]   = None
+    body_lines:        int             = 0
+
+
+# ---------------------------------------------------------------------------
+# Wikilink agent state
+# ---------------------------------------------------------------------------
+
+class WikilinkProcessedEntry(BaseModel):
+    processedAt:    datetime
+    linksInserted:  int = 0
+
+
+WikilinkProcessedState = dict[str, WikilinkProcessedEntry]
+
+
+# ---------------------------------------------------------------------------
+# Cleanup agent
+# ---------------------------------------------------------------------------
+
+class CleanupReport(BaseModel):
+    date:            str
+    generatedAt:     datetime
+    logsDeleted:     int = 0
+    reportsDeleted:  int = 0
+    metricsTrimmed:  int = 0
+
+
+# ---------------------------------------------------------------------------
+# Relationship agent
+# ---------------------------------------------------------------------------
+
+class RelationshipEdge(BaseModel):
+    source:       str    # entity id
+    target:       str    # entity id
+    relation:     str    # "npc_location" | "npc_faction" | "quest_npc" | etc.
+    weight:       float  = 1.0   # shared-tag / wikilink score
+
+
+class RelationshipGraph(BaseModel):
+    """Root schema for relationship-graph.json."""
+    version:      int                        = 1
+    generatedAt:  datetime
+    edges:        list[RelationshipEdge]     = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Canon agent
+# ---------------------------------------------------------------------------
+
+class CanonViolationType(str, Enum):
+    broken_wikilink        = "broken_wikilink"
+    missing_relationship   = "missing_relationship"
+    duplicate_id           = "duplicate_id"
+    missing_required_field = "missing_required_field"
+    orphan_entity          = "orphan_entity"
+
+
+class CanonViolation(BaseModel):
+    entity_id:      str
+    path:           str
+    violation_type: CanonViolationType
+    detail:         str
+
+
+class CanonReport(BaseModel):
+    date:              str
+    generatedAt:       datetime
+    violations:        list[CanonViolation] = Field(default_factory=list)
+    entities_scanned:  int = 0
+    entities_clean:    int = 0
+
+
+# ---------------------------------------------------------------------------
+# Curator agent
+# ---------------------------------------------------------------------------
+
+class CuratorSuggestion(BaseModel):
+    path:              str
+    id:                str
+    type:              EntityType
+    quality:           Annotated[int, Field(ge=0, le=10)]
+    suggested_quality: Optional[int] = None
+    ready:             bool           # quality >= 7 AND reviewed AND has_relationships
+    blockers:          list[str]      = Field(default_factory=list)
+
+
+class CuratorReport(BaseModel):
+    generatedAt:   datetime
+    date:          str
+    suggestions:   list[CuratorSuggestion] = Field(default_factory=list)
+    ready_count:   int = 0
+    blocked_count: int = 0
+
+
+# ---------------------------------------------------------------------------
+# Search agent
+# ---------------------------------------------------------------------------
+
+class SearchEntry(BaseModel):
+    id:            str
+    path:          str
+    type:          EntityType
+    title:         str
+    tags:          list[str]      = Field(default_factory=list)
+    relationships: list[str]      = Field(default_factory=list)
+    status:        EntityStatus
+    quality:       Annotated[int, Field(ge=0, le=10)]
+    body_excerpt:  str            = ""
+    indexed_at:    datetime
+
+
+SearchIndex = dict[str, SearchEntry]   # keyed by entity id
+
+
+class SearchIndexState(BaseModel):
+    """Root schema for search-index.json."""
+    version:    int                      = 1
+    indexed_at: datetime
+    entries:    dict[str, SearchEntry]   = Field(default_factory=dict)
+
+
+# ---------------------------------------------------------------------------
+# Deduplication agent
+# ---------------------------------------------------------------------------
+
+class DedupMatchReason(str, Enum):
+    slug      = "slug"
+    tags      = "tags"
+    content   = "content"
+    id_prefix = "id_prefix"
+
+
+class DedupCandidate(BaseModel):
+    source_path:      str
+    candidate_path:   str
+    similarity_score: float
+    match_reason:     DedupMatchReason
+
+
+class DedupReport(BaseModel):
+    date:          str
+    generatedAt:   datetime
+    candidates:    list[DedupCandidate] = Field(default_factory=list)
+    files_scanned: int = 0

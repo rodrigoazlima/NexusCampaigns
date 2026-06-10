@@ -43,4 +43,7 @@ restrictions:
 state_files:
   - state/reports/
   - state/logs/08-daily-report_YYYY-MM-DD.log
+commit_scope:
+  - knowledge-base/01-Processing
+  - .agents/review/state
 ---

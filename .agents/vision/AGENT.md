@@ -53,6 +53,11 @@ state_files:
   - state/processed-images.json
   - state/processed-images.txt (legacy migration source)
   - state/token-links.json
+commit_scope:
+  - knowledge-base/00-Inbox/images
+  - knowledge-base/01-Processing
+  - .agents/vision/state
+  - .shared/state
 ---
 
 ## Valid Classification Values

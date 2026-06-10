@@ -44,4 +44,8 @@ restrictions:
 state_files:
   - state/processed-docx.txt
   - .shared/state/inbox-queue.json (shared owner — ingestion writes, others update)
+commit_scope:
+  - .shared/state
+  - knowledge-base/00-Inbox
+  - .agents/ingestion/state
 ---

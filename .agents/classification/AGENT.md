@@ -50,6 +50,11 @@ restrictions:
   - Tag LLM max 80 tokens; type LLM max 10 tokens
 state_files:
   - state/bad-docs.txt
+commit_scope:
+  - knowledge-base/00-Inbox
+  - knowledge-base/01-Processing
+  - .agents/classification/state
+  - .shared/state
 ---
 
 ## Valid Tags (29)
