@@ -7,7 +7,7 @@ param(
     [string]$StateFile = ".system/claude-queue-state.json",
     [int]$RetryDelayMinutes = 40,
     [int]$MaxRetries = 200,
-    [int]$TimeoutMinutes = 10
+    [int]$TimeoutMinutes = 30
 )
 
 $TimeoutSeconds = $TimeoutMinutes * 60
