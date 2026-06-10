@@ -95,14 +95,18 @@ class ClaudeRunner:
         # Agentic loop
         # ------------------------------------------------------------------ #
         client = anthropic.Anthropic()
-        max_rounds = int(cfg.get("max_tool_rounds", 20))
-        exit_code = 0
+        max_rounds      = int(cfg.get("max_tool_rounds", 20))
+        max_tokens_run  = cfg.get("max_tokens_per_run")  # optional budget guard
+        model_id        = cfg["model"]
+        exit_code       = 0
         last_error: Optional[str] = None
+        total_input     = 0
+        total_output    = 0
 
         try:
             for round_num in range(max_rounds):
                 create_kwargs: dict[str, Any] = {
-                    "model":      cfg["model"],
+                    "model":      model_id,
                     "messages":   messages,
                     "max_tokens": int(cfg.get("max_tokens", 4096)),
                 }
@@ -113,6 +117,11 @@ class ClaudeRunner:
 
                 resp = client.messages.create(**create_kwargs)
 
+                # Accumulate token usage
+                if hasattr(resp, "usage") and resp.usage:
+                    total_input  += getattr(resp.usage, "input_tokens", 0)
+                    total_output += getattr(resp.usage, "output_tokens", 0)
+
                 # Convert content blocks to serialisable form for history
                 assistant_content = _serialise_content(resp.content)
                 messages.append({"role": "assistant", "content": assistant_content})
@@ -121,6 +130,14 @@ class ClaudeRunner:
                     break
 
                 if resp.stop_reason != "tool_use":
+                    break
+
+                # Budget guard — check after accumulating tokens
+                if max_tokens_run and (total_input + total_output) > max_tokens_run:
+                    last_error = (
+                        f"Token budget exceeded "
+                        f"({total_input + total_output} > {max_tokens_run}). Stopping."
+                    )
                     break
 
                 # Execute all tool calls in this response
@@ -157,7 +174,13 @@ class ClaudeRunner:
             if history_path is not None:
                 _save_history(history_path, messages)
 
-        return RunResult(exit_code=exit_code, error=last_error)
+        return RunResult(
+            exit_code=exit_code,
+            error=last_error,
+            input_tokens=total_input,
+            output_tokens=total_output,
+            model=model_id,
+        )
 
 
 # ---------------------------------------------------------------------------

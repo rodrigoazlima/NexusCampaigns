@@ -283,6 +283,17 @@ class INPCGenerator(ABC):
         """
         ...
 
+    @abstractmethod
+    def generate_with_critique(
+        self,
+        image_path: Path,
+        scenario: dict,
+        canon_context: str,
+        critique: str,
+    ) -> NPCLLMOutput:
+        """Re-generate with critique injected into user turn. Same contract as generate()."""
+        ...
+
 
 # ---------------------------------------------------------------------------
 # ITokenRenderer (token agent contract)
@@ -382,8 +393,8 @@ class IOrchestrator(ABC):
         ...
 
     @abstractmethod
-    def dispatch(self, task_id: str) -> int:
-        """Resolve agent.json, select runner, execute. Return exit code."""
+    def dispatch(self, task_id: str) -> tuple[int, RunResult]:
+        """Resolve agent.json, select runner, execute. Return (exit_code, RunResult)."""
         ...
 
     @abstractmethod
@@ -542,6 +553,25 @@ class IDedupAnalyzer(ABC):
     @abstractmethod
     def find_candidates(self, paths: list[Path]) -> list[DedupCandidate]:
         """Return merge candidates above similarity threshold. Read-only."""
+        ...
+
+
+# ---------------------------------------------------------------------------
+# ISignalEmitter — file-based inter-agent signal bus
+# ---------------------------------------------------------------------------
+
+@runtime_checkable
+class ISignalEmitter(Protocol):
+    """Structural protocol for emitting inter-agent signals."""
+
+    def emit(
+        self,
+        signal_type: str,
+        emitter: str,
+        ref: str = "",
+        payload: Optional[dict] = None,
+    ) -> str:
+        """Write a signal file to the signals directory. Returns signal ID."""
         ...
 
 

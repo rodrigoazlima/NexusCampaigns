@@ -36,6 +36,8 @@ from shared import (  # noqa: E402
     get_runner,
     TASKS_STATE_DEFAULT,
 )
+from shared.models import RunResult  # noqa: E402
+from shared.signal_bus import SignalConsumer  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -47,6 +49,8 @@ _METRICS_JSON  = _RUNTIME_STATE / "agent-metrics.json"
 _LOCK_FILE     = _RUNTIME_STATE / "runner.lock"
 _LOGS_DIR      = _RUNTIME_STATE / "logs"
 _MASTER_LOG    = _LOGS_DIR / "automation.log"
+_SIGNALS_DIR   = _RUNTIME_STATE / "signals"
+_COSTS_DIR     = _RUNTIME_STATE / "costs"
 
 _LOCK_STALE_SECONDS = 1800   # 30 min
 _DEFAULT_INTERVAL   = 60     # orchestrator poll cadence
@@ -195,6 +199,72 @@ def _record_metrics(
 
 
 # ---------------------------------------------------------------------------
+# Cost recording
+# ---------------------------------------------------------------------------
+
+def _record_cost(
+    task_id: str,
+    model: str,
+    input_tokens: int,
+    output_tokens: int,
+    started_at: datetime,
+) -> None:
+    """Append per-run token usage to the daily cost file (atomic write)."""
+    if not model and not input_tokens and not output_tokens:
+        return  # non-Claude runner — nothing to record
+
+    today = started_at.strftime("%Y-%m-%d")
+    _COSTS_DIR.mkdir(parents=True, exist_ok=True)
+    cost_file = _COSTS_DIR / f"costs-{today}.json"
+
+    data: dict = {}
+    if cost_file.exists():
+        try:
+            data = json.loads(cost_file.read_text(encoding="utf-8"))
+        except Exception:
+            data = {}
+
+    entry = data.setdefault(task_id, {"runs": []})
+    entry["runs"].append({
+        "ts":            started_at.isoformat(),
+        "model":         model,
+        "input_tokens":  input_tokens,
+        "output_tokens": output_tokens,
+    })
+
+    tmp = cost_file.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    tmp.replace(cost_file)
+
+
+# ---------------------------------------------------------------------------
+# Signal bus helpers
+# ---------------------------------------------------------------------------
+
+def _check_signals(
+    tasks: list[tuple[str, TaskDispatchEntry]],
+    log: _Logger,
+) -> set[str]:
+    """Return task_ids that should run immediately due to pending signals."""
+    consumer = SignalConsumer(_SIGNALS_DIR)
+    triggered: set[str] = set()
+
+    for task_id, entry in tasks:
+        triggers = list(getattr(entry, "signal_triggers", None) or [])
+        for signal_type in triggers:
+            pending = consumer.pending(signal_type)
+            if pending:
+                log.info(
+                    f"Signal '{signal_type}' pending ({len(pending)} item(s)) — "
+                    f"triggering {task_id} immediately"
+                )
+                triggered.add(task_id)
+                break
+
+    return triggered
+
+
+# ---------------------------------------------------------------------------
 # Task discovery — reads agent.json files, no tasks.json
 # ---------------------------------------------------------------------------
 
@@ -338,19 +408,21 @@ class Runtime(IOrchestrator):
     def load_agent_dispatch(self, task_id: str) -> Optional[AgentDispatchConfig]:
         return _load_agent_dispatch(task_id, self._log)
 
-    def dispatch(self, task_id: str) -> int:
+    def dispatch(self, task_id: str) -> tuple[int, RunResult]:
         entry = self._get_task_entry(task_id)
+        _empty = RunResult(exit_code=1)
         if entry is None:
             self._log.error(f"Task not found in any agent.json: {task_id}")
-            return 1
+            return 1, _empty
 
         dispatch_cfg = _load_agent_dispatch(task_id, self._log)
         if dispatch_cfg is None:
-            return 1
+            return 1, _empty
 
         log = _Logger(task_id)
         t0 = log.start()
         exit_code = 1
+        result = _empty
 
         try:
             sub_config = _extract_dispatch_sub(dispatch_cfg)
@@ -376,7 +448,7 @@ class Runtime(IOrchestrator):
             log.error(f"Unexpected dispatch error: {exc}")
 
         log.done(t0, count=1 if exit_code == 0 else 0, failed=0 if exit_code == 0 else 1)
-        return exit_code
+        return exit_code, result
 
     def commit_changes(self, task_id: str) -> None:
         scope = _read_agent_commit_scope(task_id)
@@ -424,20 +496,27 @@ class Runtime(IOrchestrator):
         self._log.info(f"Discovered {len(self._tasks)} tasks from agent.json files")
 
     def run_cycle(self, task_filter: Optional[str] = None) -> None:
-        """One scheduling cycle: check all tasks, dispatch due ones."""
+        """One scheduling cycle: check all tasks, dispatch due and signal-triggered ones."""
         self.reload()
+        _SIGNALS_DIR.mkdir(parents=True, exist_ok=True)
+
+        signal_triggered = _check_signals(self._tasks, self._log)
 
         for task_id, entry in self._tasks:
             if task_filter and task_id != task_filter:
                 continue
 
-            if not self.is_due(task_id):
-                self._log.info(f"Skip {task_id} — not yet due")
+            due       = self.is_due(task_id)
+            signalled = task_id in signal_triggered
+
+            if not due and not signalled:
+                self._log.info(f"Skip {task_id} — not due, no signal")
                 continue
 
-            self._log.info(f"Dispatching {task_id} ({entry.description})")
-            started_at = datetime.now(timezone.utc)
-            exit_code  = self.dispatch(task_id)
+            reason = "signalled" if signalled and not due else "due"
+            self._log.info(f"Dispatching {task_id} ({entry.description}) [{reason}]")
+            started_at  = datetime.now(timezone.utc)
+            exit_code, result = self.dispatch(task_id)
             finished_at = datetime.now(timezone.utc)
 
             assert self._state is not None
@@ -450,6 +529,17 @@ class Runtime(IOrchestrator):
             except Exception as exc:
                 self._log.warning(f"Metrics update failed for {task_id}: {exc}")
 
+            try:
+                _record_cost(
+                    task_id,
+                    result.model,
+                    result.input_tokens,
+                    result.output_tokens,
+                    started_at,
+                )
+            except Exception as exc:
+                self._log.warning(f"Cost recording failed for {task_id}: {exc}")
+
             if exit_code == 0:
                 try:
                     self.commit_changes(task_id)
@@ -457,6 +547,20 @@ class Runtime(IOrchestrator):
                     self._log.warning(f"Git commit failed for {task_id}: {exc}")
             else:
                 self._log.warning(f"Task {task_id} exited with code {exit_code} — skipping git commit")
+
+        # Consume processed signals AFTER all dispatches in this cycle
+        consumer = SignalConsumer(_SIGNALS_DIR)
+        for task_id in signal_triggered:
+            entry = self._get_task_entry(task_id)
+            if entry is None:
+                continue
+            triggers = list(getattr(entry, "signal_triggers", None) or [])
+            for signal_type in triggers:
+                consumed = consumer.consume_all(signal_type)
+                if consumed:
+                    self._log.info(
+                        f"Consumed {len(consumed)} '{signal_type}' signal(s) for {task_id}"
+                    )
 
 
 # ---------------------------------------------------------------------------

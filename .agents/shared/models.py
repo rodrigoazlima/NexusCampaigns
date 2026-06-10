@@ -363,14 +363,15 @@ class OpenAIApiConfig(BaseModel):
 
 
 class ClaudeApiConfig(BaseModel):
-    model:            str
-    system_file:      Optional[str]       = None
-    tools_module:     Optional[str]       = None   # dotted import path e.g. "repair.tools.repair_agent"
-    history_file:     Optional[str]       = None   # relative to agent state/ dir
-    max_tokens:       int                 = 4096
-    temperature:      float               = 0.0
-    timeout_seconds:  int                 = 120
-    max_tool_rounds:  int                 = 20
+    model:               str
+    system_file:         Optional[str]       = None
+    tools_module:        Optional[str]       = None   # dotted import path e.g. "repair.tools.repair_agent"
+    history_file:        Optional[str]       = None   # relative to agent state/ dir
+    max_tokens:          int                 = 4096
+    temperature:         float               = 0.0
+    timeout_seconds:     int                 = 120
+    max_tool_rounds:     int                 = 20
+    max_tokens_per_run:  Optional[int]       = None   # abort run if total tokens exceed this
 
 
 class GeminiApiConfig(BaseModel):
@@ -401,9 +402,11 @@ class AgentDispatchConfig(BaseModel):
 
 
 class TaskDispatchEntry(BaseModel):
-    intervalSeconds: int
-    description:     str
-    dispatch:        AgentDispatchConfig
+    intervalSeconds:  int
+    description:      str
+    dispatch:         AgentDispatchConfig
+    signal_triggers:  list[str] = Field(default_factory=list)  # signal types that trigger immediate dispatch
+    emits_signals:    list[str] = Field(default_factory=list)  # documentation only
 
 
 class AgentFolderConfig(BaseModel):
@@ -417,10 +420,13 @@ class AgentFolderConfig(BaseModel):
 # ---------------------------------------------------------------------------
 
 class RunResult(BaseModel):
-    exit_code:   int
-    output:      str            = ""
-    error:       Optional[str]  = None
-    duration_ms: int            = 0
+    exit_code:      int
+    output:         str            = ""
+    error:          Optional[str]  = None
+    duration_ms:    int            = 0
+    input_tokens:   int            = 0
+    output_tokens:  int            = 0
+    model:          str            = ""
 
 
 # ---------------------------------------------------------------------------

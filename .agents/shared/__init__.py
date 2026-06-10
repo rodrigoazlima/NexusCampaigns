@@ -21,6 +21,7 @@ from .slug_utils import (
 )
 from .state_store import StateStore
 from .vault_guard import VaultGuard
+from .signal_bus import SignalEmitter, SignalConsumer
 from .defaults import (
     CANON_REPORT_DEFAULT,
     DEDUP_REPORT_DEFAULT,
@@ -57,6 +58,7 @@ from .interfaces import (
     IReportBuilder,
     IRunner,
     ISearchIndexer,
+    ISignalEmitter,
     IStateStore,
     ITagEnricher,
     ITokenRenderer,
@@ -146,10 +148,12 @@ __all__ = [
     "IDedupAnalyzer", "IFaceMatcher", "IFrontmatterIO", "IImageClassifier",
     "ILLMClient", "ILogger", "INPCGenerator", "IOrchestrator", "IQualityGate",
     "IRelationshipBuilder", "IReportBuilder", "IRunner", "ISearchIndexer",
-    "IStateStore", "ITagEnricher", "ITokenRenderer", "IVaultGuard",
+    "ISignalEmitter", "IStateStore", "ITagEnricher", "ITokenRenderer", "IVaultGuard",
     "IWikiCompiler", "IWikilinkResolver",
     # Exceptions
     "DispatchError", "LLMOfflineError", "LLMResponseError", "VaultWriteError",
+    # Signal bus
+    "SignalEmitter", "SignalConsumer",
     # Runners
     "get_runner",
     # Models — enums
