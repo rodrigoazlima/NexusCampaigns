@@ -67,7 +67,7 @@ class SystemPaths:
 
     @property
     def logs_dir(self) -> Path:
-        return self.agents_dir / "orchestrator" / "state" / "logs"
+        return self.agents_dir / "runtime" / "state" / "logs"
 
     @property
     def reports_dir(self) -> Path:

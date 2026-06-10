@@ -30,9 +30,8 @@ SCRIPT_BASENAME = "daily_report.py"
 _VAULT_ROOT   = _PROJECT_ROOT / "knowledge-base"
 _PROCESSING   = _VAULT_ROOT / "01-Processing"
 _LIBRARY      = _VAULT_ROOT / "02-Library"
-_ORCH_STATE   = _AGENTS_DIR / "orchestrator" / "state"
+_ORCH_STATE   = _AGENTS_DIR / "runtime" / "state"
 _MASTER_LOG   = _ORCH_STATE / "logs" / "automation.log"
-_TASKS_JSON   = _ORCH_STATE / "tasks.json"
 _AGENT_STATE  = _AGENTS_DIR / "review" / "state"
 _LOGS_DIR     = _AGENT_STATE / "logs"
 _REPORTS_DIR  = _AGENT_STATE / "reports"
@@ -185,12 +184,21 @@ def _vault_health(fio: FrontmatterIO, log: _Logger) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 def _load_tasks_config() -> dict[str, Any]:
-    if not _TASKS_JSON.exists():
-        return {}
-    try:
-        return json.loads(_TASKS_JSON.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
+    """Discover task configs by scanning */agent.json files."""
+    tasks = []
+    agents_dir = Path(__file__).resolve().parents[2]
+    for agent_json in sorted(agents_dir.glob("*/agent.json")):
+        try:
+            raw = json.loads(agent_json.read_text(encoding="utf-8"))
+            for tid, entry in raw.get("tasks", {}).items():
+                tasks.append({
+                    "id":              tid,
+                    "intervalSeconds": entry.get("intervalSeconds"),
+                    "description":     entry.get("description", ""),
+                })
+        except Exception:
+            continue
+    return {"tasks": tasks}
 
 
 def _write_reports_js(log: _Logger) -> None:
@@ -253,3 +261,79 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+# ---------------------------------------------------------------------------
+# Agentic tool interface
+# ---------------------------------------------------------------------------
+
+from shared.agent_tools import SELF_MANAGEMENT_TOOLS, call_self_management_tool  # noqa: E402
+
+_MODULE_FILE = Path(__file__)
+
+TOOLS = SELF_MANAGEMENT_TOOLS + [
+    {
+        "name": "parse_automation_log",
+        "description": "Parse automation.log for the last N hours and return per-agent summaries.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "hours": {"type": "integer", "description": "How many hours back to scan (default: 24)", "default": 24},
+            },
+        },
+    },
+    {
+        "name": "scan_vault_health",
+        "description": "Scan 01-Processing/ for pending reviews, orphans, and quality scores. Returns health dict.",
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "write_report",
+        "description": "Write the daily JSON report file and rebuild reports-data.js for the dashboard.",
+        "input_schema": {"type": "object", "properties": {}},
+    },
+]
+
+
+def call_tool(name: str, args: dict, context: dict) -> str:
+    import json as _json
+    result = call_self_management_tool(
+        name, args, context, module_file=_MODULE_FILE, task_id=TASK_ID
+    )
+    if result is not None:
+        return result
+
+    log = _Logger()
+    fio = FrontmatterIO()
+
+    if name == "parse_automation_log":
+        from datetime import timedelta
+        hours = int(args.get("hours", 24))
+        since = datetime.now(timezone.utc) - timedelta(hours=hours)
+        summaries = _parse_automation_log(since)
+        return _json.dumps(summaries, indent=2, default=str)
+
+    if name == "scan_vault_health":
+        health = _vault_health(fio, log)
+        return _json.dumps(health, indent=2, default=str)
+
+    if name == "write_report":
+        from datetime import timedelta
+        _REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+        now = datetime.now(timezone.utc)
+        since = now - timedelta(hours=24)
+        today = now.strftime("%Y-%m-%d")
+        summaries = _parse_automation_log(since)
+        health = _vault_health(fio, log)
+        report = {
+            "generatedAt":    now.isoformat(),
+            "date":           today,
+            "agentSummaries": summaries,
+            "vaultHealth":    health,
+        }
+        report_path = _REPORTS_DIR / f"report-{today}.json"
+        report_path.write_text(_json.dumps(report, indent=2, default=str), encoding="utf-8")
+        _write_reports_js(log)
+        return f"Report written: {report_path.name}"
+
+    raise ValueError(f"Unknown tool: {name!r}")

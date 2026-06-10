@@ -16,7 +16,8 @@ llm_endpoints:
     provider: local-router
 
 execution_order:
-  - orchestrator
+  - runtime
+  - repair
   - ingestion
   - vision
   - lore
@@ -24,6 +25,8 @@ execution_order:
   - wiki
   - classification
   - review
+  - wikilink
+  - cleanup
 
 shared_state_files:
   inbox-queue.json:
@@ -35,14 +38,21 @@ shared_state_files:
       - wiki
 
 agents:
-  orchestrator:
+  runtime:
     status: active
+    description: "Python scheduler and dispatch runtime — the only static code. Not an AI agent."
     interval_seconds: 60
     llm: none
     tools:
-      - tools/runner.ps1
-      - tools/register-tasks.ps1
-      - tools/deregister-tasks.ps1
+      - tools/runner.py
+
+  repair:
+    status: active
+    task_id: repair-agent
+    interval_seconds: 900
+    llm: none
+    tools:
+      - tools/repair_agent.py
 
   ingestion:
     status: active
@@ -50,7 +60,7 @@ agents:
     interval_seconds: 3600
     llm: none
     tools:
-      - tools/11-ingestion-agent.ps1
+      - tools/ingestion_agent.py
     shared_state:
       writes:
         - .shared/state/inbox-queue.json
@@ -61,8 +71,7 @@ agents:
     interval_seconds: 3600
     llm: vision_llm
     tools:
-      - tools/06-classify-images.ps1
-      - tools/06-match-token.py
+      - tools/classify_images.py
     prompts:
       - prompts/classify-image.txt
     shared_state:
@@ -77,8 +86,7 @@ agents:
     interval_seconds: 3600
     llm: vision_llm
     tools:
-      - tools/09-generate-npcs.ps1
-      - tools/09-generate-npcs.py
+      - tools/generate_npcs.py
     prompts:
       - prompts/generate-npc.txt
     shared_state:
@@ -94,8 +102,7 @@ agents:
     interval_seconds: 3600
     llm: none
     tools:
-      - tools/10-generate-tokens.ps1
-      - tools/10-generate-tokens.py
+      - tools/generate_tokens.py
     shared_state:
       reads:
         - .agents/vision/state/processed-images.json
@@ -106,7 +113,7 @@ agents:
     interval_seconds: 3600
     llm: local_router
     tools:
-      - tools/04-enrich-tags.ps1
+      - tools/enrich_tags.py
     prompts:
       - prompts/enrich-tags.txt
       - prompts/infer-type.txt
@@ -120,7 +127,7 @@ agents:
     interval_seconds: 3600
     llm: local_router
     tools:
-      - tools/03-compile-wiki.ps1
+      - tools/compile_wiki.py
     prompts:
       - prompts/compile-entity.txt
     shared_state:
@@ -135,7 +142,27 @@ agents:
     interval_seconds: 900
     llm: none
     tools:
-      - tools/08-daily-report.ps1
+      - tools/daily_report.py
+      - tools/flag_short_files.py
+
+  wikilink:
+    status: active
+    task_id: wikilink-agent
+    interval_seconds: 3600
+    llm: none
+    tools:
+      - tools/wikilink_library.py
+    shared_state:
+      reads:
+        - .agents/wikilink/state/wikilink-state.json
+
+  cleanup:
+    status: active
+    task_id: cleanup-agent
+    interval_seconds: 86400
+    llm: none
+    tools:
+      - tools/cleanup_agent.py
 
   relationship:
     status: planned

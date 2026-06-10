@@ -42,7 +42,7 @@ from shared import (  # noqa: E402
 # ---------------------------------------------------------------------------
 
 TASK_ID         = "ingestion-agent"
-SCRIPT_BASENAME = "11_ingestion_agent.py"
+SCRIPT_BASENAME = "ingestion_agent.py"
 BATCH_SIZE      = 10
 
 IMAGE_EXTS    = frozenset({".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tiff", ".tif"})
@@ -88,8 +88,8 @@ class _Logger:
         self.task_id = task_id
         _LOGS_DIR.mkdir(parents=True, exist_ok=True)
         today = datetime.now().strftime("%Y-%m-%d")
-        self._daily  = _LOGS_DIR / f"11-ingestion-agent_{today}.log"
-        self._master = _AGENTS_DIR / "orchestrator" / "state" / "logs" / "automation.log"
+        self._daily  = _LOGS_DIR / f"ingestion-agent_{today}.log"
+        self._master = _AGENTS_DIR / "runtime" / "state" / "logs" / "automation.log"
 
     def _write(self, level: str, message: str) -> None:
         ts   = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -447,3 +447,54 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+# ---------------------------------------------------------------------------
+# Agentic tool interface
+# ---------------------------------------------------------------------------
+
+if str(_AGENTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_AGENTS_DIR))
+
+from shared.agent_tools import SELF_MANAGEMENT_TOOLS, call_self_management_tool  # noqa: E402
+
+_MODULE_FILE = Path(__file__)
+
+TOOLS = SELF_MANAGEMENT_TOOLS + [
+    {
+        "name": "clean_filenames",
+        "description": "Strip emoji and non-ASCII characters from all filenames in 00-Inbox/. Idempotent.",
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "convert_docx",
+        "description": "Convert all unprocessed .docx files in the vault to GFM Markdown via Pandoc. Extracts embedded images.",
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "register_queue",
+        "description": "Scan 00-Inbox/ for files not yet in inbox-queue.json and register them with appropriate agent slots.",
+        "input_schema": {"type": "object", "properties": {}},
+    },
+]
+
+
+def call_tool(name: str, args: dict, context: dict) -> str:
+    result = call_self_management_tool(
+        name, args, context, module_file=_MODULE_FILE, task_id=TASK_ID
+    )
+    if result is not None:
+        return result
+
+    log = _Logger()
+    if name == "clean_filenames":
+        n = strip_emoji_filenames(_INBOX, log)
+        return f"Cleaned {n} filename(s)"
+    if name == "convert_docx":
+        ok, failed = process_docx_files(log)
+        return f"Converted {ok} docx file(s); {failed} failed"
+    if name == "register_queue":
+        ok, failed = register_new_files(log)
+        return f"Registered {ok} file(s); {failed} failed"
+
+    raise ValueError(f"Unknown tool: {name!r}")

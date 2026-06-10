@@ -6,9 +6,9 @@ purpose: >
   a vault health section listing pending-review drafts, orphan nodes, and quality
   scores. Rebuilds the reports-data.js dashboard data file after every report.
 inputs:
-  - .agents/orchestrator/state/logs/automation.log
+  - .agents/runtime/state/logs/automation.log
   - vault://01-Processing/**/*.md
-  - .agents/orchestrator/state/tasks.json
+  - .agents/*/agent.json  (task discovery for interval data)
 outputs:
   - state/reports/report-{YYYY-MM-DD}.json
   - state/reports/reports-data.js
@@ -17,7 +17,8 @@ outputs:
 dependencies: []
 dispatch_config: agent.json
 owned_tools:
-  - tools/08-daily-report.ps1
+  - tools/daily_report.py
+  - tools/flag_short_files.py
 responsibilities:
   - Parse automation.log for all lines in last 24h matching [timestamp][taskId] format
   - Count START/DONE markers per task to compute runs and completedRuns
@@ -30,7 +31,7 @@ responsibilities:
   - Inject suggestedQuality into frontmatter of quality:0 files that lack it
   - Write report JSON to state/reports/report-{date}.json
   - Rebuild state/reports/reports-data.js embedding all historical report JSONs
-  - Embed TASK_CONFIG and TASK_INTERVALS from tasks.json into reports-data.js
+  - Embed TASK_CONFIG and TASK_INTERVALS from agent.json discovery into reports-data.js
 restrictions:
   - Must not approve content
   - Must not modify 02-Library/

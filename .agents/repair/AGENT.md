@@ -5,11 +5,11 @@ purpose: >
   directories exist, and removes orphan image references from state indexes.
   No LLM calls. No vault content changes.
 inputs:
-  - .agents/orchestrator/state/runner.lock
+  - .agents/runtime/state/runner.lock
   - .agents/*/state/**
   - .shared/state/inbox-queue.json
 outputs:
-  - .agents/orchestrator/state/ (stale lock removed)
+  - .agents/runtime/state/ (stale lock removed)
   - .agents/*/state/ (missing dirs created)
   - state/logs/12-repair-agent_YYYY-MM-DD.log
 dependencies: []
@@ -29,7 +29,7 @@ restrictions:
 state_files:
   - state/logs/12-repair-agent_YYYY-MM-DD.log
 commit_scope:
-  - .agents/orchestrator/state
+  - .agents/runtime/state
   - .agents/ingestion/state
   - .agents/vision/state
   - .agents/lore/state

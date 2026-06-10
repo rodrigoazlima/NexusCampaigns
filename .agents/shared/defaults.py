@@ -58,7 +58,7 @@ GENERATED_TOKENS_DEFAULT: dict[str, Any] = {}
 """generated-tokens.json — keyed by source image SHA256."""
 
 # ---------------------------------------------------------------------------
-# Orchestrator state
+# Runtime state
 # ---------------------------------------------------------------------------
 
 TASKS_STATE_DEFAULT: dict[str, Any] = {
@@ -72,6 +72,7 @@ TASKS_STATE_DEFAULT: dict[str, Any] = {
     "classification-agent":     {"lastRun": "1970-01-01T00:00:00+00:00"},
     "review-agent-short-files": {"lastRun": "1970-01-01T00:00:00+00:00"},
     "wikilink-agent":           {"lastRun": "1970-01-01T00:00:00+00:00"},
+    "cleanup-agent":            {"lastRun": "1970-01-01T00:00:00+00:00"},
 }
 """tasks-state.json — last-run timestamps, reset to epoch forces immediate first run."""
 
@@ -141,7 +142,7 @@ STATE_FILE_DEFAULTS: dict[str, Any] = {
     ".agents/lore/state/processed-npcs.json":                   PROCESSED_NPCS_DEFAULT,
     ".agents/lore/state/scenarios.json":                        SCENARIOS_DEFAULT,
     ".agents/token/state/generated-tokens.json":                GENERATED_TOKENS_DEFAULT,
-    ".agents/orchestrator/state/tasks-state.json":              TASKS_STATE_DEFAULT,
+    ".agents/runtime/state/tasks-state.json":              TASKS_STATE_DEFAULT,
     ".agents/wikilink/state/wikilink-state.json":               WIKILINK_STATE_DEFAULT,
     ".agents/relationship/state/relationship-graph.json":       RELATIONSHIP_GRAPH_DEFAULT,
     ".agents/canon/state/canon-report-latest.json":             CANON_REPORT_DEFAULT,
@@ -152,8 +153,8 @@ STATE_FILE_DEFAULTS: dict[str, Any] = {
 # Directories that must exist before any agent runs
 REQUIRED_DIRS: list[str] = [
     ".shared/state",
-    ".agents/orchestrator/state",
-    ".agents/orchestrator/state/logs",
+    ".agents/runtime/state",
+    ".agents/runtime/state/logs",
     ".agents/ingestion/state",
     ".agents/vision/state",
     ".agents/lore/state",

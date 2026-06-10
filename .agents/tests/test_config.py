@@ -44,7 +44,7 @@ class TestSystemPaths:
         sp = SystemPaths(project_root=tmp_path)
         assert sp.agents_dir   == tmp_path / ".agents"
         assert sp.shared_state == tmp_path / ".shared" / "state"
-        assert sp.logs_dir     == tmp_path / ".agents" / "orchestrator" / "state" / "logs"
+        assert sp.logs_dir     == tmp_path / ".agents" / "runtime" / "state" / "logs"
         assert sp.reports_dir  == tmp_path / ".agents" / "review" / "state" / "reports"
 
     def test_agent_state(self, tmp_path):

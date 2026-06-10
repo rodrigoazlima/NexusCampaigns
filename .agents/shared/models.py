@@ -363,12 +363,14 @@ class OpenAIApiConfig(BaseModel):
 
 
 class ClaudeApiConfig(BaseModel):
-    model:           str
-    prompt_file:     Optional[str]        = None
-    system_file:     Optional[str]        = None
-    max_tokens:      int                  = 4096
-    temperature:     float                = 0.0
-    timeout_seconds: int                  = 120
+    model:            str
+    system_file:      Optional[str]       = None
+    tools_module:     Optional[str]       = None   # dotted import path e.g. "repair.tools.repair_agent"
+    history_file:     Optional[str]       = None   # relative to agent state/ dir
+    max_tokens:       int                 = 4096
+    temperature:      float               = 0.0
+    timeout_seconds:  int                 = 120
+    max_tool_rounds:  int                 = 20
 
 
 class GeminiApiConfig(BaseModel):
@@ -399,11 +401,14 @@ class AgentDispatchConfig(BaseModel):
 
 
 class TaskDispatchEntry(BaseModel):
-    dispatch: AgentDispatchConfig
+    intervalSeconds: int
+    description:     str
+    dispatch:        AgentDispatchConfig
 
 
 class AgentFolderConfig(BaseModel):
     """Root schema for agent.json — keyed by task ID."""
+    cleanupDays: int = 90
     tasks: dict[str, TaskDispatchEntry]
 
 
@@ -419,19 +424,8 @@ class RunResult(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Orchestrator / task scheduler
+# Runtime / task scheduler
 # ---------------------------------------------------------------------------
-
-class TaskConfig(BaseModel):
-    id:              str
-    intervalSeconds: int
-    description:     str
-
-
-class TasksConfig(BaseModel):
-    cleanupDays: int             = 90
-    tasks:       list[TaskConfig]
-
 
 class TaskStateEntry(BaseModel):
     lastRun: datetime

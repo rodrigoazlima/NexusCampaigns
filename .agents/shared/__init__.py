@@ -123,9 +123,7 @@ from .models import (
     SearchIndex,
     SearchIndexState,
     TagEnrichmentOutput,
-    TaskConfig,
     TaskDispatchEntry,
-    TasksConfig,
     TasksState,
     TaskStateEntry,
     VaultHealthReport,
@@ -175,8 +173,8 @@ __all__ = [
     "AgentDispatchConfig", "AgentFolderConfig", "CliDispatchConfig",
     "ClaudeApiConfig", "GeminiApiConfig", "OpenAIApiConfig", "OpenRouterApiConfig",
     "RunResult", "TaskDispatchEntry",
-    # Models — orchestrator
-    "TaskConfig", "TasksConfig", "TasksState", "TaskStateEntry",
+    # Models — runtime
+    "TasksState", "TaskStateEntry",
     # Models — metrics
     "RunMetrics", "AgentMetricsEntry", "AgentMetrics",
     # Models — reports

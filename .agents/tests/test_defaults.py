@@ -50,7 +50,7 @@ class TestDefaults:
         assert ".shared/state/inbox-queue.json" in STATE_FILE_DEFAULTS
         assert ".agents/vision/state/processed-images.json" in STATE_FILE_DEFAULTS
         assert ".agents/lore/state/processed-npcs.json" in STATE_FILE_DEFAULTS
-        assert ".agents/orchestrator/state/tasks-state.json" in STATE_FILE_DEFAULTS
+        assert ".agents/runtime/state/tasks-state.json" in STATE_FILE_DEFAULTS
 
     def test_required_dirs_contains_shared_state(self):
         assert ".shared/state" in REQUIRED_DIRS

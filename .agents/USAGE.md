@@ -8,7 +8,7 @@ How to invoke, configure, debug, and extend each agent.
 
 | Agent | Trigger | Tool | Manual Run |
 |-------|---------|------|-----------|
-| orchestrator | Windows Task Scheduler | `runner.ps1` | `pwsh .agents/orchestrator/tools/runner.ps1` |
+| orchestrator | Windows Task Scheduler | `runner.ps1` | `pwsh .agents/runtime/tools/runner.ps1` |
 | ingestion | runner (1 h) | `11-ingestion-agent.ps1` | `pwsh .agents/ingestion/tools/11-ingestion-agent.ps1` |
 | vision | runner (1 h) | `06-classify-images.ps1` | `pwsh .agents/vision/tools/06-classify-images.ps1` |
 | lore | runner (1 h) | `09-generate-npcs.ps1` | `pwsh .agents/lore/tools/09-generate-npcs.ps1` |
@@ -29,26 +29,26 @@ How to invoke, configure, debug, and extend each agent.
 
 ```powershell
 # Run once as Administrator
-pwsh .agents/orchestrator/tools/register-tasks.ps1
+pwsh .agents/runtime/tools/register-tasks.ps1
 ```
 
 ### Uninstall
 
 ```powershell
-pwsh .agents/orchestrator/tools/deregister-tasks.ps1
+pwsh .agents/runtime/tools/deregister-tasks.ps1
 ```
 
 ### Manual dispatch
 
 ```powershell
-pwsh .agents/orchestrator/tools/runner.ps1
+pwsh .agents/runtime/tools/runner.ps1
 ```
 
 ### State files
 
 | File | Purpose |
 |------|---------|
-| `state/tasks.json` | Agent registry — ids, script paths, intervals |
+| `state/agent.json` | Agent registry — ids, script paths, intervals |
 | `state/tasks-state.json` | Last-run timestamps per agent |
 | `state/settings.json` | Task Scheduler config (task name, interval minutes) |
 | `state/logs/automation.log` | Master log — all agents, all runs |
@@ -56,7 +56,7 @@ pwsh .agents/orchestrator/tools/runner.ps1
 
 ### Add / remove an agent from schedule
 
-Edit `state/tasks.json`:
+Edit `state/agent.json`:
 
 ```json
 {
@@ -450,7 +450,7 @@ $base = "$vault\.agents\$name"
 Then:
 1. Write `AGENT.md` (see schema in `README.md`)
 2. Add to `registry.yaml`
-3. Add to `orchestrator/state/tasks.json` + `tasks-state.json`
+3. Add to `runtime/state/agent.json` + `tasks-state.json`
 
 ### Override LLM endpoint
 
@@ -462,13 +462,13 @@ Edit `registry.yaml` `llm_endpoints` section. All agents that reference the alia
 pwsh .agents/{agent}/tools/{tool-script}.ps1
 ```
 
-Or update `orchestrator/state/tasks-state.json` to set `lastRun` to epoch time for that agent — runner will fire it on next tick.
+Or update `runtime/state/tasks-state.json` to set `lastRun` to epoch time for that agent — runner will fire it on next tick.
 
 ### View logs
 
 ```powershell
 # Master log (all agents)
-Get-Content .agents/orchestrator/state/logs/automation.log -Tail 50
+Get-Content .agents/runtime/state/logs/automation.log -Tail 50
 
 # Single agent log
 Get-Content ".agents/vision/state/logs/06-classify-images_$(Get-Date -Format 'yyyy-MM-dd').log"

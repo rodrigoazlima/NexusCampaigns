@@ -81,7 +81,7 @@ def fmio():
 @pytest.fixture
 def logger_setup(vault):
     logs_dir   = vault / ".agents" / "ingestion" / "state" / "logs"
-    master_log = vault / ".agents" / "orchestrator" / "state" / "logs" / "automation.log"
+    master_log = vault / ".agents" / "runtime" / "state" / "logs" / "automation.log"
     logger = Logger(
         task_id        = "ingestion-agent",
         script_basename= "ingestion_agent.py",
@@ -139,7 +139,7 @@ class TestLoggerAndStateStoreTogether:
 
     def test_multiple_agent_logs_share_master_log(self, vault):
         """Two agents logging to the same automation.log."""
-        master = vault / ".agents" / "orchestrator" / "state" / "logs" / "automation.log"
+        master = vault / ".agents" / "runtime" / "state" / "logs" / "automation.log"
 
         log_a = Logger("agent-a", "a.py", vault / "logs-a", master)
         log_b = Logger("agent-b", "b.py", vault / "logs-b", master)
@@ -482,7 +482,7 @@ class TestBootstrapAllDefaults:
             assert data is not None
 
     def test_tasks_state_all_agents_epoch(self, vault):
-        path  = vault / ".agents" / "orchestrator" / "state" / "tasks-state.json"
+        path  = vault / ".agents" / "runtime" / "state" / "tasks-state.json"
         store = StateStore(path, default=TASKS_STATE_DEFAULT)
         store.init_defaults()
         data  = store.load()
