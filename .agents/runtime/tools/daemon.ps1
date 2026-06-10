@@ -1,12 +1,20 @@
-$env:VAULT_ROOT = "C:\opt\GitHub\NexusCampaigns\knowledge-base"
-$env:LLM_TEXT_URL = "http://localhost:11434"
-$env:LLM_VISION_URL = "http://localhost:11435"
-$env:LLM_TEXT_MODEL = "mistral:7b"
-$env:LLM_VISION_MODEL = "llava:13b"
-$env:GIT_AUTHOR_NAME = "Vault Bot"
-$env:GIT_AUTHOR_EMAIL = "bot@localhost"
+# Task Scheduler fallback daemon — calls runner.py --once every 60s.
+# Prefer NSSM for production installs: runner.py runs its own loop when
+# invoked without --once.
+#
+# Usage: powershell -NonInteractive -File daemon.ps1
+# API keys and GIT_AUTHOR_* must be set in the Task Scheduler environment
+# or in the system/user environment before launching this script.
+
+param(
+    [string]$ProjectRoot = "C:\opt\GitHub\NexusCampaigns",
+    [string]$Python      = "python",
+    [int]   $IntervalSec = 60
+)
+
+$Runner = "$ProjectRoot\.agents\runtime\tools\runner.py"
 
 while ($true) {
-    & "C:\opt\Python\Python310\python.exe" "C:\opt\GitHub\NexusCampaigns\.agents\orchestrator\tools\runner.py" --once
-    Start-Sleep -Seconds 60
+    & $Python $Runner --once
+    Start-Sleep -Seconds $IntervalSec
 }

@@ -43,12 +43,17 @@ from shared import (  # noqa: E402
 
 _RUNTIME_STATE = Path(__file__).resolve().parents[1] / "state"
 _STATE_JSON    = _RUNTIME_STATE / "tasks-state.json"
+_METRICS_JSON  = _RUNTIME_STATE / "agent-metrics.json"
 _LOCK_FILE     = _RUNTIME_STATE / "runner.lock"
 _LOGS_DIR      = _RUNTIME_STATE / "logs"
 _MASTER_LOG    = _LOGS_DIR / "automation.log"
 
 _LOCK_STALE_SECONDS = 1800   # 30 min
 _DEFAULT_INTERVAL   = 60     # orchestrator poll cadence
+_MAX_METRICS_RUNS   = 100
+
+# Parses "processed=N failed=N" from agent DONE lines
+_DONE_PARSE_RE = re.compile(r"processed=(\d+).*?failed=(\d+)")
 
 # Maps dispatch.type → attribute name on AgentDispatchConfig
 _DISPATCH_TYPE_FIELD: dict[str, str] = {
@@ -127,6 +132,66 @@ def _release_lock() -> None:
         _LOCK_FILE.unlink(missing_ok=True)
     except Exception:
         pass
+
+
+# ---------------------------------------------------------------------------
+# Metrics helpers
+# ---------------------------------------------------------------------------
+
+def _load_metrics() -> dict:
+    if not _METRICS_JSON.exists():
+        return {}
+    try:
+        return json.loads(_METRICS_JSON.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _save_metrics(data: dict) -> None:
+    tmp = _METRICS_JSON.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    tmp.replace(_METRICS_JSON)
+
+
+def _parse_agent_items(task_id: str, after: datetime) -> tuple[int, int]:
+    """Return (processed, failed) from the agent's first DONE line after 'after'."""
+    if not _MASTER_LOG.exists():
+        return 0, 0
+    try:
+        tag = f"[{task_id}]"
+        ts_after = after.strftime("%Y-%m-%d %H:%M:%S")
+        for line in _MASTER_LOG.read_text(encoding="utf-8").splitlines():
+            if tag not in line or "--- DONE ---" not in line:
+                continue
+            ts_m = re.match(r"\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]", line)
+            if ts_m and ts_m.group(1) >= ts_after:
+                m = _DONE_PARSE_RE.search(line)
+                if m:
+                    return int(m.group(1)), int(m.group(2))
+    except Exception:
+        pass
+    return 0, 0
+
+
+def _record_metrics(
+    task_id: str,
+    started_at: datetime,
+    finished_at: datetime,
+    items_processed: int,
+    items_failed: int,
+) -> None:
+    data = _load_metrics()
+    entry = data.setdefault(task_id, {"runs": []})
+    entry["runs"].append({
+        "startedAt":      started_at.isoformat(),
+        "finishedAt":     finished_at.isoformat(),
+        "durationMs":     int((finished_at - started_at).total_seconds() * 1000),
+        "itemsProcessed": items_processed,
+        "itemsFailed":    items_failed,
+    })
+    if len(entry["runs"]) > _MAX_METRICS_RUNS:
+        entry["runs"] = entry["runs"][-_MAX_METRICS_RUNS:]
+    _save_metrics(data)
 
 
 # ---------------------------------------------------------------------------
@@ -371,13 +436,19 @@ class Runtime(IOrchestrator):
                 continue
 
             self._log.info(f"Dispatching {task_id} ({entry.description})")
-            exit_code = self.dispatch(task_id)
+            started_at = datetime.now(timezone.utc)
+            exit_code  = self.dispatch(task_id)
+            finished_at = datetime.now(timezone.utc)
 
             assert self._state is not None
-            self._state[task_id] = TaskStateEntry(
-                lastRun=datetime.now(timezone.utc)
-            )
+            self._state[task_id] = TaskStateEntry(lastRun=finished_at)
             _save_state(self._state)
+
+            try:
+                processed, failed = _parse_agent_items(task_id, started_at)
+                _record_metrics(task_id, started_at, finished_at, processed, failed)
+            except Exception as exc:
+                self._log.warning(f"Metrics update failed for {task_id}: {exc}")
 
             if exit_code == 0:
                 try:

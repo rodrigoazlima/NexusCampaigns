@@ -1,15 +1,32 @@
 #Requires -RunAsAdministrator
-# Installs VaultKnowledgeFactory as a Windows service via NSSM.
+# Installs vault-knowledge-factory as a Windows service via NSSM.
 # Run once from an elevated PowerShell prompt.
+#
+# Prerequisites:
+#   1. nssm.exe on PATH  (https://nssm.cc/download)
+#   2. pip install -r requirements.txt
+#   3. Set $ApiKey and optionally $OpenAIKey below, or supply via env vars
 
-$ProjectRoot = "C:\opt\GitHub\NexusCampaigns"
-$VaultRoot   = "C:\opt\GitHub\NexusCampaigns\knowledge-base"
-$Python      = "C:\opt\Python\Python310\python.exe"
-$Runner      = "$ProjectRoot\.agents\orchestrator\tools\runner.py"
-$LogsDir     = "$ProjectRoot\.agents\orchestrator\state\logs"
-$SvcName     = "vault-knowledge-factory"
+param(
+    [string]$ProjectRoot  = "C:\opt\GitHub\NexusCampaigns",
+    [string]$Python       = "python",
+    [string]$ApiKey       = $env:ANTHROPIC_API_KEY,
+    [string]$OpenAIKey    = $(if ($env:OPENAI_API_KEY) { $env:OPENAI_API_KEY } else { "lm-studio" })
+)
+
+$SvcName = "vault-knowledge-factory"
+$Runner  = "$ProjectRoot\.agents\runtime\tools\runner.py"
+$LogsDir = "$ProjectRoot\.agents\runtime\state\logs"
 
 New-Item -ItemType Directory -Force $LogsDir | Out-Null
+
+# Verify runner starts cleanly before registering
+Write-Host "Verifying runner (--once)..."
+& $Python $Runner --once
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Runner exited with code $LASTEXITCODE. Fix before installing service."
+    exit 1
+}
 
 nssm install $SvcName $Python
 nssm set $SvcName AppParameters "`"$Runner`""
@@ -20,16 +37,17 @@ nssm set $SvcName Start SERVICE_AUTO_START
 nssm set $SvcName AppRestartDelay 30000
 nssm set $SvcName AppStdout "$LogsDir\service-stdout.log"
 nssm set $SvcName AppStderr "$LogsDir\service-stderr.log"
-nssm set $SvcName AppEnvironmentExtra `
-    "VAULT_ROOT=$VaultRoot" `
-    "LLM_TEXT_URL=http://localhost:11434" `
-    "LLM_VISION_URL=http://localhost:11435" `
-    "LLM_TEXT_MODEL=mistral:7b" `
-    "LLM_VISION_MODEL=llava:13b" `
-    "GIT_AUTHOR_NAME=Vault Bot" `
-    "GIT_AUTHOR_EMAIL=bot@localhost"
+
+$envBlock = @(
+    "GIT_AUTHOR_NAME=Vault Bot",
+    "GIT_AUTHOR_EMAIL=bot@localhost",
+    "ANTHROPIC_API_KEY=$ApiKey",
+    "OPENAI_API_KEY=$OpenAIKey"
+)
+nssm set $SvcName AppEnvironmentExtra ($envBlock -join "`n")
 
 nssm start $SvcName
+
 Write-Host "Service '$SvcName' installed and started."
-Write-Host "Check status: nssm status $SvcName"
-Write-Host "Logs: $LogsDir\automation.log"
+Write-Host "Status : nssm status $SvcName"
+Write-Host "Logs   : $LogsDir\automation.log"
