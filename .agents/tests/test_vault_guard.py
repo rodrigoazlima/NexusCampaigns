@@ -108,6 +108,46 @@ class TestIsUnderHelper:
         assert _is_under(tmp_path, child) is False
 
 
+class TestVaultGuardAssertNotSelfApproved:
+    def test_reviewed_true_raises(self, guard):
+        with pytest.raises(VaultWriteError, match="reviewed"):
+            guard.assert_not_self_approved({"reviewed": True, "status": "draft"})
+
+    def test_status_approved_raises(self, guard):
+        with pytest.raises(VaultWriteError, match="status"):
+            guard.assert_not_self_approved({"reviewed": False, "status": "approved"})
+
+    def test_both_forbidden_raises_on_first(self, guard):
+        with pytest.raises(VaultWriteError):
+            guard.assert_not_self_approved({"reviewed": True, "status": "approved"})
+
+    def test_draft_status_is_allowed(self, guard):
+        guard.assert_not_self_approved({"reviewed": False, "status": "draft"})
+
+    def test_review_status_is_allowed(self, guard):
+        guard.assert_not_self_approved({"reviewed": False, "status": "review"})
+
+    def test_reviewed_false_is_allowed(self, guard):
+        guard.assert_not_self_approved({"reviewed": False})
+
+    def test_missing_fields_is_allowed(self, guard):
+        guard.assert_not_self_approved({})
+
+    def test_error_message_contains_field_name(self, guard):
+        try:
+            guard.assert_not_self_approved({"reviewed": True})
+            pytest.fail("Expected VaultWriteError")
+        except VaultWriteError as e:
+            assert "reviewed" in str(e)
+
+    def test_error_message_contains_approved_value(self, guard):
+        try:
+            guard.assert_not_self_approved({"status": "approved"})
+            pytest.fail("Expected VaultWriteError")
+        except VaultWriteError as e:
+            assert "approved" in str(e)
+
+
 class TestVaultWriteErrorIsPermissionError:
     def test_subclass(self):
         exc = VaultWriteError("test")

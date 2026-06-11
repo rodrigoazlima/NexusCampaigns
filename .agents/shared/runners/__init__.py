@@ -1,13 +1,25 @@
 """shared.runners — dispatch runner factory.
 
 get_runner(dispatch_type) → IRunner
+_resolve_placeholders(text, context) → str
 """
 
 from __future__ import annotations
 
+import re
+
 from ..interfaces import DispatchError, IRunner
 
-__all__ = ["IRunner", "get_runner"]
+__all__ = ["IRunner", "get_runner", "_resolve_placeholders"]
+
+
+def _resolve_placeholders(text: str, context: dict) -> str:
+    """Replace {{key}} with context[key]. Unknown keys are left unchanged."""
+    return re.sub(
+        r"\{\{(\w+)\}\}",
+        lambda m: str(context.get(m.group(1), m.group(0))),
+        text,
+    )
 
 _TYPE_TO_MODULE: dict[str, str] = {
     "cli":            ".cli",

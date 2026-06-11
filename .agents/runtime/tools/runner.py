@@ -154,7 +154,9 @@ def _load_metrics() -> dict:
     if not _METRICS_JSON.exists():
         return {}
     try:
-        return json.loads(_METRICS_JSON.read_text(encoding="utf-8"))
+        # Strip BOM: Windows PS may write UTF-8-BOM to agent-metrics.json
+        text = _METRICS_JSON.read_text(encoding="utf-8").lstrip("﻿")
+        return json.loads(text)
     except Exception:
         return {}
 
@@ -173,7 +175,7 @@ def _parse_agent_items(task_id: str, after: datetime) -> tuple[int, int]:
         tag = f"[{task_id}]"
         ts_after = after.strftime("%Y-%m-%d %H:%M:%S")
         for line in _MASTER_LOG.read_text(encoding="utf-8").splitlines():
-            if tag not in line or "--- DONE ---" not in line:
+            if tag not in line or "--- DONE" not in line:
                 continue
             ts_m = re.match(r"\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]", line)
             if ts_m and ts_m.group(1) >= ts_after:

@@ -1,11 +1,14 @@
 """Tests for shared.logger.Logger."""
 
+import io
+import sys
 import time
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
-from shared.logger import Logger
+from shared.logger import Logger, _ensure_utf8_stdout
 
 
 @pytest.fixture
@@ -122,9 +125,11 @@ class TestLoggerStartDone:
         t0 = logger.start()
         logger.done(t0, key="processed", count=5, failed=1)
         content = master.read_text(encoding="utf-8")
-        assert "--- DONE ---" in content
+        # spec format: --- DONE (key: N, failed: N, elapsed: Xs) ---
+        assert "--- DONE (" in content
         assert "processed: 5" in content
-        assert "failed=1" in content
+        assert "failed: 1" in content
+        assert content.strip().endswith("---")
 
     def test_done_reports_elapsed(self, logger, log_dirs):
         _, master = log_dirs
@@ -132,4 +137,36 @@ class TestLoggerStartDone:
         time.sleep(0.01)
         logger.done(t0, key="classified", count=0, failed=0)
         content = master.read_text(encoding="utf-8")
-        assert "elapsed=" in content
+        assert "elapsed:" in content
+
+
+class TestEnsureUtf8Stdout:
+    def test_no_op_when_already_utf8(self):
+        """_ensure_utf8_stdout() must not double-wrap a UTF-8 stdout."""
+        original = sys.stdout
+        with patch("sys.platform", "win32"):
+            fake = io.TextIOWrapper(io.BytesIO(), encoding="utf-8")
+            with patch("sys.stdout", fake):
+                _ensure_utf8_stdout()
+                assert sys.stdout is fake  # unchanged
+        sys.stdout = original
+
+    def test_wraps_non_utf8_stdout_on_windows(self):
+        """On Windows with non-UTF-8 encoding, stdout is re-wrapped as UTF-8."""
+        with patch("sys.platform", "win32"):
+            buf = io.BytesIO()
+            fake = io.TextIOWrapper(buf, encoding="cp1252")
+            with patch("sys.stdout", fake):
+                _ensure_utf8_stdout()
+                assert sys.stdout.encoding == "utf-8"
+
+    def test_noop_on_non_windows(self):
+        """On non-Windows platforms, stdout is left unchanged."""
+        original = sys.stdout
+        with patch("sys.platform", "linux"):
+            buf = io.BytesIO()
+            fake = io.TextIOWrapper(buf, encoding="cp1252")
+            with patch("sys.stdout", fake):
+                _ensure_utf8_stdout()
+                assert sys.stdout is fake  # not replaced
+        sys.stdout = original

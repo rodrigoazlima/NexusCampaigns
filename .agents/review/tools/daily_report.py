@@ -22,7 +22,13 @@ _PROJECT_ROOT = _AGENTS_DIR.parent
 if str(_AGENTS_DIR) not in sys.path:
     sys.path.insert(0, str(_AGENTS_DIR))
 
-from shared import FrontmatterIO  # noqa: E402
+from shared import (  # noqa: E402
+    FrontmatterIO,
+    describe_violations,
+    extract_wikilinks,
+    is_orphan,
+    slugs_from_relationships,
+)
 
 TASK_ID         = "review-agent"
 SCRIPT_BASENAME = "daily_report.py"
@@ -141,42 +147,88 @@ def _vault_health(fio: FrontmatterIO, log: _Logger) -> dict[str, Any]:
     orphans:        list[str] = []
     quality_scores: dict[str, int] = {}
 
-    if not _PROCESSING.is_dir():
-        return {
-            "pendingReview": pending_review,
-            "orphans": orphans,
-            "qualityScores": quality_scores,
-        }
+    if _PROCESSING.is_dir():
+        for md_path in sorted(_PROCESSING.glob("**/*.md")):
+            try:
+                fm, body = fio.read(md_path)
+            except Exception:
+                continue
 
-    for md_path in sorted(_PROCESSING.glob("**/*.md")):
+            rel = md_path.relative_to(_PROJECT_ROOT).as_posix()
+
+            if not fm.get("reviewed") or fm.get("status") == "draft":
+                pending_review.append(rel)
+
+            if not _WIKILINK_RE.search(body):
+                orphans.append(rel)
+
+            score = _quality_score(fm, body)
+            quality_scores[rel] = score
+
+            if fm.get("quality", 0) == 0 and "suggestedQuality" not in fm:
+                try:
+                    fm["suggestedQuality"] = score
+                    fio.write(md_path, fm, body)
+                except Exception as exc:
+                    log.warning(f"Could not inject suggestedQuality in {md_path.name}: {exc}")
+
+    # Scan 02-Library/ for link-rule violations (linking-rules.spec.md)
+    library_violations = _library_link_violations(fio)
+
+    return {
+        "pendingReview":        pending_review,
+        "orphans":              orphans,
+        "qualityScores":        quality_scores,
+        "libraryLinkViolations": library_violations,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Library link-rule violation detection (linking-rules.spec.md)
+# ---------------------------------------------------------------------------
+
+def _library_link_violations(fio: FrontmatterIO) -> list[dict[str, Any]]:
+    """Scan 02-Library/ for entities missing required outbound link types.
+
+    Returns one entry per violating entity:
+      {"path": str, "type": str, "violations": [str, ...]}
+
+    Covers both orphans (zero links) and per-type required-link gaps.
+    """
+    violations: list[dict[str, Any]] = []
+    if not _LIBRARY.is_dir():
+        return violations
+
+    for md_path in sorted(_LIBRARY.glob("**/*.md")):
         try:
             fm, body = fio.read(md_path)
         except Exception:
             continue
 
+        entity_type = fm.get("type", "")
         rel = md_path.relative_to(_PROJECT_ROOT).as_posix()
 
-        if not fm.get("reviewed") or fm.get("status") == "draft":
-            pending_review.append(rel)
+        linked = (
+            slugs_from_relationships(fm.get("relationships") or [])
+            + extract_wikilinks(body)
+        )
 
-        if not _WIKILINK_RE.search(body):
-            orphans.append(rel)
+        if is_orphan(linked):
+            violations.append({
+                "path":       rel,
+                "type":       entity_type,
+                "violations": ["no outbound links (orphan)"],
+            })
+        else:
+            issues = describe_violations(entity_type, linked)
+            if issues:
+                violations.append({
+                    "path":       rel,
+                    "type":       entity_type,
+                    "violations": issues,
+                })
 
-        score = _quality_score(fm, body)
-        quality_scores[rel] = score
-
-        if fm.get("quality", 0) == 0 and "suggestedQuality" not in fm:
-            try:
-                fm["suggestedQuality"] = score
-                fio.write(md_path, fm, body)
-            except Exception as exc:
-                log.warning(f"Could not inject suggestedQuality in {md_path.name}: {exc}")
-
-    return {
-        "pendingReview": pending_review,
-        "orphans": orphans,
-        "qualityScores": quality_scores,
-    }
+    return violations
 
 
 # ---------------------------------------------------------------------------
@@ -251,9 +303,13 @@ def main() -> None:
 
     _write_reports_js(log)
 
-    n_pending = len(health["pendingReview"])
-    n_orphans = len(health["orphans"])
-    log.info(f"Vault health: pendingReview={n_pending} orphans={n_orphans}")
+    n_pending    = len(health["pendingReview"])
+    n_orphans    = len(health["orphans"])
+    n_violations = len(health["libraryLinkViolations"])
+    log.info(
+        f"Vault health: pendingReview={n_pending} orphans={n_orphans}"
+        f" libraryLinkViolations={n_violations}"
+    )
 
     log.done(t0, count=1)
     sys.exit(0)
@@ -284,7 +340,11 @@ TOOLS = SELF_MANAGEMENT_TOOLS + [
     },
     {
         "name": "scan_vault_health",
-        "description": "Scan 01-Processing/ for pending reviews, orphans, and quality scores. Returns health dict.",
+        "description": (
+            "Scan 01-Processing/ for pending reviews, orphans, and quality scores. "
+            "Also scans 02-Library/ for link-rule violations (missing required links per linking-rules.spec.md). "
+            "Returns health dict including libraryLinkViolations."
+        ),
         "input_schema": {"type": "object", "properties": {}},
     },
     {

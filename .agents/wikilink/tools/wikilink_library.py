@@ -30,6 +30,8 @@ from shared import (  # noqa: E402
     StateStore,
     extract_wikilinks,
     has_wikilink,
+    slugs_from_relationships,
+    required_type_boost,
     WIKILINK_STATE_DEFAULT,
 )
 from shared.interfaces import IWikilinkResolver  # noqa: E402
@@ -205,6 +207,18 @@ class WikilinkResolver(IWikilinkResolver):
         src_kw = _extract_keywords(source_body)
         tgt_kw = _extract_keywords(target_body)
         score += min(len(src_kw & tgt_kw), 2)
+
+        # Required-link type boost: +5 if candidate fills a missing required link group
+        # (linking-rules.spec.md — per-type enforcement)
+        src_linked = (
+            slugs_from_relationships(source_fm.get("relationships") or [])
+            + extract_wikilinks(source_body)
+        )
+        score += required_type_boost(
+            source_fm.get("type", ""),
+            src_linked,
+            target_slug,
+        )
 
         return score
 

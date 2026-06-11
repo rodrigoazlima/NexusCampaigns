@@ -14,6 +14,12 @@ _WIKILINK_RE = re.compile(r"\[\[([^\[\]|#]+?)(?:[|#][^\[\]]*)?\]\]")
 _NON_SLUG_RE = re.compile(r"[^a-z0-9]+")
 _MULTI_DASH_RE = re.compile(r"-{2,}")
 
+# Forbidden substrings / patterns in entity slugs (data-contracts.spec.md)
+_FORBIDDEN_SLUG_SUBSTRINGS: frozenset[str] = frozenset({
+    "final_v2", "new", "cool", "untitled",
+})
+_VALID_SLUG_RE = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)+$")
+
 
 def to_slug(text: str) -> str:
     """Convert arbitrary text to a lowercase hyphenated slug.
@@ -77,6 +83,48 @@ def has_wikilink(text: str, slug: str) -> bool:
         re.IGNORECASE,
     )
     return bool(pattern.search(text))
+
+
+def build_entity_slug(entity_type: str, *descriptors: str) -> str:
+    """Build a spec-compliant entity slug: {type}-{descriptor1}-{descriptor2}.
+
+    Each part is individually slugified and joined with hyphens.
+
+    >>> build_entity_slug("npc", "Necromancer", "Black Hollow")
+    'npc-necromancer-black-hollow'
+    >>> build_entity_slug("location", "Dungeon Cirit 01")
+    'location-dungeon-cirit-01'
+    """
+    parts = [to_slug(entity_type)] + [to_slug(d) for d in descriptors if d]
+    return "-".join(p for p in parts if p)
+
+
+def is_valid_slug(slug: str) -> bool:
+    """Return True if slug follows the data-contracts spec naming rules.
+
+    Rules:
+    - Lowercase letters, digits, and hyphens only
+    - Must start with a letter
+    - Must contain at least one hyphen (type prefix required)
+    - No forbidden substrings: final_v2, new, cool, untitled
+    - No uppercase, no spaces, no underscores
+
+    >>> is_valid_slug("npc-necromancer-black-hollow")
+    True
+    >>> is_valid_slug("Untitled")
+    False
+    >>> is_valid_slug("npc_new")
+    False
+    >>> is_valid_slug("final_v2-boss")
+    False
+    """
+    lower = slug.lower()
+    if any(forbidden in lower for forbidden in _FORBIDDEN_SLUG_SUBSTRINGS):
+        return False
+    # Reject uppercase, spaces, underscores
+    if slug != lower or " " in slug or "_" in slug:
+        return False
+    return bool(_VALID_SLUG_RE.match(slug))
 
 
 def slugs_from_relationships(relationships: list[str]) -> list[str]:

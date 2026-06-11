@@ -3,6 +3,7 @@
 Enforces write-protection rules from security.spec.md:
   - Agents may NOT write to 02-Library/ (human promotion only)
   - Agents may NOT delete files from 00-Inbox/ (source preservation)
+  - Agents may NOT set reviewed=True or status='approved' in frontmatter (G3)
 
 Note: Ingestion Agent renames files within 00-Inbox/ — it does NOT call
 assert_writable() because renaming is an explicit responsibility defined in
@@ -12,9 +13,16 @@ its AGENT.md. VaultGuard is for agents writing new content.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from .config import VaultPaths
 from .interfaces import IVaultGuard, VaultWriteError
+
+# Frontmatter fields that only humans may set to their protected values.
+_HUMAN_ONLY_FIELDS: dict[str, Any] = {
+    "reviewed": True,
+    "status":   "approved",
+}
 
 
 class VaultGuard(IVaultGuard):
@@ -41,6 +49,14 @@ class VaultGuard(IVaultGuard):
             raise VaultWriteError(
                 f"Agents may not delete files from 00-Inbox/: {target}"
             )
+
+    def assert_not_self_approved(self, frontmatter: dict) -> None:
+        for field, forbidden_value in _HUMAN_ONLY_FIELDS.items():
+            if frontmatter.get(field) == forbidden_value:
+                raise VaultWriteError(
+                    f"Agents may not set {field}={forbidden_value!r} "
+                    f"— human-only field (security.spec.md G3)"
+                )
 
 
 def _is_under(child: Path, parent: Path) -> bool:

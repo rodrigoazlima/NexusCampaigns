@@ -8,9 +8,25 @@ Writes [YYYY-MM-DD HH:mm:ss] [task_id] LEVEL: message to:
 
 from __future__ import annotations
 
+import io
+import sys
 import time
 from datetime import datetime
 from pathlib import Path
+
+
+def _ensure_utf8_stdout() -> None:
+    """Wrap stdout with UTF-8 on Windows when the default encoding is not UTF-8.
+
+    Required by data-contracts.spec.md: stdout wrapped with
+    io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace') on Windows.
+    """
+    if sys.platform == "win32" and hasattr(sys.stdout, "buffer"):
+        enc = (getattr(sys.stdout, "encoding", "") or "").lower().replace("-", "")
+        if enc != "utf8":
+            sys.stdout = io.TextIOWrapper(
+                sys.stdout.buffer, encoding="utf-8", errors="replace"
+            )
 
 
 class Logger:
@@ -23,6 +39,7 @@ class Logger:
         logs_dir: Path,
         master_log: Path,
     ) -> None:
+        _ensure_utf8_stdout()
         self.task_id = task_id
         logs_dir.mkdir(parents=True, exist_ok=True)
         master_log.parent.mkdir(parents=True, exist_ok=True)
@@ -53,5 +70,5 @@ class Logger:
         elapsed = round(time.monotonic() - t0, 2)
         self._write(
             "INFO",
-            f"--- DONE --- {key}: {count} failed={failed} elapsed={elapsed}s",
+            f"--- DONE ({key}: {count}, failed: {failed}, elapsed: {elapsed}s) ---",
         )

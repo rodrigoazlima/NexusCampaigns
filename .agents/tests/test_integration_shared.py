@@ -131,7 +131,7 @@ class TestLoggerAndStateStoreTogether:
         # Logger wrote to disk
         log_content = master_log.read_text(encoding="utf-8")
         assert "--- START ---" in log_content
-        assert "--- DONE ---" in log_content
+        assert "--- DONE (" in log_content
         assert "processed: 3" in log_content
 
         # StateStore persisted the update

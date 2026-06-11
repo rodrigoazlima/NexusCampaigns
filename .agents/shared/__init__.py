@@ -8,21 +8,32 @@ from .entity_scanner import EntityScanner
 from .frontmatter_io import FrontmatterIO
 from .llm_client import LLMClient
 from .loaders import load_vault_config
-from .logger import Logger
+from .logger import Logger, _ensure_utf8_stdout
 from .quality_gate import QualityGate
 from .slug_utils import (
+    build_entity_slug,
     entity_id_from_path,
     extract_wikilinks,
     has_wikilink,
+    is_valid_slug,
     normalize_slug,
     slugs_from_relationships,
     to_slug,
     wikilink,
 )
-from .state_store import StateStore
+from .state_store import StateStore, TextStateStore, bootstrap_vault_state
 from .vault_guard import VaultGuard
 from .signal_bus import SignalEmitter, SignalConsumer
+from .linking_rules import (
+    REQUIRED_LINK_GROUPS,
+    describe_violations,
+    has_required_links,
+    is_orphan,
+    missing_required_groups,
+    required_type_boost,
+)
 from .defaults import (
+    AGENT_METRICS_DEFAULT,
     CANON_REPORT_DEFAULT,
     DEDUP_REPORT_DEFAULT,
     GENERATED_TOKENS_DEFAULT,
@@ -35,6 +46,7 @@ from .defaults import (
     SEARCH_INDEX_DEFAULT,
     STATE_FILE_DEFAULTS,
     TASKS_STATE_DEFAULT,
+    TEXT_STATE_FILES,
     TOKEN_LINKS_DEFAULT,
     WIKILINK_STATE_DEFAULT,
 )
@@ -139,10 +151,11 @@ __all__ = [
     "LLMEndpointConfig", "SystemPaths", "VaultConfig", "VaultPaths",
     # Concrete implementations
     "EntityScanner", "FrontmatterIO", "LLMClient", "load_vault_config",
-    "Logger", "QualityGate", "StateStore", "VaultGuard",
+    "Logger", "_ensure_utf8_stdout", "QualityGate",
+    "StateStore", "TextStateStore", "bootstrap_vault_state", "VaultGuard",
     # Slug utilities
-    "entity_id_from_path", "extract_wikilinks", "has_wikilink",
-    "normalize_slug", "slugs_from_relationships", "to_slug", "wikilink",
+    "build_entity_slug", "entity_id_from_path", "extract_wikilinks", "has_wikilink",
+    "is_valid_slug", "normalize_slug", "slugs_from_relationships", "to_slug", "wikilink",
     # Interfaces
     "BaseAgent", "IAgent", "ICanonValidator", "ICleaner", "ICurator",
     "IDedupAnalyzer", "IFaceMatcher", "IFrontmatterIO", "IImageClassifier",
@@ -152,6 +165,9 @@ __all__ = [
     "IWikiCompiler", "IWikilinkResolver",
     # Exceptions
     "DispatchError", "LLMOfflineError", "LLMResponseError", "VaultWriteError",
+    # Linking rules
+    "REQUIRED_LINK_GROUPS", "describe_violations", "has_required_links",
+    "is_orphan", "missing_required_groups", "required_type_boost",
     # Signal bus
     "SignalEmitter", "SignalConsumer",
     # Runners
@@ -188,10 +204,10 @@ __all__ = [
     "ReviewItem", "SearchEntry", "SearchIndex", "SearchIndexState",
     "VaultHealthReport",
     # Defaults
-    "CANON_REPORT_DEFAULT", "DEDUP_REPORT_DEFAULT",
+    "AGENT_METRICS_DEFAULT", "CANON_REPORT_DEFAULT", "DEDUP_REPORT_DEFAULT",
     "GENERATED_TOKENS_DEFAULT", "INBOX_QUEUE_DEFAULT",
     "PROCESSED_IMAGES_DEFAULT", "PROCESSED_NPCS_DEFAULT",
     "RELATIONSHIP_GRAPH_DEFAULT", "REQUIRED_DIRS", "SCENARIOS_DEFAULT",
     "SEARCH_INDEX_DEFAULT", "STATE_FILE_DEFAULTS", "TASKS_STATE_DEFAULT",
-    "TOKEN_LINKS_DEFAULT", "WIKILINK_STATE_DEFAULT",
+    "TEXT_STATE_FILES", "TOKEN_LINKS_DEFAULT", "WIKILINK_STATE_DEFAULT",
 ]

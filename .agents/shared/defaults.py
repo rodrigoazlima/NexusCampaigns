@@ -61,6 +61,9 @@ GENERATED_TOKENS_DEFAULT: dict[str, Any] = {}
 # Runtime state
 # ---------------------------------------------------------------------------
 
+AGENT_METRICS_DEFAULT: dict[str, Any] = {}
+"""agent-metrics.json — per-task run history keyed by task-id; populated by runner."""
+
 TASKS_STATE_DEFAULT: dict[str, Any] = {
     "repair-agent":             {"lastRun": "1970-01-01T00:00:00+00:00"},
     "review-agent":             {"lastRun": "1970-01-01T00:00:00+00:00"},
@@ -142,13 +145,27 @@ STATE_FILE_DEFAULTS: dict[str, Any] = {
     ".agents/lore/state/processed-npcs.json":                   PROCESSED_NPCS_DEFAULT,
     ".agents/lore/state/scenarios.json":                        SCENARIOS_DEFAULT,
     ".agents/token/state/generated-tokens.json":                GENERATED_TOKENS_DEFAULT,
-    ".agents/runtime/state/tasks-state.json":              TASKS_STATE_DEFAULT,
+    ".agents/runtime/state/tasks-state.json":                   TASKS_STATE_DEFAULT,
+    ".agents/runtime/state/agent-metrics.json":                 AGENT_METRICS_DEFAULT,
     ".agents/wikilink/state/wikilink-state.json":               WIKILINK_STATE_DEFAULT,
     ".agents/relationship/state/relationship-graph.json":       RELATIONSHIP_GRAPH_DEFAULT,
     ".agents/canon/state/canon-report-latest.json":             CANON_REPORT_DEFAULT,
     ".agents/search/state/search-index.json":                   SEARCH_INDEX_DEFAULT,
     ".agents/deduplication/state/dedup-report-latest.json":     DEDUP_REPORT_DEFAULT,
 }
+
+# ---------------------------------------------------------------------------
+# Plain-text state files (newline-delimited path lists)
+# Handled by TextStateStore; bootstrapped as empty files on first run.
+# ---------------------------------------------------------------------------
+
+TEXT_STATE_FILES: list[str] = [
+    ".agents/ingestion/state/processed-docx.txt",
+    ".agents/wiki/state/processed.txt",
+    ".agents/wiki/state/bad-wiki-docs.txt",
+    ".agents/classification/state/bad-docs.txt",
+]
+"""Plain-text state files bootstrapped as empty on first run."""
 
 # Directories that must exist before any agent runs
 REQUIRED_DIRS: list[str] = [
