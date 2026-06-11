@@ -20,7 +20,7 @@
 | Fix label | Action |
 |-----------|--------|
 | `stale-lock` | Delete `runner.lock` if > 30 min old |
-| `missing-directory` | Create missing `.system/` subdirectories |
+| `missing-directory` | Create missing `.agents/` and `.shared/` subdirectories |
 | `missing-image-ref` | Validate image refs in `processed-images.json` using SHA256 identity (not filename) |
 
 ---

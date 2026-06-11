@@ -5,17 +5,16 @@
 ## Process Model
 
 ```
-NSSM Windows Service
-  └─ daemon.ps1                  # persistent loop (PS 7+)
-       └─ runner.py              # dispatched every 60s
-            └─ foreach task in agent.json
-                 if (now - lastRun) >= intervalSeconds:
-                     load .agents/{name}/agent.json
-                     get_runner(dispatch.type)
-                     runner.run(dispatch_config)
-                     update tasks-state.json
-                     update agent-metrics.json
-                     git commit (scoped to commit_scope) if changes exist
+OS Service Supervisor (NSSM / systemd / launchd)
+  └─ runner.py                   # persistent loop — sole static process
+       └─ every 60s: foreach task in agent.json
+            if (now - lastRun) >= intervalSeconds OR signal pending:
+                load .agents/{name}/agent.json
+                get_runner(dispatch.type)
+                runner.run(dispatch_config)
+                update tasks-state.json
+                update agent-metrics.json
+                git commit (scoped to commit_scope) if changes exist
 ```
 
 **Lock file:** `.agents/runtime/state/runner.lock` — prevents concurrent runner instances.

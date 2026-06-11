@@ -27,14 +27,22 @@ See [agent-dispatch.spec.md](agent-dispatch.spec.md) for the full provider confi
 
 ## Current Agent Assignments
 
-| Agent | Dispatch type | Model | Purpose |
-|---|---|---|---|
-| Vision | `openai-api` | `qwen3-vl-4b-instruct` @ `localhost:1234` | Image classification (type/race/class/element/environment) |
-| Lore | `openai-api` | `qwen3-vl-4b-instruct` @ `localhost:1234` | NPC sheet generation from image + scenario |
-| Classification | `openai-api` | `auto` @ `localhost:8080` | Tag enrichment and type inference |
-| Wiki | `openai-api` | `auto` @ `localhost:8080` | Entity page synthesis from raw notes |
+All active agents use `dispatch.type: claude-api` — Claude operates as the AI agent and calls
+Python tools via the tool-use loop. Some agents' tools make additional LLM calls internally
+(to local endpoints) for vision classification and text synthesis.
 
-All other current agents use `dispatch.type: cli` with no LLM calls.
+| Agent | Dispatch type | Claude model | Internal LLM (tool calls) | Purpose |
+|---|---|---|---|---|
+| Vision | `claude-api` | `claude-sonnet-4-6` | `qwen3-vl-4b-instruct` @ `localhost:1234` | Image classification |
+| Lore | `claude-api` | `claude-sonnet-4-6` | `qwen3-vl-4b-instruct` @ `localhost:1234` | NPC sheet generation |
+| Classification | `claude-api` | `claude-haiku-4-5-20251001` | `auto` @ `localhost:8080` | Tag enrichment |
+| Wiki | `claude-api` | `claude-sonnet-4-6` | `auto` @ `localhost:8080` | Entity page synthesis |
+| Ingestion | `claude-api` | `claude-haiku-4-5-20251001` | none | Queue registration, DOCX conversion |
+| Review | `claude-api` | `claude-haiku-4-5-20251001` | none | Vault health report |
+| Repair | `claude-api` | `claude-haiku-4-5-20251001` | none | Stale lock + dir repair |
+| Token | `claude-api` | `claude-haiku-4-5-20251001` | none | Token frame compositing |
+| Wikilink | `claude-api` | `claude-haiku-4-5-20251001` | none | Cross-link insertion |
+| Cleanup | `claude-api` | `claude-haiku-4-5-20251001` | none | Log/report rotation |
 
 ---
 

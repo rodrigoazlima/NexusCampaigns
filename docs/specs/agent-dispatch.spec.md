@@ -181,7 +181,7 @@ Anthropic Claude API. Supports two patterns:
 | `system_file` | string | no | — | System prompt `.md` path, relative to agent dir (e.g. `prompts/system.md`) |
 | `tools_module` | string | no | — | Python module path providing agent tools (e.g. `ingestion.tools.ingestion_agent`). Enables tool-use loop. |
 | `history_file` | string | no | — | JSON file for conversation history, relative to agent state dir. Only used with `tools_module`. |
-| `max_tool_rounds` | int | no | 10 | Max agent loop iterations before forced stop. Only used with `tools_module`. |
+| `max_tool_rounds` | int | no | 20 | Max agent loop iterations before forced stop. Only used with `tools_module`. |
 | `prompt_file` | string | no | — | User prompt `.md` path, relative to agent dir. Used in prompt pattern only (no `tools_module`). |
 | `max_tokens` | int | no | 4096 | Max completion tokens |
 | `temperature` | float | no | 0 | Sampling temperature |

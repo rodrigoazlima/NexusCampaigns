@@ -4,7 +4,7 @@
 **Input:** images in `.agents/vision/state/processed-images.json` with `type ∈ {portrait, body, token}` not yet in `.agents/lore/state/processed-npcs.json`; `.agents/lore/state/scenarios.json` for arc context; `02-Library/` for canon reference  
 **Output:** `01-Processing/{slug}-A{arc}.md` NPC sheets  
 **Dependency:** LM Studio at `http://localhost:1234` with model `qwen3-vl-4b-instruct`  
-**Dispatch:** `claude-api` · `claude-haiku-4-5-20251001` · `tools_module: lore.tools.generate_npcs`
+**Dispatch:** `claude-api` · `claude-sonnet-4-6` · `tools_module: lore.tools.generate_npcs`
 
 ---
 

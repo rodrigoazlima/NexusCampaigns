@@ -39,15 +39,16 @@ Returns JSON only:
 ```json
 {
   "type": "portrait | body | battlemap | scene",
-  "race": "human | elf | dark-elf | dwarf | orc | goblin | troll | ogre | dragon | angel | devil | demon | undead | skeleton | zombie | vampire | werewolf | spirit",
-  "class": "warrior | mage | archer | cleric | paladin | necromancer | assassin | monster | none",
-  "element": "fire | water | earth | air | nature | dark | light | none",
-  "environment": "dungeon | cave | forest | city | tavern | desert | snow | sea | swamp | ruins | temple | castle | plains | mountain | interior | exterior | none",
+  "ancestry": "open PF2e ancestry string (see PF2E_ANCESTRIES in models.py)",
+  "class": "open PF2e class string (see PF2E_CLASSES in models.py)",
+  "creature_type": "PF2e creature trait | none",
+  "element": "fire | water | earth | air | metal | wood | nature | dark | light | void | vitality | none",
+  "environment": "dungeon | cave | forest | city | tavern | desert | snow | sea | swamp | ruins | temple | castle | plains | mountain | volcano | underwater | sky | astral | shadow | abyss | interior | exterior | none",
   "description": "1-2 sentence string"
 }
 ```
 
-- `battlemap` / `scene`: race/class/element set to `none`
+- `battlemap` / `scene`: ancestry/class/creature_type/element set to `none`
 - `portrait` / `body`: environment set to `none`
 
 ---
@@ -76,8 +77,9 @@ Collision resolution: bump existing file to `{base}-N.{suffix}.ext`.
       "processedAt": "ISO-8601",
       "originalName": "string",
       "type": "portrait | body | battlemap | scene",
-      "race": "string",
+      "ancestry": "string",
       "class": "string",
+      "creature_type": "string",
       "element": "string",
       "environment": "string",
       "description": "string",
