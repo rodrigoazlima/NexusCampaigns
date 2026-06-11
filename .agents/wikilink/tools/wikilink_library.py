@@ -1,16 +1,21 @@
-"""wikilink.tools.14_wikilink_library
+"""wikilink.tools.wikilink_library
 
-Inserts cross-reference wikilinks into ## Related sections of approved
-02-Library/ entities. No LLM. No 00-Inbox or 01-Processing writes.
+Actions: ScoreEntityPairs · InsertWikilinks
+Reads:   02-Library/**/*.md, .agents/wikilink/state/wikilink-state.json
+Writes:  ## Related sections in-place in 02-Library/ (body only, never frontmatter)
+         .agents/wikilink/state/wikilink-state.json
+No LLM. No 00-Inbox or 01-Processing writes.
 Batch: 20 files per run.
 """
 
 from __future__ import annotations
 
+import re
 import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 _TOOLS_DIR    = Path(__file__).resolve().parent
 _AGENTS_DIR   = _TOOLS_DIR.parents[1]
@@ -19,186 +24,295 @@ _PROJECT_ROOT = _AGENTS_DIR.parent
 if str(_AGENTS_DIR) not in sys.path:
     sys.path.insert(0, str(_AGENTS_DIR))
 
-from shared import FrontmatterIO, extract_wikilinks  # noqa: E402
+from shared import (  # noqa: E402
+    FrontmatterIO,
+    Logger,
+    StateStore,
+    extract_wikilinks,
+    has_wikilink,
+    WIKILINK_STATE_DEFAULT,
+)
+from shared.interfaces import IWikilinkResolver  # noqa: E402
 
 TASK_ID         = "wikilink-agent"
 SCRIPT_BASENAME = "wikilink_library.py"
 BATCH_SIZE      = 20
+MIN_SCORE       = 1   # minimum pair score to insert a link
+MAX_LINKS       = 10  # max new links inserted per file per run
 
 _VAULT_ROOT  = _PROJECT_ROOT / "knowledge-base"
 _LIBRARY     = _VAULT_ROOT / "02-Library"
 _AGENT_STATE = _AGENTS_DIR / "wikilink" / "state"
 _LOGS_DIR    = _AGENT_STATE / "logs"
 _MASTER_LOG  = _AGENTS_DIR / "runtime" / "state" / "logs" / "automation.log"
-_PROCESSED   = _AGENT_STATE / "processed-wikilinks.txt"
+_STATE_FILE  = _AGENT_STATE / "wikilink-state.json"
 
-_RELATED_SECTION_RE = __import__("re").compile(
-    r"(## Related\s*\n)(.*?)(?=\n##|\Z)", __import__("re").DOTALL
-)
+_RELATED_HEADER_RE = re.compile(r"^## Related\s*$", re.MULTILINE)
+_SECTION_RE        = re.compile(r"(## Related[ \t]*\n)(.*?)(?=\n## |\Z)", re.DOTALL)
 
-
-class _Logger:
-    def __init__(self) -> None:
-        _LOGS_DIR.mkdir(parents=True, exist_ok=True)
-        today = datetime.now().strftime("%Y-%m-%d")
-        self._daily  = _LOGS_DIR / f"wikilink-library_{today}.log"
-        self._master = _MASTER_LOG
-
-    def _write(self, level: str, msg: str) -> None:
-        ts   = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        line = f"[{ts}] [{TASK_ID}] {level}: {msg}"
-        print(line, flush=True)
-        self._master.parent.mkdir(parents=True, exist_ok=True)
-        for p in (self._master, self._daily):
-            with open(p, "a", encoding="utf-8") as fh:
-                fh.write(line + "\n")
-
-    def info(self, m: str)    -> None: self._write("INFO",  m)
-    def warning(self, m: str) -> None: self._write("WARN",  m)
-    def error(self, m: str)   -> None: self._write("ERROR", m)
-
-    def start(self) -> float:
-        self._write("INFO", "--- START ---")
-        return time.monotonic()
-
-    def done(self, t0: float, count: int = 0, failed: int = 0) -> None:
-        elapsed = round(time.monotonic() - t0, 2)
-        self._write("INFO", f"--- DONE --- processed={count} failed={failed} elapsed={elapsed}s")
+_STOP_WORDS: frozenset[str] = frozenset({
+    "a", "an", "the", "is", "are", "was", "were", "be", "been",
+    "have", "has", "had", "do", "does", "did", "will", "would",
+    "shall", "should", "may", "might", "must", "can", "could",
+    "of", "in", "on", "at", "to", "for", "with", "by", "from",
+    "as", "into", "and", "or", "but", "not", "that", "this",
+    "it", "its", "he", "she", "they", "his", "her", "their",
+    "our", "we", "you", "i", "my", "your",
+})
 
 
-def _load_processed() -> set[str]:
-    if not _PROCESSED.exists():
-        return set()
-    return {ln.strip() for ln in _PROCESSED.read_text(encoding="utf-8").splitlines() if ln.strip()}
+def _extract_keywords(text: str) -> frozenset[str]:
+    """Extract significant lowercase words (min 4 chars, no stop words)."""
+    return frozenset(
+        w for w in re.findall(r"[a-z]{4,}", text.lower())
+        if w not in _STOP_WORDS
+    )
 
 
-def _mark_processed(rel: str) -> None:
-    _AGENT_STATE.mkdir(parents=True, exist_ok=True)
-    with open(_PROCESSED, "a", encoding="utf-8") as fh:
-        fh.write(rel + "\n")
+def _body_above_related(body: str) -> str:
+    m = _RELATED_HEADER_RE.search(body)
+    return body[: m.start()] if m else body
 
 
-def _collect_library_slugs() -> set[str]:
-    if not _LIBRARY.is_dir():
-        return set()
-    return {p.stem for p in _LIBRARY.glob("**/*.md")}
+def _splice_related(body: str, new_slugs: list[str]) -> tuple[str, int]:
+    """Insert [[slug]] lines into ## Related, creating the section if absent.
 
-
-def _insert_wikilinks(body: str, slugs: set[str]) -> tuple[str, int]:
-    """Insert missing [[slug]] into the ## Related section. Returns (new_body, count_added)."""
-    import re
-    added = 0
+    Returns (updated_body, count_inserted).
+    """
+    inserted_count = 0
 
     def replacer(m: re.Match) -> str:
-        nonlocal added
+        nonlocal inserted_count
         header  = m.group(1)
         section = m.group(2)
-
         existing = set(extract_wikilinks(section))
-        new_links: list[str] = []
-
-        for slug in sorted(slugs):
-            if slug not in existing and slug.lower() in section.lower():
-                new_links.append(f"[[{slug}]]")
+        additions: list[str] = []
+        for slug in new_slugs:
+            if slug not in existing:
+                additions.append(f"[[{slug}]]")
                 existing.add(slug)
-                added += 1
-
-        if new_links:
-            section = section.rstrip() + "\n" + "\n".join(new_links) + "\n"
-
+                inserted_count += 1
+        if additions:
+            section = section.rstrip("\n") + "\n" + "\n".join(additions) + "\n"
         return header + section
 
-    new_body = _RELATED_SECTION_RE.sub(replacer, body)
-    return new_body, added
+    new_body = _SECTION_RE.sub(replacer, body)
+
+    if inserted_count == 0 and not _RELATED_HEADER_RE.search(body):
+        # Section was absent — create it
+        new_body = body.rstrip("\n") + "\n\n## Related\n" + "\n".join(
+            f"[[{s}]]" for s in new_slugs
+        ) + "\n"
+        inserted_count = len(new_slugs)
+
+    return new_body, inserted_count
 
 
-def _write_with_retry(path: Path, content: str, retries: int = 3) -> bool:
-    import time as _time
-    for attempt in range(retries):
-        try:
-            tmp = path.with_suffix(".tmp")
-            tmp.write_text(content, encoding="utf-8")
-            tmp.replace(path)
-            return True
-        except Exception:
-            if attempt < retries - 1:
-                _time.sleep(0.3)
-    return False
+def _atomic_write(path: Path, fm: dict, body: str) -> bool:
+    """Write frontmatter + body to path atomically. Returns True on success."""
+    try:
+        from io import StringIO
+        from ruamel.yaml import YAML  # type: ignore[import]
+        y = YAML()
+        y.default_flow_style = False
+        y.preserve_quotes    = True
+        y.width              = 4096
+        buf = StringIO()
+        y.dump(fm, buf)
+        fm_str = buf.getvalue().rstrip("\n")
+    except ImportError:
+        import yaml
+        fm_str = yaml.dump(fm, allow_unicode=True, default_flow_style=False).rstrip("\n")
 
+    content = f"---\n{fm_str}\n---\n{body}"
+    tmp = path.with_name(path.name + ".tmp")
+    try:
+        tmp.write_text(content, encoding="utf-8")
+        tmp.replace(path)
+        return True
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        return False
+
+
+# ---------------------------------------------------------------------------
+# WikilinkResolver — implements IWikilinkResolver
+# ---------------------------------------------------------------------------
+
+class WikilinkResolver(IWikilinkResolver):
+    """Scores entity pairs and inserts missing [[slug]] cross-references.
+
+    Scoring (per candidate slug against a source file):
+      +1 per shared tag (max 3)
+      +3 if target slug already wikilinked in source body (outside Related)
+      +2 if target slug text appears verbatim in source body
+      +1 per shared significant keyword (max 2)
+    """
+
+    def __init__(
+        self,
+        fio: FrontmatterIO,
+        min_score: int = MIN_SCORE,
+        max_links: int = MAX_LINKS,
+    ) -> None:
+        self._fio       = fio
+        self._min_score = min_score
+        self._max_links = max_links
+        self._cache: dict[str, tuple[dict, str]] = {}
+
+    def build_slug_index(self, library_dir: Path) -> dict[str, Path]:
+        """Return {slug: path} for every .md in library_dir."""
+        if not library_dir.is_dir():
+            return {}
+        return {p.stem: p for p in library_dir.glob("**/*.md")}
+
+    def _load(self, path: Path) -> tuple[dict, str]:
+        slug = path.stem
+        if slug not in self._cache:
+            try:
+                fm, body = self._fio.read(path)
+                self._cache[slug] = (fm, body)
+            except Exception:
+                self._cache[slug] = ({}, "")
+        return self._cache[slug]
+
+    def _score(
+        self,
+        source_fm: dict,
+        source_body: str,
+        target_slug: str,
+        target_fm: dict,
+        target_body: str,
+    ) -> int:
+        score = 0
+
+        # Shared tags: +1 each (cap 3)
+        src_tags = set(source_fm.get("tags") or [])
+        tgt_tags = set(target_fm.get("tags") or [])
+        score += min(len(src_tags & tgt_tags), 3)
+
+        # Explicit wikilink in source body above Related: +3
+        above = _body_above_related(source_body)
+        if has_wikilink(above, target_slug):
+            score += 3
+        elif target_slug.replace("-", " ") in source_body.lower():
+            # Entity name mentioned as prose: +2
+            score += 2
+        elif target_slug in source_body.lower():
+            score += 1
+
+        # Body keyword overlap: +1 each (cap 2)
+        src_kw = _extract_keywords(source_body)
+        tgt_kw = _extract_keywords(target_body)
+        score += min(len(src_kw & tgt_kw), 2)
+
+        return score
+
+    def insert_wikilinks(self, target: Path, slug_index: dict[str, Path]) -> int:
+        """Insert missing [[slug]] into ## Related section. Return count inserted."""
+        target_fm, target_body = self._load(target)
+        target_slug = target.stem
+
+        existing = set(extract_wikilinks(target_body))
+
+        scored: list[tuple[int, str]] = []
+        for slug, path in slug_index.items():
+            if slug == target_slug or slug in existing:
+                continue
+            cand_fm, cand_body = self._load(path)
+            s = self._score(target_fm, target_body, slug, cand_fm, cand_body)
+            if s >= self._min_score:
+                scored.append((s, slug))
+
+        scored.sort(key=lambda x: -x[0])
+        to_insert = [slug for _, slug in scored[: self._max_links]]
+
+        if not to_insert:
+            return 0
+
+        new_body, n = _splice_related(target_body, to_insert)
+        if n == 0:
+            return 0
+
+        ok = _atomic_write(target, target_fm, new_body)
+        if ok:
+            self._cache.pop(target_slug, None)
+        return n if ok else 0
+
+
+# ---------------------------------------------------------------------------
+# State helpers
+# ---------------------------------------------------------------------------
+
+def _make_store() -> StateStore:
+    _AGENT_STATE.mkdir(parents=True, exist_ok=True)
+    return StateStore(_STATE_FILE, WIKILINK_STATE_DEFAULT)
+
+
+def _load_processed(store: StateStore) -> set[str]:
+    data = store.load()
+    return set(data.keys())
+
+
+def _mark_processed(store: StateStore, rel: str, links_inserted: int) -> None:
+    def updater(data: dict) -> dict:
+        data[rel] = {
+            "processedAt":   datetime.now(timezone.utc).isoformat(),
+            "linksInserted": links_inserted,
+        }
+        return data
+    store.update(updater)
+
+
+# ---------------------------------------------------------------------------
+# main — direct invocation
+# ---------------------------------------------------------------------------
 
 def main() -> None:
-    log = _Logger()
-    t0  = log.start()
-    fio = FrontmatterIO()
+    log   = Logger(TASK_ID, SCRIPT_BASENAME, _LOGS_DIR, _MASTER_LOG)
+    t0    = log.start()
+    store = _make_store()
+    store.init_defaults()
 
     if not _LIBRARY.is_dir():
         log.info("02-Library/ does not exist — nothing to process")
-        log.done(t0)
+        log.done(t0, key="linked", count=0, failed=0)
         sys.exit(0)
 
-    all_slugs = _collect_library_slugs()
-    processed = _load_processed()
+    fio       = FrontmatterIO()
+    resolver  = WikilinkResolver(fio)
+    slug_idx  = resolver.build_slug_index(_LIBRARY)
+    processed = _load_processed(store)
+
+    log.info(f"Library: {len(slug_idx)} entities")
 
     candidates = [
         p for p in sorted(_LIBRARY.glob("**/*.md"))
         if p.relative_to(_PROJECT_ROOT).as_posix() not in processed
     ]
 
-    batch   = candidates[:BATCH_SIZE]
-    count   = 0
-    failed  = 0
+    batch  = candidates[:BATCH_SIZE]
+    count  = 0
+    failed = 0
 
     for md_path in batch:
         rel = md_path.relative_to(_PROJECT_ROOT).as_posix()
         try:
-            fm, body = fio.read(md_path)
-
-            if "## Related" not in body:
-                _mark_processed(rel)
-                continue
-
-            other_slugs = all_slugs - {md_path.stem}
-            new_body, n_added = _insert_wikilinks(body, other_slugs)
-
-            if n_added:
-                ok = _write_with_retry(md_path, f"---\n{_dump_fm(fm)}\n---\n{new_body}")
-                if ok:
-                    log.info(f"Inserted {n_added} wikilinks in {md_path.name}")
-                    count += 1
-                else:
-                    log.error(f"Write failed: {md_path.name}")
-                    failed += 1
-                    continue
-            else:
-                count += 1
-
-            _mark_processed(rel)
-
+            n = resolver.insert_wikilinks(md_path, slug_idx)
+            if n:
+                log.info(f"Inserted {n} link(s) in {md_path.name}")
+            _mark_processed(store, rel, n)
+            count += 1
         except Exception as exc:
             log.error(f"Error processing {md_path.name}: {exc}")
             failed += 1
 
     remaining = len(candidates) - len(batch)
     if remaining:
-        log.info(f"{remaining} file(s) remain for next run")
+        log.info(f"{remaining} file(s) queued for next run")
 
-    log.done(t0, count=count, failed=failed)
+    log.done(t0, key="linked", count=count, failed=failed)
     sys.exit(0 if failed == 0 else 1)
-
-
-def _dump_fm(fm: dict) -> str:
-    try:
-        from ruamel.yaml import YAML
-        import io as _io
-        y = YAML()
-        y.default_flow_style = False
-        y.width = 4096
-        buf = _io.StringIO()
-        y.dump(fm, buf)
-        return buf.getvalue().rstrip("\n")
-    except ImportError:
-        import yaml
-        return yaml.dump(fm, allow_unicode=True, default_flow_style=False).rstrip("\n")
 
 
 if __name__ == "__main__":
@@ -226,7 +340,8 @@ TOOLS = SELF_MANAGEMENT_TOOLS + [
         "name": "insert_wikilinks",
         "description": (
             "Process up to BATCH_SIZE Library entities, inserting missing [[slug]] "
-            "cross-references into their ## Related sections. Returns count of files updated."
+            "cross-references into their ## Related sections (creating the section "
+            "if absent). Returns count of files processed and total links inserted."
         ),
         "input_schema": {"type": "object", "properties": {}},
     },
@@ -241,34 +356,39 @@ def call_tool(name: str, args: dict, context: dict) -> str:
         return result
 
     if name == "score_entity_pairs":
-        slugs = _collect_library_slugs()
-        return f"Library slug index built: {len(slugs)} entities"
+        fio      = FrontmatterIO()
+        resolver = WikilinkResolver(fio)
+        idx      = resolver.build_slug_index(_LIBRARY)
+        return f"Library slug index built: {len(idx)} entities available for cross-linking"
 
     if name == "insert_wikilinks":
-        log = _Logger()
-        processed = _load_processed()
-        slugs = _collect_library_slugs()
-        fio = FrontmatterIO()
-        count = 0
+        log      = Logger(TASK_ID, SCRIPT_BASENAME, _LOGS_DIR, _MASTER_LOG)
+        store    = _make_store()
+        store.init_defaults()
+        fio      = FrontmatterIO()
+        resolver = WikilinkResolver(fio)
+        slug_idx = resolver.build_slug_index(_LIBRARY)
+        processed = _load_processed(store)
+
+        count        = 0
+        total_links  = 0
+
         for md_path in sorted(_LIBRARY.glob("**/*.md")):
-            rel = md_path.relative_to(_PROJECT_ROOT).as_posix()
-            if rel in processed or len([r for r in processed]) == 0:
-                pass
-            if rel in processed:
-                continue
             if count >= BATCH_SIZE:
                 break
+            rel = md_path.relative_to(_PROJECT_ROOT).as_posix()
+            if rel in processed:
+                continue
             try:
-                _, body = fio.read(md_path)
-                new_body, n = _insert_wikilinks(body, slugs)
-                if n > 0:
-                    fm, _ = fio.read(md_path)
-                    fio.write(md_path, fm, new_body)
-                    log.info(f"Inserted {n} link(s) into {md_path.name}")
-                _mark_processed(rel)
+                n = resolver.insert_wikilinks(md_path, slug_idx)
+                _mark_processed(store, rel, n)
+                total_links += n
                 count += 1
+                if n:
+                    log.info(f"Inserted {n} link(s) in {md_path.name}")
             except Exception as exc:
                 log.error(f"Error processing {md_path.name}: {exc}")
-        return f"Processed {count} file(s) with wikilink insertion"
+
+        return f"Processed {count} file(s); {total_links} link(s) inserted"
 
     raise ValueError(f"Unknown tool: {name!r}")

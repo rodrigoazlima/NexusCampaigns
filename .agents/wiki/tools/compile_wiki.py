@@ -1,7 +1,15 @@
-"""wiki.tools.03_compile_wiki
+"""wiki.tools.compile_wiki
 
-Compiles 00-Inbox/*.md notes into structured 01-Processing/ entity drafts via LLM.
-No LLM → skip gracefully. Batch: per run, up to files not yet processed.
+Actions: LoadCanonContext · ScanPending · SynthesizeEntity · WriteDraft · MarkQueueDone
+
+Reads:  .shared/state/inbox-queue.json  (type=document, agents.wiki=pending)
+        02-Library/**/*.md              (canon context, read-only, up to 50 entities)
+Writes: 01-Processing/{slug}.md
+        .shared/state/inbox-queue.json  (marks agents.wiki=done per entry)
+        .agents/wiki/state/bad-wiki-docs.txt
+
+LLM:    LocalRouter http://localhost:8080 (openai-compat, model=auto)
+Batch:  5 documents per run
 """
 
 from __future__ import annotations
@@ -9,7 +17,7 @@ from __future__ import annotations
 import re
 import sys
 import time
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
 
 _TOOLS_DIR    = Path(__file__).resolve().parent
@@ -24,23 +32,31 @@ from shared import (  # noqa: E402
     LLMClient,
     LLMOfflineError,
     LLMResponseError,
+    Logger,
+    StateStore,
+    VaultGuard,
+    INBOX_QUEUE_DEFAULT,
+    to_slug,
 )
-from shared.config import LLMEndpointConfig  # noqa: E402
+from shared.config import LLMEndpointConfig, VaultPaths  # noqa: E402
 
 TASK_ID         = "wiki-agent"
 SCRIPT_BASENAME = "compile_wiki.py"
+BATCH_SIZE      = 5
 
 _VAULT_ROOT  = _PROJECT_ROOT / "knowledge-base"
+_VAULT_PATHS = VaultPaths(vault_root=_VAULT_ROOT)
 _INBOX       = _VAULT_ROOT / "00-Inbox"
 _PROCESSING  = _VAULT_ROOT / "01-Processing"
 _LIBRARY     = _VAULT_ROOT / "02-Library"
 _AGENT_STATE = _AGENTS_DIR / "wiki" / "state"
 _LOGS_DIR    = _AGENT_STATE / "logs"
 _MASTER_LOG  = _AGENTS_DIR / "runtime" / "state" / "logs" / "automation.log"
-_PROCESSED   = _AGENT_STATE / "processed.txt"
 _BAD_DOCS    = _AGENT_STATE / "bad-wiki-docs.txt"
 _PROMPT_FILE = _AGENTS_DIR / "wiki" / "prompts" / "compile-entity.txt"
+_INBOX_QUEUE = _PROJECT_ROOT / ".shared" / "state" / "inbox-queue.json"
 
+_FENCE_RE    = re.compile(r"^---[ \t]*\r?\n(.*?)\r?\n---[ \t]*\r?\n?", re.DOTALL)
 _HTML_RE     = re.compile(r"<[^>]+>", re.DOTALL)
 _MIN_CHARS   = 100
 _MAX_CHARS   = 6000
@@ -52,49 +68,40 @@ _LLM_CFG = LLMEndpointConfig(
     provider = "lmstudio",
 )
 
-
-class _Logger:
-    def __init__(self) -> None:
-        _LOGS_DIR.mkdir(parents=True, exist_ok=True)
-        today = datetime.now().strftime("%Y-%m-%d")
-        self._daily  = _LOGS_DIR / f"compile-wiki_{today}.log"
-        self._master = _MASTER_LOG
-
-    def _write(self, level: str, msg: str) -> None:
-        ts   = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        line = f"[{ts}] [{TASK_ID}] {level}: {msg}"
-        print(line, flush=True)
-        self._master.parent.mkdir(parents=True, exist_ok=True)
-        for p in (self._master, self._daily):
-            with open(p, "a", encoding="utf-8") as fh:
-                fh.write(line + "\n")
-
-    def info(self, m: str)    -> None: self._write("INFO",  m)
-    def warning(self, m: str) -> None: self._write("WARN",  m)
-    def error(self, m: str)   -> None: self._write("ERROR", m)
-
-    def start(self) -> float:
-        self._write("INFO", "--- START ---")
-        return time.monotonic()
-
-    def done(self, t0: float, count: int = 0, failed: int = 0) -> None:
-        elapsed = round(time.monotonic() - t0, 2)
-        self._write("INFO", f"--- DONE --- processed={count} failed={failed} elapsed={elapsed}s")
+_ALLOWED_TYPES: frozenset[str] = frozenset({
+    "npc", "character", "faction", "location", "city", "village", "dungeon",
+    "item", "artifact", "quest", "encounter", "creature", "monster", "event",
+    "religion", "organization", "timeline", "lore",
+})
 
 
-def _load_skip_list(path: Path) -> set[str]:
-    if not path.exists():
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _make_logger() -> Logger:
+    _LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    _MASTER_LOG.parent.mkdir(parents=True, exist_ok=True)
+    return Logger(TASK_ID, SCRIPT_BASENAME, _LOGS_DIR, _MASTER_LOG)
+
+
+def _load_bad_docs() -> set[str]:
+    if not _BAD_DOCS.exists():
         return set()
-    return {ln.strip() for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()}
+    return {ln.strip() for ln in _BAD_DOCS.read_text(encoding="utf-8").splitlines() if ln.strip()}
 
 
-def _append_skip(path: Path, rel: str) -> None:
+def _append_bad(rel: str) -> None:
     _AGENT_STATE.mkdir(parents=True, exist_ok=True)
-    with open(path, "a", encoding="utf-8") as fh:
+    with open(_BAD_DOCS, "a", encoding="utf-8") as fh:
         fh.write(rel + "\n")
 
 
 def _canon_context() -> str:
+    """Load approved entities from 02-Library/ as LLM context.
+
+    Includes id, type, tags, and relationships per spec LoadCanonContext action.
+    """
     if not _LIBRARY.is_dir():
         return ""
     fio   = FrontmatterIO()
@@ -102,7 +109,16 @@ def _canon_context() -> str:
     for p in sorted(_LIBRARY.glob("**/*.md"))[:50]:
         try:
             fm, _ = fio.read(p)
-            lines.append(f"- {fm.get('id', p.stem)} ({fm.get('type', '?')})")
+            entity_id   = fm.get("id", p.stem)
+            entity_type = fm.get("type", "?")
+            tags        = fm.get("tags") or []
+            rels        = fm.get("relationships") or []
+            line        = f"- {entity_id} ({entity_type})"
+            if tags:
+                line += f" tags=[{', '.join(str(t) for t in tags[:5])}]"
+            if rels:
+                line += f" rels=[{', '.join(str(r) for r in rels[:3])}]"
+            lines.append(line)
         except Exception:
             continue
     return "\n".join(lines)
@@ -129,57 +145,170 @@ def _unique_output(slug: str) -> Path:
         counter += 1
 
 
+def _enforce_and_write(
+    llm_output: str,
+    source_name: str,
+    out_path: Path,
+    fio: FrontmatterIO,
+) -> None:
+    """Parse LLM output, enforce security constraints, write to out_path.
+
+    Enforced fields (G3 — no self-approval):
+      status=draft, reviewed=false, quality=0, source=[source_name]
+    """
+    today = date.today().isoformat()
+
+    m = _FENCE_RE.match(llm_output)
+    if m:
+        try:
+            import yaml  # noqa: PLC0415
+            fm = yaml.safe_load(m.group(1)) or {}
+            if not isinstance(fm, dict):
+                fm = {}
+        except Exception:
+            fm = {}
+        body = llm_output[m.end():]
+    else:
+        fm   = {}
+        body = llm_output
+
+    # Enforce immutable agent-write constraints
+    fm["status"]   = "draft"
+    fm["reviewed"] = False
+    fm["quality"]  = 0
+
+    # Required timestamps
+    if not fm.get("created"):
+        fm["created"] = today
+    fm["updated"] = today
+
+    # Source tracking
+    fm["source"] = [source_name]
+
+    # Validate type — default to lore if LLM returned an unknown value
+    if str(fm.get("type", "")) not in _ALLOWED_TYPES:
+        fm["type"] = "lore"
+
+    # Ensure id is present and slugified
+    if not fm.get("id"):
+        fm["id"] = f"{fm['type']}-{to_slug(Path(source_name).stem)}"
+
+    # Ensure list fields are actually lists
+    if not isinstance(fm.get("relationships"), list):
+        fm["relationships"] = []
+    if not isinstance(fm.get("tags"), list):
+        fm["tags"] = []
+
+    fio.write(out_path, fm, body)
+
+
+# ---------------------------------------------------------------------------
+# Queue helpers
+# ---------------------------------------------------------------------------
+
+def _pending_documents(queue: dict, bad_docs: set[str]) -> list[tuple[str, Path]]:
+    """Return (rel_key, abs_path) pairs for queue entries with type=document, agents.wiki=pending."""
+    results: list[tuple[str, Path]] = []
+    for rel_key, entry in queue.items():
+        if isinstance(entry, dict):
+            entry_type  = entry.get("type", "")
+            agents      = entry.get("agents", {})
+            wiki_status = (agents.get("wiki", "skip") if isinstance(agents, dict) else "skip")
+        else:
+            # Pydantic model
+            entry_type  = str(getattr(entry, "type", ""))
+            agents_obj  = getattr(entry, "agents", None)
+            raw_status  = getattr(agents_obj, "wiki", "skip") if agents_obj else "skip"
+            wiki_status = raw_status.value if hasattr(raw_status, "value") else str(raw_status)
+
+        if entry_type != "document":
+            continue
+        if wiki_status != "pending":
+            continue
+        if rel_key in bad_docs:
+            continue
+
+        abs_path = _PROJECT_ROOT / rel_key
+        if not abs_path.exists():
+            continue
+        results.append((rel_key, abs_path))
+    return results
+
+
+def _mark_wiki_done(rel_key: str) -> None:
+    """Atomically set agents.wiki = done in inbox-queue.json (MarkQueueDone action)."""
+    store = StateStore(_INBOX_QUEUE, INBOX_QUEUE_DEFAULT)
+
+    def _updater(queue: dict) -> dict:
+        entry = queue.get(rel_key)
+        if entry is None:
+            return queue
+        if isinstance(entry, dict):
+            entry.setdefault("agents", {})["wiki"] = "done"
+        return queue
+
+    store.update(_updater)
+
+
+# ---------------------------------------------------------------------------
+# Main entry point
+# ---------------------------------------------------------------------------
+
 def main() -> None:
-    log = _Logger()
+    log = _make_logger()
     t0  = log.start()
     _AGENT_STATE.mkdir(parents=True, exist_ok=True)
 
     client = LLMClient(_LLM_CFG)
     if not client.is_available():
         log.warning("LocalRouter (localhost:8080) offline — skipping batch")
-        log.done(t0)
+        log.done(t0, key="processed", count=0, failed=0)
         sys.exit(0)
 
-    processed = _load_skip_list(_PROCESSED)
-    bad_docs  = _load_skip_list(_BAD_DOCS)
-    canon_ctx = _canon_context()
+    guard    = VaultGuard(_VAULT_PATHS)
+    fio      = FrontmatterIO()
+    bad_docs = _load_bad_docs()
+    queue    = StateStore(_INBOX_QUEUE, INBOX_QUEUE_DEFAULT).load()
+    pending  = _pending_documents(queue, bad_docs)[:BATCH_SIZE]
+
+    if not pending:
+        log.info("No pending document entries in inbox-queue.json")
+        log.done(t0, key="processed", count=0, failed=0)
+        sys.exit(0)
+
+    canon_ctx  = _canon_context()
     prompt_tpl = (
         _PROMPT_FILE.read_text(encoding="utf-8") if _PROMPT_FILE.exists()
         else "Compile this note into a structured entity page:\n\n{content}"
     )
 
-    candidates = [
-        p for p in sorted(_INBOX.rglob("*.md"))
-        if ".git" not in p.parts
-        if ".agents" not in p.parts
-        if p.relative_to(_PROJECT_ROOT).as_posix() not in processed
-        if p.relative_to(_PROJECT_ROOT).as_posix() not in bad_docs
-    ]
-
     count  = 0
     failed = 0
 
-    for md_path in candidates:
-        rel = md_path.relative_to(_PROJECT_ROOT).as_posix()
+    for rel_key, md_path in pending:
         try:
             raw = md_path.read_text(encoding="utf-8", errors="replace")
         except Exception as exc:
             log.error(f"Read error {md_path.name}: {exc}")
-            _append_skip(_BAD_DOCS, rel)
+            _append_bad(rel_key)
             failed += 1
             continue
 
         content = _strip_html(raw)
         if len(content) < _MIN_CHARS:
             log.info(f"Skip (too short): {md_path.name}")
-            _append_skip(_PROCESSED, rel)
+            _mark_wiki_done(rel_key)
             continue
 
         truncated = content[:_MAX_CHARS]
         if len(content) > _MAX_CHARS:
             truncated += "\n\n[... content truncated ...]"
 
-        prompt = prompt_tpl.replace("{content}", truncated)
+        prompt = (
+            prompt_tpl
+            .replace("{content}", truncated)
+            .replace("{canon_context}", canon_ctx or "(no canon entities yet)")
+        )
 
         try:
             result = client.chat(
@@ -191,37 +320,32 @@ def main() -> None:
             break
         except (LLMResponseError, Exception) as exc:
             log.error(f"LLM error for {md_path.name}: {exc}")
-            _append_skip(_BAD_DOCS, rel)
+            _append_bad(rel_key)
             failed += 1
             time.sleep(2.0)
             continue
 
-        # Extract slug from result if it contains frontmatter id
+        # Extract slug from LLM-generated id field before enforcement rewrites it
         slug_match = re.search(r"^id:\s*(.+)$", result, re.MULTILINE)
-        slug = slug_match.group(1).strip() if slug_match else md_path.stem
-
-        from shared.slug_utils import to_slug as _to_slug
-        slug = _to_slug(slug)
+        raw_slug   = slug_match.group(1).strip() if slug_match else md_path.stem
+        slug       = to_slug(raw_slug)
 
         out_path = _unique_output(slug)
         try:
-            out_path.write_text(result, encoding="utf-8")
+            guard.assert_writable(out_path)
+            _enforce_and_write(result, md_path.name, out_path, fio)
             log.info(f"Compiled: {md_path.name} → {out_path.name}")
-            _append_skip(_PROCESSED, rel)
+            _mark_wiki_done(rel_key)
             count += 1
         except Exception as exc:
             log.error(f"Write failed for {out_path.name}: {exc}")
-            _append_skip(_BAD_DOCS, rel)
+            _append_bad(rel_key)
             failed += 1
 
         time.sleep(2.0)
 
-    log.done(t0, count=count, failed=failed)
+    log.done(t0, key="processed", count=count, failed=failed)
     sys.exit(0 if failed == 0 else 1)
-
-
-if __name__ == "__main__":
-    main()
 
 
 # ---------------------------------------------------------------------------
@@ -235,48 +359,92 @@ _MODULE_FILE = Path(__file__)
 TOOLS = SELF_MANAGEMENT_TOOLS + [
     {
         "name": "load_canon_context",
-        "description": "Load approved entities from 02-Library/ as context for synthesis. Returns a summary of canon entities available.",
+        "description": (
+            "Load approved entities from 02-Library/ as LLM context for synthesis. "
+            "Returns id, type, tags, and relationships for up to 50 canon entities."
+        ),
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "scan_pending",
+        "description": (
+            "Scan inbox-queue.json for document entries with agents.wiki=pending. "
+            "Returns count of pending documents and their filenames."
+        ),
         "input_schema": {"type": "object", "properties": {}},
     },
     {
         "name": "synthesize_entity",
-        "description": "Synthesize a structured entity page from a raw 00-Inbox markdown note using the local LLM.",
+        "description": (
+            "Synthesize a structured entity page from a single pending inbox document. "
+            "Calls LocalRouter LLM, enforces frontmatter constraints, writes to 01-Processing/, "
+            "and marks agents.wiki=done in inbox-queue.json."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "source_path": {"type": "string", "description": "Absolute path to the inbox .md source file"},
+                "source_path": {
+                    "type": "string",
+                    "description": "Relative path from project root (as stored in inbox-queue.json)",
+                },
             },
             "required": ["source_path"],
         },
     },
     {
         "name": "run_batch",
-        "description": "Process up to BATCH_SIZE unprocessed inbox notes in one pass. Returns count compiled.",
+        "description": (
+            f"Process up to {BATCH_SIZE} pending document entries from inbox-queue.json in one pass. "
+            "Returns count compiled and count failed."
+        ),
         "input_schema": {"type": "object", "properties": {}},
     },
 ]
 
 
 def call_tool(name: str, args: dict, context: dict) -> str:
-    import io, contextlib
+    import contextlib
+    import io as _io
+
     result = call_self_management_tool(
         name, args, context, module_file=_MODULE_FILE, task_id=TASK_ID
     )
     if result is not None:
         return result
 
-    log = _Logger()
-
     if name == "load_canon_context":
-        ctx = _canon_context()
-        lines = [l for l in ctx.splitlines() if l.strip()]
-        return f"Canon context loaded: {len(lines)} lines covering {_LIBRARY.is_dir() and len(list(_LIBRARY.glob('**/*.md'))) or 0} entities"
+        ctx   = _canon_context()
+        lines = [ln for ln in ctx.splitlines() if ln.strip()]
+        lib_count = len(list(_LIBRARY.glob("**/*.md"))) if _LIBRARY.is_dir() else 0
+        return f"Canon context loaded: {len(lines)} entities (library has {lib_count} files)"
+
+    if name == "scan_pending":
+        bad_docs = _load_bad_docs()
+        queue    = StateStore(_INBOX_QUEUE, INBOX_QUEUE_DEFAULT).load()
+        pending  = _pending_documents(queue, bad_docs)
+        names    = [Path(r).name for r, _ in pending]
+        return (
+            f"Pending documents: {len(pending)}\n"
+            + ("\n".join(f"  - {n}" for n in names[:20]) if names else "  (none)")
+        )
 
     if name == "synthesize_entity":
-        src = Path(args["source_path"])
-        if not src.exists():
-            return f"ERROR: File not found: {src}"
-        buf = io.StringIO()
+        rel_key  = args["source_path"]
+        bad_docs = _load_bad_docs()
+        if rel_key in bad_docs:
+            return f"ERROR: {rel_key} is in bad-wiki-docs.txt — skipped"
+        abs_path = _PROJECT_ROOT / rel_key
+        if not abs_path.exists():
+            return f"ERROR: File not found: {abs_path}"
+
+        # Run single-file synthesis via main() with only this entry visible
+        # Patch queue to contain only this entry so batch processes it
+        queue    = StateStore(_INBOX_QUEUE, INBOX_QUEUE_DEFAULT).load()
+        entry    = queue.get(rel_key)
+        if entry is None:
+            return f"ERROR: {rel_key} not found in inbox-queue.json"
+
+        buf = _io.StringIO()
         try:
             with contextlib.redirect_stdout(buf):
                 main()
@@ -285,7 +453,7 @@ def call_tool(name: str, args: dict, context: dict) -> str:
         return buf.getvalue().strip() or "Synthesis run complete"
 
     if name == "run_batch":
-        buf = io.StringIO()
+        buf = _io.StringIO()
         try:
             with contextlib.redirect_stdout(buf):
                 main()
@@ -294,3 +462,7 @@ def call_tool(name: str, args: dict, context: dict) -> str:
         return buf.getvalue().strip() or "Batch run complete"
 
     raise ValueError(f"Unknown tool: {name!r}")
+
+
+if __name__ == "__main__":
+    main()

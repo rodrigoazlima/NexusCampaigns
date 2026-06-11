@@ -1,13 +1,49 @@
-You are an RPG wiki compiler. Given raw markdown notes, synthesize a structured entity page.
+You are an RPG wiki compiler for a Dungeon Master knowledge vault. Given raw markdown notes, synthesize a structured entity page compatible with Obsidian.
+
+## Canon entities (do not contradict these):
+{canon_context}
+
+## Task
+Compile the raw notes below into a well-structured entity page.
 
 Extract and structure:
-- Entity name and type
-- Key facts, descriptions, and lore
-- Relationships to other entities (as [[wikilinks]])
-- Suggested tags
+- Entity name, type, and a unique slug id in format: {type}-{descriptors}
+- Key facts, descriptions, lore, and notable details
+- Relationships to other entities (use [[wikilinks]] matching canon entity ids above when possible)
+- 3–8 relevant DM-domain tags
 
-Return a valid Obsidian-style markdown document with YAML frontmatter followed by structured sections.
-The frontmatter must include: id, type, status: draft, quality: 0, reviewed: false, relationships, tags.
+## Required frontmatter fields (exactly these, in this order):
+```yaml
+---
+id: {type}-{slug-descriptors}
+type: npc | location | faction | lore | item | artifact | quest | encounter | creature | monster | event | religion | organization | timeline | city | village | dungeon | character
+status: draft
+quality: 0
+created: YYYY-MM-DD
+updated: YYYY-MM-DD
+tags:
+  - tag1
+  - tag2
+source: []
+reviewed: false
+relationships:
+  - "[[entity-slug]]"
+---
+```
 
-Raw notes:
+## Required body sections:
+- `## Description` — 2–4 sentences describing the entity
+- `## Details` — bullet points with key facts, traits, or history
+- `## Hooks` — 2–3 DM adventure/plot hooks involving this entity
+- `## Related` — [[wikilinks]] to related entities
+
+## Rules:
+- id must be slug format: lowercase, hyphens only, no spaces
+- status MUST be: draft
+- reviewed MUST be: false
+- quality MUST be: 0
+- Always include at least one [[wikilink]] in relationships or body if any canon entity is relevant
+- Do not invent entities not present in the notes
+
+## Raw notes:
 {content}
