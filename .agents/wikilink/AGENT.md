@@ -6,10 +6,10 @@ purpose: >
   library and injecting [[slug]] references where missing. No LLM calls.
 inputs:
   - vault://02-Library/**/*.md
-  - state/processed-wikilinks.txt
+  - state/wikilink-state.json
 outputs:
   - vault://02-Library/**/*.md (## Related section updated in-place)
-  - state/processed-wikilinks.txt (processed file paths appended)
+  - state/wikilink-state.json (processed file paths and link counts)
   - state/logs/14-wikilink-library_YYYY-MM-DD.log
 dependencies:
   - ingestion
@@ -19,19 +19,20 @@ owned_tools:
 responsibilities:
   - Collect all entity slugs from 02-Library/ (filename stems)
   - For each .md in 02-Library/: parse frontmatter + body
-  - Identify unlinked slug mentions in ## Related section
-  - Insert missing [[slug]] wikilinks without duplicating existing ones
-  - Write updated file with 3-retry loop
-  - Track processed files in state/processed-wikilinks.txt
+  - Score entity pairs by shared tags, slug mentions, and keyword overlap
+  - Insert missing [[slug]] wikilinks into ## Related section (create if absent)
+  - Never duplicate existing wikilinks
+  - Write updated file atomically (tmp → replace)
+  - Track processed files in state/wikilink-state.json
   - Batch: 20 files per run
 restrictions:
   - Must not call any LLM
   - Must not modify 00-Inbox/ or 01-Processing/
-  - Must not change frontmatter fields other than relationships
+  - Must not modify frontmatter
   - Must not create new files
   - Must not remove existing wikilinks
 state_files:
-  - state/processed-wikilinks.txt
+  - state/wikilink-state.json
 commit_scope:
   - knowledge-base/02-Library
   - .agents/wikilink/state

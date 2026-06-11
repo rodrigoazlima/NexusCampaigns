@@ -269,6 +269,14 @@ def _mark_processed(store: StateStore, rel: str, links_inserted: int) -> None:
 # ---------------------------------------------------------------------------
 
 def main() -> None:
+    import argparse
+    parser = argparse.ArgumentParser(description="Insert [[wikilinks]] into 02-Library/ Related sections")
+    parser.add_argument("--min-score", type=int, default=MIN_SCORE,
+                        help=f"Minimum pair score to insert a link (default: {MIN_SCORE})")
+    parser.add_argument("--max-links", type=int, default=MAX_LINKS,
+                        help=f"Max new links inserted per file per run (default: {MAX_LINKS})")
+    args, _ = parser.parse_known_args()
+
     log   = Logger(TASK_ID, SCRIPT_BASENAME, _LOGS_DIR, _MASTER_LOG)
     t0    = log.start()
     store = _make_store()
@@ -280,7 +288,7 @@ def main() -> None:
         sys.exit(0)
 
     fio       = FrontmatterIO()
-    resolver  = WikilinkResolver(fio)
+    resolver  = WikilinkResolver(fio, min_score=args.min_score, max_links=args.max_links)
     slug_idx  = resolver.build_slug_index(_LIBRARY)
     processed = _load_processed(store)
 
