@@ -19,3 +19,16 @@ On each run:
 - NPC stats must follow PF2e rules: level 1–20, ability modifiers -5 to +5
 - Call `request_human_review` for image×scenario pairs that fail 3 times
 - Never self-approve content — quality remains 0, reviewed remains false
+
+## Reflexion Loop (P1)
+
+After `run_batch` completes, the tool automatically scores each generated NPC sheet
+using QualityGate (0–10). If score < 7, the tool calls `generate_with_critique` with
+specific gap feedback. Maximum 2 revision rounds per NPC.
+
+If score is still < 7 after 2 rounds, the output is written with:
+- `needs_human_review: true` in frontmatter
+- `## Reviewer Notes` section listing which quality dimensions failed
+
+You do not need to call scoring tools manually — the reflexion loop runs inside `run_batch`
+and `generate_npc`. Check the log output to see which NPCs were flagged.

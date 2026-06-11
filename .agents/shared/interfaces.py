@@ -25,6 +25,7 @@ from .models import (
     InboxQueue,
     ProcessedImagesState,
     ProcessedNPCs,
+    RegistryConfig,
     RelationshipGraph,
     RepairReport,
     ReviewItem,
@@ -597,6 +598,36 @@ class IDedupAnalyzer(ABC):
 
 
 # ---------------------------------------------------------------------------
+# IQueueRegistrar (ingestion agent contract)
+# ---------------------------------------------------------------------------
+
+class IQueueRegistrar(ABC):
+    """Contract for registering 00-Inbox/ files into the processing queue.
+
+    Owned by the Ingestion agent. No LLM calls. No 02-Library writes.
+    """
+
+    @abstractmethod
+    def classify_file(self, path: Path) -> str:
+        """Return 'image', 'document', or 'other' for the given file path."""
+        ...
+
+    @abstractmethod
+    def make_slots(self, file_type: str) -> InboxQueue:
+        """Return initialized agent slots dict for the given file type."""
+        ...
+
+    @abstractmethod
+    def scan_and_register(self, inbox: Path) -> tuple[int, int]:
+        """Scan inbox for unregistered files and add them to the shared queue.
+
+        Returns (count_added, count_failed). Saves atomically.
+        Must not delete or overwrite existing queue entries.
+        """
+        ...
+
+
+# ---------------------------------------------------------------------------
 # ISignalEmitter — file-based inter-agent signal bus
 # ---------------------------------------------------------------------------
 
@@ -612,6 +643,23 @@ class ISignalEmitter(Protocol):
         payload: Optional[dict] = None,
     ) -> str:
         """Write a signal file to the signals directory. Returns signal ID."""
+        ...
+
+
+# ---------------------------------------------------------------------------
+# IRegistryLoader — registry.yaml loader contract
+# ---------------------------------------------------------------------------
+
+@runtime_checkable
+class IRegistryLoader(Protocol):
+    """Structural protocol for loading the agent registry from registry.yaml."""
+
+    def load(self, project_root: Path) -> RegistryConfig:
+        """Parse .agents/registry.yaml and return a validated RegistryConfig.
+
+        Raises FileNotFoundError if registry.yaml does not exist.
+        Raises ValidationError if the YAML does not conform to the schema.
+        """
         ...
 
 

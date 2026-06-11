@@ -1,4 +1,4 @@
-"""ingestion.tools.11_ingestion_agent
+"""ingestion.tools.ingestion_agent
 
 Ingestion Agent — first stage of the vault pipeline.
   - Strips emoji from filenames in 00-Inbox/ (idempotent)
@@ -15,7 +15,6 @@ import re
 import shutil
 import subprocess
 import sys
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -34,16 +33,18 @@ from shared import (  # noqa: E402
     BaseAgent,
     InboxQueue,
     InboxQueueEntry,
-    VaultConfig,
 )
+from shared.logger import Logger  # noqa: E402
+from shared.loaders import load_vault_config  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
 TASK_ID         = "ingestion-agent"
-SCRIPT_BASENAME = "ingestion_agent.py"
+SCRIPT_BASENAME = "ingestion_agent"
 BATCH_SIZE      = 10
+DONE_KEY        = "processed"
 
 IMAGE_EXTS    = frozenset({".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tiff", ".tif"})
 DOCUMENT_EXTS = frozenset({".docx", ".doc", ".pdf", ".md", ".txt", ".odt"})
@@ -80,37 +81,17 @@ _EMOJI_RE = re.compile(
 
 
 # ---------------------------------------------------------------------------
-# Logger
+# Logger factory — used by call_tool() agentic dispatch (no agent instance)
 # ---------------------------------------------------------------------------
 
-class _Logger:
-    def __init__(self, task_id: str = TASK_ID) -> None:
-        self.task_id = task_id
-        _LOGS_DIR.mkdir(parents=True, exist_ok=True)
-        today = datetime.now().strftime("%Y-%m-%d")
-        self._daily  = _LOGS_DIR / f"ingestion-agent_{today}.log"
-        self._master = _AGENTS_DIR / "runtime" / "state" / "logs" / "automation.log"
-
-    def _write(self, level: str, message: str) -> None:
-        ts   = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        line = f"[{ts}] [{self.task_id}] {level}: {message}"
-        print(line, flush=True)
-        self._master.parent.mkdir(parents=True, exist_ok=True)
-        for path in (self._master, self._daily):
-            with open(path, "a", encoding="utf-8") as fh:
-                fh.write(line + "\n")
-
-    def info(self, msg: str)    -> None: self._write("INFO",  msg)
-    def warning(self, msg: str) -> None: self._write("WARN",  msg)
-    def error(self, msg: str)   -> None: self._write("ERROR", msg)
-
-    def start(self) -> float:
-        self._write("INFO", "--- START ---")
-        return time.monotonic()
-
-    def done(self, t0: float, *, key: str = TASK_ID, count: int = 0, failed: int = 0) -> None:
-        elapsed = round(time.monotonic() - t0, 2)
-        self._write("INFO", f"--- DONE --- processed={count} failed={failed} elapsed={elapsed}s")
+def _make_logger() -> Logger:
+    """Construct a shared Logger from module-level path constants."""
+    return Logger(
+        task_id         = TASK_ID,
+        script_basename = SCRIPT_BASENAME,
+        logs_dir        = _LOGS_DIR,
+        master_log      = _AGENTS_DIR / "runtime" / "state" / "logs" / "automation.log",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -164,7 +145,7 @@ def _strip_emoji(text: str) -> str:
     return cleaned or text  # never return empty
 
 
-def strip_emoji_filenames(inbox: Path, log: _Logger) -> int:
+def strip_emoji_filenames(inbox: Path, log: Logger) -> int:
     """Rename files in inbox/ that contain emoji. Idempotent. Returns count renamed."""
     renamed = 0
     for path in sorted(inbox.rglob("*")):
@@ -193,7 +174,7 @@ def strip_emoji_filenames(inbox: Path, log: _Logger) -> int:
 # Pandoc / DOCX conversion
 # ---------------------------------------------------------------------------
 
-def _ensure_pandoc(log: _Logger) -> bool:
+def _ensure_pandoc(log: Logger) -> bool:
     if shutil.which("pandoc"):
         return True
     log.warning("pandoc not found — attempting: winget install JohnMacFarlane.Pandoc")
@@ -217,13 +198,12 @@ def _to_slug(stem: str) -> str:
     return s or "document"
 
 
-def _convert_docx(docx_path: Path, log: _Logger) -> Optional[Path]:
+def _convert_docx(docx_path: Path, log: Logger) -> Optional[Path]:
     """Convert one DOCX → GFM Markdown. Images → 00-Inbox/images/{slug}/. Returns .md or None."""
     slug       = _to_slug(docx_path.stem)
     images_dir = _INBOX / "images" / slug
     images_dir.mkdir(parents=True, exist_ok=True)
 
-    # Pandoc extracts to <images_dir>/media/ — we flatten that after conversion
     out_md = _INBOX / "docs" / f"{slug}.md"
     out_md.parent.mkdir(parents=True, exist_ok=True)
 
@@ -248,7 +228,7 @@ def _convert_docx(docx_path: Path, log: _Logger) -> Optional[Path]:
     return out_md
 
 
-def _flatten_media(images_dir: Path, md_path: Path, log: _Logger) -> None:
+def _flatten_media(images_dir: Path, md_path: Path, log: Logger) -> None:
     """Move pandoc's media/ subdir files up into images_dir, fix md image refs."""
     media_sub = images_dir / "media"
     if not media_sub.exists():
@@ -279,14 +259,11 @@ def _fix_md_image_refs(md_path: Path, images_dir: Path) -> None:
     try:
         content = md_path.read_text(encoding="utf-8")
 
-        # pandoc may write absolute paths or paths relative to CWD
         abs_media = (images_dir / "media").as_posix()
         rel_media = images_dir.relative_to(_PROJECT_ROOT).as_posix()
 
         content = content.replace(abs_media + "/", rel_media + "/")
-        # Also handle Windows backslash variant
         content = content.replace(str(images_dir / "media").replace("/", "\\") + "\\", rel_media + "/")
-        # Handle pandoc's relative "media/" prefix (written relative to output dir)
         content = re.sub(
             r"!\[([^\]]*)\]\(media/([^)]+)\)",
             lambda m: f"![{m.group(1)}]({rel_media}/{m.group(2)})",
@@ -298,7 +275,7 @@ def _fix_md_image_refs(md_path: Path, images_dir: Path) -> None:
         pass  # non-fatal — images still exist, paths just need manual fix
 
 
-def process_docx_files(log: _Logger) -> tuple[int, int]:
+def process_docx_files(log: Logger) -> tuple[int, int]:
     """Discover + convert unprocessed .docx files vault-wide (max BATCH_SIZE)."""
     if not _ensure_pandoc(log):
         log.warning("DOCX conversion skipped — pandoc unavailable")
@@ -349,11 +326,10 @@ def _make_slots(file_type: str) -> AgentSlots:
         return AgentSlots(vision=p, lore=p, classification=p, wiki=s)
     if file_type == "document":
         return AgentSlots(vision=s, lore=s, classification=p, wiki=p)
-    # other
     return AgentSlots(vision=s, lore=s, classification=s, wiki=s)
 
 
-def register_new_files(log: _Logger) -> tuple[int, int]:
+def register_new_files(log: Logger) -> tuple[int, int]:
     """Scan 00-Inbox/ recursively; add files absent from queue. Returns (added, 0)."""
     queue = _load_queue()
     added = 0
@@ -389,11 +365,11 @@ class IngestionAgent(BaseAgent):
     TASK_ID         = TASK_ID
     SCRIPT_BASENAME = SCRIPT_BASENAME
     BATCH_SIZE      = BATCH_SIZE
+    DONE_KEY        = DONE_KEY
 
     def __init__(self) -> None:
-        # cfg unused — all paths resolved via module-level constants
-        super().__init__(cfg=None)  # type: ignore[arg-type]
-        self._log = _Logger()
+        cfg = load_vault_config(_PROJECT_ROOT)
+        super().__init__(cfg=cfg)
 
     def bootstrap(self) -> None:
         """Ensure required state dirs and queue file exist. Idempotent."""
@@ -406,34 +382,21 @@ class IngestionAgent(BaseAgent):
             _save_queue({})
 
     def run_batch(self) -> tuple[int, int]:
+        # self._logger set by BaseAgent.execute() before run_batch() is called
+        log = self._logger
         total_count, total_failed = 0, 0
 
-        # Step 1: strip emoji from 00-Inbox/ filenames
-        renamed = strip_emoji_filenames(_INBOX, self._log)
+        renamed = strip_emoji_filenames(_INBOX, log)
         total_count += renamed
 
-        # Step 2: convert DOCX files to Markdown
-        docx_count, docx_failed = process_docx_files(self._log)
+        docx_count, docx_failed = process_docx_files(log)
         total_count  += docx_count
         total_failed += docx_failed
 
-        # Step 3: register new Inbox files into the shared queue
-        added, _ = register_new_files(self._log)
+        added, _ = register_new_files(log)
         total_count += added
 
         return total_count, total_failed
-
-    def execute(self) -> int:
-        self.bootstrap()
-        t0 = self._log.start()
-        try:
-            count, failed = self.run_batch()
-            self._log.done(t0, key=TASK_ID, count=count, failed=failed)
-            return 0 if failed == 0 else 1
-        except Exception as exc:
-            self._log.error(f"Unhandled exception: {exc}")
-            self._log.done(t0, key=TASK_ID, count=0, failed=1)
-            return 1
 
 
 # ---------------------------------------------------------------------------
@@ -450,11 +413,8 @@ if __name__ == "__main__":
 
 
 # ---------------------------------------------------------------------------
-# Agentic tool interface
+# Agentic tool interface (claude-api tool-use dispatch)
 # ---------------------------------------------------------------------------
-
-if str(_AGENTS_DIR) not in sys.path:
-    sys.path.insert(0, str(_AGENTS_DIR))
 
 from shared.agent_tools import SELF_MANAGEMENT_TOOLS, call_self_management_tool  # noqa: E402
 
@@ -486,7 +446,7 @@ def call_tool(name: str, args: dict, context: dict) -> str:
     if result is not None:
         return result
 
-    log = _Logger()
+    log = _make_logger()
     if name == "clean_filenames":
         n = strip_emoji_filenames(_INBOX, log)
         return f"Cleaned {n} filename(s)"

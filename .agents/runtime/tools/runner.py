@@ -113,7 +113,7 @@ class _Logger:
 
     def done(self, t0: float, *, count: int = 0, failed: int = 0) -> None:
         elapsed = round(time.monotonic() - t0, 2)
-        self._write("INFO", f"--- DONE --- processed={count} failed={failed} elapsed={elapsed}s")
+        self._write("INFO", f"--- DONE (processed: {count}, failed: {failed}, elapsed: {elapsed}s) ---")
 
 
 # ---------------------------------------------------------------------------

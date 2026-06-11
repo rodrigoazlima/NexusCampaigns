@@ -7,7 +7,7 @@ from .config import LLMEndpointConfig, SystemPaths, VaultConfig, VaultPaths
 from .entity_scanner import EntityScanner
 from .frontmatter_io import FrontmatterIO
 from .llm_client import LLMClient
-from .loaders import load_vault_config
+from .loaders import load_registry, load_vault_config
 from .logger import Logger, _ensure_utf8_stdout
 from .quality_gate import QualityGate
 from .slug_utils import (
@@ -66,6 +66,7 @@ from .interfaces import (
     INPCGenerator,
     IOrchestrator,
     IQualityGate,
+    IQueueRegistrar,
     IRelationshipBuilder,
     IReportBuilder,
     IRunner,
@@ -160,9 +161,9 @@ __all__ = [
     "BaseAgent", "IAgent", "ICanonValidator", "ICleaner", "ICurator",
     "IDedupAnalyzer", "IFaceMatcher", "IFrontmatterIO", "IImageClassifier",
     "ILLMClient", "ILogger", "INPCGenerator", "IOrchestrator", "IQualityGate",
-    "IRelationshipBuilder", "IReportBuilder", "IRunner", "ISearchIndexer",
-    "ISignalEmitter", "IStateStore", "ITagEnricher", "ITokenRenderer", "IVaultGuard",
-    "IWikiCompiler", "IWikilinkResolver",
+    "IQueueRegistrar", "IRelationshipBuilder", "IReportBuilder", "IRunner",
+    "ISearchIndexer", "ISignalEmitter", "IStateStore", "ITagEnricher",
+    "ITokenRenderer", "IVaultGuard", "IWikiCompiler", "IWikilinkResolver",
     # Exceptions
     "DispatchError", "LLMOfflineError", "LLMResponseError", "VaultWriteError",
     # Linking rules
