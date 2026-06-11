@@ -3,7 +3,7 @@
 # =============================================
 
 param(
-    [string]$TemplateFile = "template.md",
+    [string]$TemplateFile = "template-spec.md",
     [string]$OutputPrefix = "prompt"
 )
 

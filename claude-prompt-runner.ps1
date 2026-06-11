@@ -4,6 +4,7 @@
 
 param(
     [string]$PromptDirectory = "docs/prompts",
+    [string]$Filter = "prompt-*.md",
     [string]$StateFile = ".system/claude-queue-state.json",
     [int]$RetryDelayMinutes = 40,
     [int]$MaxRetries = 200,
@@ -20,14 +21,14 @@ $FailurePatterns = @(
 )
 
 function Get-Prompts {
-    param([string]$Directory)
+    param([string]$Directory, [string]$GlobFilter)
 
     if (-not (Test-Path $Directory)) {
         Write-Host "Error: Prompt directory '$Directory' not found." -ForegroundColor Red
         return @()
     }
 
-    $promptFiles = Get-ChildItem -Path "$Directory/prompt-*.md" -File | Sort-Object Name
+    $promptFiles = Get-ChildItem -Path "$Directory/$GlobFilter" -File | Sort-Object Name
     return $promptFiles.FullName
 }
 
@@ -90,16 +91,17 @@ function Write-Status {
 # Main execution
 Write-Status "Claude Prompt Runner Starting" -Color Green
 Write-Status "Prompt directory: $PromptDirectory" -Color Gray
+Write-Status "Filter: $Filter" -Color Gray
 Write-Status "State file: $StateFile" -Color Gray
 Write-Status "Retry delay: $RetryDelayMinutes minutes" -Color Gray
 Write-Status "Max retries: $MaxRetries" -Color Gray
 
 $existingState = Load-State $StateFile
 
-if ($existingState.Count -eq 0) {
-    Write-Status "Discovering prompt files..."
-    $promptPaths = Get-Prompts $PromptDirectory
+Write-Status "Discovering prompt files..."
+$promptPaths = Get-Prompts $PromptDirectory $Filter
 
+if ($existingState.Count -eq 0) {
     if ($promptPaths.Count -eq 0) {
         Write-Status "No prompt files found!" -Color Yellow
         exit 0
@@ -108,16 +110,47 @@ if ($existingState.Count -eq 0) {
     $queueState = @()
     foreach ($path in $promptPaths) {
         $queueState += [PSCustomObject]@{
-            Path      = $path
-            Retries   = 0
-            LastRun   = $null
-            Completed = $false
+            Path        = $path
+            Retries     = 0
+            LastRun     = $null
+            StartedAt   = $null
+            CompletedAt = $null
+            Completed   = $false
         }
     }
 }
 else {
     Write-Status "Continuing with existing queue..."
-    $queueState = $existingState
+    # Migrate old state objects that may be missing fields added later
+    $migrated = $existingState | ForEach-Object {
+        [PSCustomObject]@{
+            Path        = $_.Path
+            Retries     = if ($null -ne $_.Retries)     { $_.Retries }     else { 0 }
+            LastRun     = if ($null -ne $_.LastRun)     { $_.LastRun }     else { $null }
+            StartedAt   = if ($null -ne $_.StartedAt)   { $_.StartedAt }   else { $null }
+            CompletedAt = if ($null -ne $_.CompletedAt) { $_.CompletedAt } else { $null }
+            Completed   = if ($null -ne $_.Completed)   { $_.Completed }   else { $false }
+        }
+    }
+    $queueState = [System.Collections.ArrayList]$migrated
+
+    # Add any new prompt files not already in the queue
+    $existingPaths = $queueState | ForEach-Object { $_.Path }
+    $newPaths = $promptPaths | Where-Object { $_ -notin $existingPaths }
+    foreach ($path in $newPaths) {
+        Write-Status "New prompt discovered: $(Split-Path $path -Leaf)" -Color Cyan
+        $queueState.Add([PSCustomObject]@{
+            Path        = $path
+            Retries     = 0
+            LastRun     = $null
+            StartedAt   = $null
+            CompletedAt = $null
+            Completed   = $false
+        }) | Out-Null
+    }
+    if ($newPaths.Count -gt 0) {
+        Write-Status "$($newPaths.Count) new prompt(s) added to queue" -Color Cyan
+    }
 }
 
 $startTime = Get-Date
@@ -184,6 +217,12 @@ while ($true) {
     Write-Host "Timeout: $TimeoutSeconds seconds"
     Write-Host ""
 
+    # Record start time
+    $queueState | Where-Object { $_.Path -eq $nextPrompt.Path } | ForEach-Object {
+        $_.StartedAt = Get-Date -Format "o"
+    }
+    Save-State $StateFile $queueState
+
     # Run claude non-interactively: pipe file content to claude -p
     $job = Start-Job -ScriptBlock {
         param($promptPath)
@@ -240,9 +279,23 @@ while ($true) {
 
     if ($result.Success) {
         Write-Status "SUCCESS: $(Format-PromptName $nextPrompt.Path)" -Color Green
+        $completedAt = Get-Date -Format "o"
         $queueState | Where-Object { $_.Path -eq $nextPrompt.Path } | ForEach-Object {
-            $_.Completed = $true
-            $_.LastRun   = Get-Date -Format "o"
+            $_.Completed    = $true
+            $_.LastRun      = $completedAt
+            $_.CompletedAt  = $completedAt
+        }
+
+        # Move prompt file to prompt-done subfolder
+        $promptFile = $nextPrompt.Path
+        if (Test-Path $promptFile) {
+            $doneDir = Join-Path (Split-Path $promptFile -Parent) "prompt-done"
+            if (-not (Test-Path $doneDir)) {
+                New-Item -ItemType Directory -Path $doneDir -Force | Out-Null
+            }
+            $destPath = Join-Path $doneDir (Split-Path $promptFile -Leaf)
+            Move-Item -Path $promptFile -Destination $destPath -Force
+            Write-Status "Moved to prompt-done: $(Split-Path $promptFile -Leaf)" -Color Gray
         }
     }
     else {
