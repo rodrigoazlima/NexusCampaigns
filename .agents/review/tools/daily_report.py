@@ -1,4 +1,4 @@
-"""review.tools.08_daily_report
+"""review.tools.daily_report
 
 Aggregates automation logs + vault health into a JSON report every 15 min.
 Rebuilds state/reports/reports-data.js after each report.
@@ -24,6 +24,7 @@ if str(_AGENTS_DIR) not in sys.path:
 
 from shared import (  # noqa: E402
     FrontmatterIO,
+    Logger,
     describe_violations,
     extract_wikilinks,
     is_orphan,
@@ -41,6 +42,7 @@ _MASTER_LOG   = _ORCH_STATE / "logs" / "automation.log"
 _AGENT_STATE  = _AGENTS_DIR / "review" / "state"
 _LOGS_DIR     = _AGENT_STATE / "logs"
 _REPORTS_DIR  = _AGENT_STATE / "reports"
+_QUEUE_FILE   = _PROJECT_ROOT / ".shared" / "state" / "inbox-queue.json"
 
 _LOG_LINE_RE  = re.compile(
     r"^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\] \[([^\]]+)\] (\w+): (.+)$"
@@ -48,33 +50,13 @@ _LOG_LINE_RE  = re.compile(
 _WIKILINK_RE  = re.compile(r"\[\[[^\]]+\]\]")
 
 
-class _Logger:
-    def __init__(self) -> None:
-        _LOGS_DIR.mkdir(parents=True, exist_ok=True)
-        today = datetime.now().strftime("%Y-%m-%d")
-        self._daily  = _LOGS_DIR / f"daily-report_{today}.log"
-        self._master = _MASTER_LOG
-
-    def _write(self, level: str, msg: str) -> None:
-        ts   = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        line = f"[{ts}] [{TASK_ID}] {level}: {msg}"
-        print(line, flush=True)
-        self._master.parent.mkdir(parents=True, exist_ok=True)
-        for p in (self._master, self._daily):
-            with open(p, "a", encoding="utf-8") as fh:
-                fh.write(line + "\n")
-
-    def info(self, m: str)    -> None: self._write("INFO",  m)
-    def warning(self, m: str) -> None: self._write("WARN",  m)
-    def error(self, m: str)   -> None: self._write("ERROR", m)
-
-    def start(self) -> float:
-        self._write("INFO", "--- START ---")
-        return time.monotonic()
-
-    def done(self, t0: float, count: int = 0, failed: int = 0) -> None:
-        elapsed = round(time.monotonic() - t0, 2)
-        self._write("INFO", f"--- DONE --- processed={count} failed={failed} elapsed={elapsed}s")
+def _make_logger() -> Logger:
+    return Logger(
+        task_id=TASK_ID,
+        script_basename=SCRIPT_BASENAME,
+        logs_dir=_LOGS_DIR,
+        master_log=_MASTER_LOG,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -112,7 +94,7 @@ def _parse_automation_log(since: datetime) -> dict[str, Any]:
 
         if "--- START ---" in message:
             s["runs"] += 1
-        elif "--- DONE ---" in message:
+        elif "--- DONE" in message:
             s["completedRuns"] += 1
 
         if level == "ERROR":
@@ -121,6 +103,39 @@ def _parse_automation_log(since: datetime) -> dict[str, Any]:
             s["warnings"] += 1
 
     return summaries
+
+
+# ---------------------------------------------------------------------------
+# Queue depth
+# ---------------------------------------------------------------------------
+
+def _load_queue_depth() -> tuple[int, int, int]:
+    """Return (total, pending, done) from inbox-queue.json.
+
+    pending = any agent slot is 'pending'
+    done    = all non-skip agent slots are 'done'
+    """
+    if not _QUEUE_FILE.exists():
+        return 0, 0, 0
+
+    try:
+        raw = json.loads(_QUEUE_FILE.read_text(encoding="utf-8").lstrip("﻿"))
+    except Exception:
+        return 0, 0, 0
+
+    total = len(raw)
+    pending_count = 0
+    done_count = 0
+
+    for entry in raw.values():
+        agents = entry.get("agents", {}) if isinstance(entry, dict) else {}
+        slots = [v for v in agents.values() if v != "skip"]
+        if any(v == "pending" for v in slots):
+            pending_count += 1
+        elif slots and all(v == "done" for v in slots):
+            done_count += 1
+
+    return total, pending_count, done_count
 
 
 # ---------------------------------------------------------------------------
@@ -142,7 +157,7 @@ def _quality_score(fm: dict, body: str) -> int:
     return min(score, 10)
 
 
-def _vault_health(fio: FrontmatterIO, log: _Logger) -> dict[str, Any]:
+def _vault_health(fio: FrontmatterIO, log: Logger) -> dict[str, Any]:
     pending_review: list[str] = []
     orphans:        list[str] = []
     quality_scores: dict[str, int] = {}
@@ -172,13 +187,16 @@ def _vault_health(fio: FrontmatterIO, log: _Logger) -> dict[str, Any]:
                 except Exception as exc:
                     log.warning(f"Could not inject suggestedQuality in {md_path.name}: {exc}")
 
-    # Scan 02-Library/ for link-rule violations (linking-rules.spec.md)
     library_violations = _library_link_violations(fio)
+    queue_depth, queue_pending, queue_done = _load_queue_depth()
 
     return {
-        "pendingReview":        pending_review,
-        "orphans":              orphans,
-        "qualityScores":        quality_scores,
+        "pendingReview":         pending_review,
+        "orphans":               orphans,
+        "qualityScores":         quality_scores,
+        "queueDepth":            queue_depth,
+        "queuePending":          queue_pending,
+        "queueDone":             queue_done,
         "libraryLinkViolations": library_violations,
     }
 
@@ -188,13 +206,7 @@ def _vault_health(fio: FrontmatterIO, log: _Logger) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 def _library_link_violations(fio: FrontmatterIO) -> list[dict[str, Any]]:
-    """Scan 02-Library/ for entities missing required outbound link types.
-
-    Returns one entry per violating entity:
-      {"path": str, "type": str, "violations": [str, ...]}
-
-    Covers both orphans (zero links) and per-type required-link gaps.
-    """
+    """Scan 02-Library/ for entities missing required outbound link types."""
     violations: list[dict[str, Any]] = []
     if not _LIBRARY.is_dir():
         return violations
@@ -253,7 +265,7 @@ def _load_tasks_config() -> dict[str, Any]:
     return {"tasks": tasks}
 
 
-def _write_reports_js(log: _Logger) -> None:
+def _write_reports_js(log: Logger) -> None:
     _REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     reports: list[dict] = []
     for f in sorted(_REPORTS_DIR.glob("report-*.json")):
@@ -274,7 +286,7 @@ def _write_reports_js(log: _Logger) -> None:
 
 
 def main() -> None:
-    log = _Logger()
+    log = _make_logger()
     t0  = log.start()
     fio = FrontmatterIO()
 
@@ -309,9 +321,11 @@ def main() -> None:
     log.info(
         f"Vault health: pendingReview={n_pending} orphans={n_orphans}"
         f" libraryLinkViolations={n_violations}"
+        f" queueDepth={health['queueDepth']} queuePending={health['queuePending']}"
+        f" queueDone={health['queueDone']}"
     )
 
-    log.done(t0, count=1)
+    log.done(t0, key="processed", count=1, failed=0)
     sys.exit(0)
 
 
@@ -343,7 +357,8 @@ TOOLS = SELF_MANAGEMENT_TOOLS + [
         "description": (
             "Scan 01-Processing/ for pending reviews, orphans, and quality scores. "
             "Also scans 02-Library/ for link-rule violations (missing required links per linking-rules.spec.md). "
-            "Returns health dict including libraryLinkViolations."
+            "Loads inbox-queue.json for queue depth metrics (total/pending/done). "
+            "Returns health dict including libraryLinkViolations and queueDepth."
         ),
         "input_schema": {"type": "object", "properties": {}},
     },
@@ -363,11 +378,10 @@ def call_tool(name: str, args: dict, context: dict) -> str:
     if result is not None:
         return result
 
-    log = _Logger()
+    log = _make_logger()
     fio = FrontmatterIO()
 
     if name == "parse_automation_log":
-        from datetime import timedelta
         hours = int(args.get("hours", 24))
         since = datetime.now(timezone.utc) - timedelta(hours=hours)
         summaries = _parse_automation_log(since)
@@ -378,7 +392,6 @@ def call_tool(name: str, args: dict, context: dict) -> str:
         return _json.dumps(health, indent=2, default=str)
 
     if name == "write_report":
-        from datetime import timedelta
         _REPORTS_DIR.mkdir(parents=True, exist_ok=True)
         now = datetime.now(timezone.utc)
         since = now - timedelta(hours=24)

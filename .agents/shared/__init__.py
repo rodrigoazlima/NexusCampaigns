@@ -3,7 +3,11 @@
 Consumers import from here; never from sub-modules directly.
 """
 
-from .config import LLMEndpointConfig, SystemPaths, VaultConfig, VaultPaths
+from .config import (
+    LLMEndpointConfig, SystemPaths, VaultConfig, VaultPaths,
+    AppConfig, LLMConfig, LoggingConfig,
+    get_config, clear_config_cache,
+)
 from .entity_scanner import EntityScanner
 from .frontmatter_io import FrontmatterIO
 from .llm_client import LLMClient
@@ -67,6 +71,7 @@ from .interfaces import (
     IOrchestrator,
     IQualityGate,
     IQueueRegistrar,
+    IRegistryLoader,
     IRelationshipBuilder,
     IReportBuilder,
     IRunner,
@@ -89,6 +94,8 @@ from .models import (
     AgentLogSummary,
     AgentMetrics,
     AgentMetricsEntry,
+    AgentRegistryEntry,
+    AgentSharedStateSpec,
     AgentSlots,
     AgentSlotStatus,
     CanonReport,
@@ -115,6 +122,7 @@ from .models import (
     ImageType,
     InboxQueue,
     InboxQueueEntry,
+    LLMEndpointSpec,
     NPCFrontmatter,
     NPCLLMOutput,
     NPCProcessStatus,
@@ -127,6 +135,7 @@ from .models import (
     ProcessedImagesState,
     ProcessedNPCEntry,
     ProcessedNPCs,
+    RegistryConfig,
     RelationshipEdge,
     RelationshipGraph,
     RepairReport,
@@ -137,6 +146,7 @@ from .models import (
     SearchEntry,
     SearchIndex,
     SearchIndexState,
+    SharedStateFileSpec,
     TagEnrichmentOutput,
     TaskDispatchEntry,
     TasksState,
@@ -148,10 +158,12 @@ from .models import (
 )
 
 __all__ = [
-    # Config
+    # Config — Layer 1 (dataclasses)
     "LLMEndpointConfig", "SystemPaths", "VaultConfig", "VaultPaths",
+    # Config — Layer 2 (JSON / AppConfig)
+    "AppConfig", "LLMConfig", "LoggingConfig", "get_config", "clear_config_cache",
     # Concrete implementations
-    "EntityScanner", "FrontmatterIO", "LLMClient", "load_vault_config",
+    "EntityScanner", "FrontmatterIO", "LLMClient", "load_registry", "load_vault_config",
     "Logger", "_ensure_utf8_stdout", "QualityGate",
     "StateStore", "TextStateStore", "bootstrap_vault_state", "VaultGuard",
     # Slug utilities
@@ -161,8 +173,8 @@ __all__ = [
     "BaseAgent", "IAgent", "ICanonValidator", "ICleaner", "ICurator",
     "IDedupAnalyzer", "IFaceMatcher", "IFrontmatterIO", "IImageClassifier",
     "ILLMClient", "ILogger", "INPCGenerator", "IOrchestrator", "IQualityGate",
-    "IQueueRegistrar", "IRelationshipBuilder", "IReportBuilder", "IRunner",
-    "ISearchIndexer", "ISignalEmitter", "IStateStore", "ITagEnricher",
+    "IQueueRegistrar", "IRegistryLoader", "IRelationshipBuilder", "IReportBuilder",
+    "IRunner", "ISearchIndexer", "ISignalEmitter", "IStateStore", "ITagEnricher",
     "ITokenRenderer", "IVaultGuard", "IWikiCompiler", "IWikilinkResolver",
     # Exceptions
     "DispatchError", "LLMOfflineError", "LLMResponseError", "VaultWriteError",
@@ -198,6 +210,9 @@ __all__ = [
     "TasksState", "TaskStateEntry",
     # Models — metrics
     "RunMetrics", "AgentMetricsEntry", "AgentMetrics",
+    # Models — registry
+    "AgentRegistryEntry", "AgentSharedStateSpec", "LLMEndpointSpec",
+    "RegistryConfig", "SharedStateFileSpec",
     # Models — reports
     "AgentLogSummary", "CanonReport", "CanonViolation", "CleanupReport",
     "CuratorReport", "CuratorSuggestion", "DailyReport", "DedupCandidate",

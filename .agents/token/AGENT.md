@@ -18,8 +18,7 @@ dependencies:
   - vision
 dispatch_config: agent.json
 owned_tools:
-  - tools/10-generate-tokens.ps1
-  - tools/10-generate-tokens.py
+  - tools/generate_tokens.py
 responsibilities:
   - Load config from state/10-generate-tokens.json (size, padding, ratios, moldura path)
   - Filter processed-images.json to status=ok, isToken=false, type not in battlemap/scene

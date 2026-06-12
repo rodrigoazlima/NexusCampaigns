@@ -1,18 +1,15 @@
-"""review.tools.15_flag_short_files
+"""review.tools.flag_short_files
 
 Scans 01-Processing/ for draft .md files with fewer than 10 body lines.
-Logs each short file. Injects suggestedQuality: 0 into frontmatter if
-quality field is 0 and suggestedQuality is absent.
+Sets needs_reprocessing: true in frontmatter and injects suggestedQuality: 0
+when quality: 0 and suggestedQuality is absent.
 No LLM. No 02-Library writes.
 """
 
 from __future__ import annotations
 
 import sys
-import time
-from datetime import datetime
 from pathlib import Path
-from typing import Any
 
 _TOOLS_DIR    = Path(__file__).resolve().parent
 _AGENTS_DIR   = _TOOLS_DIR.parents[1]
@@ -21,7 +18,7 @@ _PROJECT_ROOT = _AGENTS_DIR.parent
 if str(_AGENTS_DIR) not in sys.path:
     sys.path.insert(0, str(_AGENTS_DIR))
 
-from shared import FrontmatterIO  # noqa: E402
+from shared import FrontmatterIO, Logger  # noqa: E402
 
 TASK_ID         = "review-agent-short-files"
 SCRIPT_BASENAME = "flag_short_files.py"
@@ -34,47 +31,34 @@ _LOGS_DIR    = _AGENT_STATE / "logs"
 _MASTER_LOG  = _AGENTS_DIR / "runtime" / "state" / "logs" / "automation.log"
 
 
-class _Logger:
-    def __init__(self) -> None:
-        _LOGS_DIR.mkdir(parents=True, exist_ok=True)
-        today = datetime.now().strftime("%Y-%m-%d")
-        self._daily  = _LOGS_DIR / f"flag-short-files_{today}.log"
-        self._master = _MASTER_LOG
-
-    def _write(self, level: str, msg: str) -> None:
-        ts   = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        line = f"[{ts}] [{TASK_ID}] {level}: {msg}"
-        print(line, flush=True)
-        self._master.parent.mkdir(parents=True, exist_ok=True)
-        for p in (self._master, self._daily):
-            with open(p, "a", encoding="utf-8") as fh:
-                fh.write(line + "\n")
-
-    def info(self, m: str)    -> None: self._write("INFO",  m)
-    def warning(self, m: str) -> None: self._write("WARN",  m)
-    def error(self, m: str)   -> None: self._write("ERROR", m)
-
-    def start(self) -> float:
-        self._write("INFO", "--- START ---")
-        return time.monotonic()
-
-    def done(self, t0: float, count: int = 0, failed: int = 0) -> None:
-        elapsed = round(time.monotonic() - t0, 2)
-        self._write("INFO", f"--- DONE --- processed={count} failed={failed} elapsed={elapsed}s")
+def _make_logger() -> Logger:
+    return Logger(
+        task_id=TASK_ID,
+        script_basename=SCRIPT_BASENAME,
+        logs_dir=_LOGS_DIR,
+        master_log=_MASTER_LOG,
+    )
 
 
-def _inject_suggested_quality(path: Path, fio: FrontmatterIO, log: _Logger) -> None:
+def _flag_short_file(path: Path, fio: FrontmatterIO, log: Logger) -> None:
+    """Set needs_reprocessing: true and inject suggestedQuality: 0 if applicable."""
     try:
         fm, body = fio.read(path)
+        changed = False
+        if not fm.get("needs_reprocessing"):
+            fm["needs_reprocessing"] = True
+            changed = True
         if fm.get("quality", 0) == 0 and "suggestedQuality" not in fm:
             fm["suggestedQuality"] = 0
+            changed = True
+        if changed:
             fio.write(path, fm, body)
     except Exception as exc:
-        log.warning(f"Could not inject suggestedQuality in {path.name}: {exc}")
+        log.warning(f"Could not flag {path.name}: {exc}")
 
 
 def main() -> None:
-    log = _Logger()
+    log = _make_logger()
     t0  = log.start()
     fio = FrontmatterIO()
     flagged = 0
@@ -82,7 +66,7 @@ def main() -> None:
 
     if not _PROCESSING.exists():
         log.info("01-Processing/ does not exist — nothing to scan")
-        log.done(t0)
+        log.done(t0, key="processed", count=0, failed=0)
         sys.exit(0)
 
     for md_path in sorted(_PROCESSING.glob("**/*.md")):
@@ -99,10 +83,10 @@ def main() -> None:
             log.warning(
                 f"Short file ({len(body_lines)} body lines): {md_path.relative_to(_PROJECT_ROOT).as_posix()}"
             )
-            _inject_suggested_quality(md_path, fio, log)
+            _flag_short_file(md_path, fio, log)
 
     log.info(f"Scanned {scanned} files — {flagged} flagged as short (< {MIN_BODY_LINES} lines)")
-    log.done(t0, count=flagged)
+    log.done(t0, key="processed", count=flagged, failed=0)
     sys.exit(0)
 
 
@@ -130,8 +114,8 @@ TOOLS = SELF_MANAGEMENT_TOOLS + [
     {
         "name": "flag_reprocessing",
         "description": (
-            "Inject suggestedQuality: 0 into the frontmatter of a short file "
-            "that has quality=0 and no existing suggestedQuality."
+            "Set needs_reprocessing: true and inject suggestedQuality: 0 (if quality=0 "
+            "and suggestedQuality absent) into the frontmatter of a short file."
         ),
         "input_schema": {
             "type": "object",
@@ -171,11 +155,11 @@ def call_tool(name: str, args: dict, context: dict) -> str:
     if result is not None:
         return result
 
-    log = _Logger()
+    log = _make_logger()
     if name == "scan_short_files":
         return _tool_scan_short_files()
     if name == "flag_reprocessing":
-        _inject_suggested_quality(Path(args["path"]), FrontmatterIO(), log)
+        _flag_short_file(Path(args["path"]), FrontmatterIO(), log)
         return f"Flagged: {args['path']}"
 
     raise ValueError(f"Unknown tool: {name!r}")

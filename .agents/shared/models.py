@@ -512,6 +512,8 @@ class RepairReport(BaseModel):
     generatedAt:        datetime
     fixLabelsDetected:  list[str] = Field(default_factory=list)
     repairsApplied:     int       = 0
+    overdueAgents:      list[str] = Field(default_factory=list)
+    invalidImageRefs:   list[str] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------

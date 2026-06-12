@@ -1,4 +1,4 @@
-"""token.tools.10_generate_tokens
+"""token.tools.generate_tokens
 
 Generates 512×512 circular portrait tokens from classified character images.
 Face detection: MediaPipe → OpenCV Haar → upper-center crop fallback.
@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 import sys
 import time
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +20,9 @@ _PROJECT_ROOT = _AGENTS_DIR.parent
 
 if str(_AGENTS_DIR) not in sys.path:
     sys.path.insert(0, str(_AGENTS_DIR))
+
+from shared.logger import Logger, _ensure_utf8_stdout  # noqa: E402
+from shared.agent_tools import SELF_MANAGEMENT_TOOLS, call_self_management_tool  # noqa: E402
 
 TASK_ID         = "token-agent"
 SCRIPT_BASENAME = "generate_tokens.py"
@@ -45,34 +48,16 @@ _DEFAULT_CFG: dict[str, Any] = {
 
 _SKIP_TYPES = frozenset({"battlemap", "scene"})
 
+_MODULE_FILE = Path(__file__)
 
-class _Logger:
-    def __init__(self) -> None:
-        _LOGS_DIR.mkdir(parents=True, exist_ok=True)
-        today = datetime.now().strftime("%Y-%m-%d")
-        self._daily  = _LOGS_DIR / f"generate-tokens_{today}.log"
-        self._master = _MASTER_LOG
 
-    def _write(self, level: str, msg: str) -> None:
-        ts   = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        line = f"[{ts}] [{TASK_ID}] {level}: {msg}"
-        print(line, flush=True)
-        self._master.parent.mkdir(parents=True, exist_ok=True)
-        for p in (self._master, self._daily):
-            with open(p, "a", encoding="utf-8") as fh:
-                fh.write(line + "\n")
-
-    def info(self, m: str)    -> None: self._write("INFO",  m)
-    def warning(self, m: str) -> None: self._write("WARN",  m)
-    def error(self, m: str)   -> None: self._write("ERROR", m)
-
-    def start(self) -> float:
-        self._write("INFO", "--- START ---")
-        return time.monotonic()
-
-    def done(self, t0: float, count: int = 0, failed: int = 0) -> None:
-        elapsed = round(time.monotonic() - t0, 2)
-        self._write("INFO", f"--- DONE --- processed={count} failed={failed} elapsed={elapsed}s")
+def _make_logger() -> Logger:
+    return Logger(
+        task_id=TASK_ID,
+        script_basename=SCRIPT_BASENAME,
+        logs_dir=_LOGS_DIR,
+        master_log=_MASTER_LOG,
+    )
 
 
 def _load_config() -> dict[str, Any]:
@@ -85,7 +70,7 @@ def _load_config() -> dict[str, Any]:
 
 def _load_vision_state() -> dict[str, Any]:
     if not _VISION_STATE.exists():
-        return {"images": {}}
+        return {"images": {}, "pathIndex": {}}
     return json.loads(_VISION_STATE.read_text(encoding="utf-8"))
 
 
@@ -166,7 +151,7 @@ def _apply_focus_offset(x: int, y: int, bw: int, bh: int, cfg: dict) -> tuple[in
 # Token generation
 # ---------------------------------------------------------------------------
 
-def _make_token(img_path: Path, out_path: Path, cfg: dict, log: _Logger) -> bool:
+def _make_token(img_path: Path, out_path: Path, cfg: dict, log: Logger) -> bool:
     try:
         from PIL import Image, ImageDraw
         import numpy as np
@@ -234,7 +219,8 @@ def _make_token(img_path: Path, out_path: Path, cfg: dict, log: _Logger) -> bool
 
 
 def main() -> None:
-    log = _Logger()
+    _ensure_utf8_stdout()
+    log = _make_logger()
     t0  = log.start()
     _AGENT_STATE.mkdir(parents=True, exist_ok=True)
 
@@ -242,7 +228,7 @@ def main() -> None:
         from PIL import Image  # noqa: F401
     except ImportError:
         log.error("Pillow not installed — install: pip install Pillow")
-        log.done(t0)
+        log.done(t0, key="generated", count=0, failed=0)
         sys.exit(1)
 
     cfg          = _load_config()
@@ -260,7 +246,7 @@ def main() -> None:
 
     if not eligible:
         log.info("No eligible images for token generation")
-        log.done(t0)
+        log.done(t0, key="generated", count=0, failed=0)
         sys.exit(0)
 
     batch   = eligible[:BATCH_SIZE]
@@ -301,7 +287,7 @@ def main() -> None:
         else:
             failed += 1
 
-    log.done(t0, count=count, failed=failed)
+    log.done(t0, key="generated", count=count, failed=failed)
     sys.exit(0 if failed == 0 else 1)
 
 
@@ -312,10 +298,6 @@ if __name__ == "__main__":
 # ---------------------------------------------------------------------------
 # Agentic tool interface
 # ---------------------------------------------------------------------------
-
-from shared.agent_tools import SELF_MANAGEMENT_TOOLS, call_self_management_tool  # noqa: E402
-
-_MODULE_FILE = Path(__file__)
 
 TOOLS = SELF_MANAGEMENT_TOOLS + [
     {
@@ -355,15 +337,18 @@ def call_tool(name: str, args: dict, context: dict) -> str:
         gen_tokens = _load_gen_tokens()
         images = vision_state.get("images", {})
         pending = [
-            img.get("path", "") for img in images.values()
-            if img.get("type") in ("portrait", "body")
-            and img.get("path") not in gen_tokens
+            entry.get("path", "")
+            for img_key, entry in images.items()
+            if entry.get("status") == "ok"
+            and not entry.get("isToken", False)
+            and entry.get("type") not in _SKIP_TYPES
+            and img_key not in gen_tokens
         ]
         return _json.dumps(pending[:20])
 
     if name == "generate_token":
         cfg = _load_config()
-        log = _Logger()
+        log = _make_logger()
         img_path = Path(args["image_path"])
         if not img_path.exists():
             img_path = _PROJECT_ROOT / args["image_path"]
@@ -371,11 +356,14 @@ def call_tool(name: str, args: dict, context: dict) -> str:
         ok = _make_token(img_path, out_path, cfg, log)
         if ok:
             gen = _load_gen_tokens()
-            rel = str(img_path.relative_to(_PROJECT_ROOT))
-            from datetime import timezone
-            gen[rel] = {
-                "sourcePath": rel,
-                "tokenPath": str(out_path.relative_to(_PROJECT_ROOT)),
+            rel = img_path.relative_to(_PROJECT_ROOT).as_posix()
+            # resolve SHA256 key from vision state pathIndex
+            vision_state = _load_vision_state()
+            sha_key = vision_state.get("pathIndex", {}).get(rel, "")
+            key = sha_key if sha_key and not sha_key.startswith("path:") else f"path:{rel}"
+            gen[key] = {
+                "sourcePath":  rel,
+                "tokenPath":   out_path.relative_to(_PROJECT_ROOT).as_posix(),
                 "generatedAt": datetime.now(timezone.utc).isoformat(),
             }
             _save_gen_tokens(gen)
