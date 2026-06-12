@@ -34,6 +34,7 @@ Retry policy (spec: agent-dispatch.spec.md):
 from __future__ import annotations
 
 import importlib
+import importlib.util
 import json
 import sys
 import time
@@ -209,12 +210,32 @@ class ClaudeRunner:
             sys.path.insert(0, str(agents_dir))
         try:
             mod = importlib.import_module(module_path)
-            tools: list[dict] = list(getattr(mod, "TOOLS", []))
+        except (ModuleNotFoundError, ImportError):
+            # Fallback: file-path import handles stdlib name conflicts (e.g. 'token')
+            parts = module_path.split(".")
+            file_path = agents_dir / Path(*parts).with_suffix(".py")
+            if not file_path.exists():
+                return RunResult(
+                    exit_code=1,
+                    error=f"Failed to import tools_module {module_path!r}: "
+                          f"module not found and file {file_path} does not exist",
+                )
+            try:
+                spec = importlib.util.spec_from_file_location(module_path, file_path)
+                mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+                sys.modules[module_path] = mod
+                spec.loader.exec_module(mod)  # type: ignore[union-attr]
+            except Exception as exc:
+                return RunResult(
+                    exit_code=1,
+                    error=f"Failed to load tools_module {module_path!r} from {file_path}: {exc}",
+                )
         except Exception as exc:
             return RunResult(
                 exit_code=1,
                 error=f"Failed to import tools_module {module_path!r}: {exc}",
             )
+        tools: list[dict] = list(getattr(mod, "TOOLS", []))
 
         # ------------------------------------------------------------------ #
         # Chat history (persistent across runs for multi-turn continuity)
