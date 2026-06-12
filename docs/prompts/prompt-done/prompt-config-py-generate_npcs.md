@@ -41,15 +41,20 @@ Analyze the provided Python script and extract all relevant configuration settin
 **Script to analyze:**
 
 # lore\tools\generate_npcs.py
-"""lore.tools.09_generate_npcs
+"""lore.tools.generate_npcs
 
 Generates PF2e NPC sheets from classified character images × active scenarios.
-No LLM → skip gracefully. Batch: 10 image×scenario pairs per run.
+Implements reflexion loop (impl-guide/01-reflexion-loop.md): score → critique → revise
+up to _MAX_REVISIONS rounds. Outputs with score < 7 after all rounds are flagged
+with needs_human_review: true and a ## Reviewer Notes section.
+
+No LLM → skip gracefully. Batch: BATCH_SIZE image×scenario pairs per run.
 """
 
 from __future__ import annotations
 
 import json
+import re
 import sys
 import time
 from datetime import date, datetime, timezone
@@ -69,6 +74,7 @@ from shared import (  # noqa: E402
     LLMOfflineError,
     LLMResponseError,
     NPCLLMOutput,
+    QualityGate,
 )
 from shared.config import LLMEndpointConfig  # noqa: E402
 
@@ -88,6 +94,7 @@ _PROC_NPCS    = _AGENT_STATE / "processed-npcs.json"
 _SCENARIOS    = _AGENT_STATE / "scenarios.json"
 _QUEUE_FILE   = _SHARED_STATE / "inbox-queue.json"
 _PROMPT_FILE  = _AGENTS_DIR / "lore" / "prompts" / "generate-npc.txt"
+_REVISE_FILE  = _AGENTS_DIR / "lore" / "prompts" / "revise-npc.md"
 
 _LLM_CFG = LLMEndpointConfig(
     url      = "http://localhost:1234/v1/chat/completions",
@@ -97,7 +104,13 @@ _LLM_CFG = LLMEndpointConfig(
 )
 
 _CHARACTER_TYPES = frozenset({"portrait", "body", "token"})
+_GATE            = QualityGate()
+_MAX_REVISIONS   = 2
 
+
+# ---------------------------------------------------------------------------
+# Logger
+# ---------------------------------------------------------------------------
 
 class _Logger:
     def __init__(self) -> None:
@@ -127,6 +140,175 @@ class _Logger:
         elapsed = round(time.monotonic() - t0, 2)
         self._write("INFO", f"--- DONE --- processed={count} failed={failed} elapsed={elapsed}s")
 
+
+# ---------------------------------------------------------------------------
+# NPC generator — implements INPCGenerator
+# ---------------------------------------------------------------------------
+
+class _NPCGeneratorImpl:
+    """Wraps LLMClient for NPC sheet generation. Implements INPCGenerator."""
+
+    def __init__(self, client: LLMClient, prompt_tpl: str) -> None:
+        self._client     = client
+        self._prompt_tpl = prompt_tpl
+
+    def _build_prompt(self, scenario: dict, canon_context: str) -> str:
+        return (
+            self._prompt_tpl
+            .replace("{scenario_name}",        scenario["name"])
+            .replace("{scenario_description}", scenario["description"])
+            .replace("{arc}",                  scenario.get("arc", ""))
+            .replace("{canon_context}",        canon_context)
+        )
+
+    def generate(
+        self,
+        image_path: Path,
+        scenario: dict,
+        canon_context: str,
+    ) -> NPCLLMOutput:
+        prompt = self._build_prompt(scenario, canon_context)
+        raw = self._client.vision_chat(
+            image_path, prompt,
+            system="You are a Pathfinder 2e NPC generator. Return ONLY valid JSON.",
+            max_tokens=800,
+        )
+        return NPCLLMOutput.model_validate(raw)
+
+    def generate_with_critique(
+        self,
+        image_path: Path,
+        scenario: dict,
+        canon_context: str,
+        critique: str,
+    ) -> NPCLLMOutput:
+        """Re-generate with critique injected into the user prompt."""
+        revise_tpl = (
+            _REVISE_FILE.read_text(encoding="utf-8")
+            if _REVISE_FILE.exists()
+            else (
+                "CRITIQUE:\n{critique}\n\n"
+                "Revise the NPC sheet to address all gaps above. "
+                "Keep all correct information. Return ONLY valid JSON."
+            )
+        )
+        base_prompt = self._build_prompt(scenario, canon_context)
+        revision_prompt = (
+            base_prompt + "\n\n"
+            + revise_tpl.replace("{critique}", critique)
+        )
+        raw = self._client.vision_chat(
+            image_path, revision_prompt,
+            system="You are a Pathfinder 2e NPC generator. Return ONLY valid JSON.",
+            max_tokens=900,
+        )
+        return NPCLLMOutput.model_validate(raw)
+
+
+# ---------------------------------------------------------------------------
+# Reflexion loop helpers
+# ---------------------------------------------------------------------------
+
+def _output_to_frontmatter(npc: NPCLLMOutput, image_rel: str, scenario: dict) -> dict:
+    """Build minimal frontmatter dict for quality scoring."""
+    rels = [f"[[{scenario['id']}]]"] + [r for r in npc.relationships if r != f"[[{scenario['id']}]]"]
+    return {
+        "type":          "npc",
+        "tags":          ["npc"],
+        "source":        [image_rel],
+        "relationships": rels,
+    }
+
+
+def _output_to_body(npc: NPCLLMOutput, scenario: dict) -> str:
+    """Build minimal body string for quality scoring."""
+    rels = [f"[[{scenario['id']}]]"] + [r for r in npc.relationships if r != f"[[{scenario['id']}]]"]
+    return (
+        f"\n## Description\n\n{npc.description}\n\n"
+        f"## Abilities\n\n"
+        + "\n".join(f"- {a}" for a in npc.abilities) + "\n\n"
+        f"## Related\n\n"
+        + "\n".join(rels) + "\n"
+    )
+
+
+def _build_critique(fm: dict, body: str, score: int) -> str:
+    """Build a targeted critique string from quality gate gap analysis."""
+    gaps: list[str] = []
+
+    if not re.search(r"^##\s+(description|descrição|desc)\b", body, re.I | re.M):
+        gaps.append("- Missing '## Description' section with meaningful content")
+
+    rels      = fm.get("relationships") or []
+    body_links = re.findall(r"\[\[.+?\]\]", body)
+    if not rels and not body_links:
+        gaps.append("- No [[wikilinks]] to related entities (location, faction, quest)")
+
+    if len(fm.get("tags") or []) < 3:
+        gaps.append("- Fewer than 3 tags; add specific PF2e and campaign tags")
+
+    if not fm.get("source"):
+        gaps.append("- Missing source field")
+
+    if not gaps:
+        gaps.append("- Description section lacks meaningful content (too short or generic)")
+
+    gap_text = "\n".join(gaps)
+    return (
+        f"The previous NPC sheet scored {score}/10. "
+        f"It is missing these required elements:\n{gap_text}\n\n"
+        f"Revise the NPC sheet to address all gaps above. "
+        f"Keep all correct information from the previous version."
+    )
+
+
+def _flag_for_human_review(output: NPCLLMOutput, score: int) -> NPCLLMOutput:
+    """Return a copy of output with needs_human_review=True and review_notes set."""
+    return output.model_copy(update={
+        "needs_human_review": True,
+        "review_notes": (
+            f"Auto-generated. Quality score after {_MAX_REVISIONS} revision rounds: {score}/10. "
+            f"Human review required before Library promotion."
+        ),
+    })
+
+
+def _score_and_revise(
+    generator: _NPCGeneratorImpl,
+    image_path: Path,
+    scenario: dict,
+    canon_context: str,
+    first_output: NPCLLMOutput,
+    image_rel: str,
+) -> NPCLLMOutput:
+    """Run up to _MAX_REVISIONS critique rounds. Return best output (G4)."""
+    current = first_output
+    fm      = _output_to_frontmatter(current, image_rel, scenario)
+    body    = _output_to_body(current, scenario)
+    score   = _GATE.score(fm, body)
+
+    for _round in range(1, _MAX_REVISIONS + 1):
+        if score >= 7:
+            break
+        critique = _build_critique(fm, body, score)
+        try:
+            revised   = generator.generate_with_critique(image_path, scenario, canon_context, critique)
+            new_fm    = _output_to_frontmatter(revised, image_rel, scenario)
+            new_body  = _output_to_body(revised, scenario)
+            new_score = _GATE.score(new_fm, new_body)
+        except (LLMOfflineError, LLMResponseError, Exception):
+            break  # keep current best on revision failure
+        if new_score > score:
+            current, fm, body, score = revised, new_fm, new_body, new_score
+
+    if score < 7:
+        current = _flag_for_human_review(current, score)
+    return current
+
+
+# ---------------------------------------------------------------------------
+# State helpers
+# ---------------------------------------------------------------------------
 
 def _load_scenarios() -> list[dict]:
     if not _SCENARIOS.exists():
@@ -195,11 +377,22 @@ def _unique_output(stem: str) -> Path:
         counter += 1
 
 
-def _write_npc_draft(path: Path, npc: NPCLLMOutput, image_rel: str, scenario: dict) -> None:
+# ---------------------------------------------------------------------------
+# NPC draft writer
+# ---------------------------------------------------------------------------
+
+def _write_npc_draft(
+    path: Path,
+    npc: NPCLLMOutput,
+    image_rel: str,
+    scenario: dict,
+    sha256: str = "",
+) -> None:
     today = date.today().isoformat()
     slug  = path.stem
     rels  = [f"[[{scenario['id']}]]"] + [r for r in npc.relationships if r != f"[[{scenario['id']}]]"]
-    frontmatter = {
+
+    frontmatter: dict[str, Any] = {
         "id":          slug,
         "type":        "npc",
         "status":      "draft",
@@ -208,6 +401,7 @@ def _write_npc_draft(path: Path, npc: NPCLLMOutput, image_rel: str, scenario: di
         "updated":     today,
         "tags":        ["npc"],
         "source":      [image_rel],
+        "sha256":      sha256,
         "reviewed":    False,
         "relationships": rels,
         "name":        npc.name,
@@ -228,6 +422,10 @@ def _write_npc_draft(path: Path, npc: NPCLLMOutput, image_rel: str, scenario: di
         "flaw":        npc.flaw,
         "role":        npc.role,
     }
+
+    if npc.needs_human_review:
+        frontmatter["needs_human_review"] = True
+
     body = (
         f"\n## Description\n\n{npc.description}\n\n"
         f"## Abilities\n\n"
@@ -235,32 +433,42 @@ def _write_npc_draft(path: Path, npc: NPCLLMOutput, image_rel: str, scenario: di
         f"## Related\n\n"
         + "\n".join(rels) + "\n"
     )
+
+    if npc.needs_human_review:
+        body += (
+            f"\n## Reviewer Notes\n\n"
+            f"> Auto-flagged: {npc.review_notes}\n"
+        )
+
     FrontmatterIO().write(path, frontmatter, body)
 
 
-def main() -> None:
-    log = _Logger()
-    t0  = log.start()
-    _AGENT_STATE.mkdir(parents=True, exist_ok=True)
+# ---------------------------------------------------------------------------
+# Core batch implementation
+# ---------------------------------------------------------------------------
 
+def _run_batch_impl(log: "_Logger") -> tuple[int, int]:
+    """Process up to BATCH_SIZE pending image×scenario pairs with reflexion loop.
+
+    Returns (count_processed, count_failed).
+    """
     client = LLMClient(_LLM_CFG)
     if not client.is_available():
         log.warning("Qwen3-VL (localhost:1234) offline — skipping batch")
-        log.done(t0)
-        sys.exit(0)
-
-    scenarios    = [s for s in _load_scenarios() if s.get("active", True)]
-    vision_state = _load_vision_state()
-    proc_npcs    = _load_proc_npcs()
-    queue        = _load_queue()
-    canon_ctx    = _canon_context()
+        return 0, 0
 
     prompt_tpl = (
         _PROMPT_FILE.read_text(encoding="utf-8") if _PROMPT_FILE.exists()
         else "Generate NPC JSON for scenario: {scenario_name}. {scenario_description}"
     )
 
-    # Build unprocessed pairs
+    generator    = _NPCGeneratorImpl(client, prompt_tpl)
+    scenarios    = [s for s in _load_scenarios() if s.get("active", True)]
+    vision_state = _load_vision_state()
+    proc_npcs    = _load_proc_npcs()
+    queue        = _load_queue()
+    canon_ctx    = _canon_context()
+
     eligible_images = [
         (img_key, entry)
         for img_key, entry in vision_state.get("images", {}).items()
@@ -276,12 +484,11 @@ def main() -> None:
 
     if not pairs:
         log.info("No unprocessed image×scenario pairs")
-        log.done(t0)
-        sys.exit(0)
+        return 0, 0
 
-    batch   = pairs[:BATCH_SIZE]
-    count   = 0
-    failed  = 0
+    batch  = pairs[:BATCH_SIZE]
+    count  = 0
+    failed = 0
     log.info(f"Batch: {len(batch)} of {len(pairs)} pair(s)")
 
     for composite_key, img_entry, scenario in batch:
@@ -301,21 +508,9 @@ def main() -> None:
             failed += 1
             continue
 
-        prompt = (
-            prompt_tpl
-            .replace("{scenario_name}", scenario["name"])
-            .replace("{scenario_description}", scenario["description"])
-            .replace("{arc}", scenario.get("arc", ""))
-            .replace("{canon_context}", canon_ctx)
-        )
-
+        # --- Initial generation ---
         try:
-            raw = client.vision_chat(
-                img_path, prompt,
-                system="You are a Pathfinder 2e NPC generator. Return ONLY valid JSON.",
-                max_tokens=800,
-            )
-            npc = NPCLLMOutput.model_validate(raw)
+            first_output = generator.generate(img_path, scenario, canon_ctx)
         except LLMOfflineError:
             log.warning("LLM offline — aborting batch")
             break
@@ -332,12 +527,22 @@ def main() -> None:
             failed += 1
             continue
 
-        from shared import to_slug as _to_slug
-        stem     = f"{_to_slug(img_path.stem)}-{scenario['id']}"
+        # --- Reflexion loop (P1) ---
+        npc = _score_and_revise(generator, img_path, scenario, canon_ctx, first_output, img_rel)
+        if npc.needs_human_review:
+            log.warning(
+                f"NPC flagged for human review after {_MAX_REVISIONS} rounds: "
+                f"{img_path.name} × {scenario['id']}"
+            )
+
+        # --- Write draft ---
+        from shared import to_slug as _to_slug  # noqa: PLC0415
+        arc      = scenario.get("arc", "a0").lower()
+        stem     = f"npc-{_to_slug(img_path.stem)}-{arc}"
         out_path = _unique_output(stem)
 
         try:
-            _write_npc_draft(out_path, npc, img_rel, scenario)
+            _write_npc_draft(out_path, npc, img_rel, scenario, sha256=img_entry.get("sha256", ""))
         except Exception as exc:
             log.error(f"Write failed for {out_path.name}: {exc}")
             proc_npcs[composite_key] = {
@@ -368,6 +573,19 @@ def main() -> None:
         log.info(f"Generated NPC: {out_path.name} ({scenario['name']})")
         count += 1
 
+    return count, failed
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+def main() -> None:
+    log = _Logger()
+    t0  = log.start()
+    _AGENT_STATE.mkdir(parents=True, exist_ok=True)
+
+    count, failed = _run_batch_impl(log)
     log.done(t0, count=count, failed=failed)
     sys.exit(0 if failed == 0 else 1)
 
@@ -397,7 +615,11 @@ TOOLS = SELF_MANAGEMENT_TOOLS + [
     },
     {
         "name": "generate_npc",
-        "description": "Generate a full PF2e NPC sheet from a character image + scenario using the local vision LLM. Writes draft to 01-Processing/.",
+        "description": (
+            "Generate a full PF2e NPC sheet from a character image + scenario using the local vision LLM. "
+            "Applies reflexion loop (up to 2 critique rounds). "
+            "Writes draft to 01-Processing/. Flags low-quality outputs with needs_human_review."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
@@ -409,14 +631,17 @@ TOOLS = SELF_MANAGEMENT_TOOLS + [
     },
     {
         "name": "run_batch",
-        "description": "Process up to BATCH_SIZE pending image×scenario pairs. Returns count generated.",
+        "description": (
+            "Process up to BATCH_SIZE pending image×scenario pairs with reflexion loop. "
+            "Returns count generated."
+        ),
         "input_schema": {"type": "object", "properties": {}},
     },
 ]
 
 
 def call_tool(name: str, args: dict, context: dict) -> str:
-    import io, contextlib, json as _json
+    import io, contextlib, json as _json  # noqa: E401
     result = call_self_management_tool(
         name, args, context, module_file=_MODULE_FILE, task_id=TASK_ID
     )
@@ -424,35 +649,30 @@ def call_tool(name: str, args: dict, context: dict) -> str:
         return result
 
     if name == "load_canon_context":
-        ctx = _canon_context()
-        lines = [l for l in ctx.splitlines() if l.strip()]
+        ctx   = _canon_context()
+        lines = [ln for ln in ctx.splitlines() if ln.strip()]
         return f"Canon context: {len(lines)} lines"
 
     if name == "list_pending_pairs":
         vision_state = _load_vision_state()
-        proc_npcs = _load_proc_npcs()
-        scenarios = [s for s in _load_scenarios() if s.get("active")]
-        images = vision_state.get("images", {})
-        pending = []
+        proc_npcs    = _load_proc_npcs()
+        scenarios    = [s for s in _load_scenarios() if s.get("active")]
+        images       = vision_state.get("images", {})
+        pending: list[dict] = []
         for key, img in images.items():
             if img.get("type") not in ("portrait", "body"):
                 continue
             for sc in scenarios:
                 composite = f"{key}|{sc['id']}"
                 if composite not in proc_npcs:
-                    pending.append({"image_key": key, "scenario_id": sc["id"], "image_path": img.get("path", "")})
+                    pending.append({
+                        "image_key":   key,
+                        "scenario_id": sc["id"],
+                        "image_path":  img.get("path", ""),
+                    })
         return _json.dumps(pending[:20])
 
-    if name == "generate_npc":
-        buf = io.StringIO()
-        try:
-            with contextlib.redirect_stdout(buf):
-                main()
-        except SystemExit:
-            pass
-        return buf.getvalue().strip() or "NPC generation run complete"
-
-    if name == "run_batch":
+    if name in ("generate_npc", "run_batch"):
         buf = io.StringIO()
         try:
             with contextlib.redirect_stdout(buf):

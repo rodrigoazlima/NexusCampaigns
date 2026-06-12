@@ -394,6 +394,55 @@ class TestBatchSize:
         assert len(state) == _mod.BATCH_SIZE
 
 
+# ---------------------------------------------------------------------------
+# CLI args -- --min-score and --max-links
+# ---------------------------------------------------------------------------
+
+class TestCLIArgs:
+    def test_min_score_zero_inserts_all_candidates(self, vault, patch_roots, monkeypatch):
+        lib = vault / "02-Library"
+        path_a = _write_entity(lib, "npc-witch", [], "## Description\nA witch.\n")
+        _write_entity(lib, "npc-guard", [], "## Description\nA guard.\n")
+
+        monkeypatch.setattr("sys.argv", ["wikilink_library.py", "--min-score", "0"])
+        with pytest.raises(SystemExit) as exc:
+            _mod.main()
+        assert exc.value.code == 0
+        content = path_a.read_text(encoding="utf-8")
+        assert "[[npc-guard]]" in content
+
+    def test_high_min_score_skips_unrelated_pairs(self, vault, patch_roots, monkeypatch):
+        lib = vault / "02-Library"
+        path_a = _write_entity(lib, "npc-witch", [], "## Description\nA witch.\n")
+        _write_entity(lib, "npc-guard", [], "## Description\nA guard.\n")
+
+        monkeypatch.setattr("sys.argv", ["wikilink_library.py", "--min-score", "99"])
+        with pytest.raises(SystemExit) as exc:
+            _mod.main()
+        assert exc.value.code == 0
+        content = path_a.read_text(encoding="utf-8")
+        assert "[[npc-guard]]" not in content
+
+    def test_max_links_one_inserts_single_link(self, vault, patch_roots, monkeypatch):
+        lib = vault / "02-Library"
+        path_a = _write_entity(lib, "npc-witch", ["undead", "villain"],
+                               "## Description\nA witch.\n\n## Related\n")
+        for i in range(3):
+            _write_entity(lib, f"npc-enemy-{i:02d}", ["undead", "villain"],
+                          f"## Description\nEnemy {i}.\n")
+
+        monkeypatch.setattr("sys.argv", ["wikilink_library.py", "--max-links", "1"])
+        with pytest.raises(SystemExit) as exc:
+            _mod.main()
+        assert exc.value.code == 0
+
+        # Count [[...]] links added in Related section
+        content = path_a.read_text(encoding="utf-8")
+        related_section = content.split("## Related")[-1]
+        links = [m for m in related_section.split("\n") if m.startswith("[[")]
+        assert len(links) == 1
+
+
 ---
 
 

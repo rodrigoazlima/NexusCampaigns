@@ -48,6 +48,7 @@ from pathlib import Path
 from abc import ABC
 from unittest.mock import MagicMock
 
+from shared.config import VaultConfig, VaultPaths, SystemPaths
 from shared.interfaces import (
     BaseAgent,
     IAgent,
@@ -68,7 +69,6 @@ from shared.interfaces import (
     LLMResponseError,
     VaultWriteError,
 )
-from shared.config import VaultConfig, VaultPaths, SystemPaths
 
 
 # ---------------------------------------------------------------------------
@@ -122,11 +122,21 @@ class TestBaseAgent:
 
             def bootstrap(self): pass
             def run_batch(self): return (0, 0)
-            def execute(self): return 0
 
         agent = MyAgent(cfg=None)  # type: ignore[arg-type]
-        assert agent.execute() == 0
         assert agent.run_batch() == (0, 0)
+
+    def test_subclass_can_override_execute(self):
+        class MyAgent(BaseAgent):
+            TASK_ID = "my-agent"
+            SCRIPT_BASENAME = "my_agent.py"
+
+            def bootstrap(self): pass
+            def run_batch(self): return (0, 0)
+            def execute(self): return 42
+
+        agent = MyAgent(cfg=None)  # type: ignore[arg-type]
+        assert agent.execute() == 42
 
     def test_batch_size_default(self):
         class MyAgent(BaseAgent):
@@ -134,19 +144,115 @@ class TestBaseAgent:
             SCRIPT_BASENAME = "x.py"
             def bootstrap(self): pass
             def run_batch(self): return (0, 0)
-            def execute(self): return 0
 
         assert MyAgent.BATCH_SIZE == 10
+
+    def test_done_key_default(self):
+        class MyAgent(BaseAgent):
+            TASK_ID = "x"
+            SCRIPT_BASENAME = "x.py"
+            def bootstrap(self): pass
+            def run_batch(self): return (0, 0)
+
+        assert MyAgent.DONE_KEY == "processed"
 
     def test_missing_run_batch_raises(self):
         class Incomplete(BaseAgent):
             TASK_ID = "x"
             SCRIPT_BASENAME = "x.py"
             def bootstrap(self): pass
-            def execute(self): return 0
 
         with pytest.raises(TypeError):
             Incomplete(cfg=None)  # type: ignore[arg-type]
+
+
+# ---------------------------------------------------------------------------
+# BaseAgent — default execute() lifecycle
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def vault_cfg(tmp_path):
+    kb = tmp_path / "knowledge-base"
+    kb.mkdir()
+    return VaultConfig(
+        vault_paths  = VaultPaths(vault_root=kb),
+        system_paths = SystemPaths(project_root=tmp_path),
+    )
+
+
+class TestBaseAgentDefaultExecute:
+    def _make_agent(self, cfg, *, batch_result=(3, 0), done_key="processed", raises=None):
+        class ConcreteAgent(BaseAgent):
+            TASK_ID         = "test-agent"
+            SCRIPT_BASENAME = "test_agent.py"
+            DONE_KEY        = done_key
+            bootstrapped    = False
+
+            def bootstrap(self):
+                ConcreteAgent.bootstrapped = True
+
+            def run_batch(self):
+                if raises:
+                    raise raises
+                return batch_result
+
+        return ConcreteAgent(cfg=cfg)
+
+    def test_returns_0_on_success(self, vault_cfg):
+        agent = self._make_agent(vault_cfg, batch_result=(5, 0))
+        assert agent.execute() == 0
+
+    def test_returns_1_when_failures(self, vault_cfg):
+        agent = self._make_agent(vault_cfg, batch_result=(5, 2))
+        assert agent.execute() == 1
+
+    def test_calls_bootstrap_before_run_batch(self, vault_cfg):
+        agent = self._make_agent(vault_cfg)
+        agent.execute()
+        assert agent.__class__.bootstrapped is True
+
+    def test_emits_start_and_done_to_master_log(self, vault_cfg, tmp_path):
+        agent = self._make_agent(vault_cfg, batch_result=(4, 0))
+        agent.execute()
+        master = tmp_path / ".agents" / "runtime" / "state" / "logs" / "automation.log"
+        content = master.read_text(encoding="utf-8")
+        assert "--- START ---" in content
+        assert "--- DONE (" in content
+
+    def test_done_line_contains_count(self, vault_cfg, tmp_path):
+        agent = self._make_agent(vault_cfg, batch_result=(7, 0))
+        agent.execute()
+        master = tmp_path / ".agents" / "runtime" / "state" / "logs" / "automation.log"
+        assert "processed: 7" in master.read_text(encoding="utf-8")
+
+    def test_done_line_uses_done_key(self, vault_cfg, tmp_path):
+        agent = self._make_agent(vault_cfg, batch_result=(2, 0), done_key="classified")
+        agent.execute()
+        master = tmp_path / ".agents" / "runtime" / "state" / "logs" / "automation.log"
+        assert "classified: 2" in master.read_text(encoding="utf-8")
+
+    def test_exception_in_run_batch_returns_1(self, vault_cfg):
+        agent = self._make_agent(vault_cfg, raises=RuntimeError("boom"))
+        assert agent.execute() == 1
+
+    def test_exception_logged_to_master(self, vault_cfg, tmp_path):
+        agent = self._make_agent(vault_cfg, raises=RuntimeError("test-error"))
+        agent.execute()
+        master = tmp_path / ".agents" / "runtime" / "state" / "logs" / "automation.log"
+        assert "test-error" in master.read_text(encoding="utf-8")
+
+    def test_per_agent_daily_log_created(self, vault_cfg, tmp_path):
+        agent = self._make_agent(vault_cfg)
+        agent.execute()
+        # agent_name = "test-agent".removesuffix("-agent") = "test"
+        logs_dir = tmp_path / ".agents" / "test" / "state" / "logs"
+        daily_files = list(logs_dir.glob("test_agent_*.log"))
+        assert len(daily_files) == 1
+
+    def test_logger_stored_on_instance(self, vault_cfg):
+        agent = self._make_agent(vault_cfg)
+        agent.execute()
+        assert hasattr(agent, "_logger")
 
 
 # ---------------------------------------------------------------------------

@@ -99,8 +99,16 @@ _LOCK_STALE_SECONDS = 1800   # 30 min
 _DEFAULT_INTERVAL   = 60     # orchestrator poll cadence
 _MAX_METRICS_RUNS   = 100
 
-# Parses "processed=N failed=N" from agent DONE lines
-_DONE_PARSE_RE = re.compile(r"processed=(\d+).*?failed=(\d+)")
+# Parses itemsProcessed / itemsFailed from agent DONE lines.
+# Handles both runner format (processed=N) and shared.Logger format (classified: N).
+# Spec keywords: classified|enriched|repairs|processed|converted|generated|linked
+_DONE_PARSE_RE = re.compile(
+    r"(?:classified|enriched|repairs|processed|converted|generated|linked)"
+    r"[=:\s]+(\d+)"
+    r".*?"
+    r"(?:failed|failures)[=:\s]+(\d+)",
+    re.IGNORECASE,
+)
 
 # Maps dispatch.type → attribute name on AgentDispatchConfig
 _DISPATCH_TYPE_FIELD: dict[str, str] = {
@@ -148,7 +156,7 @@ class _Logger:
 
     def done(self, t0: float, *, count: int = 0, failed: int = 0) -> None:
         elapsed = round(time.monotonic() - t0, 2)
-        self._write("INFO", f"--- DONE --- processed={count} failed={failed} elapsed={elapsed}s")
+        self._write("INFO", f"--- DONE (processed: {count}, failed: {failed}, elapsed: {elapsed}s) ---")
 
 
 # ---------------------------------------------------------------------------
@@ -189,7 +197,9 @@ def _load_metrics() -> dict:
     if not _METRICS_JSON.exists():
         return {}
     try:
-        return json.loads(_METRICS_JSON.read_text(encoding="utf-8"))
+        # Strip BOM: Windows PS may write UTF-8-BOM to agent-metrics.json
+        text = _METRICS_JSON.read_text(encoding="utf-8").lstrip("﻿")
+        return json.loads(text)
     except Exception:
         return {}
 
@@ -208,7 +218,7 @@ def _parse_agent_items(task_id: str, after: datetime) -> tuple[int, int]:
         tag = f"[{task_id}]"
         ts_after = after.strftime("%Y-%m-%d %H:%M:%S")
         for line in _MASTER_LOG.read_text(encoding="utf-8").splitlines():
-            if tag not in line or "--- DONE ---" not in line:
+            if tag not in line or "--- DONE" not in line:
                 continue
             ts_m = re.match(r"\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]", line)
             if ts_m and ts_m.group(1) >= ts_after:
@@ -308,13 +318,30 @@ def _check_signals(
 
 
 # ---------------------------------------------------------------------------
-# Task discovery — reads agent.json files, no tasks.json
+# Task discovery — reads agent.json files, respects execution_order
 # ---------------------------------------------------------------------------
 
+def _load_execution_order() -> list[str]:
+    """Load execution_order list from registry.yaml. Returns [] on any error."""
+    registry = _AGENTS_DIR / "registry.yaml"
+    if not registry.exists():
+        return []
+    try:
+        from ruamel.yaml import YAML  # available via requirements.txt
+        data = YAML().load(registry.read_text(encoding="utf-8"))
+        return list(data.get("execution_order", []))
+    except Exception:
+        return []
+
+
 def _discover_tasks() -> list[tuple[str, TaskDispatchEntry]]:
-    """Scan .agents/*/agent.json and return all (task_id, TaskDispatchEntry) pairs."""
+    """Scan .agents/*/agent.json and return all (task_id, TaskDispatchEntry) pairs.
+
+    Tasks are ordered by execution_order from registry.yaml. Agents absent from
+    execution_order are appended after all ordered agents, sorted alphabetically.
+    """
     result: list[tuple[str, TaskDispatchEntry]] = []
-    for agent_json in sorted(_AGENTS_DIR.glob("*/agent.json")):
+    for agent_json in _AGENTS_DIR.glob("*/agent.json"):
         try:
             raw = json.loads(agent_json.read_text(encoding="utf-8"))
             folder = AgentFolderConfig.model_validate(raw)
@@ -322,6 +349,19 @@ def _discover_tasks() -> list[tuple[str, TaskDispatchEntry]]:
                 result.append((task_id, entry))
         except Exception as exc:
             _Logger().warning(f"Skipping {agent_json}: {exc}")
+
+    order = _load_execution_order()
+    if order:
+        def _sort_key(item: tuple[str, TaskDispatchEntry]) -> tuple[int, str]:
+            agent_name = _agent_name_from_task_id(item[0])
+            try:
+                return (order.index(agent_name), item[0])
+            except ValueError:
+                return (len(order), item[0])  # unlisted agents last
+        result.sort(key=_sort_key)
+    else:
+        result.sort(key=lambda t: t[0])  # stable fallback: alphabetical by task_id
+
     return result
 
 
@@ -554,6 +594,11 @@ class Runtime(IOrchestrator):
 
             if not due and not signalled:
                 self._log.info(f"Skip {task_id} — not due, no signal")
+                continue
+
+            # Pre-check: if agent.json is missing, skip without updating lastRun
+            # (spec: agent.json missing → log error, skip, lastRun not updated)
+            if _load_agent_dispatch(task_id, self._log) is None:
                 continue
 
             reason = "signalled" if signalled and not due else "due"

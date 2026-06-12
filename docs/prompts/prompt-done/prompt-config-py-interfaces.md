@@ -41,10 +41,11 @@ Analyze the provided Python script and extract all relevant configuration settin
 **Script to analyze:**
 
 # shared\interfaces.py
-"""Abstract interfaces for all pipeline components.
+"""Abstract interfaces and base classes for all pipeline components.
 
-No implementation. All methods are abstract or raise NotImplementedError.
-Concrete classes live in each agent's tools/ package.
+Protocols (I*) define structural contracts — no implementation.
+BaseAgent provides a concrete default execute() per shared-library.spec.md.
+Concrete implementations live in each agent's tools/ package.
 """
 
 from __future__ import annotations
@@ -54,6 +55,7 @@ from pathlib import Path
 from typing import Any, Optional, Protocol, runtime_checkable
 
 from .config import VaultConfig
+from .logger import Logger
 from .models import (
     AgentDispatchConfig,
     AgentFolderConfig,
@@ -66,6 +68,7 @@ from .models import (
     InboxQueue,
     ProcessedImagesState,
     ProcessedNPCs,
+    RegistryConfig,
     RelationshipGraph,
     RepairReport,
     ReviewItem,
@@ -102,18 +105,19 @@ class IAgent(Protocol):
 class BaseAgent(ABC):
     """Abstract base class for all vault pipeline agents.
 
-    Enforces the contract via ABC. Subclasses must define
-    TASK_ID, SCRIPT_BASENAME and implement run_batch().
+    Subclasses must define TASK_ID, SCRIPT_BASENAME and implement
+    bootstrap() + run_batch(). execute() has a default implementation
+    that handles the full agent lifecycle per shared-library.spec.md:
+      bootstrap() → START log → run_batch() → DONE log → return exit code.
 
-    Bootstrap contract (called before execute()):
-      bootstrap() must be called once on first run to initialise any missing
-      state files via IStateStore.init_defaults(). Idempotent — safe to call
-      on every startup.
+    Override DONE_KEY to customise the item-count label in the DONE line
+    (data-contracts.spec.md: processed | classified | enriched | ...).
     """
 
     TASK_ID:         str
     SCRIPT_BASENAME: str
     BATCH_SIZE:      int = 10
+    DONE_KEY:        str = "processed"
 
     def __init__(self, cfg: VaultConfig) -> None:
         self.cfg = cfg
@@ -130,10 +134,37 @@ class BaseAgent(ABC):
         """Process up to BATCH_SIZE items. Returns (count, failed)."""
         ...
 
-    @abstractmethod
     def execute(self) -> int:
-        """Entry point. Calls bootstrap(), emits START/DONE log lines. Returns exit code."""
-        ...
+        """Default agent lifecycle: bootstrap → START → run_batch → DONE.
+
+        Creates a Logger from VaultConfig paths and TASK_ID / SCRIPT_BASENAME.
+        Per-agent daily log: .agents/{name}/state/logs/{basename}_YYYY-MM-DD.log.
+        Master log:          .agents/runtime/state/logs/automation.log.
+
+        Returns 0 on success, 1 if any items failed or an exception was raised.
+        Subclasses may override for custom lifecycle control.
+        """
+        agent_name = self.TASK_ID.removesuffix("-agent")
+        logs_dir   = self.cfg.system_paths.agent_state(agent_name) / "logs"
+        master_log = self.cfg.system_paths.logs_dir / "automation.log"
+        logger = Logger(
+            task_id        = self.TASK_ID,
+            script_basename= self.SCRIPT_BASENAME,
+            logs_dir       = logs_dir,
+            master_log     = master_log,
+        )
+        self._logger = logger
+
+        self.bootstrap()
+        t0 = logger.start()
+        try:
+            count, failed = self.run_batch()
+        except Exception as exc:
+            logger.error(str(exc))
+            logger.done(t0, key=self.DONE_KEY, count=0, failed=1)
+            return 1
+        logger.done(t0, key=self.DONE_KEY, count=count, failed=failed)
+        return 0 if failed == 0 else 1
 
 
 # ---------------------------------------------------------------------------
@@ -259,14 +290,24 @@ class IVaultGuard(ABC):
 
     @abstractmethod
     def assert_writable(self, target: Path) -> None:
-        """Raise PermissionError if target is inside a write-protected dir.
+        """Raise VaultWriteError if target is inside a write-protected dir.
         Protected dirs: 02-Library/, 00-Inbox/.
         """
         ...
 
     @abstractmethod
     def assert_not_inbox_delete(self, target: Path) -> None:
-        """Raise PermissionError if target is inside 00-Inbox/."""
+        """Raise VaultWriteError if target is inside 00-Inbox/."""
+        ...
+
+    @abstractmethod
+    def assert_not_self_approved(self, frontmatter: dict) -> None:
+        """Raise VaultWriteError if frontmatter contains human-only field values.
+
+        Forbidden: status='approved', reviewed=True.
+        These fields are set exclusively by humans. Agents must call this
+        before any frontmatter write to enforce security.spec.md Rule G3.
+        """
         ...
 
 
@@ -600,6 +641,36 @@ class IDedupAnalyzer(ABC):
 
 
 # ---------------------------------------------------------------------------
+# IQueueRegistrar (ingestion agent contract)
+# ---------------------------------------------------------------------------
+
+class IQueueRegistrar(ABC):
+    """Contract for registering 00-Inbox/ files into the processing queue.
+
+    Owned by the Ingestion agent. No LLM calls. No 02-Library writes.
+    """
+
+    @abstractmethod
+    def classify_file(self, path: Path) -> str:
+        """Return 'image', 'document', or 'other' for the given file path."""
+        ...
+
+    @abstractmethod
+    def make_slots(self, file_type: str) -> InboxQueue:
+        """Return initialized agent slots dict for the given file type."""
+        ...
+
+    @abstractmethod
+    def scan_and_register(self, inbox: Path) -> tuple[int, int]:
+        """Scan inbox for unregistered files and add them to the shared queue.
+
+        Returns (count_added, count_failed). Saves atomically.
+        Must not delete or overwrite existing queue entries.
+        """
+        ...
+
+
+# ---------------------------------------------------------------------------
 # ISignalEmitter — file-based inter-agent signal bus
 # ---------------------------------------------------------------------------
 
@@ -615,6 +686,23 @@ class ISignalEmitter(Protocol):
         payload: Optional[dict] = None,
     ) -> str:
         """Write a signal file to the signals directory. Returns signal ID."""
+        ...
+
+
+# ---------------------------------------------------------------------------
+# IRegistryLoader — registry.yaml loader contract
+# ---------------------------------------------------------------------------
+
+@runtime_checkable
+class IRegistryLoader(Protocol):
+    """Structural protocol for loading the agent registry from registry.yaml."""
+
+    def load(self, project_root: Path) -> RegistryConfig:
+        """Parse .agents/registry.yaml and return a validated RegistryConfig.
+
+        Raises FileNotFoundError if registry.yaml does not exist.
+        Raises ValidationError if the YAML does not conform to the schema.
+        """
         ...
 
 

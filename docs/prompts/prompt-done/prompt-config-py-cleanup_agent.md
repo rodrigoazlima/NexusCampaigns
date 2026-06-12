@@ -44,9 +44,10 @@ Analyze the provided Python script and extract all relevant configuration settin
 """cleanup.tools.cleanup_agent
 
 Cleanup Agent — log/report rotation and metrics trimming.
-  - Purge log files older than cleanupDays
+  - Purge log files older than cleanupDays (read from agent.json, default 90)
   - Purge report files older than cleanupDays
   - Trim agent-metrics.json run history to last 100 entries per agent
+  - Write CleanupReport to state/reports/cleanup-{YYYY-MM-DD}.json
 
 No LLM. No vault content changes.
 """
@@ -66,49 +67,44 @@ _PROJECT_ROOT = _AGENTS_DIR.parent
 if str(_AGENTS_DIR) not in sys.path:
     sys.path.insert(0, str(_AGENTS_DIR))
 
+from shared.logger import Logger  # noqa: E402
+
 TASK_ID         = "cleanup-agent"
 SCRIPT_BASENAME = "cleanup_agent.py"
-CLEANUP_DAYS    = 90
 MAX_METRIC_RUNS = 100
 
-_ORCH_STATE   = _AGENTS_DIR / "runtime" / "state"
-_MASTER_LOG   = _ORCH_STATE / "logs" / "automation.log"
-_AGENT_STATE  = _AGENTS_DIR / "cleanup" / "state"
+_AGENT_DIR    = _AGENTS_DIR / "cleanup"
+_AGENT_STATE  = _AGENT_DIR / "state"
 _LOGS_DIR     = _AGENT_STATE / "logs"
 _REPORTS_DIR  = _AGENT_STATE / "reports"
-_METRICS_FILE = _AGENTS_DIR / "shared" / "state" / "agent-metrics.json"
+_MASTER_LOG   = _AGENTS_DIR / "runtime" / "state" / "logs" / "automation.log"
+_METRICS_FILE = _AGENTS_DIR / "runtime" / "state" / "agent-metrics.json"
+_AGENT_JSON   = _AGENT_DIR / "agent.json"
 
 
-class _Logger:
-    def __init__(self) -> None:
-        _LOGS_DIR.mkdir(parents=True, exist_ok=True)
-        today = datetime.now().strftime("%Y-%m-%d")
-        self._daily  = _LOGS_DIR / f"cleanup-agent_{today}.log"
-        self._master = _MASTER_LOG
-
-    def _write(self, level: str, msg: str) -> None:
-        ts   = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        line = f"[{ts}] [{TASK_ID}] {level}: {msg}"
-        print(line, flush=True)
-        self._master.parent.mkdir(parents=True, exist_ok=True)
-        for p in (self._master, self._daily):
-            with open(p, "a", encoding="utf-8") as fh:
-                fh.write(line + "\n")
-
-    def info(self, m: str)    -> None: self._write("INFO",  m)
-    def warning(self, m: str) -> None: self._write("WARN",  m)
-    def error(self, m: str)   -> None: self._write("ERROR", m)
-
-    def start(self) -> float:
-        self._write("INFO", "--- START ---")
-        return time.monotonic()
-
-    def done(self, t0: float, count: int = 0, failed: int = 0) -> None:
-        elapsed = round(time.monotonic() - t0, 2)
-        self._write("INFO", f"--- DONE --- processed={count} failed={failed} elapsed={elapsed}s")
+def _load_cleanup_days() -> int:
+    """Read cleanupDays from agent.json top-level field. Default 90."""
+    try:
+        cfg = json.loads(_AGENT_JSON.read_text(encoding="utf-8"))
+        return int(cfg.get("cleanupDays", 90))
+    except Exception:
+        return 90
 
 
-def _purge_old_files(directory: Path, keep_days: int, log: _Logger) -> int:
+def _make_logger() -> Logger:
+    return Logger(
+        task_id        = TASK_ID,
+        script_basename= SCRIPT_BASENAME,
+        logs_dir       = _LOGS_DIR,
+        master_log     = _MASTER_LOG,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Core operations
+# ---------------------------------------------------------------------------
+
+def _purge_dir(directory: Path, keep_days: int, log: Logger) -> int:
     """Delete files in directory older than keep_days. Returns count deleted."""
     if not directory.is_dir():
         return 0
@@ -121,35 +117,37 @@ def _purge_old_files(directory: Path, keep_days: int, log: _Logger) -> int:
             mtime = datetime.fromtimestamp(f.stat().st_mtime, tz=timezone.utc)
             if mtime < cutoff:
                 f.unlink()
-                log.info(f"Purged: {f.name} (age={( datetime.now(timezone.utc) - mtime).days}d)")
+                age = (datetime.now(timezone.utc) - mtime).days
+                log.info(f"Purged: {f.name} (age={age}d)")
                 deleted += 1
         except Exception as exc:
             log.warning(f"Could not delete {f.name}: {exc}")
     return deleted
 
 
-def purge_logs(keep_days: int, log: _Logger) -> int:
-    """Purge all agent log directories older than keep_days."""
+def purge_logs(keep_days: int, log: Logger) -> int:
+    """Purge log files older than keep_days across all agent log directories."""
     total = 0
     for logs_dir in _AGENTS_DIR.glob("*/state/logs"):
-        total += _purge_old_files(logs_dir, keep_days, log)
+        total += _purge_dir(logs_dir, keep_days, log)
     return total
 
 
-def purge_reports(keep_days: int, log: _Logger) -> int:
-    """Purge all agent report directories older than keep_days."""
+def purge_reports(keep_days: int, log: Logger) -> int:
+    """Purge report files older than keep_days across all agent report directories."""
     total = 0
     for reports_dir in _AGENTS_DIR.glob("*/state/reports"):
-        total += _purge_old_files(reports_dir, keep_days, log)
+        total += _purge_dir(reports_dir, keep_days, log)
     return total
 
 
-def trim_metrics(max_runs: int, log: _Logger) -> int:
+def trim_metrics(max_runs: int, log: Logger) -> int:
     """Trim agent-metrics.json to max_runs entries per agent. Returns total runs removed."""
     if not _METRICS_FILE.exists():
         return 0
     try:
-        data: dict = json.loads(_METRICS_FILE.read_text(encoding="utf-8"))
+        raw = _METRICS_FILE.read_text(encoding="utf-8").lstrip("﻿")
+        data: dict = json.loads(raw)
     except Exception as exc:
         log.error(f"Could not read agent-metrics.json: {exc}")
         return 0
@@ -171,16 +169,40 @@ def trim_metrics(max_runs: int, log: _Logger) -> int:
     return removed
 
 
+def _write_report(logs_deleted: int, reports_deleted: int, metrics_trimmed: int) -> None:
+    """Write CleanupReport to state/reports/cleanup-{date}.json atomically."""
+    _REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    today = datetime.now().strftime("%Y-%m-%d")
+    report = {
+        "date":           today,
+        "generatedAt":    datetime.now(timezone.utc).isoformat(),
+        "logsDeleted":    logs_deleted,
+        "reportsDeleted": reports_deleted,
+        "metricsTrimmed": metrics_trimmed,
+    }
+    out = _REPORTS_DIR / f"cleanup-{today}.json"
+    tmp = out.with_suffix(".tmp")
+    tmp.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    tmp.replace(out)
+
+
+# ---------------------------------------------------------------------------
+# Standalone entry point
+# ---------------------------------------------------------------------------
+
 def main() -> None:
-    log = _Logger()
+    cleanup_days = _load_cleanup_days()
+    log = _make_logger()
     t0  = log.start()
-    count = 0
 
-    count += purge_logs(CLEANUP_DAYS, log)
-    count += purge_reports(CLEANUP_DAYS, log)
-    count += trim_metrics(MAX_METRIC_RUNS, log)
+    logs_deleted    = purge_logs(cleanup_days, log)
+    reports_deleted = purge_reports(cleanup_days, log)
+    metrics_trimmed = trim_metrics(MAX_METRIC_RUNS, log)
 
-    log.done(t0, count=count)
+    _write_report(logs_deleted, reports_deleted, metrics_trimmed)
+
+    total = logs_deleted + reports_deleted + metrics_trimmed
+    log.done(t0, key="processed", count=total, failed=0)
     sys.exit(0)
 
 
@@ -199,21 +221,29 @@ _MODULE_FILE = Path(__file__)
 TOOLS = SELF_MANAGEMENT_TOOLS + [
     {
         "name": "purge_logs",
-        "description": f"Delete log files older than {CLEANUP_DAYS} days from all agent log directories.",
+        "description": "Delete log files older than cleanupDays from all agent log directories.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "keep_days": {"type": "integer", "description": f"Days to retain (default: {CLEANUP_DAYS})", "default": CLEANUP_DAYS},
+                "keep_days": {
+                    "type": "integer",
+                    "description": "Days to retain (default: read from agent.json)",
+                    "default": 90,
+                },
             },
         },
     },
     {
         "name": "purge_reports",
-        "description": f"Delete report files older than {CLEANUP_DAYS} days from all agent report directories.",
+        "description": "Delete report files older than cleanupDays from all agent report directories.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "keep_days": {"type": "integer", "description": f"Days to retain (default: {CLEANUP_DAYS})", "default": CLEANUP_DAYS},
+                "keep_days": {
+                    "type": "integer",
+                    "description": "Days to retain (default: read from agent.json)",
+                    "default": 90,
+                },
             },
         },
     },
@@ -223,7 +253,11 @@ TOOLS = SELF_MANAGEMENT_TOOLS + [
         "input_schema": {
             "type": "object",
             "properties": {
-                "max_runs": {"type": "integer", "description": f"Max runs to keep per agent (default: {MAX_METRIC_RUNS})", "default": MAX_METRIC_RUNS},
+                "max_runs": {
+                    "type": "integer",
+                    "description": f"Max runs to keep per agent (default: {MAX_METRIC_RUNS})",
+                    "default": MAX_METRIC_RUNS,
+                },
             },
         },
     },
@@ -237,12 +271,14 @@ def call_tool(name: str, args: dict, context: dict) -> str:
     if result is not None:
         return result
 
-    log = _Logger()
+    cleanup_days = _load_cleanup_days()
+    log = _make_logger()
+
     if name == "purge_logs":
-        n = purge_logs(int(args.get("keep_days", CLEANUP_DAYS)), log)
+        n = purge_logs(int(args.get("keep_days", cleanup_days)), log)
         return f"Purged {n} old log file(s)"
     if name == "purge_reports":
-        n = purge_reports(int(args.get("keep_days", CLEANUP_DAYS)), log)
+        n = purge_reports(int(args.get("keep_days", cleanup_days)), log)
         return f"Purged {n} old report file(s)"
     if name == "trim_metrics":
         n = trim_metrics(int(args.get("max_runs", MAX_METRIC_RUNS)), log)

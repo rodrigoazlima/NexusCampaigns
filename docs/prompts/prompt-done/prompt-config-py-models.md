@@ -240,6 +240,9 @@ class NPCLLMOutput(BaseModel):
     role:       str         = ""
     relationships: list[str] = Field(default_factory=list)
     description:   str      = ""
+    # Reflexion loop metadata — never comes from LLM; set by _flag_for_human_review
+    needs_human_review: bool = False
+    review_notes:       str  = ""
 
     model_config = {"populate_by_name": True}
 
@@ -409,6 +412,7 @@ class ClaudeApiConfig(BaseModel):
     model:               str
     system_file:         Optional[str]       = None
     tools_module:        Optional[str]       = None   # dotted import path e.g. "repair.tools.repair_agent"
+    prompt_file:         Optional[str]       = None   # user prompt .md, relative to agent dir; prompt pattern only
     history_file:        Optional[str]       = None   # relative to agent state/ dir
     max_tokens:          int                 = 4096
     temperature:         float               = 0.0
@@ -524,11 +528,26 @@ class VaultHealthReport(BaseModel):
     queueDone:     int                  = 0
 
 
+class TaskCostEntry(BaseModel):
+    model:         str
+    runs:          int = 0
+    input_tokens:  int = 0
+    output_tokens: int = 0
+
+
+class CostSummary(BaseModel):
+    date:                str
+    by_task:             dict[str, TaskCostEntry] = Field(default_factory=dict)
+    total_input_tokens:  int = 0
+    total_output_tokens: int = 0
+
+
 class DailyReport(BaseModel):
     generatedAt:    datetime
     date:           str
     agentSummaries: dict[str, AgentLogSummary] = Field(default_factory=dict)
     vaultHealth:    VaultHealthReport          = Field(default_factory=VaultHealthReport)
+    costSummary:    Optional[CostSummary]      = None
 
 
 class RepairReport(BaseModel):
@@ -536,6 +555,8 @@ class RepairReport(BaseModel):
     generatedAt:        datetime
     fixLabelsDetected:  list[str] = Field(default_factory=list)
     repairsApplied:     int       = 0
+    overdueAgents:      list[str] = Field(default_factory=list)
+    invalidImageRefs:   list[str] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -680,6 +701,69 @@ class SearchIndexState(BaseModel):
     version:    int                      = 1
     indexed_at: datetime
     entries:    dict[str, SearchEntry]   = Field(default_factory=dict)
+
+
+# ---------------------------------------------------------------------------
+# Registry — agent-registry.spec.md
+# ---------------------------------------------------------------------------
+
+class LLMEndpointSpec(BaseModel):
+    """One entry under registry.yaml llm_endpoints."""
+    url:      str
+    model:    str
+    type:     str    # "vision" | "text"
+    provider: str
+
+
+class AgentSharedStateSpec(BaseModel):
+    """Declares which shared state paths an agent reads / writes / updates."""
+    reads:   list[str] = Field(default_factory=list)
+    writes:  list[str] = Field(default_factory=list)
+    updates: list[str] = Field(default_factory=list)
+
+
+class AgentRegistryEntry(BaseModel):
+    """One entry under registry.yaml agents."""
+    status:           Literal["active", "planned", "deprecated"]
+    task_id:          Optional[str]                 = None
+    description:      Optional[str]                 = None
+    interval_seconds: Optional[int]                 = None
+    llm:              Optional[str]                 = None   # alias or "none"
+    tools:            list[str]                     = Field(default_factory=list)
+    prompts:          list[str]                     = Field(default_factory=list)
+    shared_state:     Optional[AgentSharedStateSpec] = None
+    dependencies:     list[str]                     = Field(default_factory=list)
+
+
+class SharedStateFileSpec(BaseModel):
+    """One entry under registry.yaml shared_state_files."""
+    path:     str
+    owner:    str
+    updaters: list[str] = Field(default_factory=list)
+
+
+class RegistryConfig(BaseModel):
+    """Full parsed representation of .agents/registry.yaml."""
+    version:            int                              = 1
+    vault_root:         str
+    agents_dir:         str                              = ".agents"
+    shared_dir:         str                              = ".shared"
+    llm_endpoints:      dict[str, LLMEndpointSpec]       = Field(default_factory=dict)
+    execution_order:    list[str]                        = Field(default_factory=list)
+    shared_state_files: dict[str, SharedStateFileSpec]   = Field(default_factory=dict)
+    agents:             dict[str, AgentRegistryEntry]    = Field(default_factory=dict)
+
+    def active_agents(self) -> dict[str, AgentRegistryEntry]:
+        """Return only agents with status='active'."""
+        return {k: v for k, v in self.agents.items() if v.status == "active"}
+
+    def planned_agents(self) -> dict[str, AgentRegistryEntry]:
+        """Return only agents with status='planned'."""
+        return {k: v for k, v in self.agents.items() if v.status == "planned"}
+
+    def get_endpoint(self, alias: str) -> Optional[LLMEndpointSpec]:
+        """Return LLM endpoint by alias, or None if not found."""
+        return self.llm_endpoints.get(alias)
 
 
 # ---------------------------------------------------------------------------

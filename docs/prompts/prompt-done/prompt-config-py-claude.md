@@ -41,20 +41,37 @@ Analyze the provided Python script and extract all relevant configuration settin
 **Script to analyze:**
 
 # shared\runners\claude.py
-"""ClaudeRunner — Anthropic Claude API with agentic tool-calling loop.
+"""ClaudeRunner — Anthropic Claude API dispatch runner.
+
+Two dispatch patterns (per agent-dispatch.spec.md):
+
+  Tool-use pattern (primary — all active agents)
+    Requires: tools_module
+    Behaviour: agentic loop calling tools until end_turn or max_tool_rounds.
+
+  Prompt pattern (simple generation)
+    Requires: prompt_file (no tools_module)
+    Behaviour: single non-agentic API call, returns text response.
 
 Dispatch config keys (from ClaudeApiConfig):
   model            str   — Claude model ID
   system_file      str?  — path to system prompt, relative to agent_dir
   tools_module     str?  — dotted import path for agent's tool module
+  prompt_file      str?  — user prompt .md, relative to agent_dir; prompt pattern only
   history_file     str?  — filename for persistent chat history, under agent state/
   max_tokens       int   — default 4096
+  temperature      float — default 0
   timeout_seconds  int   — default 120 (per API call)
   max_tool_rounds  int   — agentic loop cap, default 20
 
-The tools module must expose:
+Tools module must expose:
   TOOLS: list[dict]                        — Anthropic tool definitions
   call_tool(name, args, context) -> str    — tool dispatcher
+
+Retry policy (spec: agent-dispatch.spec.md):
+  - API 5xx: retry up to 3× with 3s backoff
+  - API 401/403: no retry, exit_code=1
+  - Timeout: no retry, exit_code=1
 """
 
 from __future__ import annotations
@@ -62,10 +79,15 @@ from __future__ import annotations
 import importlib
 import json
 import sys
+import time
 from pathlib import Path
 from typing import Any, Optional
 
 from ..models import RunResult
+from . import _resolve_placeholders
+
+_MAX_RETRIES   = 3
+_RETRY_DELAY_S = 3.0
 
 
 class ClaudeRunner:
@@ -80,24 +102,12 @@ class ClaudeRunner:
 
         cfg          = dispatch_config
         agent_dir    = Path(context["agent_dir"])
-        project_root = Path(context["project_root"])
         agents_dir   = Path(context.get("agents_dir", str(agent_dir.parent)))
+        model_id     = cfg["model"]
+        timeout_s    = float(cfg.get("timeout_seconds", 120))
+        temperature  = float(cfg.get("temperature", 0.0))
 
-        # ------------------------------------------------------------------ #
-        # Load tools module
-        # ------------------------------------------------------------------ #
-        mod = None
-        tools: list[dict] = []
-        if cfg.get("tools_module"):
-            module_path = cfg["tools_module"]
-            # Ensure .agents/ is on sys.path
-            if str(agents_dir) not in sys.path:
-                sys.path.insert(0, str(agents_dir))
-            try:
-                mod = importlib.import_module(module_path)
-                tools = list(getattr(mod, "TOOLS", []))
-            except Exception as exc:
-                return RunResult(exit_code=1, error=f"Failed to import tools_module {module_path!r}: {exc}")
+        client = anthropic.Anthropic(timeout=timeout_s)
 
         # ------------------------------------------------------------------ #
         # System prompt
@@ -106,7 +116,148 @@ class ClaudeRunner:
         if cfg.get("system_file"):
             p = agent_dir / cfg["system_file"]
             if p.exists():
-                system = p.read_text(encoding="utf-8").strip()
+                system = _resolve_placeholders(
+                    p.read_text(encoding="utf-8").strip(), context
+                )
+
+        # ------------------------------------------------------------------ #
+        # Route to appropriate pattern
+        # ------------------------------------------------------------------ #
+        if cfg.get("tools_module"):
+            return self._run_tool_use(
+                cfg, context, client, agent_dir, agents_dir,
+                model_id, system, temperature,
+            )
+        else:
+            return self._run_prompt(
+                cfg, context, client, agent_dir,
+                model_id, system, temperature,
+            )
+
+    # ---------------------------------------------------------------------- #
+    # Prompt pattern — single non-agentic call
+    # ---------------------------------------------------------------------- #
+
+    def _run_prompt(
+        self,
+        cfg: dict,
+        context: dict,
+        client: Any,
+        agent_dir: Path,
+        model_id: str,
+        system: str,
+        temperature: float,
+    ) -> RunResult:
+        try:
+            import anthropic
+        except ImportError:
+            return RunResult(exit_code=1, error="anthropic package not installed")
+
+        prompt = _load_file(agent_dir, cfg.get("prompt_file"), context)
+
+        create_kwargs: dict[str, Any] = {
+            "model":       model_id,
+            "messages":    [{"role": "user", "content": prompt}],
+            "max_tokens":  int(cfg.get("max_tokens", 4096)),
+            "temperature": temperature,
+        }
+        if system:
+            create_kwargs["system"] = system
+
+        t0 = time.monotonic()
+        last_error: Optional[str] = None
+
+        for attempt in range(_MAX_RETRIES):
+            try:
+                resp = client.messages.create(**create_kwargs)
+
+                input_tokens  = getattr(getattr(resp, "usage", None), "input_tokens",  0)
+                output_tokens = getattr(getattr(resp, "usage", None), "output_tokens", 0)
+
+                text = "".join(
+                    blk.text for blk in resp.content if hasattr(blk, "text")
+                )
+                return RunResult(
+                    exit_code=0,
+                    output=text,
+                    duration_ms=_ms(t0),
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    model=model_id,
+                )
+
+            except anthropic.AuthenticationError as exc:
+                return RunResult(
+                    exit_code=1,
+                    error=f"Claude API auth error: {exc}",
+                    duration_ms=_ms(t0),
+                    model=model_id,
+                )
+            except anthropic.PermissionDeniedError as exc:
+                return RunResult(
+                    exit_code=1,
+                    error=f"Claude API permission denied: {exc}",
+                    duration_ms=_ms(t0),
+                    model=model_id,
+                )
+            except anthropic.APITimeoutError as exc:
+                return RunResult(
+                    exit_code=1,
+                    error=f"Claude API timeout: {exc}",
+                    duration_ms=_ms(t0),
+                    model=model_id,
+                )
+            except anthropic.InternalServerError as exc:
+                last_error = f"Claude API 5xx error (attempt {attempt + 1}): {exc}"
+            except Exception as exc:
+                last_error = f"Claude API error (attempt {attempt + 1}): {exc}"
+
+            if attempt < _MAX_RETRIES - 1:
+                time.sleep(_RETRY_DELAY_S)
+
+        return RunResult(
+            exit_code=1,
+            error=last_error,
+            duration_ms=_ms(t0),
+            model=model_id,
+        )
+
+    # ---------------------------------------------------------------------- #
+    # Tool-use pattern — agentic loop
+    # ---------------------------------------------------------------------- #
+
+    def _run_tool_use(
+        self,
+        cfg: dict,
+        context: dict,
+        client: Any,
+        agent_dir: Path,
+        agents_dir: Path,
+        model_id: str,
+        system: str,
+        temperature: float,
+    ) -> RunResult:
+        try:
+            import anthropic
+        except ImportError:
+            return RunResult(exit_code=1, error="anthropic package not installed")
+
+        project_root = Path(context["project_root"])
+
+        # ------------------------------------------------------------------ #
+        # Load tools module
+        # ------------------------------------------------------------------ #
+        module_path = cfg["tools_module"]
+        if str(agents_dir) not in sys.path:
+            sys.path.insert(0, str(agents_dir))
+        try:
+            mod = importlib.import_module(module_path)
+            tools: list[dict] = list(getattr(mod, "TOOLS", []))
+        except Exception as exc:
+            return RunResult(
+                exit_code=1,
+                error=f"Failed to import tools_module {module_path!r}: {exc}",
+            )
 
         # ------------------------------------------------------------------ #
         # Chat history (persistent across runs for multi-turn continuity)
@@ -123,7 +274,6 @@ class ClaudeRunner:
                 except Exception:
                     messages = []
 
-        # Add current task invocation
         messages.append({
             "role": "user",
             "content": (
@@ -137,35 +287,38 @@ class ClaudeRunner:
         # ------------------------------------------------------------------ #
         # Agentic loop
         # ------------------------------------------------------------------ #
-        client = anthropic.Anthropic()
         max_rounds      = int(cfg.get("max_tool_rounds", 20))
-        max_tokens_run  = cfg.get("max_tokens_per_run")  # optional budget guard
-        model_id        = cfg["model"]
+        max_tokens_run  = cfg.get("max_tokens_per_run")
         exit_code       = 0
         last_error: Optional[str] = None
         total_input     = 0
         total_output    = 0
 
+        t0 = time.monotonic()
+
         try:
             for round_num in range(max_rounds):
                 create_kwargs: dict[str, Any] = {
-                    "model":      model_id,
-                    "messages":   messages,
-                    "max_tokens": int(cfg.get("max_tokens", 4096)),
+                    "model":       model_id,
+                    "messages":    messages,
+                    "max_tokens":  int(cfg.get("max_tokens", 4096)),
+                    "temperature": temperature,
                 }
                 if system:
                     create_kwargs["system"] = system
                 if tools:
                     create_kwargs["tools"] = tools
 
-                resp = client.messages.create(**create_kwargs)
+                resp = _create_with_retry(client, create_kwargs)
+                if resp is None:
+                    exit_code  = 1
+                    last_error = "Claude API 5xx — max retries exhausted mid-loop"
+                    break
 
-                # Accumulate token usage
                 if hasattr(resp, "usage") and resp.usage:
-                    total_input  += getattr(resp.usage, "input_tokens", 0)
+                    total_input  += getattr(resp.usage, "input_tokens",  0)
                     total_output += getattr(resp.usage, "output_tokens", 0)
 
-                # Convert content blocks to serialisable form for history
                 assistant_content = _serialise_content(resp.content)
                 messages.append({"role": "assistant", "content": assistant_content})
 
@@ -175,7 +328,6 @@ class ClaudeRunner:
                 if resp.stop_reason != "tool_use":
                     break
 
-                # Budget guard — check after accumulating tokens
                 if max_tokens_run and (total_input + total_output) > max_tokens_run:
                     last_error = (
                         f"Token budget exceeded "
@@ -183,7 +335,6 @@ class ClaudeRunner:
                     )
                     break
 
-                # Execute all tool calls in this response
                 tool_results: list[dict] = []
                 for blk in resp.content:
                     if blk.type != "tool_use":
@@ -191,8 +342,8 @@ class ClaudeRunner:
                     try:
                         result = mod.call_tool(blk.name, blk.input, context)
                     except Exception as exc:
-                        result = f"ERROR: {exc}"
-                        exit_code = 1
+                        result     = f"ERROR: {exc}"
+                        exit_code  = 1
                         last_error = str(exc)
 
                     tool_results.append({
@@ -204,22 +355,21 @@ class ClaudeRunner:
                 messages.append({"role": "user", "content": tool_results})
 
             else:
-                # Hit max_rounds without end_turn
-                exit_code = 1
+                exit_code  = 1
                 last_error = f"Agent hit max_tool_rounds={max_rounds} without completing"
 
         except Exception as exc:
-            exit_code = 1
+            exit_code  = 1
             last_error = str(exc)
 
         finally:
-            # Persist chat history — keep last 50 turns to bound file size
             if history_path is not None:
                 _save_history(history_path, messages)
 
         return RunResult(
             exit_code=exit_code,
             error=last_error,
+            duration_ms=_ms(t0),
             input_tokens=total_input,
             output_tokens=total_output,
             model=model_id,
@@ -230,7 +380,40 @@ class ClaudeRunner:
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _serialise_content(content) -> list[dict]:
+def _create_with_retry(client: Any, kwargs: dict) -> Any:
+    """Call client.messages.create() with 3× retry on 5xx. Returns None on exhaustion."""
+    try:
+        import anthropic
+    except ImportError:
+        return None
+
+    for attempt in range(_MAX_RETRIES):
+        try:
+            return client.messages.create(**kwargs)
+        except (anthropic.AuthenticationError, anthropic.PermissionDeniedError,
+                anthropic.APITimeoutError):
+            raise  # propagate non-retryable errors immediately
+        except anthropic.InternalServerError:
+            pass  # 5xx — retry
+        except Exception:
+            raise
+
+        if attempt < _MAX_RETRIES - 1:
+            time.sleep(_RETRY_DELAY_S)
+
+    return None
+
+
+def _load_file(agent_dir: Path, filename: str | None, context: dict) -> str:
+    if not filename:
+        return ""
+    p = agent_dir / filename
+    if not p.exists():
+        return ""
+    return _resolve_placeholders(p.read_text(encoding="utf-8").strip(), context)
+
+
+def _serialise_content(content: Any) -> list[dict]:
     """Convert SDK content blocks to plain dicts for JSON serialisation."""
     result = []
     for blk in content:
@@ -244,7 +427,6 @@ def _serialise_content(content) -> list[dict]:
 
 
 def _save_history(path: Path, messages: list[dict]) -> None:
-    """Persist chat history, trimmed to last 50 messages."""
     trimmed = messages[-50:]
     try:
         tmp = path.with_suffix(".tmp")
@@ -252,6 +434,10 @@ def _save_history(path: Path, messages: list[dict]) -> None:
         tmp.replace(path)
     except Exception:
         pass
+
+
+def _ms(t0: float) -> int:
+    return int((time.monotonic() - t0) * 1000)
 
 
 ---

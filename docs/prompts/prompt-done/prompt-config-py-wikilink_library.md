@@ -73,6 +73,8 @@ from shared import (  # noqa: E402
     StateStore,
     extract_wikilinks,
     has_wikilink,
+    slugs_from_relationships,
+    required_type_boost,
     WIKILINK_STATE_DEFAULT,
 )
 from shared.interfaces import IWikilinkResolver  # noqa: E402
@@ -249,6 +251,18 @@ class WikilinkResolver(IWikilinkResolver):
         tgt_kw = _extract_keywords(target_body)
         score += min(len(src_kw & tgt_kw), 2)
 
+        # Required-link type boost: +5 if candidate fills a missing required link group
+        # (linking-rules.spec.md — per-type enforcement)
+        src_linked = (
+            slugs_from_relationships(source_fm.get("relationships") or [])
+            + extract_wikilinks(source_body)
+        )
+        score += required_type_boost(
+            source_fm.get("type", ""),
+            src_linked,
+            target_slug,
+        )
+
         return score
 
     def insert_wikilinks(self, target: Path, slug_index: dict[str, Path]) -> int:
@@ -312,6 +326,14 @@ def _mark_processed(store: StateStore, rel: str, links_inserted: int) -> None:
 # ---------------------------------------------------------------------------
 
 def main() -> None:
+    import argparse
+    parser = argparse.ArgumentParser(description="Insert [[wikilinks]] into 02-Library/ Related sections")
+    parser.add_argument("--min-score", type=int, default=MIN_SCORE,
+                        help=f"Minimum pair score to insert a link (default: {MIN_SCORE})")
+    parser.add_argument("--max-links", type=int, default=MAX_LINKS,
+                        help=f"Max new links inserted per file per run (default: {MAX_LINKS})")
+    args, _ = parser.parse_known_args()
+
     log   = Logger(TASK_ID, SCRIPT_BASENAME, _LOGS_DIR, _MASTER_LOG)
     t0    = log.start()
     store = _make_store()
@@ -323,7 +345,7 @@ def main() -> None:
         sys.exit(0)
 
     fio       = FrontmatterIO()
-    resolver  = WikilinkResolver(fio)
+    resolver  = WikilinkResolver(fio, min_score=args.min_score, max_links=args.max_links)
     slug_idx  = resolver.build_slug_index(_LIBRARY)
     processed = _load_processed(store)
 
