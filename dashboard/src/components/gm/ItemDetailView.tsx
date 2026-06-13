@@ -308,7 +308,8 @@ export default function ItemDetailView({ item: initial }: Props) {
             {item.imageClassification && (
               <div className="mt-2 flex flex-wrap gap-1">
                 {(['type','ancestry','char_class','element','environment'] as const).map((field) => {
-                  const val = (item.imageClassification as Record<string, string>)[field]
+                  const cls = item.imageClassification!
+                  const val = cls[field as keyof typeof cls] as string | undefined
                   if (!val || val === 'none') return null
                   return (
                     <span key={field} className="text-[10px] px-1.5 py-0.5 rounded bg-surface-3 text-zinc-500 font-mono">

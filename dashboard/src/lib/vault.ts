@@ -559,9 +559,9 @@ const TOKEN_ELIGIBLE_TYPES = new Set(['portrait', 'body'])
 const DEFAULT_MOLDURA = 'knowledge-base/00-Inbox/tokens/Molduras/moldura_default.png'
 const TOKEN_CONFIG_PATH = path.join(PROJECT_ROOT, '.shared', 'state', 'token-config.json')
 
-export function readVisionState(): Record<string, ImageClassification & { path: string; status: string }> {
+export function readVisionState(): Record<string, Record<string, unknown>> {
   const visionPath = path.join(PROJECT_ROOT, '.agents', 'vision', 'state', 'processed-images.json')
-  const raw = readJson<{ images: Record<string, ImageClassification & { path: string; status: string }>; pathIndex: Record<string, string> }>(visionPath)
+  const raw = readJson<{ images: Record<string, Record<string, unknown>>; pathIndex: Record<string, string> }>(visionPath)
   return raw?.images ?? {}
 }
 
@@ -612,18 +612,20 @@ export function readItemDetail(id: string): ItemDetail | null {
     const sha256Key = pathIndex[inboxRelPath]
     const visionEntry = sha256Key ? visionImages[sha256Key] : null
     if (visionEntry) {
+      const v = visionEntry as Record<string, unknown>
+      const imgType = String(v.type ?? 'unknown')
       imageClassification = {
-        type: visionEntry.type,
-        ancestry: (visionEntry as Record<string, string>).ancestry ?? 'none',
-        char_class: (visionEntry as Record<string, string>).char_class ?? 'none',
-        creature_type: (visionEntry as Record<string, string>).creature_type ?? 'none',
-        element: (visionEntry as Record<string, string>).element ?? 'none',
-        environment: (visionEntry as Record<string, string>).environment ?? 'none',
-        description: (visionEntry as Record<string, string>).description ?? '',
-        sha256: (visionEntry as Record<string, string>).sha256 ?? '',
-        isToken: !!(visionEntry as Record<string, unknown>).isToken,
+        type: imgType,
+        ancestry: String(v.ancestry ?? 'none'),
+        char_class: String(v.char_class ?? v.class ?? 'none'),
+        creature_type: String(v.creature_type ?? 'none'),
+        element: String(v.element ?? 'none'),
+        environment: String(v.environment ?? 'none'),
+        description: String(v.description ?? ''),
+        sha256: String(v.sha256 ?? ''),
+        isToken: Boolean(v.isToken),
       }
-      tokenEligible = TOKEN_ELIGIBLE_TYPES.has(visionEntry.type)
+      tokenEligible = TOKEN_ELIGIBLE_TYPES.has(imgType)
     }
 
     // Find token by source path
