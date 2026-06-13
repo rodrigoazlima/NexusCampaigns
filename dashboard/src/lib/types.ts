@@ -191,14 +191,26 @@ export interface ClaudeCodeConfig {
   env?: Record<string, string>
 }
 
+export interface CodexCliConfig {
+  prompt_file?: string | null
+  prompt?: string | null
+  model?: string
+  approval_mode?: 'suggest' | 'auto-edit' | 'full-auto'
+  extra_args?: string[]
+  cwd?: 'project_root' | 'agent_dir'
+  timeout_seconds?: number
+  env?: Record<string, string>
+}
+
 export interface IntelligenceConfig {
-  type: 'cli' | 'claude-api' | 'openai-api' | 'gemini-api' | 'openrouter-api' | 'claude-code'
+  type: 'cli' | 'claude-api' | 'openai-api' | 'gemini-api' | 'openrouter-api' | 'claude-code' | 'codex-cli'
   cli?: CliConfig
   claude_api?: ClaudeApiConfig
   openai_api?: OpenAIApiConfig
   gemini_api?: GeminiApiConfig
   openrouter_api?: OpenRouterApiConfig
   claude_code?: ClaudeCodeConfig
+  codex_cli?: CodexCliConfig
 }
 
 export interface TaskConfig {
