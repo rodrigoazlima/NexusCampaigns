@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { X, AlertTriangle, Loader2, CheckCircle } from 'lucide-react'
-import type { AgentConfig, RuntimeConfig, IntelligenceConfig } from '@/lib/types'
+import type { AgentConfig, RuntimeConfig, IntelligenceConfig, AgentCapability } from '@/lib/types'
 
 interface AgentConfigDialogProps {
   agentName: string
@@ -32,7 +32,34 @@ const DEFAULT_INTELLIGENCE: Record<string, Record<string, unknown>> = {
   'openrouter-api': { model: '', max_tokens: 4096, temperature: 0.0, timeout_seconds: 180 },
   'claude-code': { prompt_file: 'prompts/prompt.md', prompt: null, extra_args: ['--dangerously-skip-permissions'], cwd: 'project_root', timeout_seconds: 600, env: {} },
   'codex-cli': { prompt_file: 'prompts/prompt.md', prompt: null, model: 'o4-mini', approval_mode: 'full-auto', extra_args: [], cwd: 'project_root', timeout_seconds: 600, env: {} },
-  'lm-studio': { base_url: 'http://localhost:1234/v1', model: '', max_tokens: 4096, temperature: 0.0, timeout_seconds: 120, system_file: null, prompt_file: null },
+  'lm-studio': { base_url: 'http://localhost:1234/v1', model: '', max_tokens: 64000, temperature: 0.0, timeout_seconds: 1800, system_file: null, prompt_file: null },
+}
+
+// Capabilities each provider definitively supports (guaranteed)
+const PROVIDER_CAPS_DEFINITE: Record<string, AgentCapability[]> = {
+  'claude-api':     ['vision', 'text', 'tool-call'],
+  'claude-code':    ['text', 'tool-call'],
+  'codex-cli':      ['text', 'tool-call'],
+  'openai-api':     ['text'],
+  'gemini-api':     ['text', 'tool-call'],
+  'openrouter-api': ['text'],
+  'lm-studio':      ['text'],
+  'cli':            [],
+}
+
+// Capabilities that may be available depending on the specific model chosen
+const PROVIDER_CAPS_UNCERTAIN: Record<string, AgentCapability[]> = {
+  'openai-api':     ['vision', 'tool-call'],
+  'gemini-api':     ['vision'],
+  'openrouter-api': ['vision', 'tool-call'],
+  'lm-studio':      ['vision', 'tool-call'],
+}
+
+const CAPABILITY_LABELS: Record<AgentCapability, string> = {
+  vision:      'Vision',
+  text:        'Text',
+  speech:      'Speech',
+  'tool-call': 'Tool Call',
 }
 
 function intervalLabel(s: number): string {
@@ -443,7 +470,7 @@ function LmStudioFields({ cfg, onChange }: { cfg: Record<string, unknown>; onCha
 
   const fetchModels = useCallback(() => {
     setFetchStatus('loading')
-    fetch(`${baseUrl}/models`)
+    fetch(`/api/lm-studio/models?baseUrl=${encodeURIComponent(baseUrl)}`)
       .then(r => r.json())
       .then((d: { data?: { id: string }[] }) => {
         const ids = (d.data ?? []).map(m => m.id)
@@ -502,6 +529,7 @@ function LmStudioFields({ cfg, onChange }: { cfg: Record<string, unknown>; onCha
       </FieldRow>
       <FieldRow label="Timeout (s)">
         <NumberInput value={cfg.timeout_seconds as number} onChange={(v) => onChange('timeout_seconds', v)} min={1} />
+        <p className="text-[10px] text-zinc-600 mt-1">= {intervalLabel(cfg.timeout_seconds as number)}</p>
       </FieldRow>
       <FieldRow label="System File">
         <TextInput value={(cfg.system_file as string) ?? ''} onChange={(v) => onChange('system_file', v || null)} mono />
@@ -563,7 +591,7 @@ export default function AgentConfigDialog({
       })
       if (!res.ok) throw new Error(`Save failed: HTTP ${res.status}`)
       setSaveStatus('success')
-      setTimeout(() => setSaveStatus('idle'), 3000)
+      setTimeout(() => onClose(), 800)
     } catch (e) {
       setSaveStatus('error')
       setSaveError(e instanceof Error ? e.message : String(e))
@@ -839,21 +867,63 @@ const DISPATCH_OPTIONS = [
   { value: 'cli', label: 'CLI' },
 ]
 
-function IntelligenceFields({ intelligence, onChange }: {
+function CapabilityWarnings({ providerType, required }: { providerType: string; required: AgentCapability[] }) {
+  if (!required || required.length === 0) return null
+  const definite = PROVIDER_CAPS_DEFINITE[providerType] ?? []
+  const uncertain = PROVIDER_CAPS_UNCERTAIN[providerType] ?? []
+  const missing = required.filter(c => !definite.includes(c))
+  const warnings = missing.map(c => ({
+    cap: c,
+    uncertain: uncertain.includes(c),
+  }))
+  if (warnings.length === 0) return null
+  return (
+    <div className="space-y-1.5 mb-3">
+      {warnings.map(({ cap, uncertain }) => (
+        <div
+          key={cap}
+          role="alert"
+          className={`flex items-start gap-2 rounded px-2.5 py-2 text-[11px] border ${
+            uncertain
+              ? 'bg-yellow-500/5 border-yellow-500/20 text-yellow-400/80'
+              : 'bg-red-500/8 border-red-500/20 text-red-400/80'
+          }`}
+        >
+          <span aria-label={uncertain ? 'Warning' : 'Error'} className="mt-px shrink-0">
+            {uncertain ? '⚠' : '✕'}
+          </span>
+          <span>
+            <span className="font-semibold">{CAPABILITY_LABELS[cap]}</span>
+            {uncertain
+              ? ` support depends on the specific model loaded — verify before use.`
+              : ` is required but not supported by this provider.`}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function IntelligenceFields({ intelligence, onChange, requiredCapabilities }: {
   intelligence: IntelligenceConfig
   onChange: (field: string, value: unknown) => void
+  requiredCapabilities?: AgentCapability[]
 }) {
   const key = TYPE_KEY_MAP[intelligence.type]
   const cfg = (key ? intelligence[key] : null) as Record<string, unknown> | null
-  if (!cfg) return null
-  if (intelligence.type === 'claude-api') return <ClaudeApiFields cfg={cfg} onChange={onChange} />
-  if (intelligence.type === 'openai-api') return <OpenAIApiFields cfg={cfg} onChange={onChange} />
-  if (intelligence.type === 'gemini-api' || intelligence.type === 'openrouter-api') return <GeminiOrOpenRouterFields cfg={cfg} onChange={onChange} />
-  if (intelligence.type === 'cli') return <CliFields cfg={cfg} onChange={onChange} />
-  if (intelligence.type === 'claude-code') return <ClaudeCodeFields cfg={cfg} onChange={onChange} />
-  if (intelligence.type === 'codex-cli') return <CodexCliFields cfg={cfg} onChange={onChange} />
-  if (intelligence.type === 'lm-studio') return <LmStudioFields cfg={cfg} onChange={onChange} />
-  return null
+  const warnings = <CapabilityWarnings providerType={intelligence.type} required={requiredCapabilities ?? []} />
+  if (!cfg) return warnings
+  const fields = (() => {
+    if (intelligence.type === 'claude-api') return <ClaudeApiFields cfg={cfg} onChange={onChange} />
+    if (intelligence.type === 'openai-api') return <OpenAIApiFields cfg={cfg} onChange={onChange} />
+    if (intelligence.type === 'gemini-api' || intelligence.type === 'openrouter-api') return <GeminiOrOpenRouterFields cfg={cfg} onChange={onChange} />
+    if (intelligence.type === 'cli') return <CliFields cfg={cfg} onChange={onChange} />
+    if (intelligence.type === 'claude-code') return <ClaudeCodeFields cfg={cfg} onChange={onChange} />
+    if (intelligence.type === 'codex-cli') return <CodexCliFields cfg={cfg} onChange={onChange} />
+    if (intelligence.type === 'lm-studio') return <LmStudioFields cfg={cfg} onChange={onChange} />
+    return null
+  })()
+  return <>{warnings}{fields}</>
 }
 
 // ---------------------------------------------------------------------------
@@ -958,6 +1028,7 @@ function TaskForm({
             <NumberInput value={task.intervalSeconds} onChange={(v) => onTaskChange(taskId, 'intervalSeconds', v)} min={60} />
             <p className="text-[10px] text-zinc-600 mt-1">= {intervalLabel(task.intervalSeconds)}</p>
           </FieldRow>
+          <TagList tags={task.required_capabilities ?? []} label="Requires" />
           <TagList tags={task.signal_triggers ?? []} label="Signal Triggers" />
           <TagList tags={task.emits_signals ?? []} label="Emits Signals" />
         </div>
@@ -972,7 +1043,7 @@ function TaskForm({
               options={DISPATCH_OPTIONS}
             />
           </FieldRow>
-          <IntelligenceFields intelligence={task.dispatch} onChange={(f, v) => onIntelligenceChange(taskId, f, v)} />
+          <IntelligenceFields intelligence={task.dispatch} onChange={(f, v) => onIntelligenceChange(taskId, f, v)} requiredCapabilities={task.required_capabilities} />
           {(() => {
             const pf = getIntelligencePromptFile(task.dispatch)
             if (!pf) return null

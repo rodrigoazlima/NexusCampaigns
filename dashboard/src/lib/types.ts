@@ -224,9 +224,12 @@ export interface IntelligenceConfig {
   lm_studio?: LmStudioConfig
 }
 
+export type AgentCapability = 'vision' | 'text' | 'speech' | 'tool-call'
+
 export interface TaskConfig {
   intervalSeconds: number
   description: string
+  required_capabilities?: AgentCapability[]
   dispatch: IntelligenceConfig
   fallback_dispatch?: IntelligenceConfig
   signal_triggers?: string[]
