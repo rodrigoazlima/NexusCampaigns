@@ -105,10 +105,9 @@ const LiveIndicator = () => (
 
 const Logo = () => (
   <div className="flex items-center gap-2">
-    <span className="text-lg">🐉</span>
     <div>
-      <div className="text-sm font-semibold text-zinc-100 leading-tight">Knowledge</div>
-      <div className="text-sm font-semibold text-zinc-100 leading-tight">Factory</div>
+      <div className="text-sm font-semibold text-zinc-100 leading-tight">Nexus</div>
+      <div className="text-sm font-semibold text-zinc-100 leading-tight">Campaigns</div>
     </div>
   </div>
 )
@@ -147,7 +146,6 @@ export default function Sidebar() {
         >
           <Menu size={20} />
         </button>
-        <span className="text-base">🐉</span>
         <span className="text-sm font-semibold text-zinc-100">Nexus Campaigns</span>
         <div className="ml-auto flex items-center gap-1.5 text-xs text-zinc-500 pr-1">
           <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
