@@ -49,7 +49,7 @@ export default function InboxImageCard({ item }: InboxImageCardProps) {
         <div className="text-xs font-mono text-zinc-200 truncate mb-1" title={item.filename}>
           {item.filename}
         </div>
-        <div className="text-[10px] text-zinc-500 mb-2">
+        <div className="text-[10px] text-zinc-500 mb-2" suppressHydrationWarning>
           {formatRelative(item.ingestedAt)}
         </div>
 

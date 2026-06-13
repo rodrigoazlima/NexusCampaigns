@@ -64,12 +64,12 @@ export default function AgentCard({ agent }: AgentCardProps) {
         <div className="text-xs text-zinc-500 space-y-1">
           <div className="flex justify-between">
             <span>Last run</span>
-            <span className="text-zinc-300 font-mono">{formatRelative(agent.lastRun)}</span>
+            <span className="text-zinc-300 font-mono" suppressHydrationWarning>{formatRelative(agent.lastRun)}</span>
           </div>
           {agent.status !== 'planned' && (
             <div className="flex justify-between">
               <span>Next run</span>
-              <span className="text-zinc-300 font-mono">{formatRelative(agent.nextRun)}</span>
+              <span className="text-zinc-300 font-mono" suppressHydrationWarning>{formatRelative(agent.nextRun)}</span>
             </div>
           )}
           {agent.avgDurationMs > 0 && (

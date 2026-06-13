@@ -36,7 +36,7 @@ export default function ChatMessage({ msg }: ChatMessageProps) {
           <div className="bg-primary/20 text-zinc-200 text-xs px-3 py-2 rounded-lg rounded-tr-sm">
             {msg.content}
           </div>
-          <div className="text-[10px] text-zinc-600 text-right mt-1">
+          <div className="text-[10px] text-zinc-600 text-right mt-1" suppressHydrationWarning>
             {formatRelative(msg.timestamp)}
           </div>
         </div>
@@ -55,7 +55,7 @@ export default function ChatMessage({ msg }: ChatMessageProps) {
         <div className="bg-surface-1 border border-surface-3 text-zinc-300 text-xs px-3 py-2 rounded-lg rounded-tl-sm">
           {renderContent(msg.content)}
         </div>
-        <div className="text-[10px] text-zinc-600 mt-1">
+        <div className="text-[10px] text-zinc-600 mt-1" suppressHydrationWarning>
           {formatRelative(msg.timestamp)}
         </div>
       </div>

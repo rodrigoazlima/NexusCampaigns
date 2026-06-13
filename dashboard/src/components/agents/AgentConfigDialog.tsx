@@ -799,11 +799,11 @@ export default function AgentConfigDialog({
       if (!prev || isRuntimeConfig(prev)) return prev
       const next = JSON.parse(JSON.stringify(prev)) as AgentConfig
       const task = next.tasks[taskId]
-      const oldKey = TYPE_KEY_MAP[task.dispatch.type]
       const newKey = TYPE_KEY_MAP[newType]
-      if (oldKey) delete task.dispatch[oldKey]
+      // Change type; keep old config key in place so switching back restores it
       task.dispatch.type = newType as IntelligenceConfig['type']
-      if (newKey) {
+      // Only write defaults when this type has never been configured
+      if (newKey && !task.dispatch[newKey]) {
         task.dispatch[newKey] = { ...(DEFAULT_INTELLIGENCE[newType] ?? {}) } as never
       }
       return next
@@ -830,11 +830,9 @@ export default function AgentConfigDialog({
       const next = JSON.parse(JSON.stringify(prev)) as AgentConfig
       const task = next.tasks[taskId]
       if (!task.fallback_dispatch) return prev
-      const oldKey = TYPE_KEY_MAP[task.fallback_dispatch.type]
       const newKey = TYPE_KEY_MAP[newType]
-      if (oldKey) delete task.fallback_dispatch[oldKey]
       task.fallback_dispatch.type = newType as IntelligenceConfig['type']
-      if (newKey) {
+      if (newKey && !task.fallback_dispatch[newKey]) {
         task.fallback_dispatch[newKey] = { ...(DEFAULT_INTELLIGENCE[newType] ?? {}) } as never
       }
       return next

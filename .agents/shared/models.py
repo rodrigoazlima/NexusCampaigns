@@ -405,14 +405,37 @@ class OpenRouterApiConfig(BaseModel):
     timeout_seconds: int                  = 180
 
 
+class LmStudioConfig(BaseModel):
+    base_url:        str                  = "http://localhost:1234/v1"
+    model:           str                  = ""
+    max_tokens:      int                  = 64000
+    temperature:     float                = 0.0
+    timeout_seconds: int                  = 1800
+    system_file:     Optional[str]        = None
+    prompt_file:     Optional[str]        = None
+
+
+class CodexCliConfig(BaseModel):
+    prompt_file:     Optional[str]        = None
+    prompt:          Optional[str]        = None
+    model:           str                  = "o4-mini"
+    approval_mode:   Literal["suggest", "auto-edit", "full-auto"] = "full-auto"
+    extra_args:      list[str]            = Field(default_factory=list)
+    cwd:             Literal["project_root", "agent_dir"] = "project_root"
+    timeout_seconds: int                  = 600
+    env:             dict[str, str]       = Field(default_factory=dict)
+
+
 class AgentDispatchConfig(BaseModel):
-    type:           Literal["cli", "openai-api", "claude-api", "gemini-api", "openrouter-api", "claude-code"]
+    type:           Literal["cli", "openai-api", "claude-api", "gemini-api", "openrouter-api", "claude-code", "lm-studio", "codex-cli"]
     cli:            Optional[CliDispatchConfig]      = None
     openai_api:     Optional[OpenAIApiConfig]        = None
     claude_api:     Optional[ClaudeApiConfig]        = None
     gemini_api:     Optional[GeminiApiConfig]        = None
     openrouter_api: Optional[OpenRouterApiConfig]    = None
     claude_code:    Optional[ClaudeCodeConfig]       = None
+    lm_studio:      Optional[LmStudioConfig]         = None
+    codex_cli:      Optional[CodexCliConfig]         = None
 
 
 class TaskDispatchEntry(BaseModel):

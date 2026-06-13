@@ -28,6 +28,8 @@ _TYPE_TO_MODULE: dict[str, str] = {
     "gemini-api":     ".gemini",
     "openrouter-api": ".openrouter",
     "claude-code":    ".claude_code",
+    "lm-studio":      ".openai_compat",   # OpenAI-compatible endpoint
+    "codex-cli":      ".codex_cli",
 }
 
 _TYPE_TO_CLASS: dict[str, str] = {
@@ -37,6 +39,8 @@ _TYPE_TO_CLASS: dict[str, str] = {
     "gemini-api":     "GeminiRunner",
     "openrouter-api": "OpenRouterRunner",
     "claude-code":    "ClaudeCodeRunner",
+    "lm-studio":      "OpenAICompatRunner",
+    "codex-cli":      "CodexCliRunner",
 }
 
 

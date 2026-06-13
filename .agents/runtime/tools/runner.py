@@ -75,6 +75,8 @@ _DISPATCH_TYPE_FIELD: dict[str, str] = {
     "gemini-api":     "gemini_api",
     "openrouter-api": "openrouter_api",
     "claude-code":    "claude_code",
+    "lm-studio":      "lm_studio",
+    "codex-cli":      "codex_cli",
 }
 
 
