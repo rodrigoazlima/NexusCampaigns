@@ -18,6 +18,7 @@ import {
   Image,
   CircleDot,
   MessageSquare,
+  FileText,
 } from 'lucide-react'
 
 const nav = [
@@ -42,6 +43,7 @@ const nav = [
     group: 'OPERATIONS',
     items: [
       { href: '/agents', label: 'Agents', icon: Bot },
+      { href: '/prompt', label: 'Prompts', icon: FileText },
       { href: '/queue', label: 'Queue', icon: Inbox },
       { href: '/errors', label: 'Errors', icon: Zap },
     ],

@@ -191,7 +191,7 @@ export interface ClaudeCodeConfig {
   env?: Record<string, string>
 }
 
-export interface DispatchConfig {
+export interface IntelligenceConfig {
   type: 'cli' | 'claude-api' | 'openai-api' | 'gemini-api' | 'openrouter-api' | 'claude-code'
   cli?: CliConfig
   claude_api?: ClaudeApiConfig
@@ -204,8 +204,8 @@ export interface DispatchConfig {
 export interface TaskConfig {
   intervalSeconds: number
   description: string
-  dispatch: DispatchConfig
-  fallback_dispatch?: DispatchConfig
+  dispatch: IntelligenceConfig
+  fallback_dispatch?: IntelligenceConfig
   signal_triggers?: string[]
   emits_signals?: string[]
 }
@@ -219,4 +219,12 @@ export interface RuntimeConfig {
   intervalSec: number
   python: string
   projectRoot: string
+}
+
+export interface PromptFile {
+  path: string       // relative to .agents/, e.g. "ingestion/prompts/prompt.md"
+  agent: string      // first folder segment, e.g. "ingestion"
+  filename: string   // e.g. "prompt.md"
+  sizeBytes: number
+  modifiedAt: string // ISO timestamp
 }

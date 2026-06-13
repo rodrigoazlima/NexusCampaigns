@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { X, AlertTriangle, Loader2, CheckCircle } from 'lucide-react'
-import type { AgentConfig, RuntimeConfig, DispatchConfig } from '@/lib/types'
+import type { AgentConfig, RuntimeConfig, IntelligenceConfig } from '@/lib/types'
 
 interface AgentConfigDialogProps {
   agentName: string
@@ -13,7 +13,7 @@ interface AgentConfigDialogProps {
 
 type ConfigData = AgentConfig | RuntimeConfig
 
-const TYPE_KEY_MAP: Record<string, keyof DispatchConfig> = {
+const TYPE_KEY_MAP: Record<string, keyof IntelligenceConfig> = {
   'cli': 'cli',
   'claude-api': 'claude_api',
   'openai-api': 'openai_api',
@@ -22,7 +22,7 @@ const TYPE_KEY_MAP: Record<string, keyof DispatchConfig> = {
   'claude-code': 'claude_code',
 }
 
-const DEFAULT_DISPATCH: Record<string, Record<string, unknown>> = {
+const DEFAULT_INTELLIGENCE: Record<string, Record<string, unknown>> = {
   'cli': { command: '', args: [], cwd: 'project_root', timeout_seconds: 300, env: {} },
   'claude-api': { model: 'claude-haiku-4-5-20251001', max_tokens: 4096, temperature: 0.0, timeout_seconds: 120, max_tool_rounds: 20 },
   'openai-api': { base_url: '', model: '', max_tokens: 1024, temperature: 0.0, timeout_seconds: 120 },
@@ -420,20 +420,20 @@ export default function AgentConfigDialog({
     })
   }, [])
 
-  const updateDispatchField = useCallback((taskId: string, field: string, value: unknown) => {
+  const updateIntelligenceField = useCallback((taskId: string, field: string, value: unknown) => {
     setConfig((prev) => {
       if (!prev || isRuntimeConfig(prev)) return prev
       const next = JSON.parse(JSON.stringify(prev)) as AgentConfig
-      const dispatch = next.tasks[taskId].dispatch
-      const key = TYPE_KEY_MAP[dispatch.type]
-      if (key && dispatch[key]) {
-        (dispatch[key] as unknown as Record<string, unknown>)[field] = value
+      const intelligence = next.tasks[taskId].dispatch
+      const key = TYPE_KEY_MAP[intelligence.type]
+      if (key && intelligence[key]) {
+        (intelligence[key] as unknown as Record<string, unknown>)[field] = value
       }
       return next
     })
   }, [])
 
-  const updateDispatchType = useCallback((taskId: string, newType: string) => {
+  const updateIntelligenceType = useCallback((taskId: string, newType: string) => {
     setConfig((prev) => {
       if (!prev || isRuntimeConfig(prev)) return prev
       const next = JSON.parse(JSON.stringify(prev)) as AgentConfig
@@ -441,9 +441,9 @@ export default function AgentConfigDialog({
       const oldKey = TYPE_KEY_MAP[task.dispatch.type]
       const newKey = TYPE_KEY_MAP[newType]
       if (oldKey) delete task.dispatch[oldKey]
-      task.dispatch.type = newType as DispatchConfig['type']
+      task.dispatch.type = newType as IntelligenceConfig['type']
       if (newKey) {
-        task.dispatch[newKey] = { ...(DEFAULT_DISPATCH[newType] ?? {}) } as never
+        task.dispatch[newKey] = { ...(DEFAULT_INTELLIGENCE[newType] ?? {}) } as never
       }
       return next
     })
@@ -472,9 +472,9 @@ export default function AgentConfigDialog({
       const oldKey = TYPE_KEY_MAP[task.fallback_dispatch.type]
       const newKey = TYPE_KEY_MAP[newType]
       if (oldKey) delete task.fallback_dispatch[oldKey]
-      task.fallback_dispatch.type = newType as DispatchConfig['type']
+      task.fallback_dispatch.type = newType as IntelligenceConfig['type']
       if (newKey) {
-        task.fallback_dispatch[newKey] = { ...(DEFAULT_DISPATCH[newType] ?? {}) } as never
+        task.fallback_dispatch[newKey] = { ...(DEFAULT_INTELLIGENCE[newType] ?? {}) } as never
       }
       return next
     })
@@ -487,7 +487,7 @@ export default function AgentConfigDialog({
       if (enabled) {
         next.tasks[taskId].fallback_dispatch = {
           type: 'cli',
-          cli: { ...(DEFAULT_DISPATCH['cli'] ?? {}) } as never,
+          cli: { ...(DEFAULT_INTELLIGENCE['cli'] ?? {}) } as never,
         }
       } else {
         delete next.tasks[taskId].fallback_dispatch
@@ -550,11 +550,12 @@ export default function AgentConfigDialog({
                 <RuntimeForm config={config} onChange={updateRuntime} />
               ) : (
                 <AgentForm
+                  agentName={agentName}
                   config={config}
                   onTopLevelChange={updateTopLevel}
                   onTaskChange={updateTask}
-                  onDispatchChange={updateDispatchField}
-                  onDispatchTypeChange={updateDispatchType}
+                  onIntelligenceChange={updateIntelligenceField}
+                  onIntelligenceTypeChange={updateIntelligenceType}
                   onFallbackChange={updateFallbackField}
                   onFallbackTypeChange={updateFallbackType}
                   onFallbackToggle={toggleFallback}
@@ -675,18 +676,18 @@ const DISPATCH_OPTIONS = [
   { value: 'cli', label: 'CLI' },
 ]
 
-function DispatchFields({ dispatch, onChange }: {
-  dispatch: DispatchConfig
+function IntelligenceFields({ intelligence, onChange }: {
+  intelligence: IntelligenceConfig
   onChange: (field: string, value: unknown) => void
 }) {
-  const key = TYPE_KEY_MAP[dispatch.type]
-  const cfg = (key ? dispatch[key] : null) as Record<string, unknown> | null
+  const key = TYPE_KEY_MAP[intelligence.type]
+  const cfg = (key ? intelligence[key] : null) as Record<string, unknown> | null
   if (!cfg) return null
-  if (dispatch.type === 'claude-api') return <ClaudeApiFields cfg={cfg} onChange={onChange} />
-  if (dispatch.type === 'openai-api') return <OpenAIApiFields cfg={cfg} onChange={onChange} />
-  if (dispatch.type === 'gemini-api' || dispatch.type === 'openrouter-api') return <GeminiOrOpenRouterFields cfg={cfg} onChange={onChange} />
-  if (dispatch.type === 'cli') return <CliFields cfg={cfg} onChange={onChange} />
-  if (dispatch.type === 'claude-code') return <ClaudeCodeFields cfg={cfg} onChange={onChange} />
+  if (intelligence.type === 'claude-api') return <ClaudeApiFields cfg={cfg} onChange={onChange} />
+  if (intelligence.type === 'openai-api') return <OpenAIApiFields cfg={cfg} onChange={onChange} />
+  if (intelligence.type === 'gemini-api' || intelligence.type === 'openrouter-api') return <GeminiOrOpenRouterFields cfg={cfg} onChange={onChange} />
+  if (intelligence.type === 'cli') return <CliFields cfg={cfg} onChange={onChange} />
+  if (intelligence.type === 'claude-code') return <ClaudeCodeFields cfg={cfg} onChange={onChange} />
   return null
 }
 
@@ -695,14 +696,15 @@ function DispatchFields({ dispatch, onChange }: {
 // ---------------------------------------------------------------------------
 
 function AgentForm({
-  config, onTopLevelChange, onTaskChange, onDispatchChange, onDispatchTypeChange,
+  agentName, config, onTopLevelChange, onTaskChange, onIntelligenceChange, onIntelligenceTypeChange,
   onFallbackChange, onFallbackTypeChange, onFallbackToggle,
 }: {
+  agentName: string
   config: AgentConfig
   onTopLevelChange: (field: string, value: unknown) => void
   onTaskChange: (taskId: string, field: string, value: unknown) => void
-  onDispatchChange: (taskId: string, field: string, value: unknown) => void
-  onDispatchTypeChange: (taskId: string, newType: string) => void
+  onIntelligenceChange: (taskId: string, field: string, value: unknown) => void
+  onIntelligenceTypeChange: (taskId: string, newType: string) => void
   onFallbackChange: (taskId: string, field: string, value: unknown) => void
   onFallbackTypeChange: (taskId: string, newType: string) => void
   onFallbackToggle: (taskId: string, enabled: boolean) => void
@@ -727,11 +729,12 @@ function AgentForm({
 
       {activeEntry && (
         <TaskForm
+          agentName={agentName}
           taskId={activeEntry[0]}
           task={activeEntry[1]}
           onTaskChange={onTaskChange}
-          onDispatchChange={onDispatchChange}
-          onDispatchTypeChange={onDispatchTypeChange}
+          onIntelligenceChange={onIntelligenceChange}
+          onIntelligenceTypeChange={onIntelligenceTypeChange}
           onFallbackChange={onFallbackChange}
           onFallbackTypeChange={onFallbackTypeChange}
           onFallbackToggle={onFallbackToggle}
@@ -745,25 +748,35 @@ function AgentForm({
 // Task form — tabs: General | Dispatch | Fallback
 // ---------------------------------------------------------------------------
 
+function getIntelligencePromptFile(intelligence: IntelligenceConfig): string | null {
+  if (intelligence.type === 'claude-code') return (intelligence.claude_code as Record<string, unknown> | undefined)?.prompt_file as string ?? null
+  if (intelligence.type === 'claude-api') {
+    const c = intelligence.claude_api as Record<string, unknown> | undefined
+    return (c?.prompt_file ?? c?.system_file) as string ?? null
+  }
+  return null
+}
+
 function TaskForm({
-  taskId, task, onTaskChange, onDispatchChange, onDispatchTypeChange,
+  agentName, taskId, task, onTaskChange, onIntelligenceChange, onIntelligenceTypeChange,
   onFallbackChange, onFallbackTypeChange, onFallbackToggle,
 }: {
+  agentName: string
   taskId: string
   task: import('@/lib/types').TaskConfig
   onTaskChange: (taskId: string, field: string, value: unknown) => void
-  onDispatchChange: (taskId: string, field: string, value: unknown) => void
-  onDispatchTypeChange: (taskId: string, newType: string) => void
+  onIntelligenceChange: (taskId: string, field: string, value: unknown) => void
+  onIntelligenceTypeChange: (taskId: string, newType: string) => void
   onFallbackChange: (taskId: string, field: string, value: unknown) => void
   onFallbackTypeChange: (taskId: string, newType: string) => void
   onFallbackToggle: (taskId: string, enabled: boolean) => void
 }) {
-  const [activeTab, setActiveTab] = useState<'general' | 'dispatch' | 'fallback'>('general')
+  const [activeTab, setActiveTab] = useState<'general' | 'intelligence' | 'fallback'>('general')
   const fb = task.fallback_dispatch
 
   const tabs: TabDef[] = [
     { id: 'general', label: 'General' },
-    { id: 'dispatch', label: 'Dispatch', badge: task.dispatch.type },
+    { id: 'intelligence', label: 'Intelligence', badge: task.dispatch.type },
     { id: 'fallback', label: 'Fallback', badge: fb ? fb.type : undefined },
   ]
 
@@ -785,16 +798,30 @@ function TaskForm({
         </div>
       )}
 
-      {activeTab === 'dispatch' && (
+      {activeTab === 'intelligence' && (
         <div className="space-y-3">
           <FieldRow label="Type">
             <SelectInput
               value={task.dispatch.type}
-              onChange={(v) => onDispatchTypeChange(taskId, v)}
+              onChange={(v) => onIntelligenceTypeChange(taskId, v)}
               options={DISPATCH_OPTIONS}
             />
           </FieldRow>
-          <DispatchFields dispatch={task.dispatch} onChange={(f, v) => onDispatchChange(taskId, f, v)} />
+          <IntelligenceFields intelligence={task.dispatch} onChange={(f, v) => onIntelligenceChange(taskId, f, v)} />
+          {(() => {
+            const pf = getIntelligencePromptFile(task.dispatch)
+            if (!pf) return null
+            return (
+              <div className="flex justify-end pt-1">
+                <a
+                  href={`/prompt/edit/${agentName}/${pf}`}
+                  className="text-[10px] text-primary/70 hover:text-primary transition-colors"
+                >
+                  Open in Prompt Editor →
+                </a>
+              </div>
+            )
+          })()}
         </div>
       )}
 
@@ -803,7 +830,7 @@ function TaskForm({
           <div className="flex items-center justify-between">
             <p className="text-xs text-zinc-500">
               {fb
-                ? 'Tried automatically if primary dispatch exits non-zero.'
+                ? 'Tried automatically if primary intelligence exits non-zero.'
                 : 'No fallback configured — failed runs stay failed.'}
             </p>
             {fb ? (
@@ -831,7 +858,21 @@ function TaskForm({
                   options={DISPATCH_OPTIONS}
                 />
               </FieldRow>
-              <DispatchFields dispatch={fb} onChange={(f, v) => onFallbackChange(taskId, f, v)} />
+              <IntelligenceFields intelligence={fb} onChange={(f, v) => onFallbackChange(taskId, f, v)} />
+              {(() => {
+                const pf = getIntelligencePromptFile(fb)
+                if (!pf) return null
+                return (
+                  <div className="flex justify-end pt-1">
+                    <a
+                      href={`/prompt/edit/${agentName}/${pf}`}
+                      className="text-[10px] text-primary/70 hover:text-primary transition-colors"
+                    >
+                      Open in Prompt Editor →
+                    </a>
+                  </div>
+                )
+              })()}
             </>
           )}
         </div>
