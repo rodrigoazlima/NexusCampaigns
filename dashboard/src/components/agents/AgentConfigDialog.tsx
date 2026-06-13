@@ -475,9 +475,22 @@ interface LmStudioModelMeta {
   type: string | null
 }
 
+interface ModelInfoResult {
+  found: boolean
+  contextLength: number | null
+  arch: string | null
+  quantization: string | null
+  state: string | null
+  type: string | null
+  source: string | null
+}
+
 function LmStudioFields({ cfg, onChange }: { cfg: Record<string, unknown>; onChange: (field: string, value: unknown) => void }) {
   const [modelMetas, setModelMetas] = useState<LmStudioModelMeta[]>([])
   const [fetchStatus, setFetchStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle')
+  const [modelInfo, setModelInfo] = useState<ModelInfoResult | null>(null)
+  const [infoLoading, setInfoLoading] = useState(false)
+
   const baseUrl = (cfg.base_url as string) || 'http://localhost:1234/v1'
   const currentModel = (cfg.model as string) ?? ''
 
@@ -496,17 +509,38 @@ function LmStudioFields({ cfg, onChange }: { cfg: Record<string, unknown>; onCha
       })
   }, [baseUrl])
 
+  const fetchModelInfo = useCallback((modelId: string) => {
+    if (!modelId) { setModelInfo(null); return }
+    setInfoLoading(true)
+    fetch(
+      `/api/lm-studio/model-info?baseUrl=${encodeURIComponent(baseUrl)}&modelId=${encodeURIComponent(modelId)}`
+    )
+      .then(r => r.json())
+      .then((d: ModelInfoResult) => setModelInfo(d))
+      .catch(() => setModelInfo(null))
+      .finally(() => setInfoLoading(false))
+  }, [baseUrl])
+
   useEffect(() => { fetchModels() }, [])
+
+  // fetch model info whenever the selected model changes
+  useEffect(() => {
+    fetchModelInfo(currentModel)
+  }, [currentModel, fetchModelInfo])
 
   const modelIds = modelMetas.map(m => m.id)
   const modelOptions = modelIds.includes(currentModel) || !currentModel
     ? modelIds
     : [currentModel, ...modelIds]
 
-  const selectedMeta: LmStudioModelMeta | null =
-    modelMetas.find(m => m.id === currentModel) ?? null
-
-  const contextLength = selectedMeta?.contextLength ?? null
+  // prefer live model-info result; fall back to list metadata
+  const listMeta = modelMetas.find(m => m.id === currentModel) ?? null
+  const contextLength = modelInfo?.contextLength ?? listMeta?.contextLength ?? null
+  const arch = modelInfo?.arch ?? listMeta?.arch ?? null
+  const quantization = modelInfo?.quantization ?? listMeta?.quantization ?? null
+  const state = modelInfo?.state ?? listMeta?.state ?? null
+  const modelType = modelInfo?.type ?? listMeta?.type ?? null
+  const hasAnyInfo = contextLength != null || arch || quantization || state || modelType
 
   return (
     <div className="space-y-3">
@@ -529,23 +563,38 @@ function LmStudioFields({ cfg, onChange }: { cfg: Record<string, unknown>; onCha
             </div>
           )}
           <button
-            onClick={fetchModels}
-            disabled={fetchStatus === 'loading'}
+            onClick={() => { fetchModels(); if (currentModel) fetchModelInfo(currentModel) }}
+            disabled={fetchStatus === 'loading' || infoLoading}
             className="shrink-0 px-2 py-1 text-[11px] bg-surface-2 border border-surface-3 rounded hover:border-primary/60 text-zinc-400 hover:text-zinc-200 disabled:opacity-40 transition-colors"
             title="Refresh models"
           >
-            {fetchStatus === 'loading' ? '…' : '↻'}
+            {fetchStatus === 'loading' || infoLoading ? '…' : '↻'}
           </button>
         </div>
-        {fetchStatus === 'error' && (
+        {fetchStatus === 'error' && !currentModel && (
           <p className="text-[10px] text-red-500/70 mt-1">LM Studio not reachable — enter model ID manually</p>
         )}
       </FieldRow>
 
-      {/* Read-only model metadata — properties set at load time, cannot change via API */}
-      {selectedMeta && (contextLength || selectedMeta.arch || selectedMeta.quantization || selectedMeta.state) && (
-        <div className="rounded border border-surface-3 bg-surface-2/40 px-3 py-2.5 space-y-1.5">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-zinc-600 mb-2">Model Properties</div>
+      {/* Model properties — read-only, set at load time */}
+      {currentModel && (
+        <div className={`rounded border px-3 py-2.5 space-y-1.5 transition-opacity ${
+          infoLoading ? 'opacity-50' : 'opacity-100'
+        } ${hasAnyInfo ? 'border-surface-3 bg-surface-2/40' : 'border-surface-3/40 bg-surface-2/20'}`}>
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-600">Model Properties</span>
+            {modelInfo?.source && (
+              <span className="text-[9px] font-mono text-zinc-700">{modelInfo.source}</span>
+            )}
+          </div>
+
+          {!hasAnyInfo && !infoLoading && (
+            <p className="text-[11px] text-zinc-600">
+              {modelInfo?.found === false
+                ? 'Model not found in LM Studio — properties unavailable'
+                : 'Fetching metadata…'}
+            </p>
+          )}
 
           {contextLength != null && (
             <div className="flex items-center justify-between">
@@ -556,29 +605,36 @@ function LmStudioFields({ cfg, onChange }: { cfg: Record<string, unknown>; onCha
               <span className="text-[11px] font-mono text-zinc-300">{contextLength.toLocaleString()} tokens</span>
             </div>
           )}
-          {selectedMeta.arch && (
+          {modelType && (
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-zinc-500">Type</span>
+              <span className="text-[11px] font-mono text-zinc-400">{modelType}</span>
+            </div>
+          )}
+          {arch && (
             <div className="flex items-center justify-between">
               <span className="text-[11px] text-zinc-500">Architecture</span>
-              <span className="text-[11px] font-mono text-zinc-400">{selectedMeta.arch}</span>
+              <span className="text-[11px] font-mono text-zinc-400">{arch}</span>
             </div>
           )}
-          {selectedMeta.quantization && (
+          {quantization && (
             <div className="flex items-center justify-between">
               <span className="text-[11px] text-zinc-500">Quantization</span>
-              <span className="text-[11px] font-mono text-zinc-400">{selectedMeta.quantization}</span>
+              <span className="text-[11px] font-mono text-zinc-400">{quantization}</span>
             </div>
           )}
-          {selectedMeta.state && (
+          {state && (
             <div className="flex items-center justify-between">
               <span className="text-[11px] text-zinc-500">State</span>
               <span className={`text-[11px] font-mono ${
-                selectedMeta.state === 'loaded' ? 'text-success' : 'text-zinc-500'
-              }`}>{selectedMeta.state}</span>
+                state === 'loaded' ? 'text-success' : 'text-zinc-500'
+              }`}>{state}</span>
             </div>
           )}
-          {contextLength != null && (
-            <p className="text-[10px] text-zinc-600 border-t border-surface-3/60 pt-1.5 mt-1">
-              🔒 properties set when model loads — reload model in LM Studio to change them
+
+          {hasAnyInfo && (
+            <p className="text-[10px] text-zinc-600 border-t border-surface-3/50 pt-1.5 mt-1">
+              🔒 set when model loads in LM Studio — cannot be changed via API
             </p>
           )}
         </div>
@@ -594,7 +650,7 @@ function LmStudioFields({ cfg, onChange }: { cfg: Record<string, unknown>; onCha
         />
         {contextLength != null ? (
           <p className="text-[10px] text-zinc-600 mt-1">
-            Tokens to generate per response — context window: {contextLength.toLocaleString()}
+            Tokens to generate — context window: {contextLength.toLocaleString()}
           </p>
         ) : (
           <p className="text-[10px] text-zinc-600 mt-1">Tokens to generate per response</p>
