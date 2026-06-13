@@ -46,7 +46,7 @@ export default async function AgentsPage() {
                 <th className="px-4 py-2 text-left">Agent</th>
                 <th className="px-4 py-2 text-left">Status</th>
                 <th className="px-4 py-2 text-left">Interval</th>
-                <th className="px-4 py-2 text-left">LLM</th>
+                <th className="px-4 py-2 text-left">Intelligence</th>
                 <th className="px-4 py-2 text-left">Last Run</th>
                 <th className="px-4 py-2 text-right">Runs</th>
                 <th className="px-4 py-2 text-right">Avg Duration</th>
@@ -74,8 +74,13 @@ export default async function AgentsPage() {
                       : `${agent.intervalSeconds / 60}m`}
                   </td>
                   <td className="px-4 py-2">
-                    {agent.llm !== 'none' ? (
-                      <span className="text-primary font-mono">{agent.llm}</span>
+                    {agent.intelligence !== 'none' ? (
+                      <div>
+                        <span className="text-primary font-mono">{agent.intelligence}</span>
+                        {agent.fallbackIntelligence && (
+                          <div className="text-zinc-500 font-mono text-[10px] mt-0.5">↳ {agent.fallbackIntelligence}</div>
+                        )}
+                      </div>
                     ) : (
                       <span className="text-zinc-600">—</span>
                     )}

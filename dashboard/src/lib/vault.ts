@@ -16,6 +16,8 @@ import type {
   VaultStats,
   InboxImage,
   TokenFile,
+  AgentConfig,
+  IntelligenceConfig,
 } from './types'
 import { addSeconds } from './utils'
 
@@ -24,6 +26,7 @@ export const PROJECT_ROOT =
 export const VAULT_ROOT =
   process.env.VAULT_ROOT ?? path.join(PROJECT_ROOT, 'knowledge-base')
 
+const AGENTS_DIR = path.join(PROJECT_ROOT, '.agents')
 const STATE_DIR = path.join(PROJECT_ROOT, '.agents', 'runtime', 'state')
 const SHARED_DIR = path.join(PROJECT_ROOT, '.shared', 'state')
 const REPORTS_DIR = path.join(PROJECT_ROOT, '.agents', 'review', 'state', 'reports')
@@ -42,6 +45,18 @@ function readJson<T>(filePath: string): T | null {
   } catch {
     return null
   }
+}
+
+function intelligenceLabel(dispatch: IntelligenceConfig): string {
+  const type = dispatch.type
+  let model: string | null = null
+  if (type === 'claude-api') model = dispatch.claude_api?.model ?? null
+  else if (type === 'openai-api') model = dispatch.openai_api?.model ?? null
+  else if (type === 'gemini-api') model = dispatch.gemini_api?.model ?? null
+  else if (type === 'openrouter-api') model = dispatch.openrouter_api?.model ?? null
+  else if (type === 'codex-cli') model = dispatch.codex_cli?.model ?? null
+  else if (type === 'lm-studio') model = dispatch.lm_studio?.model ?? null
+  return model ? `${type} · ${model}` : type
 }
 
 function countFiles(dir: string): number {
@@ -282,6 +297,13 @@ export function readAgents(): AgentInfo[] {
         ? addSeconds(lastRunStr, intervalSeconds)
         : null
 
+    const agentConfig = readJson<AgentConfig>(path.join(AGENTS_DIR, key, 'agent.json'))
+    const taskConfig = agentConfig?.tasks[taskId] ?? (agentConfig ? Object.values(agentConfig.tasks)[0] : null)
+    const intelligence = taskConfig ? intelligenceLabel(taskConfig.dispatch) : (regAgent.llm ?? 'none')
+    const fallbackIntelligence = taskConfig?.fallback_dispatch
+      ? intelligenceLabel(taskConfig.fallback_dispatch)
+      : null
+
     agents.push({
       id: taskId,
       name: key,
@@ -289,6 +311,8 @@ export function readAgents(): AgentInfo[] {
       description: regAgent.description ?? '',
       intervalSeconds,
       llm: regAgent.llm ?? 'none',
+      intelligence,
+      fallbackIntelligence,
       lastRun: lastRunStr,
       nextRun,
       totalRuns,

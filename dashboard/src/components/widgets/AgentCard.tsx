@@ -88,10 +88,16 @@ export default function AgentCard({ agent }: AgentCardProps) {
                 : `${agent.intervalSeconds}s`}
             </span>
           </div>
-          {agent.llm !== 'none' && (
-            <div className="flex justify-between">
-              <span>LLM</span>
-              <span className="text-primary font-mono">{agent.llm}</span>
+          {agent.intelligence !== 'none' && (
+            <div className="flex justify-between gap-2 min-w-0">
+              <span className="shrink-0">Intelligence</span>
+              <span className="text-primary font-mono truncate text-right" title={agent.intelligence}>{agent.intelligence}</span>
+            </div>
+          )}
+          {agent.fallbackIntelligence && (
+            <div className="flex justify-between gap-2 min-w-0">
+              <span className="shrink-0 text-zinc-600">Fallback</span>
+              <span className="text-zinc-400 font-mono truncate text-right" title={agent.fallbackIntelligence}>{agent.fallbackIntelligence}</span>
             </div>
           )}
         </div>

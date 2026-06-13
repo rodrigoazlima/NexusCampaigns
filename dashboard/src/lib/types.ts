@@ -15,6 +15,8 @@ export interface AgentInfo {
   description: string
   intervalSeconds: number
   llm: string
+  intelligence: string
+  fallbackIntelligence: string | null
   lastRun: string | null
   nextRun: string | null
   totalRuns: number

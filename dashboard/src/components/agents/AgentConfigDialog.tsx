@@ -867,6 +867,36 @@ const DISPATCH_OPTIONS = [
   { value: 'cli', label: 'CLI' },
 ]
 
+function providerCompatibility(
+  providerType: string,
+  required: AgentCapability[]
+): 'ok' | 'uncertain' | 'incompatible' {
+  if (!required || required.length === 0) return 'ok'
+  const definite = PROVIDER_CAPS_DEFINITE[providerType] ?? []
+  const uncertain = PROVIDER_CAPS_UNCERTAIN[providerType] ?? []
+  let worstIsUncertain = false
+  for (const cap of required) {
+    if (!definite.includes(cap)) {
+      if (uncertain.includes(cap)) {
+        worstIsUncertain = true
+      } else {
+        return 'incompatible'
+      }
+    }
+  }
+  return worstIsUncertain ? 'uncertain' : 'ok'
+}
+
+function dispatchOptionsWithWarnings(required: AgentCapability[]): { value: string; label: string }[] {
+  return DISPATCH_OPTIONS.map((o) => {
+    const compat = providerCompatibility(o.value, required)
+    return {
+      value: o.value,
+      label: compat === 'incompatible' ? `✕ ${o.label}` : compat === 'uncertain' ? `⚠ ${o.label}` : o.label,
+    }
+  })
+}
+
 function CapabilityWarnings({ providerType, required }: { providerType: string; required: AgentCapability[] }) {
   if (!required || required.length === 0) return null
   const definite = PROVIDER_CAPS_DEFINITE[providerType] ?? []
@@ -1040,7 +1070,7 @@ function TaskForm({
             <SelectInput
               value={task.dispatch.type}
               onChange={(v) => onIntelligenceTypeChange(taskId, v)}
-              options={DISPATCH_OPTIONS}
+              options={dispatchOptionsWithWarnings(task.required_capabilities ?? [])}
             />
           </FieldRow>
           <IntelligenceFields intelligence={task.dispatch} onChange={(f, v) => onIntelligenceChange(taskId, f, v)} requiredCapabilities={task.required_capabilities} />
@@ -1091,7 +1121,7 @@ function TaskForm({
                 <SelectInput
                   value={fb.type}
                   onChange={(v) => onFallbackTypeChange(taskId, v)}
-                  options={DISPATCH_OPTIONS}
+                  options={dispatchOptionsWithWarnings(task.required_capabilities ?? [])}
                 />
               </FieldRow>
               <IntelligenceFields intelligence={fb} onChange={(f, v) => onFallbackChange(taskId, f, v)} />
