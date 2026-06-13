@@ -490,6 +490,8 @@ function LmStudioFields({ cfg, onChange }: { cfg: Record<string, unknown>; onCha
   const [fetchStatus, setFetchStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle')
   const [modelInfo, setModelInfo] = useState<ModelInfoResult | null>(null)
   const [infoLoading, setInfoLoading] = useState(false)
+  const [testState, setTestState] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle')
+  const [testReply, setTestReply] = useState<string | null>(null)
 
   const baseUrl = (cfg.base_url as string) || 'http://localhost:1234/v1'
   const currentModel = (cfg.model as string) ?? ''
@@ -508,6 +510,36 @@ function LmStudioFields({ cfg, onChange }: { cfg: Record<string, unknown>; onCha
         setFetchStatus('error')
       })
   }, [baseUrl])
+
+  const runTest = useCallback(() => {
+    if (!currentModel) return
+    setTestState('loading')
+    setTestReply(null)
+    fetch('/api/lm-studio/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        baseUrl,
+        modelId: currentModel,
+        temperature: 0,
+        maxTokens: 128,
+      }),
+    })
+      .then(r => r.json())
+      .then((d: { ok?: boolean; reply?: string; error?: string }) => {
+        if (d.ok && d.reply != null) {
+          setTestReply(d.reply)
+          setTestState('ok')
+        } else {
+          setTestReply(d.error ?? 'No reply')
+          setTestState('error')
+        }
+      })
+      .catch((e: Error) => {
+        setTestReply(e.message)
+        setTestState('error')
+      })
+  }, [baseUrl, currentModel])
 
   const fetchModelInfo = useCallback((modelId: string) => {
     if (!modelId) { setModelInfo(null); return }
@@ -640,25 +672,33 @@ function LmStudioFields({ cfg, onChange }: { cfg: Record<string, unknown>; onCha
         </div>
       )}
 
-      <FieldRow label="Max Tokens">
-        <NumberInput
-          value={cfg.max_tokens as number}
-          onChange={(v) => onChange('max_tokens', v)}
-          min={1}
-          max={contextLength ?? undefined}
-          warn={contextLength != null}
-        />
-        {contextLength != null ? (
-          <p className="text-[10px] text-zinc-600 mt-1">
-            Tokens to generate — context window: {contextLength.toLocaleString()}
-          </p>
-        ) : (
-          <p className="text-[10px] text-zinc-600 mt-1">Tokens to generate per response</p>
-        )}
-      </FieldRow>
-      <FieldRow label="Temperature">
-        <TemperatureField value={cfg.temperature as number} onChange={(v) => onChange('temperature', v)} />
-      </FieldRow>
+      {/* Connection test */}
+      {currentModel && (
+        <div className="flex items-start gap-2">
+          <button
+            onClick={runTest}
+            disabled={testState === 'loading'}
+            className={`shrink-0 px-3 py-1.5 text-[11px] font-medium rounded border transition-colors disabled:opacity-40 ${
+              testState === 'ok'
+                ? 'border-success/40 bg-success/10 text-success'
+                : testState === 'error'
+                ? 'border-danger/40 bg-danger/10 text-danger'
+                : 'border-surface-3 bg-surface-2 text-zinc-400 hover:text-zinc-200 hover:border-primary/60'
+            }`}
+          >
+            {testState === 'loading' ? '…' : testState === 'ok' ? '✓ Test' : testState === 'error' ? '✕ Test' : 'Test'}
+          </button>
+          {testReply != null && (
+            <p className={`text-[11px] font-mono leading-relaxed flex-1 ${
+              testState === 'ok' ? 'text-zinc-300' : 'text-danger/80'
+            }`}>{testReply}</p>
+          )}
+          {testState === 'loading' && (
+            <p className="text-[11px] text-zinc-600 flex-1">Sending test message…</p>
+          )}
+        </div>
+      )}
+
       <FieldRow label="Timeout (s)">
         <NumberInput value={cfg.timeout_seconds as number} onChange={(v) => onChange('timeout_seconds', v)} min={1} />
         <p className="text-[10px] text-zinc-600 mt-1">= {intervalLabel(cfg.timeout_seconds as number)}</p>
