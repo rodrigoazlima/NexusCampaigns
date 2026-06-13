@@ -48,7 +48,7 @@ A clean run produces `--- START ---` and `--- DONE ---` in
 | Property | Value |
 |----------|-------|
 | **Name** | `vault-knowledge-factory` |
-| **Display name** | Vault Knowledge Factory |
+| **Display name** | Vault Nexus Campaigns |
 | **Description** | DM pipeline — ingests, classifies, and links vault entities on schedule |
 | **Entry command** | `python <project_root>/.agents/runtime/tools/runner.py` |
 | **Working directory** | `<project_root>` (repo root, not `.agents/`) |
@@ -96,7 +96,7 @@ nssm install vault-knowledge-factory python
 nssm set vault-knowledge-factory AppParameters ^
     "<project_root>\.agents\runtime\tools\runner.py"
 nssm set vault-knowledge-factory AppDirectory "<project_root>"
-nssm set vault-knowledge-factory DisplayName "Vault Knowledge Factory"
+nssm set vault-knowledge-factory DisplayName "Vault Nexus Campaigns"
 nssm set vault-knowledge-factory Description ^
     "DM pipeline - ingests, classifies, and links vault entities on schedule"
 nssm set vault-knowledge-factory Start SERVICE_AUTO_START
@@ -146,7 +146,7 @@ Create `/etc/systemd/system/vault-knowledge-factory.service`:
 
 ```ini
 [Unit]
-Description=Vault Knowledge Factory
+Description=Vault Nexus Campaigns
 After=network.target
 Wants=network.target
 

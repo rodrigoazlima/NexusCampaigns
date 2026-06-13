@@ -1,6 +1,6 @@
 # Agent Architecture
 
-This directory is the agent layer of the DM Knowledge Factory. Each subdirectory is an autonomous agent with clear ownership of tools, state, and responsibilities.
+This directory is the agent layer of the Nexus Campaigns. Each subdirectory is an autonomous agent with clear ownership of tools, state, and responsibilities.
 
 ---
 

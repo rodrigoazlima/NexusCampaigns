@@ -1,8 +1,8 @@
-# Claude Code — DM Knowledge Factory
+# Claude Code — Nexus Campaigns
 
 ## Vault Purpose
 
-Dungeon Master knowledge factory. Transforms raw inspiration into reusable campaign assets via AI processing + human review.
+Dungeon Master Nexus Campaigns. Transforms raw inspiration into reusable campaign assets via AI processing + human review.
 
 Root: `knowledge-base`
 

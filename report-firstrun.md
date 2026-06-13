@@ -1,4 +1,4 @@
-# Vault Knowledge Factory — First Run Report
+# Vault Nexus Campaigns — First Run Report
 
 **Date:** 2026-06-12  
 **Monitor window:** 03:34:29 → 03:44:35 (local, UTC-3) — 10 minutes  

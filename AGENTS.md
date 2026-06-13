@@ -6,7 +6,7 @@ Every agent reads this file before making changes to the repository.
 
 ## Purpose
 
-This repository is a **Dungeon Master Knowledge Factory**.
+This repository is a **Dungeon Master Nexus Campaigns**.
 
 Goal: transform raw inspiration into reusable campaign assets via AI processing + human review.
 

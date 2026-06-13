@@ -1,4 +1,4 @@
-# DM Knowledge Factory Dashboard — Product Specification
+# Nexus Campaigns Dashboard — Product Specification
 
 ## 1. Purpose
 
@@ -25,7 +25,7 @@ and knowledge-base analytics over an Obsidian vault.
 ## 3. Navigation
 
 ```
-🐉 Knowledge Factory
+🐉 Nexus Campaigns
 ──────────────────────
 OVERVIEW
   ⬡  Executive

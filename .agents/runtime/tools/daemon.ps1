@@ -1,4 +1,4 @@
-# Vault Knowledge Factory daemon — calls runner.py every $IntervalSec seconds.
+# Vault Nexus Campaigns daemon — calls runner.py every $IntervalSec seconds.
 #
 # Auth strategy (priority order):
 #   1. ANTHROPIC_API_KEY already in environment (permanent API key — preferred)

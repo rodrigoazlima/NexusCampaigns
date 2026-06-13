@@ -1,6 +1,6 @@
-# NexusCampaigns — Vault Knowledge Factory
+# NexusCampaigns — Vault Nexus Campaigns
 
-AI-powered knowledge factory that transforms raw campaign inspiration (images, documents, notes) into reusable, linked, quality-gated knowledge assets for Dungeon Masters.
+AI-powered Nexus Campaigns that transforms raw campaign inspiration (images, documents, notes) into reusable, linked, quality-gated knowledge assets for Dungeon Masters.
 
 **Vault root:** `knowledge-base/`  
 **Version:** 1.0 · **Date:** 2026-06-09

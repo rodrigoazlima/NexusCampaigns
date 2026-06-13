@@ -1,4 +1,4 @@
-# Software Design Document — Pathway DM Knowledge Factory
+# Software Design Document — Pathway Nexus Campaigns
 
 **Version:** 1.3  
 **Date:** 2026-06-10  

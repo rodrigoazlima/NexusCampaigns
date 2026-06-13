@@ -1,5 +1,5 @@
 [Unit]
-Description=Vault Knowledge Factory
+Description=Vault Nexus Campaigns
 After=network.target
 Wants=network.target
 

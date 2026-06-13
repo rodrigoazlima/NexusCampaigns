@@ -1,6 +1,6 @@
-# DM Knowledge Factory — Dashboard Product Specification
+# Nexus Campaigns — Dashboard Product Specification
 
-**Version:** 1.0
+**Version:** 1.1
 **Date:** 2026-06-13
 **Supersedes:** `docs/dashboard-legacy.spec.md`
 **Implementation:** See `docs/admin-dashboard.spec.md`
@@ -20,22 +20,41 @@ and knowledge-base analytics over an Obsidian vault.
 
 ## 2. Pages
 
+### Read-only monitoring
+
 | Route | Page | One-liner |
 |-------|------|-----------|
 | `/` | Executive Dashboard | Factory state in 30 seconds |
 | `/pipeline` | Pipeline | Stage flow, counts, folder ownership |
 | `/queue` | Queue | inbox-queue state, stuck items |
-| `/review` | Human Review | 01-Processing drafts, promotion workflow |
+| `/review` | Human Review | 01-Processing drafts list (read-only) |
 | `/agents` | Agent Monitoring | Per-agent health, schedule, live log |
 | `/library` | Library Analytics | 02-Library stats, type breakdown, quality |
 | `/errors` | Error Monitoring | Grouped errors from log + daily report |
+
+### Game Master write interface
+
+| Route | Page | One-liner |
+|-------|------|-----------|
+| `/gm` | GM Hub | Pending count, recent actions, quick links |
+| `/gm/review` | GM Review | Card view: approve / reject / flag / edit |
+| `/gm/inbox` | GM Inbox | Image gallery with queue status per agent |
+| `/gm/tokens` | GM Tokens | Token gallery with frame switcher |
+| `/gm/chat` | Agent Chat | Freeform instructions to lore/wiki/vision agents |
 
 ---
 
 ## 3. Navigation
 
 ```
-🐉 Knowledge Factory
+🐉 Nexus Campaigns
+──────────────────────
+GAME MASTER
+  🎲  GM Hub        /gm
+  ✅  Review        /gm/review
+  🖼  Inbox         /gm/inbox
+  ⭕  Tokens        /gm/tokens
+  💬  Agent Chat    /gm/chat
 ──────────────────────
 OVERVIEW
   ⬡  Executive
@@ -209,33 +228,38 @@ Sidebar shows "Live · 30s refresh" indicator.
 
 ### Phase 1 — MVP (complete)
 
-- [x] Next.js 15 App Router scaffold (TypeScript, Tailwind, IBM Plex Sans)
+- [x] Next.js 16 App Router scaffold (TypeScript, Tailwind, IBM Plex Sans)
 - [x] Design system tokens + dark theme
-- [x] Sidebar navigation (7 sections)
-- [x] All 7 pages (Executive, Pipeline, Queue, Review, Agents, Library, Errors)
-- [x] All 7 API routes
+- [x] Mobile-responsive sidebar (hamburger + drawer on mobile)
+- [x] All 7 read-only pages (Executive, Pipeline, Queue, Review, Agents, Library, Errors)
+- [x] All 7 read-only API routes
 - [x] Vault filesystem reader + frontmatter parser + log parser
 
-### Phase 2 — Automation & Analytics
+### Phase 2 — Game Master Write Interface (complete)
+
+- [x] 5 GM pages: Hub, Review, Inbox, Tokens, Chat
+- [x] 7 GM API routes under `/api/gm/` (inbox, tokens, approve, reject, flag, edit, chat)
+- [x] Approve action: frontmatter merge + promotion to `02-Library/`
+- [x] Reject action: sets `status:rejected, quality:1`
+- [x] Flag action: sets `needs_reprocessing:true`
+- [x] Agent chat: reads agent system prompt, calls Anthropic API
+- [x] Image serving via `/api/image` for vault PNG files
+- [x] GM components: ImageModal, QualityPicker, GMActionBar, InboxImageCard, TokenCard, ReviewCard, ChatMessage
+
+### Phase 3 — Automation & Analytics
 
 - [ ] Client-side 30s auto-refresh (`AutoRefresh` component)
 - [ ] Campaign Dashboard `/campaigns` — reads `03-Campaigns/`
 - [ ] Knowledge Graph `/graph` — React Flow + `02-Library/` relationship data
 - [ ] Full-text search across all entities
-- [ ] Inline review actions (approve/reject via API writing vault frontmatter)
+- [ ] Bulk approve (all drafts with quality ≥ 7)
+- [ ] Growth trend charts — Recharts LineChart, daily snapshot series
 
-### Phase 3 — Live & Rich
+### Phase 4 — Live & Team
 
 - [ ] WebSocket live updates via `chokidar` file watcher
-- [ ] Growth trend charts — Recharts LineChart, daily snapshot series
 - [ ] Browser notifications for new errors or stuck items
-- [ ] Scenario management UI (edit `scenarios.json`)
-- [ ] Token gallery (`05-Assets/tokens/`)
-
-### Phase 4 — Team & Export
-
 - [ ] Auth (local Passkey or API key)
-- [ ] Bulk approve (all drafts with quality ≥ 7)
 - [ ] Export to PDF / HTML for session prep
 - [ ] Campaign session notes integration
 

@@ -41,7 +41,7 @@ Analyze the provided Python script and extract all relevant configuration settin
 **Script to analyze:**
 
 # shared\models.py
-"""Data contracts for the Vault Knowledge Factory pipeline.
+"""Data contracts for the Vault Nexus Campaigns pipeline.
 
 Pydantic v2 models only — no logic, no I/O, no side effects.
 All validation is declarative (field constraints + allowed enums).

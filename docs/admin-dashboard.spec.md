@@ -1,6 +1,6 @@
 # Admin Dashboard — Implementation Spec
 
-**Version:** 2.0  
+**Version:** 2.1  
 **Date:** 2026-06-13  
 **Supersedes:** `.system/dashboard-legacy/SPEC.md` (stale paths)  
 **Augments:** `docs/dashboard.SPEC.md` (product spec, still valid for pages/components/design)
@@ -9,7 +9,7 @@
 
 ## Purpose
 
-Next.js dashboard for the DM Knowledge Factory. Reads live vault and agent state from the filesystem. No database — vault is the single source of truth.
+Next.js dashboard for the Nexus Campaigns. Reads live vault and agent state from the filesystem. No database — vault is the single source of truth.
 
 **Location:** `dashboard/` (project root)  
 **Run:** `cd dashboard && npm run dev` → http://localhost:3131
@@ -20,7 +20,7 @@ Next.js dashboard for the DM Knowledge Factory. Reads live vault and agent state
 
 | Tool | Version | Role |
 |------|---------|------|
-| Next.js | 15 App Router | SSR, API routes, `force-dynamic` |
+| Next.js | 16 App Router | SSR, API routes, `force-dynamic` |
 | TypeScript | 5 | Type safety for vault data shapes |
 | Tailwind CSS | 3 | Design tokens, dark theme |
 | IBM Plex Sans / Mono | — | Operations-center typography |
@@ -62,6 +62,7 @@ All paths relative to `PROJECT_ROOT` (`C:\opt\GitHub\NexusCampaigns`).
 ```
 VAULT_ROOT=C:\opt\GitHub\NexusCampaigns\knowledge-base
 PROJECT_ROOT=C:\opt\GitHub\NexusCampaigns
+ANTHROPIC_API_KEY=           # required for /gm/chat agent chat feature
 ```
 
 ---
@@ -107,21 +108,35 @@ Planned agents (7): relationship, deduplication, canon, curator, search, adventu
 
 ## Pages & Data Sources
 
+### Read-only monitoring
+
 | Route | Page | Key Data Sources |
 |-------|------|-----------------|
 | `/` | Executive Dashboard | vault folder counts, inbox-queue.json, agent-metrics.json, logs tail, reports |
 | `/pipeline` | Pipeline | vault folder counts, processed-images.json, 01-Processing/ frontmatter |
 | `/queue` | Queue | inbox-queue.json |
-| `/review` | Human Review | 01-Processing/*.md frontmatter, processed-images.json, generated-tokens.json |
+| `/review` | Human Review | 01-Processing/*.md frontmatter |
 | `/agents` | Agent Monitoring | registry.yaml, tasks-state.json, agent-metrics.json, automation.log |
 | `/library` | Library Analytics | 02-Library/**/*.md frontmatter |
 | `/errors` | Error Monitoring | automation.log, reports/report-*.json |
+
+### Game Master write interface
+
+| Route | Page | Key Data Sources |
+|-------|------|-----------------|
+| `/gm` | GM Hub | 01-Processing/ counts, recent log events |
+| `/gm/review` | GM Review | 01-Processing/*.md frontmatter (read+write) |
+| `/gm/inbox` | GM Inbox | 00-Inbox/images/, inbox-queue.json |
+| `/gm/tokens` | GM Tokens | 05-Assets/tokens/, 00-Inbox/images/, 00-Inbox/tokens/ |
+| `/gm/chat` | Agent Chat | .agents/{name}/prompts/system.md, Anthropic API |
 
 ---
 
 ## API Routes
 
 All use `export const dynamic = 'force-dynamic'`.
+
+### Read-only
 
 | Method | Route | Returns |
 |--------|-------|---------|
@@ -133,11 +148,25 @@ All use `export const dynamic = 'force-dynamic'`.
 | GET | `/api/logs?limit&severity&task` | LogLine[] |
 | GET | `/api/reports/latest` | DailyReport |
 | GET | `/api/reports/all` | Record<string, DailyReport> |
-| GET | `/api/image?path=` | Binary image |
+| GET | `/api/image?path=` | Binary image (serves vault PNG/JPG) |
+
+### GM write interface
+
+| Method | Route | Body | Action |
+|--------|-------|------|--------|
+| GET | `/api/gm/inbox` | — | InboxImage[] |
+| GET | `/api/gm/tokens` | — | TokenFile[] |
+| POST | `/api/gm/approve` | `{filename, quality}` | Merge frontmatter, copy to 02-Library/ |
+| POST | `/api/gm/reject` | `{filename}` | Set status:rejected, quality:1 |
+| POST | `/api/gm/flag` | `{filename}` | Set needs_reprocessing:true |
+| POST | `/api/gm/edit` | `{filename, fields}` | Merge arbitrary frontmatter fields |
+| POST | `/api/gm/chat` | `{message, agent, context}` | Call Anthropic API, return assistant reply |
 
 ---
 
-## Components (implemented in legacy, unchanged)
+## Components
+
+### Shared widgets
 
 | Component | File | Purpose |
 |-----------|------|---------|
@@ -145,8 +174,20 @@ All use `export const dynamic = 'force-dynamic'`.
 | `AgentCard` | `components/widgets/AgentCard.tsx` | Agent status dot + run stats |
 | `ActivityFeed` | `components/widgets/ActivityFeed.tsx` | Log viewer with severity coloring |
 | `PageHeader` | `components/widgets/PageHeader.tsx` | Icon + title + subtitle |
-| `Sidebar` | `components/layout/Sidebar.tsx` | 7-section nav + live indicator |
+| `Sidebar` | `components/layout/Sidebar.tsx` | Nav (GM + monitoring sections) + live indicator |
 | `AutoRefresh` | `components/AutoRefresh.tsx` | 30s client-side refresh |
+
+### GM components
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| `ImageModal` | `components/gm/ImageModal.tsx` | Full-screen image overlay |
+| `QualityPicker` | `components/gm/QualityPicker.tsx` | 1–10 button grid, color-zoned |
+| `GMActionBar` | `components/gm/GMActionBar.tsx` | Approve / Reject / Flag / Edit buttons |
+| `InboxImageCard` | `components/gm/InboxImageCard.tsx` | Thumbnail + agent slot badges + queue age |
+| `TokenCard` | `components/gm/TokenCard.tsx` | Token PNG + frame switcher |
+| `ReviewCard` | `components/gm/ReviewCard.tsx` | Draft card with image, actions, frontmatter |
+| `ChatMessage` | `components/gm/ChatMessage.tsx` | Chat bubble with role styling |
 
 ---
 
@@ -164,10 +205,11 @@ Quality: 1-3→danger, 4-6→warning, 7-10→success
 
 ---
 
-## Phase 2 Backlog
+## Phase 3 Backlog
 
 - [ ] Client-side 30s auto-refresh via `AutoRefresh` component (already built)
 - [ ] Knowledge Graph `/graph` — ReactFlow, 02-Library relationship edges
 - [ ] Growth trend charts — Recharts LineChart, daily snapshot data
 - [ ] Campaign Dashboard `/campaigns` — 03-Campaigns/ content
-- [ ] Inline review actions (approve/reject writing to vault frontmatter)
+- [ ] Bulk approve (all drafts with quality ≥ 7 in one click)
+- [ ] WebSocket live updates via `chokidar` file watcher

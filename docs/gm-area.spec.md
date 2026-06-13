@@ -8,7 +8,7 @@
 
 ## 1. Purpose
 
-The Game Master Area is the human-in-the-loop interface of the DM Knowledge Factory. It gives the GM direct control over the AI pipeline: reviewing AI-generated content, approving or rejecting drafts, managing images and tokens, and sending custom instructions to agents.
+The Game Master Area is the human-in-the-loop interface of the Nexus Campaigns. It gives the GM direct control over the AI pipeline: reviewing AI-generated content, approving or rejecting drafts, managing images and tokens, and sending custom instructions to agents.
 
 The existing dashboard pages are read-only monitoring tools. The GM Area adds **write operations**: approval, rejection, flagging, field editing, and agent chat.
 

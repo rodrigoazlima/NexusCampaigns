@@ -1,7 +1,7 @@
 # Agentic Evolution Plan — Overview
 
 **Source:** `docs/agentic-review.md` + Claude-generated analysis (2026-06-10)  
-**Scope:** Transform NexusCampaigns from a scheduled batch pipeline into a self-improving, semi-autonomous knowledge factory.
+**Scope:** Transform NexusCampaigns from a scheduled batch pipeline into a self-improving, semi-autonomous Nexus Campaigns.
 
 ---
 

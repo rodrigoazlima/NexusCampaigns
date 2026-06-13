@@ -657,7 +657,7 @@ class Runtime(IOrchestrator):
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Vault Knowledge Factory — agent runtime",
+        description="Vault Nexus Campaigns — agent runtime",
     )
     parser.add_argument("--once", action="store_true", help="Run one scheduling cycle then exit")
     parser.add_argument("--task", metavar="TASK_ID", default=None, help="Run only this specific task")

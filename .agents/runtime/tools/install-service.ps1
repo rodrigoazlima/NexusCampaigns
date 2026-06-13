@@ -33,7 +33,7 @@ if ($LASTEXITCODE -ne 0) {
 nssm install $SvcName $Python
 nssm set $SvcName AppParameters "`"$Runner`""
 nssm set $SvcName AppDirectory $ProjectRoot
-nssm set $SvcName DisplayName "Vault Knowledge Factory"
+nssm set $SvcName DisplayName "Vault Nexus Campaigns"
 nssm set $SvcName Description "DM pipeline - ingests, classifies, and links vault entities on schedule"
 nssm set $SvcName Start SERVICE_AUTO_START
 nssm set $SvcName AppRestartDelay 30000

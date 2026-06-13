@@ -1,4 +1,4 @@
-# setup-service.ps1 — Install Vault Knowledge Factory as a Windows service
+# setup-service.ps1 — Install Vault Nexus Campaigns as a Windows service
 #
 # Supported methods (auto-detected):
 #   nssm      — NSSM service manager (requires Admin; recommended for production)
@@ -34,7 +34,7 @@ $ErrorActionPreference = "Stop"
 
 $ServiceName  = "vault-knowledge-factory"
 $TaskName     = "VaultKnowledgeFactory"
-$DisplayName  = "Vault Knowledge Factory"
+$DisplayName  = "Vault Nexus Campaigns"
 $Description  = "DM pipeline: ingests, classifies, and links vault entities on schedule"
 $DaemonScript = "$ProjectRoot\.agents\runtime\tools\daemon.ps1"
 $RunnerScript = "$ProjectRoot\.agents\runtime\tools\runner.py"
@@ -171,7 +171,7 @@ if ($Uninstall) {
 # Pre-flight checks
 # ---------------------------------------------------------------------------
 
-Log "=== Vault Knowledge Factory — Service Setup ==="
+Log "=== Vault Nexus Campaigns — Service Setup ==="
 Log "ProjectRoot : $ProjectRoot"
 Log "Python      : $Python"
 
