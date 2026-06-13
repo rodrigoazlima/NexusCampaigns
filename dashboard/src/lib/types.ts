@@ -202,8 +202,18 @@ export interface CodexCliConfig {
   env?: Record<string, string>
 }
 
+export interface LmStudioConfig {
+  base_url?: string
+  model?: string
+  max_tokens?: number
+  temperature?: number
+  timeout_seconds?: number
+  system_file?: string | null
+  prompt_file?: string | null
+}
+
 export interface IntelligenceConfig {
-  type: 'cli' | 'claude-api' | 'openai-api' | 'gemini-api' | 'openrouter-api' | 'claude-code' | 'codex-cli'
+  type: 'cli' | 'claude-api' | 'openai-api' | 'gemini-api' | 'openrouter-api' | 'claude-code' | 'codex-cli' | 'lm-studio'
   cli?: CliConfig
   claude_api?: ClaudeApiConfig
   openai_api?: OpenAIApiConfig
@@ -211,6 +221,7 @@ export interface IntelligenceConfig {
   openrouter_api?: OpenRouterApiConfig
   claude_code?: ClaudeCodeConfig
   codex_cli?: CodexCliConfig
+  lm_studio?: LmStudioConfig
 }
 
 export interface TaskConfig {

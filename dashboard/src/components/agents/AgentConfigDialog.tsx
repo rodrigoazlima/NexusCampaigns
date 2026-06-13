@@ -20,6 +20,8 @@ const TYPE_KEY_MAP: Record<string, keyof IntelligenceConfig> = {
   'gemini-api': 'gemini_api',
   'openrouter-api': 'openrouter_api',
   'claude-code': 'claude_code',
+  'codex-cli': 'codex_cli',
+  'lm-studio': 'lm_studio',
 }
 
 const DEFAULT_INTELLIGENCE: Record<string, Record<string, unknown>> = {
@@ -29,6 +31,8 @@ const DEFAULT_INTELLIGENCE: Record<string, Record<string, unknown>> = {
   'gemini-api': { model: '', max_tokens: 2048, temperature: 0.0, timeout_seconds: 120 },
   'openrouter-api': { model: '', max_tokens: 4096, temperature: 0.0, timeout_seconds: 180 },
   'claude-code': { prompt_file: 'prompts/prompt.md', prompt: null, extra_args: ['--dangerously-skip-permissions'], cwd: 'project_root', timeout_seconds: 600, env: {} },
+  'codex-cli': { prompt_file: 'prompts/prompt.md', prompt: null, model: 'o4-mini', approval_mode: 'full-auto', extra_args: [], cwd: 'project_root', timeout_seconds: 600, env: {} },
+  'lm-studio': { base_url: 'http://localhost:1234/v1', model: '', max_tokens: 4096, temperature: 0.0, timeout_seconds: 120, system_file: null, prompt_file: null },
 }
 
 function intervalLabel(s: number): string {
@@ -352,6 +356,163 @@ function ClaudeCodeFields({ cfg, onChange }: { cfg: Record<string, unknown>; onC
   )
 }
 
+function CodexCliFields({ cfg, onChange }: { cfg: Record<string, unknown>; onChange: (field: string, value: unknown) => void }) {
+  const extraArgsText = Array.isArray(cfg.extra_args) ? (cfg.extra_args as string[]).join('\n') : ''
+  const envText = cfg.env ? JSON.stringify(cfg.env, null, 2) : '{}'
+
+  return (
+    <div className="space-y-3">
+      <FieldRow label="Prompt File">
+        <TextInput
+          value={(cfg.prompt_file as string) ?? ''}
+          onChange={(v) => onChange('prompt_file', v || null)}
+          placeholder="prompts/prompt.md"
+          mono
+        />
+        <p className="text-[10px] text-zinc-600 mt-1">Path relative to agent dir</p>
+      </FieldRow>
+      <FieldRow label="Inline Prompt">
+        <TextareaInput
+          value={(cfg.prompt as string) ?? ''}
+          onChange={(v) => onChange('prompt', v || null)}
+          rows={4}
+          mono
+        />
+        <p className="text-[10px] text-zinc-600 mt-1">Used only when prompt_file is empty</p>
+      </FieldRow>
+      <FieldRow label="Model">
+        <TextInput
+          value={(cfg.model as string) ?? 'o4-mini'}
+          onChange={(v) => onChange('model', v)}
+          placeholder="o4-mini"
+          mono
+        />
+      </FieldRow>
+      <FieldRow label="Approval Mode">
+        <SelectInput
+          value={(cfg.approval_mode as string) ?? 'full-auto'}
+          onChange={(v) => onChange('approval_mode', v)}
+          options={[
+            { value: 'suggest', label: 'Suggest' },
+            { value: 'auto-edit', label: 'Auto Edit' },
+            { value: 'full-auto', label: 'Full Auto' },
+          ]}
+        />
+      </FieldRow>
+      <FieldRow label="Extra Args">
+        <TextareaInput
+          value={extraArgsText}
+          onChange={(v) => onChange('extra_args', v.split('\n').filter(Boolean))}
+          rows={3}
+          mono
+        />
+        <p className="text-[10px] text-zinc-600 mt-1">One arg per line</p>
+      </FieldRow>
+      <FieldRow label="CWD">
+        <SelectInput
+          value={(cfg.cwd as string) ?? 'project_root'}
+          onChange={(v) => onChange('cwd', v)}
+          options={[
+            { value: 'project_root', label: 'Project Root' },
+            { value: 'agent_dir', label: 'Agent Dir' },
+          ]}
+        />
+      </FieldRow>
+      <FieldRow label="Timeout (s)">
+        <NumberInput value={cfg.timeout_seconds as number} onChange={(v) => onChange('timeout_seconds', v)} min={1} />
+      </FieldRow>
+      <FieldRow label="Env Vars">
+        <TextareaInput
+          value={envText}
+          onChange={(v) => {
+            try { onChange('env', JSON.parse(v)) } catch { /* ignore invalid JSON */ }
+          }}
+          rows={3}
+          mono
+        />
+        <p className="text-[10px] text-zinc-600 mt-1">JSON object of env vars</p>
+      </FieldRow>
+    </div>
+  )
+}
+
+function LmStudioFields({ cfg, onChange }: { cfg: Record<string, unknown>; onChange: (field: string, value: unknown) => void }) {
+  const [models, setModels] = useState<string[]>([])
+  const [fetchStatus, setFetchStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle')
+  const baseUrl = (cfg.base_url as string) || 'http://localhost:1234/v1'
+
+  const fetchModels = useCallback(() => {
+    setFetchStatus('loading')
+    fetch(`${baseUrl}/models`)
+      .then(r => r.json())
+      .then((d: { data?: { id: string }[] }) => {
+        const ids = (d.data ?? []).map(m => m.id)
+        setModels(ids)
+        setFetchStatus(ids.length > 0 ? 'ok' : 'error')
+      })
+      .catch(() => {
+        setModels([])
+        setFetchStatus('error')
+      })
+  }, [baseUrl])
+
+  useEffect(() => { fetchModels() }, [])
+
+  const currentModel = (cfg.model as string) ?? ''
+  const modelOptions = models.includes(currentModel) || !currentModel
+    ? models
+    : [currentModel, ...models]
+
+  return (
+    <div className="space-y-3">
+      <FieldRow label="Base URL">
+        <TextInput value={baseUrl} onChange={(v) => onChange('base_url', v)} mono />
+      </FieldRow>
+      <FieldRow label="Model">
+        <div className="flex gap-2">
+          {fetchStatus === 'ok' && modelOptions.length > 0 ? (
+            <div className="flex-1">
+              <SelectInput
+                value={currentModel}
+                onChange={(v) => onChange('model', v)}
+                options={modelOptions.map(m => ({ value: m, label: m }))}
+              />
+            </div>
+          ) : (
+            <div className="flex-1">
+              <TextInput value={currentModel} onChange={(v) => onChange('model', v)} mono placeholder="model-id" />
+            </div>
+          )}
+          <button
+            onClick={fetchModels}
+            disabled={fetchStatus === 'loading'}
+            className="shrink-0 px-2 py-1 text-[11px] bg-surface-2 border border-surface-3 rounded hover:border-primary/60 text-zinc-400 hover:text-zinc-200 disabled:opacity-40 transition-colors"
+            title="Refresh models"
+          >
+            {fetchStatus === 'loading' ? '…' : '↻'}
+          </button>
+        </div>
+        {fetchStatus === 'error' && <p className="text-[10px] text-red-500/70 mt-1">LM Studio not reachable — enter model ID manually</p>}
+      </FieldRow>
+      <FieldRow label="Max Tokens">
+        <NumberInput value={cfg.max_tokens as number} onChange={(v) => onChange('max_tokens', v)} min={1} />
+      </FieldRow>
+      <FieldRow label="Temperature">
+        <TemperatureField value={cfg.temperature as number} onChange={(v) => onChange('temperature', v)} />
+      </FieldRow>
+      <FieldRow label="Timeout (s)">
+        <NumberInput value={cfg.timeout_seconds as number} onChange={(v) => onChange('timeout_seconds', v)} min={1} />
+      </FieldRow>
+      <FieldRow label="System File">
+        <TextInput value={(cfg.system_file as string) ?? ''} onChange={(v) => onChange('system_file', v || null)} mono />
+      </FieldRow>
+      <FieldRow label="Prompt File">
+        <TextInput value={(cfg.prompt_file as string) ?? ''} onChange={(v) => onChange('prompt_file', v || null)} mono />
+      </FieldRow>
+    </div>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Main dialog
 // ---------------------------------------------------------------------------
@@ -670,6 +831,8 @@ function Tabs({ tabs, active, onChange }: {
 const DISPATCH_OPTIONS = [
   { value: 'claude-api', label: 'Claude API' },
   { value: 'claude-code', label: 'Claude Code CLI' },
+  { value: 'codex-cli', label: 'Codex CLI' },
+  { value: 'lm-studio', label: 'LM Studio' },
   { value: 'openai-api', label: 'OpenAI API' },
   { value: 'gemini-api', label: 'Gemini API' },
   { value: 'openrouter-api', label: 'OpenRouter API' },
@@ -688,6 +851,8 @@ function IntelligenceFields({ intelligence, onChange }: {
   if (intelligence.type === 'gemini-api' || intelligence.type === 'openrouter-api') return <GeminiOrOpenRouterFields cfg={cfg} onChange={onChange} />
   if (intelligence.type === 'cli') return <CliFields cfg={cfg} onChange={onChange} />
   if (intelligence.type === 'claude-code') return <ClaudeCodeFields cfg={cfg} onChange={onChange} />
+  if (intelligence.type === 'codex-cli') return <CodexCliFields cfg={cfg} onChange={onChange} />
+  if (intelligence.type === 'lm-studio') return <LmStudioFields cfg={cfg} onChange={onChange} />
   return null
 }
 
