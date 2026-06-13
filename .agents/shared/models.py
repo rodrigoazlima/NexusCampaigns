@@ -355,6 +355,16 @@ class CliDispatchConfig(BaseModel):
     env:             dict[str, str]       = Field(default_factory=dict)
 
 
+class ClaudeCodeConfig(BaseModel):
+    prompt_file:                  Optional[str]  = None    # relative to agent_dir
+    prompt:                       Optional[str]  = None    # inline prompt (alt to file)
+    extra_args:                   list[str]      = Field(default_factory=list)
+    dangerously_skip_permissions: bool           = True
+    cwd:                          Literal["project_root", "agent_dir"] = "project_root"
+    timeout_seconds:              int            = 600
+    env:                          dict[str, str] = Field(default_factory=dict)
+
+
 class OpenAIApiConfig(BaseModel):
     base_url:        str
     model:           str
@@ -397,12 +407,13 @@ class OpenRouterApiConfig(BaseModel):
 
 
 class AgentDispatchConfig(BaseModel):
-    type:           Literal["cli", "openai-api", "claude-api", "gemini-api", "openrouter-api"]
+    type:           Literal["cli", "openai-api", "claude-api", "gemini-api", "openrouter-api", "claude-code"]
     cli:            Optional[CliDispatchConfig]      = None
     openai_api:     Optional[OpenAIApiConfig]        = None
     claude_api:     Optional[ClaudeApiConfig]        = None
     gemini_api:     Optional[GeminiApiConfig]        = None
     openrouter_api: Optional[OpenRouterApiConfig]    = None
+    claude_code:    Optional[ClaudeCodeConfig]       = None
 
 
 class TaskDispatchEntry(BaseModel):

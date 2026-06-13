@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import { execSync } from 'child_process'
 import matter from 'gray-matter'
 import { parse as parseYaml } from 'yaml'
 import type {
@@ -191,6 +192,35 @@ interface Registry {
   agents: Record<string, RegistryAgent>
 }
 
+const RUNTIME_SERVICE_NAME = 'vault-knowledge-factory'
+const LOCK_STALE_SECONDS = 1800
+
+function readRuntimeStatus(): AgentStatus {
+  // Active cycle: lock file exists and is not stale
+  try {
+    const lockPath = path.join(STATE_DIR, 'runner.lock')
+    const data = JSON.parse(fs.readFileSync(lockPath, 'utf-8'))
+    const ageSeconds = (Date.now() - new Date(data.startedAt).getTime()) / 1000
+    if (ageSeconds < LOCK_STALE_SECONDS) return 'running'
+  } catch {
+    // no lock file — normal between cycles
+  }
+
+  // Windows service check
+  try {
+    const out = execSync(`sc query ${RUNTIME_SERVICE_NAME}`, {
+      encoding: 'utf-8',
+      timeout: 2000,
+    })
+    if (out.includes('RUNNING')) return 'idle'
+    if (out.includes('STOPPED') || out.includes('STOP_PENDING')) return 'offline'
+  } catch {
+    // service not installed
+  }
+
+  return 'offline'
+}
+
 export function readAgents(): AgentInfo[] {
   let registry: Registry | null = null
   try {
@@ -226,7 +256,9 @@ export function readAgents(): AgentInfo[] {
       totalRuns > 0 ? runs.reduce((s, r) => s + r.durationMs, 0) / totalRuns : 0
 
     let status: AgentStatus = 'planned'
-    if (regAgent.status === 'active') {
+    if (key === 'runtime') {
+      status = readRuntimeStatus()
+    } else if (regAgent.status === 'active') {
       if (!lastRunStr) {
         status = 'offline'
       } else {
@@ -246,7 +278,7 @@ export function readAgents(): AgentInfo[] {
     }
 
     const nextRun =
-      lastRunStr && regAgent.status === 'active'
+      lastRunStr && regAgent.status === 'active' && key !== 'runtime'
         ? addSeconds(lastRunStr, intervalSeconds)
         : null
 

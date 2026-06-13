@@ -19,6 +19,7 @@ const TYPE_KEY_MAP: Record<string, keyof DispatchConfig> = {
   'openai-api': 'openai_api',
   'gemini-api': 'gemini_api',
   'openrouter-api': 'openrouter_api',
+  'claude-code': 'claude_code',
 }
 
 const DEFAULT_DISPATCH: Record<string, Record<string, unknown>> = {
@@ -27,6 +28,7 @@ const DEFAULT_DISPATCH: Record<string, Record<string, unknown>> = {
   'openai-api': { base_url: '', model: '', max_tokens: 1024, temperature: 0.0, timeout_seconds: 120 },
   'gemini-api': { model: '', max_tokens: 2048, temperature: 0.0, timeout_seconds: 120 },
   'openrouter-api': { model: '', max_tokens: 4096, temperature: 0.0, timeout_seconds: 180 },
+  'claude-code': { prompt_file: 'prompts/prompt.md', prompt: null, extra_args: [], dangerously_skip_permissions: true, cwd: 'project_root', timeout_seconds: 600, env: {} },
 }
 
 function intervalLabel(s: number): string {
@@ -281,6 +283,79 @@ function CliFields({ cfg, onChange }: { cfg: Record<string, unknown>; onChange: 
             try { onChange('env', JSON.parse(v)) } catch { /* ignore invalid JSON */ }
           }}
           rows={4}
+          mono
+        />
+        <p className="text-[10px] text-zinc-600 mt-1">JSON object of env vars</p>
+      </FieldRow>
+    </div>
+  )
+}
+
+function ClaudeCodeFields({ cfg, onChange }: { cfg: Record<string, unknown>; onChange: (field: string, value: unknown) => void }) {
+  const extraArgsText = Array.isArray(cfg.extra_args) ? (cfg.extra_args as string[]).join('\n') : ''
+  const envText = cfg.env ? JSON.stringify(cfg.env, null, 2) : '{}'
+  const skipPerms = cfg.dangerously_skip_permissions !== false
+
+  return (
+    <div className="space-y-3">
+      <FieldRow label="Prompt File">
+        <TextInput
+          value={(cfg.prompt_file as string) ?? ''}
+          onChange={(v) => onChange('prompt_file', v || null)}
+          placeholder="prompts/prompt.md"
+          mono
+        />
+        <p className="text-[10px] text-zinc-600 mt-1">Path relative to agent dir; supports {'{{project_root}}'} placeholders</p>
+      </FieldRow>
+      <FieldRow label="Inline Prompt">
+        <TextareaInput
+          value={(cfg.prompt as string) ?? ''}
+          onChange={(v) => onChange('prompt', v || null)}
+          rows={4}
+          mono
+        />
+        <p className="text-[10px] text-zinc-600 mt-1">Used only when prompt_file is empty</p>
+      </FieldRow>
+      <FieldRow label="Extra Args">
+        <TextareaInput
+          value={extraArgsText}
+          onChange={(v) => onChange('extra_args', v.split('\n').filter(Boolean))}
+          rows={2}
+          mono
+        />
+        <p className="text-[10px] text-zinc-600 mt-1">One arg per line; appended after --dangerously-skip-permissions</p>
+      </FieldRow>
+      <FieldRow label="Skip Permissions">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={skipPerms}
+            onChange={(e) => onChange('dangerously_skip_permissions', e.target.checked)}
+            className="accent-primary"
+          />
+          <span className="text-xs text-zinc-300">--dangerously-skip-permissions (enabled by default)</span>
+        </label>
+      </FieldRow>
+      <FieldRow label="CWD">
+        <SelectInput
+          value={(cfg.cwd as string) ?? 'project_root'}
+          onChange={(v) => onChange('cwd', v)}
+          options={[
+            { value: 'project_root', label: 'Project Root' },
+            { value: 'agent_dir', label: 'Agent Dir' },
+          ]}
+        />
+      </FieldRow>
+      <FieldRow label="Timeout (s)">
+        <NumberInput value={cfg.timeout_seconds as number} onChange={(v) => onChange('timeout_seconds', v)} min={1} />
+      </FieldRow>
+      <FieldRow label="Env Vars">
+        <TextareaInput
+          value={envText}
+          onChange={(v) => {
+            try { onChange('env', JSON.parse(v)) } catch { /* ignore invalid JSON */ }
+          }}
+          rows={3}
           mono
         />
         <p className="text-[10px] text-zinc-600 mt-1">JSON object of env vars</p>
@@ -599,6 +674,7 @@ function TaskForm({
               onChange={(v) => onDispatchTypeChange(taskId, v)}
               options={[
                 { value: 'claude-api', label: 'Claude API' },
+                { value: 'claude-code', label: 'Claude Code CLI' },
                 { value: 'openai-api', label: 'OpenAI API' },
                 { value: 'gemini-api', label: 'Gemini API' },
                 { value: 'openrouter-api', label: 'OpenRouter API' },
@@ -618,6 +694,9 @@ function TaskForm({
           )}
           {dispatchCfg && dispatch.type === 'cli' && (
             <CliFields cfg={dispatchCfg} onChange={(f, v) => onDispatchChange(taskId, f, v)} />
+          )}
+          {dispatchCfg && dispatch.type === 'claude-code' && (
+            <ClaudeCodeFields cfg={dispatchCfg} onChange={(f, v) => onDispatchChange(taskId, f, v)} />
           )}
         </div>
       </div>

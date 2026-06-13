@@ -182,13 +182,24 @@ export interface CliConfig {
   env?: Record<string, string>
 }
 
+export interface ClaudeCodeConfig {
+  prompt_file?: string | null
+  prompt?: string | null
+  extra_args?: string[]
+  dangerously_skip_permissions?: boolean
+  cwd?: 'project_root' | 'agent_dir'
+  timeout_seconds?: number
+  env?: Record<string, string>
+}
+
 export interface DispatchConfig {
-  type: 'cli' | 'claude-api' | 'openai-api' | 'gemini-api' | 'openrouter-api'
+  type: 'cli' | 'claude-api' | 'openai-api' | 'gemini-api' | 'openrouter-api' | 'claude-code'
   cli?: CliConfig
   claude_api?: ClaudeApiConfig
   openai_api?: OpenAIApiConfig
   gemini_api?: GeminiApiConfig
   openrouter_api?: OpenRouterApiConfig
+  claude_code?: ClaudeCodeConfig
 }
 
 export interface TaskConfig {

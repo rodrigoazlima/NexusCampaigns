@@ -104,6 +104,7 @@ from .models import (
     CleanupReport,
     CliDispatchConfig,
     ClaudeApiConfig,
+    ClaudeCodeConfig,
     CuratorReport,
     CuratorSuggestion,
     DailyReport,
@@ -204,7 +205,7 @@ __all__ = [
     "WikilinkProcessedEntry", "WikilinkProcessedState",
     # Models — dispatch config
     "AgentDispatchConfig", "AgentFolderConfig", "CliDispatchConfig",
-    "ClaudeApiConfig", "GeminiApiConfig", "OpenAIApiConfig", "OpenRouterApiConfig",
+    "ClaudeApiConfig", "ClaudeCodeConfig", "GeminiApiConfig", "OpenAIApiConfig", "OpenRouterApiConfig",
     "RunResult", "TaskDispatchEntry",
     # Models — runtime
     "TasksState", "TaskStateEntry",

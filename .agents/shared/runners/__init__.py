@@ -27,6 +27,7 @@ _TYPE_TO_MODULE: dict[str, str] = {
     "claude-api":     ".claude",
     "gemini-api":     ".gemini",
     "openrouter-api": ".openrouter",
+    "claude-code":    ".claude_code",
 }
 
 _TYPE_TO_CLASS: dict[str, str] = {
@@ -35,6 +36,7 @@ _TYPE_TO_CLASS: dict[str, str] = {
     "claude-api":     "ClaudeRunner",
     "gemini-api":     "GeminiRunner",
     "openrouter-api": "OpenRouterRunner",
+    "claude-code":    "ClaudeCodeRunner",
 }
 
 
