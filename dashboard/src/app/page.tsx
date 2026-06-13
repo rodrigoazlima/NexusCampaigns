@@ -39,7 +39,7 @@ export default async function ExecutivePage() {
       <PageHeader
         icon={LayoutDashboard}
         title="Executive Dashboard"
-        subtitle={report ? `Daily report for ${report.date} · generated ${formatDateTime(report.generatedAt)}` : 'DM Knowledge Factory'}
+        subtitle={report ? `Daily report for ${report.date} · generated ${formatDateTime(report.generatedAt)}` : 'Nexus Campaigns'}
       />
 
       {/* KPI Row */}

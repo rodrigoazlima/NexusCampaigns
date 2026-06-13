@@ -148,7 +148,7 @@ export default function Sidebar() {
           <Menu size={20} />
         </button>
         <span className="text-base">🐉</span>
-        <span className="text-sm font-semibold text-zinc-100">Knowledge Factory</span>
+        <span className="text-sm font-semibold text-zinc-100">Nexus Campaigns</span>
         <div className="ml-auto flex items-center gap-1.5 text-xs text-zinc-500 pr-1">
           <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
           Live

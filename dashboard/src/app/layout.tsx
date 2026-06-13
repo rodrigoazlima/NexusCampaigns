@@ -3,8 +3,8 @@ import './globals.css'
 import Sidebar from '@/components/layout/Sidebar'
 
 export const metadata: Metadata = {
-  title: 'Knowledge Factory',
-  description: 'DM Knowledge Factory — Admin Dashboard',
+  title: 'Nexus Campaigns',
+  description: 'Nexus Campaigns — Admin Dashboard',
 }
 
 export default function RootLayout({
