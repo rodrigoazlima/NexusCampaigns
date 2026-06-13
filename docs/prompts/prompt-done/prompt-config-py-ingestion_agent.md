@@ -6,10 +6,10 @@ Analyze the provided Python script and extract all relevant configuration settin
 **Requirements:**
 
 1. **Two-level configuration architecture:**
-   - **Level 1: Global Shared Config** (`.shared/config/global.json`)
+   - **Level 1: Global Shared Config** (`.system/config/global.json`)
      - Contains variables and settings that are shared across multiple scripts/agents.
      - Always loaded first.
-   - **Level 2: Local Script Config** (`.shared/config/<script_name>.json`)
+   - **Level 2: Local Script Config** (`.system/config/<script_name>.json`)
      - Contains script-specific settings and overrides.
      - Always loaded after global config (can override global values).
      - Can be empty (`{}`) but must always exist.
@@ -46,7 +46,7 @@ Analyze the provided Python script and extract all relevant configuration settin
 Ingestion Agent — first stage of the vault pipeline.
   - Strips emoji from filenames in 00-Inbox/ (idempotent)
   - Converts .docx files vault-wide to GFM Markdown via Pandoc
-  - Registers new Inbox files into .shared/state/inbox-queue.json
+  - Registers new Inbox files into .system/state/inbox-queue.json
 
 No LLM calls. No 02-Library writes. No 00-Inbox deletes.
 """
@@ -94,7 +94,7 @@ DOCUMENT_EXTS = frozenset({".docx", ".doc", ".pdf", ".md", ".txt", ".odt"})
 
 _VAULT_ROOT   = _PROJECT_ROOT / "knowledge-base"
 _INBOX        = _VAULT_ROOT / "00-Inbox"
-_SHARED_STATE = _PROJECT_ROOT / ".shared" / "state"
+_SHARED_STATE = _PROJECT_ROOT / ".system" / "state"
 _QUEUE_FILE   = _SHARED_STATE / "inbox-queue.json"
 
 _AGENT_STATE    = _AGENTS_DIR / "ingestion" / "state"
@@ -516,7 +516,7 @@ Now analyze the script and generate both configurations.
 
 ```
 NexusCampaigns/
-├── .shared/config/
+├── .system/config/
 │   ├── global.json
 │   └── classify_images.json
 ├── .agents/

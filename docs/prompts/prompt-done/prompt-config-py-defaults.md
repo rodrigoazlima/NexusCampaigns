@@ -6,10 +6,10 @@ Analyze the provided Python script and extract all relevant configuration settin
 **Requirements:**
 
 1. **Two-level configuration architecture:**
-   - **Level 1: Global Shared Config** (`.shared/config/global.json`)
+   - **Level 1: Global Shared Config** (`.system/config/global.json`)
      - Contains variables and settings that are shared across multiple scripts/agents.
      - Always loaded first.
-   - **Level 2: Local Script Config** (`.shared/config/<script_name>.json`)
+   - **Level 2: Local Script Config** (`.system/config/<script_name>.json`)
      - Contains script-specific settings and overrides.
      - Always loaded after global config (can override global values).
      - Can be empty (`{}`) but must always exist.
@@ -182,7 +182,7 @@ DEDUP_REPORT_DEFAULT: dict[str, Any] = {
 # ---------------------------------------------------------------------------
 
 STATE_FILE_DEFAULTS: dict[str, Any] = {
-    ".shared/state/inbox-queue.json":                           INBOX_QUEUE_DEFAULT,
+    ".system/state/inbox-queue.json":                           INBOX_QUEUE_DEFAULT,
     ".agents/vision/state/processed-images.json":               PROCESSED_IMAGES_DEFAULT,
     ".agents/vision/state/token-links.json":                    TOKEN_LINKS_DEFAULT,
     ".agents/lore/state/processed-npcs.json":                   PROCESSED_NPCS_DEFAULT,
@@ -212,7 +212,7 @@ TEXT_STATE_FILES: list[str] = [
 
 # Directories that must exist before any agent runs
 REQUIRED_DIRS: list[str] = [
-    ".shared/state",
+    ".system/state",
     ".agents/runtime/state",
     ".agents/runtime/state/logs",
     ".agents/ingestion/state",
@@ -251,7 +251,7 @@ Now analyze the script and generate both configurations.
 
 ```
 NexusCampaigns/
-├── .shared/config/
+├── .system/config/
 │   ├── global.json
 │   └── classify_images.json
 ├── .agents/

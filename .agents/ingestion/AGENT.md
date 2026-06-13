@@ -2,14 +2,14 @@
 name: ingestion
 purpose: >
   First-stage pipeline agent. Normalizes filenames in 00-Inbox/, converts DOCX to
-  Markdown via Pandoc, registers all new Inbox files into .shared/state/inbox-queue.json
+  Markdown via Pandoc, registers all new Inbox files into .system/state/inbox-queue.json
   with agent processing slots initialized. No LLM calls.
 inputs:
   - vault://00-Inbox/**
-  - .shared/state/inbox-queue.json
+  - .system/state/inbox-queue.json
   - state/processed-docx.txt
 outputs:
-  - .shared/state/inbox-queue.json (new entries written)
+  - .system/state/inbox-queue.json (new entries written)
   - vault://00-Inbox/ (renamed files, emoji stripped)
   - vault://00-Inbox/images/{slug}/ (extracted DOCX images)
   - state/processed-docx.txt
@@ -38,9 +38,9 @@ restrictions:
   - DOCX batch capped at 10 per run
 state_files:
   - state/processed-docx.txt
-  - .shared/state/inbox-queue.json (shared owner — ingestion writes, others update)
+  - .system/state/inbox-queue.json (shared owner — ingestion writes, others update)
 commit_scope:
-  - .shared/state
+  - .system/state
   - knowledge-base/00-Inbox
   - .agents/ingestion/state
 ---

@@ -67,7 +67,7 @@ SELF_MANAGEMENT_TOOLS: list[dict[str, Any]] = [
         "name": "request_human_review",
         "description": (
             "Flag a file or item for human attention. Writes an entry to "
-            ".shared/state/review-requests.json. Use when something needs human judgment."
+            ".system/state/review-requests.json. Use when something needs human judgment."
         ),
         "input_schema": {
             "type": "object",
@@ -225,7 +225,7 @@ def _write_state(rel_path: str, data: dict, merge: bool, context: dict) -> str:
 
 
 def _request_human_review(item: str, reason: str, context: dict, task_id: str) -> str:
-    review_file = Path(context["project_root"]) / ".shared" / "state" / "review-requests.json"
+    review_file = Path(context["project_root"]) / ".system" / "state" / "review-requests.json"
     review_file.parent.mkdir(parents=True, exist_ok=True)
 
     requests: list[dict] = []

@@ -8,7 +8,7 @@ All runtime state is stored in JSON files. State files are gitignored runtime ar
 
 | File | Path | Owner | Readers/Updaters |
 |------|------|-------|-----------------|
-| `inbox-queue.json` | `.shared/state/inbox-queue.json` | ingestion (creates) | vision, lore, wiki (update agent slots) |
+| `inbox-queue.json` | `.system/state/inbox-queue.json` | ingestion (creates) | vision, lore, wiki (update agent slots) |
 
 ### inbox-queue.json schema
 

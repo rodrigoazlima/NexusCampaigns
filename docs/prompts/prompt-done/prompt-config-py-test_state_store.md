@@ -6,10 +6,10 @@ Analyze the provided Python script and extract all relevant configuration settin
 **Requirements:**
 
 1. **Two-level configuration architecture:**
-   - **Level 1: Global Shared Config** (`.shared/config/global.json`)
+   - **Level 1: Global Shared Config** (`.system/config/global.json`)
      - Contains variables and settings that are shared across multiple scripts/agents.
      - Always loaded first.
-   - **Level 2: Local Script Config** (`.shared/config/<script_name>.json`)
+   - **Level 2: Local Script Config** (`.system/config/<script_name>.json`)
      - Contains script-specific settings and overrides.
      - Always loaded after global config (can override global values).
      - Can be empty (`{}`) but must always exist.
@@ -275,12 +275,12 @@ class TestTextStateStoreInitDefaults:
 class TestBootstrapVaultState:
     def test_creates_required_dirs(self, tmp_path):
         bootstrap_vault_state(tmp_path)
-        assert (tmp_path / ".shared" / "state").is_dir()
+        assert (tmp_path / ".system" / "state").is_dir()
         assert (tmp_path / ".agents" / "runtime" / "state").is_dir()
 
     def test_creates_json_state_files(self, tmp_path):
         bootstrap_vault_state(tmp_path)
-        assert (tmp_path / ".shared" / "state" / "inbox-queue.json").exists()
+        assert (tmp_path / ".system" / "state" / "inbox-queue.json").exists()
         assert (tmp_path / ".agents" / "runtime" / "state" / "tasks-state.json").exists()
         assert (tmp_path / ".agents" / "runtime" / "state" / "agent-metrics.json").exists()
         assert (tmp_path / ".agents" / "vision" / "state" / "processed-images.json").exists()
@@ -294,7 +294,7 @@ class TestBootstrapVaultState:
 
     def test_idempotent(self, tmp_path):
         bootstrap_vault_state(tmp_path)
-        queue = tmp_path / ".shared" / "state" / "inbox-queue.json"
+        queue = tmp_path / ".system" / "state" / "inbox-queue.json"
         queue.write_text('{"existing": true}', encoding="utf-8")
         bootstrap_vault_state(tmp_path)
         assert '"existing"' in queue.read_text(encoding="utf-8")
@@ -319,7 +319,7 @@ Now analyze the script and generate both configurations.
 
 ```
 NexusCampaigns/
-├── .shared/config/
+├── .system/config/
 │   ├── global.json
 │   └── classify_images.json
 ├── .agents/

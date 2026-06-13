@@ -6,10 +6,10 @@ Analyze the provided Python script and extract all relevant configuration settin
 **Requirements:**
 
 1. **Two-level configuration architecture:**
-   - **Level 1: Global Shared Config** (`.shared/config/global.json`)
+   - **Level 1: Global Shared Config** (`.system/config/global.json`)
      - Contains variables and settings that are shared across multiple scripts/agents.
      - Always loaded first.
-   - **Level 2: Local Script Config** (`.shared/config/<script_name>.json`)
+   - **Level 2: Local Script Config** (`.system/config/<script_name>.json`)
      - Contains script-specific settings and overrides.
      - Always loaded after global config (can override global values).
      - Can be empty (`{}`) but must always exist.
@@ -148,7 +148,7 @@ class TestConfigToPathResolution:
     def test_system_paths_resolve_from_same_root(self, vault):
         cfg = load_vault_config(vault)
         assert cfg.system_paths.project_root == vault
-        assert cfg.system_paths.shared_state == vault / ".shared" / "state"
+        assert cfg.system_paths.system_state == vault / ".system" / "state"
 
     def test_llm_endpoints_accessible_from_config(self, vault):
         cfg = load_vault_config(vault)
@@ -198,7 +198,7 @@ class TestLoggerAndStateStoreTogether:
     def test_state_persists_across_logger_instances(self, vault, logger_setup):
         """State written in one run is readable by a fresh StateStore."""
         _, logs_dir, master_log = logger_setup
-        state_path = vault / ".shared" / "state" / "inbox-queue.json"
+        state_path = vault / ".system" / "state" / "inbox-queue.json"
 
         store1 = StateStore(state_path, default={})
         store1.save({"file.png": {"type": "image"}})
@@ -284,7 +284,7 @@ class TestDraftWritingPipeline:
 
 class TestInboxQueueLifecycle:
     def _make_queue_store(self, vault):
-        path = vault / ".shared" / "state" / "inbox-queue.json"
+        path = vault / ".system" / "state" / "inbox-queue.json"
         return StateStore(path, default=INBOX_QUEUE_DEFAULT)
 
     def test_init_defaults_creates_empty_queue(self, vault):
@@ -534,7 +534,7 @@ class TestBootstrapAllDefaults:
 
     def test_init_defaults_idempotent(self, vault):
         """Calling init_defaults() twice must not overwrite existing data."""
-        path  = vault / ".shared" / "state" / "inbox-queue.json"
+        path  = vault / ".system" / "state" / "inbox-queue.json"
         store = StateStore(path, default=INBOX_QUEUE_DEFAULT)
         store.init_defaults()
         store.save({"existing-file.png": {"type": "image"}})
@@ -751,7 +751,7 @@ Now analyze the script and generate both configurations.
 
 ```
 NexusCampaigns/
-├── .shared/config/
+├── .system/config/
 │   ├── global.json
 │   └── classify_images.json
 ├── .agents/

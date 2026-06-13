@@ -404,7 +404,7 @@ class TestQueueIntegration:
         rel = proc.relative_to(tmp_path).as_posix()
 
         queue_data = {rel: {"agents": {"classification": "done"}}}
-        q = tmp_path / ".shared" / "state" / "inbox-queue.json"
+        q = tmp_path / ".system" / "state" / "inbox-queue.json"
         q.parent.mkdir(parents=True, exist_ok=True)
         q.write_text(_json.dumps(queue_data), encoding="utf-8")
         monkeypatch.setattr(_mod, "_QUEUE_FILE", q)
@@ -425,7 +425,7 @@ class TestQueueIntegration:
         rel = proc.relative_to(tmp_path).as_posix()
 
         queue_data = {rel: {"agents": {"classification": "pending"}}}
-        q = tmp_path / ".shared" / "state" / "inbox-queue.json"
+        q = tmp_path / ".system" / "state" / "inbox-queue.json"
         q.parent.mkdir(parents=True, exist_ok=True)
         q.write_text(_json.dumps(queue_data), encoding="utf-8")
         monkeypatch.setattr(_mod, "_QUEUE_FILE", q)

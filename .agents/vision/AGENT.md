@@ -9,7 +9,7 @@ inputs:
   - vault://00-Inbox/images/**/*.{png,jpg,jpeg,webp}
   - state/processed-images.json
   - state/token-links.json
-  - .shared/state/inbox-queue.json
+  - .system/state/inbox-queue.json
   - LLM: http://localhost:1234/v1/chat/completions (Qwen3-VL)
 outputs:
   - vault://01-Processing/{slug}.md (draft entity per image)
@@ -17,7 +17,7 @@ outputs:
   - vault://00-Inbox/images/{folder}/{slug}.{ext} (renamed image)
   - state/processed-images.json (updated index)
   - state/token-links.json (face match links)
-  - .shared/state/inbox-queue.json (agents.vision = done)
+  - .system/state/inbox-queue.json (agents.vision = done)
   - state/logs/classify_images.py_YYYY-MM-DD.log
 dependencies:
   - ingestion
@@ -51,7 +51,7 @@ commit_scope:
   - knowledge-base/00-Inbox/images
   - knowledge-base/01-Processing
   - .agents/vision/state
-  - .shared/state
+  - .system/state
 ---
 
 ## Valid Classification Values

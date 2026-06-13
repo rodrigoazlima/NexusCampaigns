@@ -6,10 +6,10 @@ Analyze the provided Python script and extract all relevant configuration settin
 **Requirements:**
 
 1. **Two-level configuration architecture:**
-   - **Level 1: Global Shared Config** (`.shared/config/global.json`)
+   - **Level 1: Global Shared Config** (`.system/config/global.json`)
      - Contains variables and settings that are shared across multiple scripts/agents.
      - Always loaded first.
-   - **Level 2: Local Script Config** (`.shared/config/<script_name>.json`)
+   - **Level 2: Local Script Config** (`.system/config/<script_name>.json`)
      - Contains script-specific settings and overrides.
      - Always loaded after global config (can override global values).
      - Can be empty (`{}`) but must always exist.
@@ -110,7 +110,7 @@ def patch_roots(vault, tmp_path, monkeypatch):
     master_log = tmp_path / ".agents" / "runtime" / "state" / "logs" / "automation.log"
     master_log.parent.mkdir(parents=True)
     master_log.touch()
-    shared_state = tmp_path / ".shared" / "state"
+    shared_state = tmp_path / ".system" / "state"
     shared_state.mkdir(parents=True)
     signals_dir = tmp_path / ".agents" / "runtime" / "state" / "signals"
     signals_dir.mkdir(parents=True)
@@ -827,7 +827,7 @@ Now analyze the script and generate both configurations.
 
 ```
 NexusCampaigns/
-├── .shared/config/
+├── .system/config/
 │   ├── global.json
 │   └── classify_images.json
 ├── .agents/

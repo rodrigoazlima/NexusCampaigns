@@ -43,7 +43,7 @@ All paths relative to `PROJECT_ROOT` (`C:\opt\GitHub\NexusCampaigns`).
 | Agent registry | `.agents/registry.yaml` |
 | Agent last-run times | `.agents/runtime/state/tasks-state.json` |
 | Agent run metrics | `.agents/runtime/state/agent-metrics.json` |
-| Inbox queue | `.shared/state/inbox-queue.json` |
+| Inbox queue | `.system/state/inbox-queue.json` |
 | Automation log | `.agents/runtime/state/logs/automation.log` |
 | Daily reports | `.agents/review/state/reports/report-YYYY-MM-DD.json` |
 | Repair reports | `.agents/review/state/reports/repair-YYYY-MM-DD.json` |
@@ -73,7 +73,7 @@ ANTHROPIC_API_KEY=           # required for /gm/chat agent chat feature
 export const VAULT_ROOT  = process.env.VAULT_ROOT  ?? 'C:\\opt\\GitHub\\NexusCampaigns\\knowledge-base'
 const PROJECT_ROOT       = process.env.PROJECT_ROOT ?? path.resolve(process.cwd(), '..')
 const STATE_DIR          = path.join(PROJECT_ROOT, '.agents', 'runtime', 'state')
-const SHARED_DIR         = path.join(PROJECT_ROOT, '.shared', 'state')
+const SHARED_DIR         = path.join(PROJECT_ROOT, '.system', 'state')
 const REPORTS_DIR        = path.join(PROJECT_ROOT, '.agents', 'review', 'state', 'reports')
 const LOGS_DIR           = path.join(PROJECT_ROOT, '.agents', 'runtime', 'state', 'logs')
 const VISION_STATE_DIR   = path.join(PROJECT_ROOT, '.agents', 'vision', 'state')

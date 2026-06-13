@@ -6,10 +6,10 @@ Analyze the provided Python script and extract all relevant configuration settin
 **Requirements:**
 
 1. **Two-level configuration architecture:**
-   - **Level 1: Global Shared Config** (`.shared/config/global.json`)
+   - **Level 1: Global Shared Config** (`.system/config/global.json`)
      - Contains variables and settings that are shared across multiple scripts/agents.
      - Always loaded first.
-   - **Level 2: Local Script Config** (`.shared/config/<script_name>.json`)
+   - **Level 2: Local Script Config** (`.system/config/<script_name>.json`)
      - Contains script-specific settings and overrides.
      - Always loaded after global config (can override global values).
      - Can be empty (`{}`) but must always exist.
@@ -87,7 +87,7 @@ _PROCESSING   = _VAULT_ROOT / "01-Processing"
 _LIBRARY      = _VAULT_ROOT / "02-Library"
 _AGENT_STATE  = _AGENTS_DIR / "lore" / "state"
 _LOGS_DIR     = _AGENT_STATE / "logs"
-_SHARED_STATE = _PROJECT_ROOT / ".shared" / "state"
+_SHARED_STATE = _PROJECT_ROOT / ".system" / "state"
 _MASTER_LOG   = _AGENTS_DIR / "runtime" / "state" / "logs" / "automation.log"
 _VISION_STATE = _AGENTS_DIR / "vision" / "state" / "processed-images.json"
 _PROC_NPCS    = _AGENT_STATE / "processed-npcs.json"
@@ -697,7 +697,7 @@ Now analyze the script and generate both configurations.
 
 ```
 NexusCampaigns/
-├── .shared/config/
+├── .system/config/
 │   ├── global.json
 │   └── classify_images.json
 ├── .agents/

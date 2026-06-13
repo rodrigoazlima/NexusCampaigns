@@ -17,7 +17,7 @@ If pandoc is not installed, log a WARNING and skip this step entirely.
 
 ## 3. Register new inbox files
 
-Read `{{project_root}}/.shared/state/inbox-queue.json`. Scan all files in `{{project_root}}/knowledge-base/00-Inbox/` recursively. For each file whose path is NOT already a key in the queue:
+Read `{{project_root}}/.system/state/inbox-queue.json`. Scan all files in `{{project_root}}/knowledge-base/00-Inbox/` recursively. For each file whose path is NOT already a key in the queue:
 - Determine type: `image` (.png .jpg .jpeg .webp .gif .bmp), `document` (.md .pdf .txt .docx), `other` (everything else)
 - Initialize agent slots:
   - image → `{"vision":"pending","lore":"pending","classification":"pending","wiki":"skip"}`

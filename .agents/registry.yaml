@@ -1,7 +1,7 @@
 version: 1
 vault_root: "C:\\opt\\GitHub\\NexusCampaigns\\knowledge-base"
 agents_dir: ".agents"
-shared_dir: ".shared"
+shared_dir: ".system"
 
 llm_endpoints:
   vision_llm:
@@ -30,7 +30,7 @@ execution_order:
 
 shared_state_files:
   inbox-queue.json:
-    path: .shared/state/inbox-queue.json
+    path: .system/state/inbox-queue.json
     owner: ingestion
     updaters:
       - vision
@@ -63,7 +63,7 @@ agents:
       - tools/ingestion_agent.py
     shared_state:
       writes:
-        - .shared/state/inbox-queue.json
+        - .system/state/inbox-queue.json
 
   vision:
     status: active
@@ -76,9 +76,9 @@ agents:
       - prompts/classify-image.txt
     shared_state:
       reads:
-        - .shared/state/inbox-queue.json
+        - .system/state/inbox-queue.json
       updates:
-        - .shared/state/inbox-queue.json
+        - .system/state/inbox-queue.json
 
   lore:
     status: active
@@ -91,10 +91,10 @@ agents:
       - prompts/generate-npc.txt
     shared_state:
       reads:
-        - .shared/state/inbox-queue.json
+        - .system/state/inbox-queue.json
         - .agents/vision/state/processed-images.json
       updates:
-        - .shared/state/inbox-queue.json
+        - .system/state/inbox-queue.json
 
   token:
     status: active
@@ -119,7 +119,7 @@ agents:
       - prompts/infer-type.txt
     shared_state:
       reads:
-        - .shared/state/inbox-queue.json
+        - .system/state/inbox-queue.json
 
   wiki:
     status: active
@@ -132,9 +132,9 @@ agents:
       - prompts/compile-entity.txt
     shared_state:
       reads:
-        - .shared/state/inbox-queue.json
+        - .system/state/inbox-queue.json
       updates:
-        - .shared/state/inbox-queue.json
+        - .system/state/inbox-queue.json
 
   review:
     status: active

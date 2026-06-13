@@ -43,7 +43,7 @@ _METRICS_FILE = _ORCH_STATE / "agent-metrics.json"
 _AGENT_STATE  = _AGENTS_DIR / "repair" / "state"
 _LOGS_DIR     = _AGENT_STATE / "logs"
 _REPORTS_DIR  = _AGENTS_DIR / "review" / "state" / "reports"
-_QUEUE_FILE   = _PROJECT_ROOT / ".shared" / "state" / "inbox-queue.json"
+_QUEUE_FILE   = _PROJECT_ROOT / ".system" / "state" / "inbox-queue.json"
 _PROC_IMAGES  = _AGENTS_DIR / "vision" / "state" / "processed-images.json"
 
 _LOCK_STALE_S = 1800  # 30 minutes
@@ -355,7 +355,7 @@ TOOLS = SELF_MANAGEMENT_TOOLS + [
     },
     {
         "name": "create_missing_dirs",
-        "description": "Create any required .agents/ and .shared/ subdirectories that do not yet exist.",
+        "description": "Create any required .agents/ and .system/ subdirectories that do not yet exist.",
         "input_schema": {"type": "object", "properties": {}},
     },
     {

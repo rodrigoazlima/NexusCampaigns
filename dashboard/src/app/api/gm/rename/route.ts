@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
         newImagePath = newRelPath
 
         // Update inbox-queue.json key
-        const queuePath = path.join(PROJECT_ROOT, '.shared', 'state', 'inbox-queue.json')
+        const queuePath = path.join(PROJECT_ROOT, '.system', 'state', 'inbox-queue.json')
         if (fs.existsSync(queuePath)) {
           const queue = JSON.parse(fs.readFileSync(queuePath, 'utf-8'))
           if (queue[oldRelPath] !== undefined) {

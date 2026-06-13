@@ -6,10 +6,10 @@ Analyze the provided Python script and extract all relevant configuration settin
 **Requirements:**
 
 1. **Two-level configuration architecture:**
-   - **Level 1: Global Shared Config** (`.shared/config/global.json`)
+   - **Level 1: Global Shared Config** (`.system/config/global.json`)
      - Contains variables and settings that are shared across multiple scripts/agents.
      - Always loaded first.
-   - **Level 2: Local Script Config** (`.shared/config/<script_name>.json`)
+   - **Level 2: Local Script Config** (`.system/config/<script_name>.json`)
      - Contains script-specific settings and overrides.
      - Always loaded after global config (can override global values).
      - Can be empty (`{}`) but must always exist.
@@ -47,8 +47,8 @@ Layer 1 (dataclasses): VaultConfig / VaultPaths / SystemPaths / LLMEndpointConfi
   Pure structure, no I/O. Loader lives in shared.loaders.
 
 Layer 2 (get_config): Two-level JSON config system.
-  .shared/config/global.json  ← always loaded first
-  .shared/config/<script>.json ← loaded second, overrides global
+  .system/config/global.json  ← always loaded first
+  .system/config/<script>.json ← loaded second, overrides global
   Environment variables NEXUS_* override both JSON layers.
   Falls back to embedded defaults when JSON files are absent.
 """
@@ -121,7 +121,7 @@ class SystemPaths:
 
     @property
     def shared_state(self) -> Path:
-        return self.project_root / ".shared" / "state"
+        return self.project_root / ".system" / "state"
 
     @property
     def logs_dir(self) -> Path:
@@ -164,7 +164,7 @@ _GLOBAL_DEFAULTS: dict[str, Any] = {
     "batch_size":           10,
     "inbox_images":         "00-Inbox/images",
     "processing_dir":       "01-Processing",
-    "state_dir":            ".shared/state",
+    "state_dir":            ".system/state",
     "retry_attempts":       3,
     "retry_delay_seconds":  5,
     "token_moldura":        "00-Inbox/tokens/Molduras/moldura_default.png",
@@ -172,7 +172,7 @@ _GLOBAL_DEFAULTS: dict[str, Any] = {
 }
 
 # Relative location of the config directory inside the project root.
-_CONFIG_SUBDIR = ".shared/config"
+_CONFIG_SUBDIR = ".system/config"
 
 
 # ---------------------------------------------------------------------------
@@ -207,7 +207,7 @@ class AppConfig(BaseModel):
     batch_size:          int           = 10
     inbox_images:        Path          = Path("00-Inbox/images")
     processing_dir:      Path          = Path("01-Processing")
-    state_dir:           Path          = Path(".shared/state")
+    state_dir:           Path          = Path(".system/state")
     retry_attempts:      int           = 3
     retry_delay_seconds: int           = 5
     token_moldura:       Path          = Path("00-Inbox/tokens/Molduras/moldura_default.png")
@@ -403,8 +403,8 @@ def get_config(
 
     Resolution order (later overrides earlier):
       1. Embedded Python defaults (_GLOBAL_DEFAULTS)
-      2. .shared/config/global.json
-      3. .shared/config/<script_stem>.json
+      2. .system/config/global.json
+      3. .system/config/<script_stem>.json
       4. NEXUS_* environment variables
 
     Args:
@@ -480,7 +480,7 @@ Now analyze the script and generate both configurations.
 
 ```
 NexusCampaigns/
-├── .shared/config/
+├── .system/config/
 │   ├── global.json
 │   └── classify_images.json
 ├── .agents/

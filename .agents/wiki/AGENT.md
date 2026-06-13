@@ -7,13 +7,13 @@ purpose: >
   to generate description, details, hooks, and wikilinks. Marks agents.wiki=done in
   inbox-queue.json after each successful write.
 inputs:
-  - state://.shared/state/inbox-queue.json  (type=document, agents.wiki=pending)
+  - state://.system/state/inbox-queue.json  (type=document, agents.wiki=pending)
   - vault://02-Library/**/*.md              (read-only: canon context, id/type/tags/rels, up to 50 entities)
   - state://bad-wiki-docs.txt
   - LLM: http://localhost:8080/v1/chat/completions (LocalRouter, model: auto)
 outputs:
   - vault://01-Processing/{slug}.md (structured entity draft)
-  - state://.shared/state/inbox-queue.json (agents.wiki=done per processed entry)
+  - state://.system/state/inbox-queue.json (agents.wiki=done per processed entry)
   - state://bad-wiki-docs.txt (rejected/failed source paths appended)
   - state://logs/compile_wiki_YYYY-MM-DD.log
 dependencies:
@@ -48,7 +48,7 @@ restrictions:
   - Must not process queue entries with type != document
   - LLM max_tokens: 1500; temperature: 0.3
 state_files:
-  - .shared/state/inbox-queue.json
+  - .system/state/inbox-queue.json
   - .agents/wiki/state/bad-wiki-docs.txt
 commit_scope:
   - knowledge-base/01-Processing

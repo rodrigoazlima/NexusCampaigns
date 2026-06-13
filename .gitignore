@@ -232,7 +232,7 @@ __marimo__/
 .agents/classification/state/
 
 # Shared queue (mutable, runtime-only)
-.shared/state/inbox-queue.json
+.system/state/inbox-queue.json
 
 # Reports (runtime output)
 .agents/review/state/reports/report-*.json

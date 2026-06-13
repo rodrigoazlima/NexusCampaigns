@@ -31,7 +31,7 @@ export const VAULT_ROOT =
 
 const AGENTS_DIR = path.join(PROJECT_ROOT, '.agents')
 const STATE_DIR = path.join(PROJECT_ROOT, '.agents', 'runtime', 'state')
-const SHARED_DIR = path.join(PROJECT_ROOT, '.shared', 'state')
+const SHARED_DIR = path.join(PROJECT_ROOT, '.system', 'state')
 const REPORTS_DIR = path.join(PROJECT_ROOT, '.agents', 'review', 'state', 'reports')
 const LOGS_DIR = path.join(PROJECT_ROOT, '.agents', 'runtime', 'state', 'logs')
 const REGISTRY_PATH = path.join(PROJECT_ROOT, '.agents', 'registry.yaml')
@@ -557,7 +557,7 @@ export function readInboxImages(): InboxImage[] {
 
 const TOKEN_ELIGIBLE_TYPES = new Set(['portrait', 'body'])
 const DEFAULT_MOLDURA = 'knowledge-base/00-Inbox/tokens/Molduras/moldura_default.png'
-const TOKEN_CONFIG_PATH = path.join(PROJECT_ROOT, '.shared', 'state', 'token-config.json')
+const TOKEN_CONFIG_PATH = path.join(PROJECT_ROOT, '.system', 'state', 'token-config.json')
 
 export function readVisionState(): Record<string, Record<string, unknown>> {
   const visionPath = path.join(PROJECT_ROOT, '.agents', 'vision', 'state', 'processed-images.json')

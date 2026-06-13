@@ -6,10 +6,10 @@ Analyze the provided Python script and extract all relevant configuration settin
 **Requirements:**
 
 1. **Two-level configuration architecture:**
-   - **Level 1: Global Shared Config** (`.shared/config/global.json`)
+   - **Level 1: Global Shared Config** (`.system/config/global.json`)
      - Contains variables and settings that are shared across multiple scripts/agents.
      - Always loaded first.
-   - **Level 2: Local Script Config** (`.shared/config/<script_name>.json`)
+   - **Level 2: Local Script Config** (`.system/config/<script_name>.json`)
      - Contains script-specific settings and overrides.
      - Always loaded after global config (can override global values).
      - Can be empty (`{}`) but must always exist.
@@ -92,13 +92,13 @@ class TestDefaults:
             assert TASKS_STATE_DEFAULT[agent]["lastRun"].startswith("1970")
 
     def test_state_file_defaults_covers_all_files(self):
-        assert ".shared/state/inbox-queue.json" in STATE_FILE_DEFAULTS
+        assert ".system/state/inbox-queue.json" in STATE_FILE_DEFAULTS
         assert ".agents/vision/state/processed-images.json" in STATE_FILE_DEFAULTS
         assert ".agents/lore/state/processed-npcs.json" in STATE_FILE_DEFAULTS
         assert ".agents/runtime/state/tasks-state.json" in STATE_FILE_DEFAULTS
 
     def test_required_dirs_contains_shared_state(self):
-        assert ".shared/state" in REQUIRED_DIRS
+        assert ".system/state" in REQUIRED_DIRS
 
     def test_required_dirs_covers_all_agents(self):
         agent_names = ["ingestion", "vision", "lore", "token",
@@ -147,7 +147,7 @@ Now analyze the script and generate both configurations.
 
 ```
 NexusCampaigns/
-├── .shared/config/
+├── .system/config/
 │   ├── global.json
 │   └── classify_images.json
 ├── .agents/

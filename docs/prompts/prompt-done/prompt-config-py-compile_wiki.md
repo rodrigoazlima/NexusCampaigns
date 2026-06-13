@@ -6,10 +6,10 @@ Analyze the provided Python script and extract all relevant configuration settin
 **Requirements:**
 
 1. **Two-level configuration architecture:**
-   - **Level 1: Global Shared Config** (`.shared/config/global.json`)
+   - **Level 1: Global Shared Config** (`.system/config/global.json`)
      - Contains variables and settings that are shared across multiple scripts/agents.
      - Always loaded first.
-   - **Level 2: Local Script Config** (`.shared/config/<script_name>.json`)
+   - **Level 2: Local Script Config** (`.system/config/<script_name>.json`)
      - Contains script-specific settings and overrides.
      - Always loaded after global config (can override global values).
      - Can be empty (`{}`) but must always exist.
@@ -45,10 +45,10 @@ Analyze the provided Python script and extract all relevant configuration settin
 
 Actions: LoadCanonContext · ScanPending · SynthesizeEntity · WriteDraft · MarkQueueDone
 
-Reads:  .shared/state/inbox-queue.json  (type=document, agents.wiki=pending)
+Reads:  .system/state/inbox-queue.json  (type=document, agents.wiki=pending)
         02-Library/**/*.md              (canon context, read-only, up to 50 entities)
 Writes: 01-Processing/{slug}.md
-        .shared/state/inbox-queue.json  (marks agents.wiki=done per entry)
+        .system/state/inbox-queue.json  (marks agents.wiki=done per entry)
         .agents/wiki/state/bad-wiki-docs.txt
 
 LLM:    LocalRouter http://localhost:8080 (openai-compat, model=auto)
@@ -97,7 +97,7 @@ _LOGS_DIR    = _AGENT_STATE / "logs"
 _MASTER_LOG  = _AGENTS_DIR / "runtime" / "state" / "logs" / "automation.log"
 _BAD_DOCS    = _AGENT_STATE / "bad-wiki-docs.txt"
 _PROMPT_FILE = _AGENTS_DIR / "wiki" / "prompts" / "compile-entity.txt"
-_INBOX_QUEUE = _PROJECT_ROOT / ".shared" / "state" / "inbox-queue.json"
+_INBOX_QUEUE = _PROJECT_ROOT / ".system" / "state" / "inbox-queue.json"
 
 _FENCE_RE    = re.compile(r"^---[ \t]*\r?\n(.*?)\r?\n---[ \t]*\r?\n?", re.DOTALL)
 _HTML_RE     = re.compile(r"<[^>]+>", re.DOTALL)
@@ -524,7 +524,7 @@ Now analyze the script and generate both configurations.
 
 ```
 NexusCampaigns/
-├── .shared/config/
+├── .system/config/
 │   ├── global.json
 │   └── classify_images.json
 ├── .agents/

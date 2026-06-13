@@ -11,7 +11,7 @@ inputs:
   - .agents/runtime/state/agent-metrics.json
   - .agents/*/agent.json
   - .agents/vision/state/processed-images.json
-  - .shared/state/inbox-queue.json
+  - .system/state/inbox-queue.json
 outputs:
   - .agents/runtime/state/ (stale lock removed)
   - .agents/*/state/ (missing dirs created)
@@ -47,5 +47,5 @@ commit_scope:
   - .agents/review/state
   - .agents/repair/state
   - .agents/wikilink/state
-  - .shared/state
+  - .system/state
 ---

@@ -2,10 +2,10 @@
 
 Actions: LoadCanonContext · ScanPending · SynthesizeEntity · WriteDraft · MarkQueueDone
 
-Reads:  .shared/state/inbox-queue.json  (type=document, agents.wiki=pending)
+Reads:  .system/state/inbox-queue.json  (type=document, agents.wiki=pending)
         02-Library/**/*.md              (canon context, read-only, up to 50 entities)
 Writes: 01-Processing/{slug}.md
-        .shared/state/inbox-queue.json  (marks agents.wiki=done per entry)
+        .system/state/inbox-queue.json  (marks agents.wiki=done per entry)
         .agents/wiki/state/bad-wiki-docs.txt
 
 LLM:    LocalRouter http://localhost:8080 (openai-compat, model=auto)
@@ -54,7 +54,7 @@ _LOGS_DIR    = _AGENT_STATE / "logs"
 _MASTER_LOG  = _AGENTS_DIR / "runtime" / "state" / "logs" / "automation.log"
 _BAD_DOCS    = _AGENT_STATE / "bad-wiki-docs.txt"
 _PROMPT_FILE = _AGENTS_DIR / "wiki" / "prompts" / "compile-entity.txt"
-_INBOX_QUEUE = _PROJECT_ROOT / ".shared" / "state" / "inbox-queue.json"
+_INBOX_QUEUE = _PROJECT_ROOT / ".system" / "state" / "inbox-queue.json"
 
 _FENCE_RE    = re.compile(r"^---[ \t]*\r?\n(.*?)\r?\n---[ \t]*\r?\n?", re.DOTALL)
 _HTML_RE     = re.compile(r"<[^>]+>", re.DOTALL)

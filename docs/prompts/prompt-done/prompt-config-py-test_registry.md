@@ -6,10 +6,10 @@ Analyze the provided Python script and extract all relevant configuration settin
 **Requirements:**
 
 1. **Two-level configuration architecture:**
-   - **Level 1: Global Shared Config** (`.shared/config/global.json`)
+   - **Level 1: Global Shared Config** (`.system/config/global.json`)
      - Contains variables and settings that are shared across multiple scripts/agents.
      - Always loaded first.
-   - **Level 2: Local Script Config** (`.shared/config/<script_name>.json`)
+   - **Level 2: Local Script Config** (`.system/config/<script_name>.json`)
      - Contains script-specific settings and overrides.
      - Always loaded after global config (can override global values).
      - Can be empty (`{}`) but must always exist.
@@ -68,7 +68,7 @@ _MINIMAL_REGISTRY = textwrap.dedent("""\
     version: 1
     vault_root: "/tmp/vault/knowledge-base"
     agents_dir: ".agents"
-    shared_dir: ".shared"
+    shared_dir: ".system"
 
     llm_endpoints:
       vision_llm:
@@ -90,7 +90,7 @@ _MINIMAL_REGISTRY = textwrap.dedent("""\
 
     shared_state_files:
       inbox-queue.json:
-        path: .shared/state/inbox-queue.json
+        path: .system/state/inbox-queue.json
         owner: ingestion
         updaters:
           - vision
@@ -112,7 +112,7 @@ _MINIMAL_REGISTRY = textwrap.dedent("""\
           - tools/ingestion_agent.py
         shared_state:
           writes:
-            - .shared/state/inbox-queue.json
+            - .system/state/inbox-queue.json
 
       vision:
         status: active
@@ -123,9 +123,9 @@ _MINIMAL_REGISTRY = textwrap.dedent("""\
           - tools/classify_images.py
         shared_state:
           reads:
-            - .shared/state/inbox-queue.json
+            - .system/state/inbox-queue.json
           updates:
-            - .shared/state/inbox-queue.json
+            - .system/state/inbox-queue.json
 
       curator:
         status: planned
@@ -165,7 +165,7 @@ class TestLoadRegistry:
         assert registry.agents_dir == ".agents"
 
     def test_shared_dir(self, registry: RegistryConfig) -> None:
-        assert registry.shared_dir == ".shared"
+        assert registry.system_dir == ".system"
 
     def test_raises_when_no_registry(self, tmp_path: Path) -> None:
         (tmp_path / "knowledge-base").mkdir()
@@ -241,18 +241,18 @@ class TestExecutionOrder:
 
 class TestSharedStateFiles:
     def test_inbox_queue_present(self, registry: RegistryConfig) -> None:
-        assert "inbox-queue.json" in registry.shared_state_files
+        assert "inbox-queue.json" in registry.system_state_files
 
     def test_inbox_queue_owner(self, registry: RegistryConfig) -> None:
-        spec = registry.shared_state_files["inbox-queue.json"]
+        spec = registry.system_state_files["inbox-queue.json"]
         assert spec.owner == "ingestion"
 
     def test_inbox_queue_updaters(self, registry: RegistryConfig) -> None:
-        spec = registry.shared_state_files["inbox-queue.json"]
+        spec = registry.system_state_files["inbox-queue.json"]
         assert "vision" in spec.updaters
 
     def test_spec_is_shared_state_file_spec(self, registry: RegistryConfig) -> None:
-        spec = registry.shared_state_files["inbox-queue.json"]
+        spec = registry.system_state_files["inbox-queue.json"]
         assert isinstance(spec, SharedStateFileSpec)
 
 
@@ -296,22 +296,22 @@ class TestAgentEntries:
 
 class TestAgentSharedState:
     def test_vision_reads_inbox_queue(self, registry: RegistryConfig) -> None:
-        ss = registry.agents["vision"].shared_state
+        ss = registry.agents["vision"].system_state
         assert ss is not None
         assert any("inbox-queue.json" in p for p in ss.reads)
 
     def test_vision_updates_inbox_queue(self, registry: RegistryConfig) -> None:
-        ss = registry.agents["vision"].shared_state
+        ss = registry.agents["vision"].system_state
         assert ss is not None
         assert any("inbox-queue.json" in p for p in ss.updates)
 
     def test_ingestion_writes_inbox_queue(self, registry: RegistryConfig) -> None:
-        ss = registry.agents["ingestion"].shared_state
+        ss = registry.agents["ingestion"].system_state
         assert ss is not None
         assert any("inbox-queue.json" in p for p in ss.writes)
 
     def test_shared_state_is_spec(self, registry: RegistryConfig) -> None:
-        ss = registry.agents["ingestion"].shared_state
+        ss = registry.agents["ingestion"].system_state
         assert isinstance(ss, AgentSharedStateSpec)
 
 
@@ -405,7 +405,7 @@ class TestLiveRegistryConsistency:
                     f"Agent '{name}' references unknown llm alias '{llm}'"
 
     def test_shared_state_owners_exist(self) -> None:
-        for fname, spec in self.reg.shared_state_files.items():
+        for fname, spec in self.reg.system_state_files.items():
             assert spec.owner in self.reg.agents, \
                 f"shared_state_files '{fname}' owner '{spec.owner}' not in agents"
 
@@ -428,7 +428,7 @@ Now analyze the script and generate both configurations.
 
 ```
 NexusCampaigns/
-├── .shared/config/
+├── .system/config/
 │   ├── global.json
 │   └── classify_images.json
 ├── .agents/

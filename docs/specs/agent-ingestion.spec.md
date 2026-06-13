@@ -2,7 +2,7 @@
 
 **Trigger:** hourly  
 **Input:** `00-Inbox/` (all files recursively), `.agents/ingestion/state/processed-docx.txt`  
-**Output:** `.shared/state/inbox-queue.json`, renamed files in `00-Inbox/`, converted `.md` files  
+**Output:** `.system/state/inbox-queue.json`, renamed files in `00-Inbox/`, converted `.md` files  
 **Dispatch:** `claude-api` · `claude-haiku-4-5-20251001` · `tools_module: ingestion.tools.ingestion_agent`
 
 ---

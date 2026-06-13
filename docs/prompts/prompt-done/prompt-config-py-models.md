@@ -6,10 +6,10 @@ Analyze the provided Python script and extract all relevant configuration settin
 **Requirements:**
 
 1. **Two-level configuration architecture:**
-   - **Level 1: Global Shared Config** (`.shared/config/global.json`)
+   - **Level 1: Global Shared Config** (`.system/config/global.json`)
      - Contains variables and settings that are shared across multiple scripts/agents.
      - Always loaded first.
-   - **Level 2: Local Script Config** (`.shared/config/<script_name>.json`)
+   - **Level 2: Local Script Config** (`.system/config/<script_name>.json`)
      - Contains script-specific settings and overrides.
      - Always loaded after global config (can override global values).
      - Can be empty (`{}`) but must always exist.
@@ -747,7 +747,7 @@ class RegistryConfig(BaseModel):
     version:            int                              = 1
     vault_root:         str
     agents_dir:         str                              = ".agents"
-    shared_dir:         str                              = ".shared"
+    shared_dir:         str                              = ".system"
     llm_endpoints:      dict[str, LLMEndpointSpec]       = Field(default_factory=dict)
     execution_order:    list[str]                        = Field(default_factory=list)
     shared_state_files: dict[str, SharedStateFileSpec]   = Field(default_factory=dict)
@@ -804,7 +804,7 @@ Now analyze the script and generate both configurations.
 
 ```
 NexusCampaigns/
-├── .shared/config/
+├── .system/config/
 │   ├── global.json
 │   └── classify_images.json
 ├── .agents/

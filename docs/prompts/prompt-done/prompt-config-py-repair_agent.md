@@ -6,10 +6,10 @@ Analyze the provided Python script and extract all relevant configuration settin
 **Requirements:**
 
 1. **Two-level configuration architecture:**
-   - **Level 1: Global Shared Config** (`.shared/config/global.json`)
+   - **Level 1: Global Shared Config** (`.system/config/global.json`)
      - Contains variables and settings that are shared across multiple scripts/agents.
      - Always loaded first.
-   - **Level 2: Local Script Config** (`.shared/config/<script_name>.json`)
+   - **Level 2: Local Script Config** (`.system/config/<script_name>.json`)
      - Contains script-specific settings and overrides.
      - Always loaded after global config (can override global values).
      - Can be empty (`{}`) but must always exist.
@@ -86,7 +86,7 @@ _METRICS_FILE = _ORCH_STATE / "agent-metrics.json"
 _AGENT_STATE  = _AGENTS_DIR / "repair" / "state"
 _LOGS_DIR     = _AGENT_STATE / "logs"
 _REPORTS_DIR  = _AGENTS_DIR / "review" / "state" / "reports"
-_QUEUE_FILE   = _PROJECT_ROOT / ".shared" / "state" / "inbox-queue.json"
+_QUEUE_FILE   = _PROJECT_ROOT / ".system" / "state" / "inbox-queue.json"
 _PROC_IMAGES  = _AGENTS_DIR / "vision" / "state" / "processed-images.json"
 
 _LOCK_STALE_S = 1800  # 30 minutes
@@ -398,7 +398,7 @@ TOOLS = SELF_MANAGEMENT_TOOLS + [
     },
     {
         "name": "create_missing_dirs",
-        "description": "Create any required .agents/ and .shared/ subdirectories that do not yet exist.",
+        "description": "Create any required .agents/ and .system/ subdirectories that do not yet exist.",
         "input_schema": {"type": "object", "properties": {}},
     },
     {
@@ -493,7 +493,7 @@ Now analyze the script and generate both configurations.
 
 ```
 NexusCampaigns/
-├── .shared/config/
+├── .system/config/
 │   ├── global.json
 │   └── classify_images.json
 ├── .agents/

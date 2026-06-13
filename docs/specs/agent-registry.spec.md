@@ -10,7 +10,7 @@
 version: 1
 vault_root:  "<absolute path to knowledge-base/>"
 agents_dir:  ".agents"
-shared_dir:  ".shared"
+shared_dir:  ".system"
 
 llm_endpoints:
   <alias>:

@@ -6,10 +6,10 @@ Analyze the provided Python script and extract all relevant configuration settin
 **Requirements:**
 
 1. **Two-level configuration architecture:**
-   - **Level 1: Global Shared Config** (`.shared/config/global.json`)
+   - **Level 1: Global Shared Config** (`.system/config/global.json`)
      - Contains variables and settings that are shared across multiple scripts/agents.
      - Always loaded first.
-   - **Level 2: Local Script Config** (`.shared/config/<script_name>.json`)
+   - **Level 2: Local Script Config** (`.system/config/<script_name>.json`)
      - Contains script-specific settings and overrides.
      - Always loaded after global config (can override global values).
      - Can be empty (`{}`) but must always exist.
@@ -97,7 +97,7 @@ def patch_roots(vault, tmp_path, monkeypatch):
     monkeypatch.setattr(_mod, "_MASTER_LOG",  master_log)
     monkeypatch.setattr(_mod, "_BAD_DOCS",    agent_state / "bad-wiki-docs.txt")
 
-    inbox_queue = tmp_path / ".shared" / "state" / "inbox-queue.json"
+    inbox_queue = tmp_path / ".system" / "state" / "inbox-queue.json"
     inbox_queue.parent.mkdir(parents=True)
     monkeypatch.setattr(_mod, "_INBOX_QUEUE", inbox_queue)
 
@@ -254,7 +254,7 @@ class TestEnforceAndWrite:
 
 class TestMarkWikiDone:
     def test_updates_queue_entry(self, vault, patch_roots, tmp_path):
-        queue_path = tmp_path / ".shared" / "state" / "inbox-queue.json"
+        queue_path = tmp_path / ".system" / "state" / "inbox-queue.json"
         queue_path.parent.mkdir(parents=True, exist_ok=True)
         _write_queue(queue_path, {
             "00-Inbox/note.md": {
@@ -268,7 +268,7 @@ class TestMarkWikiDone:
         assert updated["00-Inbox/note.md"]["agents"]["wiki"] == "done"
 
     def test_tolerates_missing_entry(self, vault, patch_roots, tmp_path):
-        queue_path = tmp_path / ".shared" / "state" / "inbox-queue.json"
+        queue_path = tmp_path / ".system" / "state" / "inbox-queue.json"
         queue_path.parent.mkdir(parents=True, exist_ok=True)
         _write_queue(queue_path, {})
         # Should not raise
@@ -302,7 +302,7 @@ class TestBatchSize:
 
 class TestMainOffline:
     def test_exits_zero_when_llm_offline(self, vault, patch_roots, tmp_path):
-        queue_path = tmp_path / ".shared" / "state" / "inbox-queue.json"
+        queue_path = tmp_path / ".system" / "state" / "inbox-queue.json"
         queue_path.parent.mkdir(parents=True, exist_ok=True)
         _write_queue(queue_path, {
             "00-Inbox/note.md": {
@@ -324,7 +324,7 @@ class TestMainOffline:
         assert exc.value.code == 0
 
     def test_no_pending_exits_zero(self, vault, patch_roots, tmp_path):
-        queue_path = tmp_path / ".shared" / "state" / "inbox-queue.json"
+        queue_path = tmp_path / ".system" / "state" / "inbox-queue.json"
         queue_path.parent.mkdir(parents=True, exist_ok=True)
         _write_queue(queue_path, {})
 
@@ -343,7 +343,7 @@ class TestMainOffline:
 
 class TestMainHappyPath:
     def test_compiles_document_and_marks_done(self, vault, patch_roots, tmp_path):
-        queue_path = tmp_path / ".shared" / "state" / "inbox-queue.json"
+        queue_path = tmp_path / ".system" / "state" / "inbox-queue.json"
         queue_path.parent.mkdir(parents=True, exist_ok=True)
 
         doc = tmp_path / "00-Inbox" / "goblin-chief.md"
@@ -419,7 +419,7 @@ Now analyze the script and generate both configurations.
 
 ```
 NexusCampaigns/
-├── .shared/config/
+├── .system/config/
 │   ├── global.json
 │   └── classify_images.json
 ├── .agents/

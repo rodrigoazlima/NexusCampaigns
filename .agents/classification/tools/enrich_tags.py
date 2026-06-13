@@ -1,7 +1,7 @@
 """classification.tools.enrich_tags
 
 Actions: EnrichTags · InferType · FlagDuplicates
-Reads:   00-Inbox/**/*.md, 01-Processing/**/*.md, .shared/state/inbox-queue.json
+Reads:   00-Inbox/**/*.md, 01-Processing/**/*.md, .system/state/inbox-queue.json
 Writes:  enriched frontmatter in-place (never 02-Library/)
 LLM:     LocalRouter http://localhost:8080 (openai-compat, model=auto)
 """
@@ -46,7 +46,7 @@ _LOGS_DIR     = _AGENT_STATE / "logs"
 _MASTER_LOG   = _AGENTS_DIR / "runtime" / "state" / "logs" / "automation.log"
 _BAD_DOCS     = _AGENT_STATE / "bad-docs.txt"
 _PROMPT_FILE  = _AGENTS_DIR / "classification" / "prompts" / "enrich-tags.txt"
-_SHARED_STATE = _PROJECT_ROOT / ".shared" / "state"
+_SHARED_STATE = _PROJECT_ROOT / ".system" / "state"
 _QUEUE_FILE   = _SHARED_STATE / "inbox-queue.json"
 
 _ALLOWED_TAGS: frozenset[str] = frozenset({

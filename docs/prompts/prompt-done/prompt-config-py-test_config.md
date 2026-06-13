@@ -6,10 +6,10 @@ Analyze the provided Python script and extract all relevant configuration settin
 **Requirements:**
 
 1. **Two-level configuration architecture:**
-   - **Level 1: Global Shared Config** (`.shared/config/global.json`)
+   - **Level 1: Global Shared Config** (`.system/config/global.json`)
      - Contains variables and settings that are shared across multiple scripts/agents.
      - Always loaded first.
-   - **Level 2: Local Script Config** (`.shared/config/<script_name>.json`)
+   - **Level 2: Local Script Config** (`.system/config/<script_name>.json`)
      - Contains script-specific settings and overrides.
      - Always loaded after global config (can override global values).
      - Can be empty (`{}`) but must always exist.
@@ -86,7 +86,7 @@ class TestSystemPaths:
     def test_derived_paths(self, tmp_path):
         sp = SystemPaths(project_root=tmp_path)
         assert sp.agents_dir   == tmp_path / ".agents"
-        assert sp.shared_state == tmp_path / ".shared" / "state"
+        assert sp.system_state == tmp_path / ".system" / "state"
         assert sp.logs_dir     == tmp_path / ".agents" / "runtime" / "state" / "logs"
         assert sp.reports_dir  == tmp_path / ".agents" / "review" / "state" / "reports"
 
@@ -128,7 +128,7 @@ Now analyze the script and generate both configurations.
 
 ```
 NexusCampaigns/
-├── .shared/config/
+├── .system/config/
 │   ├── global.json
 │   └── classify_images.json
 ├── .agents/

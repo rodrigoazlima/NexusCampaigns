@@ -3,7 +3,7 @@
 Ingestion Agent — first stage of the vault pipeline.
   - Strips emoji from filenames in 00-Inbox/ (idempotent)
   - Converts .docx files vault-wide to GFM Markdown via Pandoc
-  - Registers new Inbox files into .shared/state/inbox-queue.json
+  - Registers new Inbox files into .system/state/inbox-queue.json
 
 No LLM calls. No 02-Library writes. No 00-Inbox deletes.
 """
@@ -51,7 +51,7 @@ DOCUMENT_EXTS = frozenset({".docx", ".doc", ".pdf", ".md", ".txt", ".odt"})
 
 _VAULT_ROOT   = _PROJECT_ROOT / "knowledge-base"
 _INBOX        = _VAULT_ROOT / "00-Inbox"
-_SHARED_STATE = _PROJECT_ROOT / ".shared" / "state"
+_SHARED_STATE = _PROJECT_ROOT / ".system" / "state"
 _QUEUE_FILE   = _SHARED_STATE / "inbox-queue.json"
 
 _AGENT_STATE    = _AGENTS_DIR / "ingestion" / "state"

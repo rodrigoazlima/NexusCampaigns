@@ -738,7 +738,7 @@ class RegistryConfig(BaseModel):
     version:            int                              = 1
     vault_root:         str
     agents_dir:         str                              = ".agents"
-    shared_dir:         str                              = ".shared"
+    shared_dir:         str                              = ".system"
     llm_endpoints:      dict[str, LLMEndpointSpec]       = Field(default_factory=dict)
     execution_order:    list[str]                        = Field(default_factory=list)
     shared_state_files: dict[str, SharedStateFileSpec]   = Field(default_factory=dict)

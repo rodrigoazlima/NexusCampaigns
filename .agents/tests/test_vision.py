@@ -67,7 +67,7 @@ def patch_roots(vault, tmp_path, monkeypatch):
     master_log = tmp_path / ".agents" / "runtime" / "state" / "logs" / "automation.log"
     master_log.parent.mkdir(parents=True)
     master_log.touch()
-    shared_state = tmp_path / ".shared" / "state"
+    shared_state = tmp_path / ".system" / "state"
     shared_state.mkdir(parents=True)
     signals_dir = tmp_path / ".agents" / "runtime" / "state" / "signals"
     signals_dir.mkdir(parents=True)

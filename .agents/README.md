@@ -10,7 +10,7 @@ This directory is the agent layer of the Nexus Campaigns. Each subdirectory is a
 |-----------|------|
 | Scripts are tools | Scripts never run standalone — they are owned and invoked by an agent |
 | State isolation | Each agent owns its state files under `{agent}/state/` |
-| Shared minimum | Code moves to `.shared/` only when used by 3+ agents |
+| Shared minimum | Code moves to `.system/` only when used by 3+ agents |
 | No self-approval | Agents may never set `reviewed: true` or promote to `02-Library/` |
 | Human gate | Canon requires explicit human action — no automation bypasses it |
 | CLI-agnostic | Agents declare `allowed_clis` — orchestrator decides which to use |
@@ -27,7 +27,7 @@ This directory is the agent layer of the Nexus Campaigns. Each subdirectory is a
 ┌─────────────┐
 │  ingestion  │  Normalize filenames, convert DOCX, register files in inbox-queue.json
 └──────┬──────┘
-       │ .shared/state/inbox-queue.json
+       │ .system/state/inbox-queue.json
        ▼
 ┌──────┴─────────────────────────────────────────┐
 │                                                │
@@ -136,7 +136,7 @@ state_files:      # state/ paths this agent owns
 ## Shared Resources
 
 ```
-.shared/
+.system/
   state/
     inbox-queue.json    ← written by ingestion; updated by vision, lore, wiki
   utils/
@@ -148,7 +148,7 @@ state_files:      # state/ paths this agent owns
     Write-InboxQueue.ps1
 ```
 
-Code belongs in `.shared/utils/` only when **3 or more agents** use it. Otherwise keep it local.
+Code belongs in `.system/utils/` only when **3 or more agents** use it. Otherwise keep it local.
 
 ---
 
@@ -192,7 +192,7 @@ New agents can be added without touching existing agents.
 
 | File | Owner | Location |
 |------|-------|----------|
-| `inbox-queue.json` | ingestion (writes) / all (update) | `.shared/state/` |
+| `inbox-queue.json` | ingestion (writes) / all (update) | `.system/state/` |
 | `processed-images.json` | vision | `.agents/vision/state/` |
 | `token-links.json` | vision | `.agents/vision/state/` |
 | `processed-npcs.json` | lore | `.agents/lore/state/` |
@@ -233,5 +233,5 @@ Windows Task Scheduler  (every 1 min)
 | Phase 1 | State files copied to agent state dirs, scripts path-updated | ⬜ Pending |
 | Phase 2 | Scripts moved to agent tools dirs, agent.json updated | ⬜ Pending |
 | Phase 3 | LLM prompts extracted to prompts/ files | ⬜ Pending |
-| Phase 4 | Shared PS utilities extracted to .shared/utils/ | ⬜ Pending |
+| Phase 4 | Shared PS utilities extracted to .system/utils/ | ⬜ Pending |
 | Phase 5 | Future agent skeletons completed | ⬜ Pending |

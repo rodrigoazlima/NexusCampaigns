@@ -98,7 +98,7 @@ Add matching entry to `state/tasks-state.json`:
 
 1. Strips emoji from filenames in `00-Inbox/` (idempotent)
 2. Converts `.docx` files to GFM Markdown via Pandoc; extracts images to `00-Inbox/images/{slug}/`
-3. Registers all new `00-Inbox/` files into `.shared/state/inbox-queue.json` with agent slots
+3. Registers all new `00-Inbox/` files into `.system/state/inbox-queue.json` with agent slots
 
 ### Prerequisites
 
@@ -109,7 +109,7 @@ Add matching entry to `state/tasks-state.json`:
 | File | Purpose |
 |------|---------|
 | `state/processed-docx.txt` | Skip list — DOCX files already converted |
-| `.shared/state/inbox-queue.json` | Per-file agent pipeline status (owned by ingestion) |
+| `.system/state/inbox-queue.json` | Per-file agent pipeline status (owned by ingestion) |
 
 ### inbox-queue.json schema
 
@@ -160,7 +160,7 @@ Remove the file path from `state/processed-docx.txt`, then run the agent.
 4. Calls Qwen3-VL with base64 image (max 1024px) → race, class, element, environment
 5. Renames file to canonical slug: `{race}-{class}-{element}.{ext}`
 6. Writes `01-Processing/{slug}.md` with full AGENTS.md frontmatter
-7. Updates `state/processed-images.json` and `.shared/state/inbox-queue.json`
+7. Updates `state/processed-images.json` and `.system/state/inbox-queue.json`
 
 ### State files
 

@@ -54,7 +54,7 @@ def patch_roots(vault, tmp_path, monkeypatch):
     monkeypatch.setattr(_mod, "_MASTER_LOG",  master_log)
     monkeypatch.setattr(_mod, "_BAD_DOCS",    agent_state / "bad-wiki-docs.txt")
 
-    inbox_queue = tmp_path / ".shared" / "state" / "inbox-queue.json"
+    inbox_queue = tmp_path / ".system" / "state" / "inbox-queue.json"
     inbox_queue.parent.mkdir(parents=True)
     monkeypatch.setattr(_mod, "_INBOX_QUEUE", inbox_queue)
 
@@ -211,7 +211,7 @@ class TestEnforceAndWrite:
 
 class TestMarkWikiDone:
     def test_updates_queue_entry(self, vault, patch_roots, tmp_path):
-        queue_path = tmp_path / ".shared" / "state" / "inbox-queue.json"
+        queue_path = tmp_path / ".system" / "state" / "inbox-queue.json"
         queue_path.parent.mkdir(parents=True, exist_ok=True)
         _write_queue(queue_path, {
             "00-Inbox/note.md": {
@@ -225,7 +225,7 @@ class TestMarkWikiDone:
         assert updated["00-Inbox/note.md"]["agents"]["wiki"] == "done"
 
     def test_tolerates_missing_entry(self, vault, patch_roots, tmp_path):
-        queue_path = tmp_path / ".shared" / "state" / "inbox-queue.json"
+        queue_path = tmp_path / ".system" / "state" / "inbox-queue.json"
         queue_path.parent.mkdir(parents=True, exist_ok=True)
         _write_queue(queue_path, {})
         # Should not raise
@@ -259,7 +259,7 @@ class TestBatchSize:
 
 class TestMainOffline:
     def test_exits_zero_when_llm_offline(self, vault, patch_roots, tmp_path):
-        queue_path = tmp_path / ".shared" / "state" / "inbox-queue.json"
+        queue_path = tmp_path / ".system" / "state" / "inbox-queue.json"
         queue_path.parent.mkdir(parents=True, exist_ok=True)
         _write_queue(queue_path, {
             "00-Inbox/note.md": {
@@ -281,7 +281,7 @@ class TestMainOffline:
         assert exc.value.code == 0
 
     def test_no_pending_exits_zero(self, vault, patch_roots, tmp_path):
-        queue_path = tmp_path / ".shared" / "state" / "inbox-queue.json"
+        queue_path = tmp_path / ".system" / "state" / "inbox-queue.json"
         queue_path.parent.mkdir(parents=True, exist_ok=True)
         _write_queue(queue_path, {})
 
@@ -300,7 +300,7 @@ class TestMainOffline:
 
 class TestMainHappyPath:
     def test_compiles_document_and_marks_done(self, vault, patch_roots, tmp_path):
-        queue_path = tmp_path / ".shared" / "state" / "inbox-queue.json"
+        queue_path = tmp_path / ".system" / "state" / "inbox-queue.json"
         queue_path.parent.mkdir(parents=True, exist_ok=True)
 
         doc = tmp_path / "00-Inbox" / "goblin-chief.md"
@@ -495,7 +495,7 @@ class TestUniqueOutput:
 
 class TestShortFileSkip:
     def test_short_file_marked_done_not_bad(self, vault, patch_roots, tmp_path):
-        queue_path = tmp_path / ".shared" / "state" / "inbox-queue.json"
+        queue_path = tmp_path / ".system" / "state" / "inbox-queue.json"
         queue_path.parent.mkdir(parents=True, exist_ok=True)
 
         short_doc = tmp_path / "00-Inbox" / "short.md"
@@ -536,7 +536,7 @@ class TestShortFileSkip:
 
 class TestContentTruncation:
     def test_long_content_truncated_in_prompt(self, vault, patch_roots, tmp_path):
-        queue_path = tmp_path / ".shared" / "state" / "inbox-queue.json"
+        queue_path = tmp_path / ".system" / "state" / "inbox-queue.json"
         queue_path.parent.mkdir(parents=True, exist_ok=True)
 
         long_doc = tmp_path / "00-Inbox" / "long-doc.md"
@@ -579,7 +579,7 @@ class TestContentTruncation:
 class TestLLMErrorHandling:
     def test_llm_response_error_records_bad_doc(self, vault, patch_roots, tmp_path):
         from shared import LLMResponseError
-        queue_path = tmp_path / ".shared" / "state" / "inbox-queue.json"
+        queue_path = tmp_path / ".system" / "state" / "inbox-queue.json"
         queue_path.parent.mkdir(parents=True, exist_ok=True)
 
         doc = tmp_path / "00-Inbox" / "broken-doc.md"
@@ -610,7 +610,7 @@ class TestLLMErrorHandling:
 
     def test_llm_offline_during_batch_aborts_without_bad_doc(self, vault, patch_roots, tmp_path):
         from shared import LLMOfflineError
-        queue_path = tmp_path / ".shared" / "state" / "inbox-queue.json"
+        queue_path = tmp_path / ".system" / "state" / "inbox-queue.json"
         queue_path.parent.mkdir(parents=True, exist_ok=True)
 
         doc = tmp_path / "00-Inbox" / "offline-doc.md"
@@ -680,14 +680,14 @@ class TestCallTool:
         assert "Canon context loaded" in result
 
     def test_scan_pending_returns_count(self, vault, patch_roots, tmp_path):
-        queue_path = tmp_path / ".shared" / "state" / "inbox-queue.json"
+        queue_path = tmp_path / ".system" / "state" / "inbox-queue.json"
         queue_path.parent.mkdir(parents=True, exist_ok=True)
         _write_queue(queue_path, {})
         result = _mod.call_tool("scan_pending", {}, {"project_root": str(tmp_path)})
         assert "Pending documents" in result
 
     def test_run_batch_dispatches(self, vault, patch_roots, tmp_path):
-        queue_path = tmp_path / ".shared" / "state" / "inbox-queue.json"
+        queue_path = tmp_path / ".system" / "state" / "inbox-queue.json"
         queue_path.parent.mkdir(parents=True, exist_ok=True)
         _write_queue(queue_path, {})
         mock_client = MagicMock()
@@ -697,7 +697,7 @@ class TestCallTool:
         assert result is not None
 
     def test_synthesize_entity_missing_file(self, vault, patch_roots, tmp_path):
-        queue_path = tmp_path / ".shared" / "state" / "inbox-queue.json"
+        queue_path = tmp_path / ".system" / "state" / "inbox-queue.json"
         queue_path.parent.mkdir(parents=True, exist_ok=True)
         _write_queue(queue_path, {})
         result = _mod.call_tool(
@@ -711,7 +711,7 @@ class TestCallTool:
         bad_path = tmp_path / ".agents" / "wiki" / "state" / "bad-wiki-docs.txt"
         bad_path.parent.mkdir(parents=True, exist_ok=True)
         bad_path.write_text("00-Inbox/bad.md\n", encoding="utf-8")
-        queue_path = tmp_path / ".shared" / "state" / "inbox-queue.json"
+        queue_path = tmp_path / ".system" / "state" / "inbox-queue.json"
         queue_path.parent.mkdir(parents=True, exist_ok=True)
         _write_queue(queue_path, {})
         result = _mod.call_tool(

@@ -10,13 +10,13 @@ inputs:
   - .agents/vision/state/processed-images.json (read-only)
   - state/processed-npcs.json
   - state/scenarios.json
-  - .shared/state/inbox-queue.json
+  - .system/state/inbox-queue.json
   - vault://02-Library/**/*.md (read-only: canon context, up to 50 entities)
   - LLM: http://localhost:1234/v1/chat/completions (Qwen3-VL)
 outputs:
   - vault://01-Processing/{image-stem}-{scenario-id}.md (NPC draft)
   - state/processed-npcs.json (updated index)
-  - .shared/state/inbox-queue.json (agents.lore = done)
+  - .system/state/inbox-queue.json (agents.lore = done)
   - state/logs/09-generate-npcs_YYYY-MM-DD.log
 dependencies:
   - ingestion
@@ -50,5 +50,5 @@ state_files:
 commit_scope:
   - knowledge-base/01-Processing
   - .agents/lore/state
-  - .shared/state
+  - .system/state
 ---

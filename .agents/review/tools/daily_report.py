@@ -42,7 +42,7 @@ _MASTER_LOG   = _ORCH_STATE / "logs" / "automation.log"
 _AGENT_STATE  = _AGENTS_DIR / "review" / "state"
 _LOGS_DIR     = _AGENT_STATE / "logs"
 _REPORTS_DIR  = _AGENT_STATE / "reports"
-_QUEUE_FILE   = _PROJECT_ROOT / ".shared" / "state" / "inbox-queue.json"
+_QUEUE_FILE   = _PROJECT_ROOT / ".system" / "state" / "inbox-queue.json"
 
 _LOG_LINE_RE  = re.compile(
     r"^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\] \[([^\]]+)\] (\w+): (.+)$"

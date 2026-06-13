@@ -42,7 +42,7 @@ config = get_config(__file__, as_pydantic=True)
 
 ```
 NexusCampaigns/
-├── .shared/config/
+├── .system/config/
 │   ├── global.json
 │   └── classify_images.json
 ├── .agents/

@@ -6,10 +6,10 @@ Analyze the provided Python script and extract all relevant configuration settin
 **Requirements:**
 
 1. **Two-level configuration architecture:**
-   - **Level 1: Global Shared Config** (`.shared/config/global.json`)
+   - **Level 1: Global Shared Config** (`.system/config/global.json`)
      - Contains variables and settings that are shared across multiple scripts/agents.
      - Always loaded first.
-   - **Level 2: Local Script Config** (`.shared/config/<script_name>.json`)
+   - **Level 2: Local Script Config** (`.system/config/<script_name>.json`)
      - Contains script-specific settings and overrides.
      - Always loaded after global config (can override global values).
      - Can be empty (`{}`) but must always exist.
@@ -110,7 +110,7 @@ SELF_MANAGEMENT_TOOLS: list[dict[str, Any]] = [
         "name": "request_human_review",
         "description": (
             "Flag a file or item for human attention. Writes an entry to "
-            ".shared/state/review-requests.json. Use when something needs human judgment."
+            ".system/state/review-requests.json. Use when something needs human judgment."
         ),
         "input_schema": {
             "type": "object",
@@ -268,7 +268,7 @@ def _write_state(rel_path: str, data: dict, merge: bool, context: dict) -> str:
 
 
 def _request_human_review(item: str, reason: str, context: dict, task_id: str) -> str:
-    review_file = Path(context["project_root"]) / ".shared" / "state" / "review-requests.json"
+    review_file = Path(context["project_root"]) / ".system" / "state" / "review-requests.json"
     review_file.parent.mkdir(parents=True, exist_ok=True)
 
     requests: list[dict] = []
@@ -428,7 +428,7 @@ Now analyze the script and generate both configurations.
 
 ```
 NexusCampaigns/
-├── .shared/config/
+├── .system/config/
 │   ├── global.json
 │   └── classify_images.json
 ├── .agents/
