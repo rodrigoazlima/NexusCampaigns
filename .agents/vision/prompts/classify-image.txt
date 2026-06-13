@@ -36,7 +36,7 @@ If type = battlemap or scene:
                    ruins / temple / castle / plains / mountain / volcano / underwater /
                    sky / astral / shadow / interior / exterior
 
-element → dominant magical feel (fire / water / earth / air / nature / dark / light /
+element → dominant magical feel (fire / water / earth / air / metal / wood / nature / dark / light /
            void / vitality / none)
 
 description → 1 sentence of evocative flavour text written for a DM reading notes.

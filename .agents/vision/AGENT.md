@@ -18,35 +18,34 @@ outputs:
   - state/processed-images.json (updated index)
   - state/token-links.json (face match links)
   - .shared/state/inbox-queue.json (agents.vision = done)
-  - state/logs/06-classify-images_YYYY-MM-DD.log
+  - state/logs/classify_images.py_YYYY-MM-DD.log
 dependencies:
   - ingestion
 dispatch_config: agent.json
 owned_tools:
-  - tools/06-classify-images.ps1
-  - tools/06-match-token.py
+  - tools/classify_images.py
 responsibilities:
   - Pre-flight check LM Studio at localhost:1234 before processing batch
-  - Detect transparent-corner PNGs as tokens (alpha sample 8 edge points)
-  - For tokens: run face-match via 06-match-token.py against non-token images in same folder
+  - Detect transparent-corner PNGs as tokens (≥2 of 4 corners with alpha < 128)
+  - For tokens: run face-match via cosine similarity against non-token images in same folder
   - Inherit classification metadata from matched source portrait if face-match succeeds
   - Call Qwen3-VL with base64-encoded image (resize to max 1024px on longest side, JPEG 85%)
-  - Validate LLM JSON response against allowed race/class/element/environment enums
-  - Build target filename slug; bump existing same-named file to counter suffix
+  - Validate LLM JSON response against PF2e vocabulary (see models.py PF2E_* constants)
+  - Build target filename slug; bump existing same-named file to counter suffix (e.g. -01, -02)
   - Write AGENTS.md-compliant draft to 01-Processing/ (status: draft, quality: 0, reviewed: false)
   - Append row to Images Index.md
   - Save result to processed-images.json after each classified image (not at batch end)
   - Update inbox-queue.json agents.vision = done for each processed file
+  - Emit image-classified signal to signals dir (fire-and-forget per G5)
   - Abort batch silently on connection-error (do not mark image as failed)
   - Batch: 10 images per run; process non-PNG before PNG (tokens last)
 restrictions:
-  - Must not approve content
+  - Must not approve content (reviewed: false, status: draft always)
   - Must not modify 02-Library/
   - Must not mark images as failed on connection-error (only on repeated API errors)
   - Max 3 LLM retries per image with 3s backoff
 state_files:
   - state/processed-images.json
-  - state/processed-images.txt (legacy migration source)
   - state/token-links.json
 commit_scope:
   - knowledge-base/00-Inbox/images
@@ -60,14 +59,28 @@ commit_scope:
 ### Image Types
 portrait · body · battlemap · scene · token
 
-### Races
-human · elf · dark-elf · dwarf · orc · goblin · troll · ogre · dragon · angel · devil · demon · undead · skeleton · zombie · vampire · werewolf · spirit
+### PF2e Ancestries
+human · elf · dwarf · halfling · gnome · goblin · leshy · lizardfolk · ratfolk · tengu ·
+catfolk · orc · shoony · anadi · grippli · automaton · fleshwarp · fetchling · sprite ·
+kitsune · kobold · android · strix · vanara · gnoll · goloma · hobgoblin · poppet · shisk ·
+conrasu · beastkin · azarketi · dhampir · aasimar · tiefling · changeling · half-elf ·
+half-orc · duskwalker · geniekin · ifrit · oread · sylph · undine · nagaji · vishkanya ·
+dark-elf · none
 
-### Classes
-warrior · mage · archer · cleric · paladin · necromancer · assassin · monster · none
+### PF2e Classes
+alchemist · barbarian · bard · champion · cleric · druid · fighter · gunslinger · inventor ·
+investigator · kineticist · magus · monk · oracle · psychic · ranger · rogue · sorcerer ·
+summoner · swashbuckler · thaumaturge · witch · wizard · animist · exemplar · commander · none
+
+### PF2e Creature Types (monsters without a class)
+aberration · animal · astral · beast · celestial · construct · dragon · dream · elemental ·
+fey · fiend · fungus · giant · humanoid · monitor · ooze · phantom · plant · spirit ·
+time · undead · none
 
 ### Elements
-fire · water · earth · air · nature · dark · light · none
+fire · water · earth · air · metal · wood · nature · dark · light · void · vitality · none
 
-### Environments (battlemap/scene)
-dungeon · cave · forest · city · tavern · desert · snow · sea · swamp · ruins · temple · castle · plains · mountain · interior · exterior · none
+### Environments (battlemap/scene only)
+dungeon · cave · forest · city · tavern · desert · snow · sea · swamp · ruins · temple ·
+castle · plains · mountain · volcano · underwater · sky · astral · shadow · abyss ·
+interior · exterior · none

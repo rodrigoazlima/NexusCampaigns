@@ -684,6 +684,119 @@ class TestToolsDefinition:
 
 
 # ---------------------------------------------------------------------------
+# _resolve_entity_path
+# ---------------------------------------------------------------------------
+
+class TestResolveEntityPath:
+    def test_returns_slug_md_when_no_collision(self, patch_roots, vault):
+        path = _mod._resolve_entity_path("portrait-human-fighter-dark")
+        assert path == vault / "01-Processing" / "portrait-human-fighter-dark.md"
+
+    def test_bumps_on_collision(self, patch_roots, vault):
+        (vault / "01-Processing" / "portrait-human-fighter-dark.md").touch()
+        path = _mod._resolve_entity_path("portrait-human-fighter-dark")
+        assert path.name == "portrait-human-fighter-dark-01.md"
+
+    def test_bumps_twice(self, patch_roots, vault):
+        (vault / "01-Processing" / "portrait-human-fighter-dark.md").touch()
+        (vault / "01-Processing" / "portrait-human-fighter-dark-01.md").touch()
+        path = _mod._resolve_entity_path("portrait-human-fighter-dark")
+        assert path.name == "portrait-human-fighter-dark-02.md"
+
+    def test_creates_processing_dir_if_missing(self, patch_roots, vault):
+        import shutil
+        shutil.rmtree(vault / "01-Processing")
+        path = _mod._resolve_entity_path("battlemap-dungeon")
+        assert path.parent.exists()
+
+
+# ---------------------------------------------------------------------------
+# _rename_image
+# ---------------------------------------------------------------------------
+
+class TestRenameImage:
+    def test_renames_to_canonical_slug(self, patch_roots, vault):
+        img = vault / "00-Inbox" / "images" / "A1" / "warrior.jpg"
+        img.parent.mkdir(parents=True, exist_ok=True)
+        img.write_bytes(b"\xff\xd8\xff" + b"\x00" * 64)
+        c = _clf(type_="portrait", ancestry="human", char_class="fighter", element="dark")
+        new_path = _mod._rename_image(img, c)
+        assert new_path.name == "human-fighter-dark.portrait.jpg"
+        assert new_path.exists()
+        assert not img.exists()
+
+    def test_no_rename_when_already_canonical(self, patch_roots, vault):
+        img = vault / "00-Inbox" / "images" / "A1" / "human-fighter-dark.portrait.jpg"
+        img.parent.mkdir(parents=True, exist_ok=True)
+        img.write_bytes(b"\xff\xd8\xff" + b"\x00" * 64)
+        c = _clf(type_="portrait", ancestry="human", char_class="fighter", element="dark")
+        new_path = _mod._rename_image(img, c)
+        assert new_path == img
+
+    def test_bumps_colliding_slug(self, patch_roots, vault):
+        folder = vault / "00-Inbox" / "images" / "A1"
+        folder.mkdir(parents=True, exist_ok=True)
+        existing = folder / "human-fighter-dark.portrait.jpg"
+        existing.write_bytes(b"\xff\xd8\xff" + b"\x00" * 64)
+        src = folder / "warrior_v2.jpg"
+        src.write_bytes(b"\xff\xd8\xff" + b"\x00" * 64)
+        c = _clf(type_="portrait", ancestry="human", char_class="fighter", element="dark")
+        new_path = _mod._rename_image(src, c)
+        assert new_path.name == "human-fighter-dark.portrait-01.jpg"
+
+
+# ---------------------------------------------------------------------------
+# _append_index
+# ---------------------------------------------------------------------------
+
+class TestAppendIndex:
+    def test_creates_index_with_header_when_missing(self, patch_roots, vault):
+        img = vault / "00-Inbox" / "images" / "A1" / "human-fighter-dark.portrait.jpg"
+        img.parent.mkdir(parents=True, exist_ok=True)
+        img.write_bytes(b"\xff\xd8\xff" + b"\x00" * 64)
+        c = _clf(type_="portrait", ancestry="human", char_class="fighter", element="dark")
+        _mod._append_index(img, c, "portrait-human-fighter-dark")
+        index = vault / "01-Processing" / "Images Index.md"
+        assert index.exists()
+        content = index.read_text(encoding="utf-8")
+        assert "# Images Index" in content
+        assert "| Date | Entity | Type | Ancestry | Element | Source |" in content
+
+    def test_appends_row_with_correct_fields(self, patch_roots, vault, tmp_path):
+        img = vault / "00-Inbox" / "images" / "A1" / "human-fighter-dark.portrait.jpg"
+        img.parent.mkdir(parents=True, exist_ok=True)
+        img.write_bytes(b"\xff\xd8\xff" + b"\x00" * 64)
+        c = _clf(type_="portrait", ancestry="human", char_class="fighter", element="dark")
+        _mod._append_index(img, c, "portrait-human-fighter-dark")
+        content = (vault / "01-Processing" / "Images Index.md").read_text(encoding="utf-8")
+        assert "[[portrait-human-fighter-dark]]" in content
+        assert "portrait" in content
+        assert "human" in content
+        assert "dark" in content
+
+    def test_appends_multiple_rows(self, patch_roots, vault, tmp_path):
+        folder = vault / "00-Inbox" / "images" / "A1"
+        folder.mkdir(parents=True, exist_ok=True)
+        for name, elt in [("img1.jpg", "dark"), ("img2.jpg", "fire")]:
+            img = folder / name
+            img.write_bytes(b"\xff\xd8\xff" + b"\x00" * 64)
+            c = _clf(element=elt)
+            _mod._append_index(img, c, f"portrait-human-fighter-{elt}")
+        content = (vault / "01-Processing" / "Images Index.md").read_text(encoding="utf-8")
+        rows = [ln for ln in content.splitlines() if ln.startswith("|") and "portrait" in ln]
+        assert len(rows) == 2
+
+    def test_row_uses_creature_type_when_ancestry_is_none(self, patch_roots, vault, tmp_path):
+        img = vault / "00-Inbox" / "images" / "dragon.jpg"
+        img.parent.mkdir(parents=True, exist_ok=True)
+        img.write_bytes(b"\xff\xd8\xff" + b"\x00" * 64)
+        c = _clf(ancestry="none", creature_type="dragon", element="fire")
+        _mod._append_index(img, c, "portrait-dragon-fire")
+        content = (vault / "01-Processing" / "Images Index.md").read_text(encoding="utf-8")
+        assert "dragon" in content
+
+
+# ---------------------------------------------------------------------------
 # call_tool dispatch
 # ---------------------------------------------------------------------------
 

@@ -252,9 +252,21 @@ Every script emits `--- START ---` and `--- DONE ---`. `--- DONE ---` format:
 After every successful run, changes are committed and pushed:
 
 ```bash
-git add -A
+git add -A {agent.scope}
 git commit -m "vault: {task-id} YYYY-MM-DD HH:mm"
 git push
 ```
 
 Commit skipped if no working-tree changes.
+
+
+# How to Monitor
+
+## Live log tail
+Get-Content 'C:\opt\GitHub\NexusCampaigns\.agents\runtime\state\logs\automation.log' -Tail 50 -Wait
+
+## Status check
+pwsh -File '.agents\runtime\tools\setup-service.ps1' -Status
+
+## Uninstall
+pwsh -File '.agents\runtime\tools\setup-service.ps1' -Uninstall

@@ -1,7 +1,7 @@
 """classification.tools.enrich_tags
 
 Actions: EnrichTags · InferType · FlagDuplicates
-Reads:   00-Inbox/**/*.md, 01-Processing/**/*.md
+Reads:   00-Inbox/**/*.md, 01-Processing/**/*.md, .shared/state/inbox-queue.json
 Writes:  enriched frontmatter in-place (never 02-Library/)
 LLM:     LocalRouter http://localhost:8080 (openai-compat, model=auto)
 """
@@ -13,7 +13,7 @@ import sys
 import time
 from difflib import SequenceMatcher
 from pathlib import Path
-from typing import Optional
+from typing import Any
 
 _TOOLS_DIR    = Path(__file__).resolve().parent
 _AGENTS_DIR   = _TOOLS_DIR.parents[1]
@@ -37,15 +37,17 @@ TASK_ID         = "classification-agent"
 SCRIPT_BASENAME = "enrich_tags.py"
 BATCH_SIZE      = 20
 
-_VAULT_ROOT  = _PROJECT_ROOT / "knowledge-base"
-_INBOX       = _VAULT_ROOT / "00-Inbox"
-_PROCESSING  = _VAULT_ROOT / "01-Processing"
-_LIBRARY     = _VAULT_ROOT / "02-Library"
-_AGENT_STATE = _AGENTS_DIR / "classification" / "state"
-_LOGS_DIR    = _AGENT_STATE / "logs"
-_MASTER_LOG  = _AGENTS_DIR / "runtime" / "state" / "logs" / "automation.log"
-_BAD_DOCS    = _AGENT_STATE / "bad-docs.txt"
-_PROMPT_FILE = _AGENTS_DIR / "classification" / "prompts" / "enrich-tags.txt"
+_VAULT_ROOT   = _PROJECT_ROOT / "knowledge-base"
+_INBOX        = _VAULT_ROOT / "00-Inbox"
+_PROCESSING   = _VAULT_ROOT / "01-Processing"
+_LIBRARY      = _VAULT_ROOT / "02-Library"
+_AGENT_STATE  = _AGENTS_DIR / "classification" / "state"
+_LOGS_DIR     = _AGENT_STATE / "logs"
+_MASTER_LOG   = _AGENTS_DIR / "runtime" / "state" / "logs" / "automation.log"
+_BAD_DOCS     = _AGENT_STATE / "bad-docs.txt"
+_PROMPT_FILE  = _AGENTS_DIR / "classification" / "prompts" / "enrich-tags.txt"
+_SHARED_STATE = _PROJECT_ROOT / ".shared" / "state"
+_QUEUE_FILE   = _SHARED_STATE / "inbox-queue.json"
 
 _ALLOWED_TAGS: frozenset[str] = frozenset({
     "npc", "creature", "monster", "location", "dungeon", "city", "village",
@@ -111,7 +113,8 @@ def _library_slugs() -> set[str]:
     return {p.stem.lower() for p in _LIBRARY.glob("**/*.md")}
 
 
-def _candidate_files(bad_docs: set[str]) -> list[Path]:
+def _candidate_files(bad_docs: set[str], *, limit: int = 0) -> list[Path]:
+    """Return .md files from Inbox and Processing, excluding bad-docs. limit=0 means no cap."""
     paths: list[Path] = []
     for root in (_INBOX, _PROCESSING):
         if root.is_dir():
@@ -120,7 +123,7 @@ def _candidate_files(bad_docs: set[str]) -> list[Path]:
                     rel = p.relative_to(_PROJECT_ROOT).as_posix()
                     if rel not in bad_docs:
                         paths.append(p)
-    return paths
+    return paths[:limit] if limit > 0 else paths
 
 
 def _assert_not_library(path: Path) -> None:
@@ -161,29 +164,71 @@ def _slug_similarity(a: str, b: str) -> float:
 
 
 # ---------------------------------------------------------------------------
-# EnrichTags action — main entry point
+# Queue helpers
 # ---------------------------------------------------------------------------
 
-def main() -> None:
-    """EnrichTags + InferType in one LLM call per sparse file."""
-    log = _make_logger()
-    t0  = log.start()
+def _load_queue() -> dict[str, Any]:
+    """Load inbox-queue.json; returns empty dict if missing or unparseable."""
+    if not _QUEUE_FILE.exists():
+        return {}
+    try:
+        return _json.loads(_QUEUE_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _is_queue_done(queue: dict[str, Any], rel: str) -> bool:
+    """Return True if the file's classification slot is already done or skip."""
+    entry = queue.get(rel)
+    if entry is None:
+        return False
+    agents = entry.get("agents")
+    if not isinstance(agents, dict):
+        return False
+    return agents.get("classification") in ("done", "skip")
+
+
+def _mark_queue_done(queue: dict[str, Any], rel: str) -> None:
+    """Atomically mark classification slot done for rel in inbox-queue.json."""
+    entry = queue.get(rel)
+    if entry is None:
+        return
+    agents = entry.get("agents")
+    if not isinstance(agents, dict) or agents.get("classification") != "pending":
+        return
+    agents["classification"] = "done"
+    tmp = _QUEUE_FILE.with_suffix(".tmp")
+    tmp.write_text(_json.dumps(queue, indent=2, default=str), encoding="utf-8")
+    tmp.replace(_QUEUE_FILE)
+
+
+# ---------------------------------------------------------------------------
+# EnrichTags action — core loop
+# ---------------------------------------------------------------------------
+
+def _run_enrich_tags() -> tuple[int, int]:
+    """EnrichTags + InferType in one LLM call per sparse file. Returns (count, failed)."""
     _AGENT_STATE.mkdir(parents=True, exist_ok=True)
 
     client = LLMClient(_LLM_CFG)
     if not client.is_available():
+        log = _make_logger()
         log.warning("LocalRouter (localhost:8080) offline — skipping batch")
-        log.done(t0, key="classified", count=0, failed=0)
-        sys.exit(0)
+        return 0, 0
 
     bad_docs   = _load_bad_docs()
+    queue      = _load_queue()
     fio        = FrontmatterIO()
     prompt_tpl = _load_prompt_template()
     count      = 0
     failed     = 0
+    log        = _make_logger()
 
-    for md_path in _candidate_files(bad_docs):
+    for md_path in _candidate_files(bad_docs, limit=BATCH_SIZE):
         rel = md_path.relative_to(_PROJECT_ROOT).as_posix()
+
+        if _is_queue_done(queue, rel):
+            continue
 
         try:
             fm, body = fio.read(md_path)
@@ -199,6 +244,8 @@ def main() -> None:
         needs_type    = not has_type
 
         if not needs_tags and not needs_type:
+            _mark_queue_done(queue, rel)
+            count += 1
             continue
 
         title   = fm.get("id") or md_path.stem
@@ -242,15 +289,25 @@ def main() -> None:
             ok = _write_with_retry(md_path, fm, body, fio)
             if ok:
                 log.info(f"Enriched: {md_path.name} tags={fm.get('tags')} type={fm.get('type')}")
+                _mark_queue_done(queue, rel)
                 count += 1
             else:
                 log.error(f"Write failed: {md_path.name}")
                 failed += 1
         else:
+            _mark_queue_done(queue, rel)
             count += 1
 
         time.sleep(0.3)
 
+    return count, failed
+
+
+def main() -> None:
+    """EnrichTags entry point — called when run as a CLI script."""
+    log = _make_logger()
+    t0  = log.start()
+    count, failed = _run_enrich_tags()
     log.done(t0, key="classified", count=count, failed=failed)
     sys.exit(0 if failed == 0 else 1)
 
@@ -379,7 +436,8 @@ TOOLS = SELF_MANAGEMENT_TOOLS + [
         "description": (
             "Process notes in 00-Inbox/ and 01-Processing/ that have ≤5 tags or a missing "
             "type field. Calls LocalRouter LLM to suggest DM-domain tags and infer entity "
-            "type in one pass. Returns count of enriched files."
+            "type in one pass. Updates inbox-queue.json classification slot to done. "
+            "Returns count of enriched files."
         ),
         "input_schema": {"type": "object", "properties": {}},
     },
@@ -412,15 +470,8 @@ def call_tool(name: str, args: dict, context: dict) -> str:
         return result
 
     if name == "enrich_tags":
-        import contextlib
-        import io as _io
-        buf = _io.StringIO()
-        try:
-            with contextlib.redirect_stdout(buf):
-                main()
-        except SystemExit:
-            pass
-        return buf.getvalue() or "EnrichTags run complete"
+        count, failed = _run_enrich_tags()
+        return f"EnrichTags complete: enriched={count} failed={failed}"
 
     if name == "infer_type":
         count, failed = _run_infer_type()

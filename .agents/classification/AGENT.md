@@ -52,7 +52,7 @@ commit_scope:
   - .shared/state
 ---
 
-## Valid Tags (29)
+## Valid Tags (28)
 npc · creature · monster · location · dungeon · city · village · faction · quest · encounter · item · artifact · lore · religion · event · organization · timeline · undead · dark · fire · light · none · portrait · battlemap · scene · token · images · pathfinder2e
 
 ## Valid Types (18)

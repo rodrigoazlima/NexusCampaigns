@@ -1,6 +1,7 @@
 """Tests for classification.tools.enrich_tags."""
 
 import json
+import json as _json
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -311,6 +312,13 @@ class TestCallTool:
         with pytest.raises(ValueError, match="Unknown tool"):
             _mod.call_tool("no_such_tool", {}, {"project_root": "/tmp"})
 
+    def test_enrich_tags_dispatches(self):
+        with patch.object(_mod, "_run_enrich_tags", return_value=(5, 0)) as mock:
+            result = _mod.call_tool("enrich_tags", {}, {"project_root": "/tmp"})
+        mock.assert_called_once()
+        assert "enriched=5" in result
+        assert "failed=0" in result
+
     def test_infer_type_dispatches(self):
         with patch.object(_mod, "_run_infer_type", return_value=(3, 0)) as mock:
             result = _mod.call_tool("infer_type", {}, {"project_root": "/tmp"})
@@ -322,3 +330,143 @@ class TestCallTool:
             result = _mod.call_tool("flag_duplicates", {}, {"project_root": "/tmp"})
         mock.assert_called_once()
         assert "flagged=2" in result
+
+
+# ---------------------------------------------------------------------------
+# Queue integration
+# ---------------------------------------------------------------------------
+
+class TestQueueHelpers:
+    def test_load_queue_missing_file(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(_mod, "_QUEUE_FILE", tmp_path / "no-queue.json")
+        assert _mod._load_queue() == {}
+
+    def test_load_queue_corrupt_file(self, tmp_path, monkeypatch):
+        q = tmp_path / "inbox-queue.json"
+        q.write_text("not json", encoding="utf-8")
+        monkeypatch.setattr(_mod, "_QUEUE_FILE", q)
+        assert _mod._load_queue() == {}
+
+    def test_load_queue_valid(self, tmp_path, monkeypatch):
+        data = {"knowledge-base/00-Inbox/a.md": {"type": "document", "agents": {"classification": "pending"}}}
+        q = tmp_path / "inbox-queue.json"
+        q.write_text(_json.dumps(data), encoding="utf-8")
+        monkeypatch.setattr(_mod, "_QUEUE_FILE", q)
+        result = _mod._load_queue()
+        assert "knowledge-base/00-Inbox/a.md" in result
+
+    def test_is_queue_done_absent(self):
+        assert _mod._is_queue_done({}, "some/file.md") is False
+
+    def test_is_queue_done_pending(self):
+        q = {"f.md": {"agents": {"classification": "pending"}}}
+        assert _mod._is_queue_done(q, "f.md") is False
+
+    def test_is_queue_done_done(self):
+        q = {"f.md": {"agents": {"classification": "done"}}}
+        assert _mod._is_queue_done(q, "f.md") is True
+
+    def test_is_queue_done_skip(self):
+        q = {"f.md": {"agents": {"classification": "skip"}}}
+        assert _mod._is_queue_done(q, "f.md") is True
+
+    def test_mark_queue_done_writes_file(self, tmp_path, monkeypatch):
+        data = {"knowledge-base/00-Inbox/a.md": {"agents": {"classification": "pending"}}}
+        q = tmp_path / "inbox-queue.json"
+        q.write_text(_json.dumps(data), encoding="utf-8")
+        monkeypatch.setattr(_mod, "_QUEUE_FILE", q)
+
+        _mod._mark_queue_done(data, "knowledge-base/00-Inbox/a.md")
+
+        saved = _json.loads(q.read_text(encoding="utf-8"))
+        assert saved["knowledge-base/00-Inbox/a.md"]["agents"]["classification"] == "done"
+
+    def test_mark_queue_done_no_op_when_not_pending(self, tmp_path, monkeypatch):
+        data = {"f.md": {"agents": {"classification": "done"}}}
+        q = tmp_path / "inbox-queue.json"
+        q.write_text(_json.dumps(data), encoding="utf-8")
+        monkeypatch.setattr(_mod, "_QUEUE_FILE", q)
+        # Should not write / raise
+        _mod._mark_queue_done(data, "f.md")
+
+    def test_mark_queue_done_no_op_when_absent(self, tmp_path, monkeypatch):
+        q = tmp_path / "inbox-queue.json"
+        monkeypatch.setattr(_mod, "_QUEUE_FILE", q)
+        _mod._mark_queue_done({}, "missing.md")  # must not raise
+
+
+class TestQueueIntegration:
+    """_run_enrich_tags skips queue-done files and marks processed files done."""
+
+    def test_skips_file_already_done_in_queue(self, patch_roots, vault, tmp_path, monkeypatch):
+        proc = vault / "01-Processing" / "npc-hero.md"
+        _write_md(proc, {"id": "npc-hero", "tags": []})
+        rel = proc.relative_to(tmp_path).as_posix()
+
+        queue_data = {rel: {"agents": {"classification": "done"}}}
+        q = tmp_path / ".shared" / "state" / "inbox-queue.json"
+        q.parent.mkdir(parents=True, exist_ok=True)
+        q.write_text(_json.dumps(queue_data), encoding="utf-8")
+        monkeypatch.setattr(_mod, "_QUEUE_FILE", q)
+
+        with patch("classification.tools.enrich_tags.LLMClient") as MockClient:
+            MockClient.return_value.is_available.return_value = True
+            count, failed = _mod._run_enrich_tags()
+
+        # file was skipped — LLM chat never called
+        MockClient.return_value.chat.assert_not_called()
+        assert count == 0
+        assert failed == 0
+
+    def test_marks_queue_done_after_successful_enrichment(self, patch_roots, vault, tmp_path, monkeypatch):
+        import yaml
+        proc = vault / "01-Processing" / "npc-hero.md"
+        _write_md(proc, {"id": "npc-hero", "tags": []}, body="A brave warrior.")
+        rel = proc.relative_to(tmp_path).as_posix()
+
+        queue_data = {rel: {"agents": {"classification": "pending"}}}
+        q = tmp_path / ".shared" / "state" / "inbox-queue.json"
+        q.parent.mkdir(parents=True, exist_ok=True)
+        q.write_text(_json.dumps(queue_data), encoding="utf-8")
+        monkeypatch.setattr(_mod, "_QUEUE_FILE", q)
+
+        with patch("classification.tools.enrich_tags.LLMClient") as MockClient:
+            MockClient.return_value.is_available.return_value = True
+            MockClient.return_value.chat.return_value = '{"tags": ["npc"], "type": "npc"}'
+            count, failed = _mod._run_enrich_tags()
+
+        assert count == 1
+        assert failed == 0
+        saved = _json.loads(q.read_text(encoding="utf-8"))
+        assert saved[rel]["agents"]["classification"] == "done"
+
+    def test_skips_queue_done_no_queue_file(self, patch_roots, vault, tmp_path, monkeypatch):
+        """Files not in queue are still processed normally."""
+        proc = vault / "01-Processing" / "unknown.md"
+        _write_md(proc, {"id": "unknown", "tags": []}, body="A dark dungeon.")
+        monkeypatch.setattr(_mod, "_QUEUE_FILE", tmp_path / "no-queue.json")
+
+        with patch("classification.tools.enrich_tags.LLMClient") as MockClient:
+            MockClient.return_value.is_available.return_value = True
+            MockClient.return_value.chat.return_value = '{"tags": ["dungeon"], "type": "dungeon"}'
+            count, _ = _mod._run_enrich_tags()
+
+        assert count == 1
+
+
+# ---------------------------------------------------------------------------
+# BATCH_SIZE enforcement
+# ---------------------------------------------------------------------------
+
+class TestBatchSize:
+    def test_candidate_files_limit(self, patch_roots, vault):
+        for i in range(30):
+            (vault / "01-Processing" / f"npc-{i:02d}.md").touch()
+        paths = _mod._candidate_files(set(), limit=20)
+        assert len(paths) == 20
+
+    def test_candidate_files_no_limit(self, patch_roots, vault):
+        for i in range(25):
+            (vault / "01-Processing" / f"npc-{i:02d}.md").touch()
+        paths = _mod._candidate_files(set(), limit=0)
+        assert len(paths) == 25
