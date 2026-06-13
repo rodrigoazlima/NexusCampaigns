@@ -10,6 +10,9 @@ import type {
   QueueItem,
   QueueStats,
   ReviewItem,
+  ItemDetail,
+  ImageClassification,
+  TokenConfig,
   PipelineData,
   LogLine,
   DailyReport,
@@ -546,6 +549,98 @@ export function readInboxImages(): InboxImage[] {
   })
 
   return results
+}
+
+// ---------------------------------------------------------------------------
+// Item detail (single review item by id)
+// ---------------------------------------------------------------------------
+
+const TOKEN_ELIGIBLE_TYPES = new Set(['portrait', 'body'])
+const DEFAULT_MOLDURA = 'knowledge-base/00-Inbox/tokens/Molduras/moldura_default.png'
+const TOKEN_CONFIG_PATH = path.join(PROJECT_ROOT, '.shared', 'state', 'token-config.json')
+
+export function readVisionState(): Record<string, ImageClassification & { path: string; status: string }> {
+  const visionPath = path.join(PROJECT_ROOT, '.agents', 'vision', 'state', 'processed-images.json')
+  const raw = readJson<{ images: Record<string, ImageClassification & { path: string; status: string }>; pathIndex: Record<string, string> }>(visionPath)
+  return raw?.images ?? {}
+}
+
+export function readVisionPathIndex(): Record<string, string> {
+  const visionPath = path.join(PROJECT_ROOT, '.agents', 'vision', 'state', 'processed-images.json')
+  const raw = readJson<{ images: Record<string, unknown>; pathIndex: Record<string, string> }>(visionPath)
+  return raw?.pathIndex ?? {}
+}
+
+export function readGeneratedTokens(): Record<string, { sourcePath: string; tokenPath: string; generatedAt: string }> {
+  const genPath = path.join(PROJECT_ROOT, '.agents', 'token', 'state', 'generated-tokens.json')
+  return readJson<Record<string, { sourcePath: string; tokenPath: string; generatedAt: string }>>(genPath) ?? {}
+}
+
+export function readTokenConfig(): TokenConfig {
+  const cfg = readJson<TokenConfig>(TOKEN_CONFIG_PATH)
+  return cfg ?? { molduraPath: DEFAULT_MOLDURA }
+}
+
+export function writeTokenConfig(cfg: TokenConfig): void {
+  const dir = path.dirname(TOKEN_CONFIG_PATH)
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+  fs.writeFileSync(TOKEN_CONFIG_PATH, JSON.stringify(cfg, null, 2), 'utf-8')
+}
+
+export function readReviewItemById(id: string): ReviewItem | null {
+  const items = readReviewItems()
+  return items.find((i) => i.id === id) ?? null
+}
+
+export function readItemDetail(id: string): ItemDetail | null {
+  const item = readReviewItemById(id)
+  if (!item) return null
+
+  const visionImages = readVisionState()
+  const pathIndex = readVisionPathIndex()
+  const genTokens = readGeneratedTokens()
+  const agents = readAgents().filter((a) => a.status !== 'planned')
+
+  // Resolve vision classification by source image path
+  let imageClassification: ImageClassification | null = null
+  let tokenPath: string | null = null
+  let tokenEligible = false
+
+  const sourceFile = item.source[0] ?? null
+  if (sourceFile) {
+    const inboxRelPath = `knowledge-base/00-Inbox/${sourceFile}`.replace(/\\/g, '/')
+    const sha256Key = pathIndex[inboxRelPath]
+    const visionEntry = sha256Key ? visionImages[sha256Key] : null
+    if (visionEntry) {
+      imageClassification = {
+        type: visionEntry.type,
+        ancestry: (visionEntry as Record<string, string>).ancestry ?? 'none',
+        char_class: (visionEntry as Record<string, string>).char_class ?? 'none',
+        creature_type: (visionEntry as Record<string, string>).creature_type ?? 'none',
+        element: (visionEntry as Record<string, string>).element ?? 'none',
+        environment: (visionEntry as Record<string, string>).environment ?? 'none',
+        description: (visionEntry as Record<string, string>).description ?? '',
+        sha256: (visionEntry as Record<string, string>).sha256 ?? '',
+        isToken: !!(visionEntry as Record<string, unknown>).isToken,
+      }
+      tokenEligible = TOKEN_ELIGIBLE_TYPES.has(visionEntry.type)
+    }
+
+    // Find token by source path
+    const tokenEntry = Object.values(genTokens).find((t) => t.sourcePath === inboxRelPath)
+    if (tokenEntry) {
+      tokenPath = tokenEntry.tokenPath
+    } else {
+      // Also check for *-token.png alongside the source
+      const srcBase = sourceFile.replace(/\.[^.]+$/, '')
+      const candidateToken = `knowledge-base/00-Inbox/${srcBase}-token.png`
+      if (fs.existsSync(path.join(PROJECT_ROOT, candidateToken))) {
+        tokenPath = candidateToken
+      }
+    }
+  }
+
+  return { ...item, imageClassification, tokenPath, tokenEligible, activeAgents: agents }
 }
 
 function scanDirForTokens(dir: string, projectRoot: string, results: TokenFile[]): void {

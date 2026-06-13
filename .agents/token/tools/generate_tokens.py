@@ -291,7 +291,46 @@ def main() -> None:
     sys.exit(0 if failed == 0 else 1)
 
 
+def run_single(image_path: str, moldura_override: str | None = None) -> int:
+    """Generate a token for a single image. Returns 0 on success, 1 on failure."""
+    _ensure_utf8_stdout()
+    log = _make_logger()
+    cfg = _load_config()
+    if moldura_override:
+        cfg["moldura_path"] = moldura_override
+    img_path = Path(image_path)
+    if not img_path.is_absolute():
+        img_path = _PROJECT_ROOT / image_path
+    if not img_path.exists():
+        log.error(f"Image not found: {img_path}")
+        return 1
+    out_path = img_path.parent / (img_path.stem + "-token.png")
+    ok = _make_token(img_path, out_path, cfg, log)
+    if ok:
+        gen = _load_gen_tokens()
+        rel = img_path.relative_to(_PROJECT_ROOT).as_posix()
+        vision_state = _load_vision_state()
+        sha_key = vision_state.get("pathIndex", {}).get(rel, "")
+        key = sha_key if sha_key and not sha_key.startswith("path:") else f"path:{rel}"
+        gen[key] = {
+            "sourcePath": rel,
+            "tokenPath": out_path.relative_to(_PROJECT_ROOT).as_posix(),
+            "generatedAt": datetime.now(timezone.utc).isoformat(),
+        }
+        _save_gen_tokens(gen)
+        print(out_path.relative_to(_PROJECT_ROOT).as_posix(), flush=True)
+        return 0
+    return 1
+
+
 if __name__ == "__main__":
+    import argparse as _argparse
+    _parser = _argparse.ArgumentParser()
+    _parser.add_argument("--image", help="Single image path to tokenize")
+    _parser.add_argument("--moldura", help="Moldura frame path override")
+    _args = _parser.parse_args()
+    if _args.image:
+        raise SystemExit(run_single(_args.image, _args.moldura))
     main()
 
 

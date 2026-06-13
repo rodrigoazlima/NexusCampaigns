@@ -1,26 +1,22 @@
 export const dynamic = 'force-dynamic'
 
-import { readReviewItems, readQueue, readAgents } from '@/lib/vault'
+import { readReviewItems, readQueue } from '@/lib/vault'
 import Link from 'next/link'
 import PageHeader from '@/components/widgets/PageHeader'
 import AutoRefresh from '@/components/AutoRefresh'
 import KPICard from '@/components/widgets/KPICard'
 import { Dices, CheckSquare, Image, CircleDot, MessageSquare } from 'lucide-react'
-import { statusDotClass, formatRelative } from '@/lib/utils'
 
 export default async function GMHubPage() {
-  const [items, queue, agents] = await Promise.all([
+  const [items, queue] = await Promise.all([
     Promise.resolve(readReviewItems()),
     Promise.resolve(readQueue()),
-    Promise.resolve(readAgents()),
   ])
 
   const pending = items.filter((i) => !i.reviewed).length
   const highQuality = items.filter((i) => i.quality >= 7).length
   const approved = items.filter((i) => i.status === 'approved').length
   const inboxDepth = queue.total
-
-  const activeAgents = agents.filter((a) => a.status !== 'planned')
 
   const actionCards = [
     {
@@ -54,8 +50,8 @@ export default async function GMHubPage() {
       href: '/gm/chat',
       icon: MessageSquare,
       label: 'Agent Chat',
-      count: activeAgents.length,
-      description: `${activeAgents.length} agents available · lore, wiki, classification`,
+      count: null as number | null,
+      description: 'lore, wiki, classification',
       accent: 'text-success',
       borderClass: 'border-success/20 hover:border-success/40',
     },
@@ -131,31 +127,6 @@ export default async function GMHubPage() {
         })}
       </div>
 
-      {/* Agent status strip */}
-      {activeAgents.length > 0 && (
-        <div className="panel p-4">
-          <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-3">
-            Agent Status
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {activeAgents.map((agent) => (
-              <div
-                key={agent.id}
-                className="flex items-center gap-2 text-xs text-zinc-400 bg-surface-3 px-3 py-1.5 rounded-full"
-                title={`Last run: ${agent.lastRun ?? 'never'}`}
-              >
-                <span
-                  className={`w-2 h-2 rounded-full flex-shrink-0 ${statusDotClass(agent.status)}`}
-                />
-                <span className="font-mono">{agent.name}</span>
-                <span className="text-zinc-600">
-                  {agent.lastRun ? formatRelative(agent.lastRun) : 'never'}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   )
 }

@@ -1,10 +1,12 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import type { ReviewItem } from '@/lib/types'
 import QualityBar from '@/components/widgets/QualityBar'
 import GMActionBar from './GMActionBar'
 import ImageModal from './ImageModal'
+import { ExternalLink } from 'lucide-react'
 
 const TYPE_COLORS: Record<string, string> = {
   npc: 'bg-blue-500/10 text-blue-400',
@@ -119,7 +121,13 @@ export default function ReviewCard({ item, onApprove, onReject, onFlag }: Review
         <div className="flex-1 min-w-0 p-4">
           {/* Header */}
           <div className="flex items-start gap-2 mb-2 flex-wrap">
-            <span className="font-mono text-sm text-zinc-100 font-semibold">{item.id}</span>
+            <Link
+              href={`/gm/view/${encodeURIComponent(item.id)}`}
+              className="font-mono text-sm text-zinc-100 font-semibold hover:text-primary transition-colors inline-flex items-center gap-1"
+            >
+              {item.id}
+              <ExternalLink size={11} className="text-zinc-600" />
+            </Link>
             <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold uppercase ${TYPE_COLORS[item.type] ?? 'bg-zinc-700 text-zinc-400'}`}>
               {item.type}
             </span>

@@ -256,3 +256,26 @@ export interface PromptFile {
   sizeBytes: number
   modifiedAt: string // ISO timestamp
 }
+
+export interface ImageClassification {
+  type: string        // portrait | body | battlemap | scene | token
+  ancestry: string
+  char_class: string
+  creature_type: string
+  element: string
+  environment: string
+  description: string
+  sha256: string
+  isToken: boolean
+}
+
+export interface ItemDetail extends ReviewItem {
+  imageClassification: ImageClassification | null
+  tokenPath: string | null
+  tokenEligible: boolean   // true when imageClassification.type is portrait or body
+  activeAgents: AgentInfo[]
+}
+
+export interface TokenConfig {
+  molduraPath: string
+}
