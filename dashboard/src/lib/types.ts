@@ -128,3 +128,84 @@ export interface GMChatMessage {
   timestamp: string
   agent: string
 }
+
+// ---------------------------------------------------------------------------
+// Agent configuration (agent.json schema)
+// ---------------------------------------------------------------------------
+
+export interface ClaudeApiConfig {
+  model: string
+  system_file?: string | null
+  tools_module?: string | null
+  prompt_file?: string | null
+  history_file?: string | null
+  max_tokens?: number
+  temperature?: number
+  timeout_seconds?: number
+  max_tool_rounds?: number
+  max_tokens_per_run?: number | null
+}
+
+export interface OpenAIApiConfig {
+  base_url: string
+  model: string
+  prompt_file?: string | null
+  system_file?: string | null
+  max_tokens?: number
+  temperature?: number
+  timeout_seconds?: number
+}
+
+export interface GeminiApiConfig {
+  model: string
+  prompt_file?: string | null
+  system_file?: string | null
+  max_tokens?: number
+  temperature?: number
+  timeout_seconds?: number
+}
+
+export interface OpenRouterApiConfig {
+  model: string
+  prompt_file?: string | null
+  system_file?: string | null
+  max_tokens?: number
+  temperature?: number
+  timeout_seconds?: number
+}
+
+export interface CliConfig {
+  command: string
+  args?: string[]
+  cwd?: 'project_root' | 'agent_dir'
+  timeout_seconds?: number
+  env?: Record<string, string>
+}
+
+export interface DispatchConfig {
+  type: 'cli' | 'claude-api' | 'openai-api' | 'gemini-api' | 'openrouter-api'
+  cli?: CliConfig
+  claude_api?: ClaudeApiConfig
+  openai_api?: OpenAIApiConfig
+  gemini_api?: GeminiApiConfig
+  openrouter_api?: OpenRouterApiConfig
+}
+
+export interface TaskConfig {
+  intervalSeconds: number
+  description: string
+  dispatch: DispatchConfig
+  signal_triggers?: string[]
+  emits_signals?: string[]
+}
+
+export interface AgentConfig {
+  cleanupDays?: number
+  tasks: Record<string, TaskConfig>
+}
+
+export interface RuntimeConfig {
+  intervalSec: number
+  python: string
+  projectRoot: string
+}

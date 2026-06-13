@@ -5,6 +5,7 @@ import PageHeader from '@/components/widgets/PageHeader'
 import AgentCard from '@/components/widgets/AgentCard'
 import ActivityFeed from '@/components/widgets/ActivityFeed'
 import AutoRefresh from '@/components/AutoRefresh'
+import { AgentConfigButton } from '@/components/agents/AgentConfigButton'
 import { Bot } from 'lucide-react'
 import { agentDisplayName, formatDateTime, formatDuration } from '@/lib/utils'
 
@@ -50,6 +51,7 @@ export default async function AgentsPage() {
                 <th className="px-4 py-2 text-right">Runs</th>
                 <th className="px-4 py-2 text-right">Avg Duration</th>
                 <th className="px-4 py-2 text-right">Failed</th>
+                <th className="px-4 py-2 text-right">Config</th>
               </tr>
             </thead>
             <tbody>
@@ -85,6 +87,9 @@ export default async function AgentsPage() {
                   </td>
                   <td className={`px-4 py-2 font-mono text-right ${agent.totalFailed > 0 ? 'text-danger' : 'text-zinc-500'}`}>
                     {agent.totalFailed}
+                  </td>
+                  <td className="px-4 py-2 text-right">
+                    <AgentConfigButton agent={agent} />
                   </td>
                 </tr>
               ))}
