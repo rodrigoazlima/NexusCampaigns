@@ -186,7 +186,6 @@ export interface ClaudeCodeConfig {
   prompt_file?: string | null
   prompt?: string | null
   extra_args?: string[]
-  dangerously_skip_permissions?: boolean
   cwd?: 'project_root' | 'agent_dir'
   timeout_seconds?: number
   env?: Record<string, string>
@@ -206,6 +205,7 @@ export interface TaskConfig {
   intervalSeconds: number
   description: string
   dispatch: DispatchConfig
+  fallback_dispatch?: DispatchConfig
   signal_triggers?: string[]
   emits_signals?: string[]
 }

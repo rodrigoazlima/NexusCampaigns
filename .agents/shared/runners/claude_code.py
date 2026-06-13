@@ -23,13 +23,12 @@ class ClaudeCodeRunner:
     """Runs Claude Code CLI as a subprocess in non-interactive (-p) mode."""
 
     def run(self, dispatch_config: dict, context: dict) -> RunResult:
-        prompt_file                  = dispatch_config.get("prompt_file")
-        prompt_inline                = dispatch_config.get("prompt") or ""
-        extra_args: list[str]        = dispatch_config.get("extra_args", [])
-        skip_perms: bool             = dispatch_config.get("dangerously_skip_permissions", True)
-        cwd_mode: str                = dispatch_config.get("cwd", "project_root")
-        timeout_seconds: int         = dispatch_config.get("timeout_seconds", 600)
-        extra_env: dict[str, str]    = dispatch_config.get("env", {})
+        prompt_file               = dispatch_config.get("prompt_file")
+        prompt_inline             = dispatch_config.get("prompt") or ""
+        extra_args: list[str]     = dispatch_config.get("extra_args", ["--dangerously-skip-permissions"])
+        cwd_mode: str             = dispatch_config.get("cwd", "project_root")
+        timeout_seconds: int      = dispatch_config.get("timeout_seconds", 600)
+        extra_env: dict[str, str] = dispatch_config.get("env", {})
 
         cwd = (
             context.get("project_root", ".")
@@ -46,10 +45,7 @@ class ClaudeCodeRunner:
 
         prompt = _resolve(prompt, context)
 
-        cmd: list[str] = ["claude", "-p", prompt]
-        if skip_perms:
-            cmd.append("--dangerously-skip-permissions")
-        cmd.extend(extra_args)
+        cmd: list[str] = ["claude", "-p", prompt, *extra_args]
 
         env = {**os.environ, **extra_env}
 

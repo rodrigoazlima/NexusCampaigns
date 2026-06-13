@@ -356,13 +356,12 @@ class CliDispatchConfig(BaseModel):
 
 
 class ClaudeCodeConfig(BaseModel):
-    prompt_file:                  Optional[str]  = None    # relative to agent_dir
-    prompt:                       Optional[str]  = None    # inline prompt (alt to file)
-    extra_args:                   list[str]      = Field(default_factory=list)
-    dangerously_skip_permissions: bool           = True
-    cwd:                          Literal["project_root", "agent_dir"] = "project_root"
-    timeout_seconds:              int            = 600
-    env:                          dict[str, str] = Field(default_factory=dict)
+    prompt_file:     Optional[str]  = None    # relative to agent_dir
+    prompt:          Optional[str]  = None    # inline prompt (alt to file)
+    extra_args:      list[str]      = Field(default_factory=lambda: ["--dangerously-skip-permissions"])
+    cwd:             Literal["project_root", "agent_dir"] = "project_root"
+    timeout_seconds: int            = 600
+    env:             dict[str, str] = Field(default_factory=dict)
 
 
 class OpenAIApiConfig(BaseModel):
@@ -417,11 +416,12 @@ class AgentDispatchConfig(BaseModel):
 
 
 class TaskDispatchEntry(BaseModel):
-    intervalSeconds:  int
-    description:      str
-    dispatch:         AgentDispatchConfig
-    signal_triggers:  list[str] = Field(default_factory=list)  # signal types that trigger immediate dispatch
-    emits_signals:    list[str] = Field(default_factory=list)  # documentation only
+    intervalSeconds:   int
+    description:       str
+    dispatch:          AgentDispatchConfig
+    fallback_dispatch: Optional[AgentDispatchConfig] = None    # tried if primary exits non-zero
+    signal_triggers:   list[str] = Field(default_factory=list)
+    emits_signals:     list[str] = Field(default_factory=list)
 
 
 class AgentFolderConfig(BaseModel):

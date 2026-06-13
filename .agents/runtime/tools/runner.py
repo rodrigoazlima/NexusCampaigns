@@ -488,6 +488,19 @@ class Runtime(IOrchestrator):
         except Exception as exc:
             log.error(f"Unexpected dispatch error: {exc}")
 
+        if exit_code != 0 and entry.fallback_dispatch is not None:
+            log.info(f"Primary failed (exit {exit_code}) — trying fallback dispatch ({entry.fallback_dispatch.type})")
+            try:
+                fb_sub    = _extract_dispatch_sub(entry.fallback_dispatch)
+                fb_runner = get_runner(entry.fallback_dispatch.type)
+                log.info(f"Fallback via {entry.fallback_dispatch.type}: {fb_sub.get('tools_module', fb_sub.get('command', entry.fallback_dispatch.type))}")
+                result    = fb_runner.run(fb_sub, context)
+                exit_code = result.exit_code
+                if result.error:
+                    log.error(f"Fallback runner error: {result.error}")
+            except Exception as exc:
+                log.error(f"Fallback dispatch failed: {exc}")
+
         log.done(t0, count=1 if exit_code == 0 else 0, failed=0 if exit_code == 0 else 1)
         return exit_code, result
 

@@ -28,7 +28,7 @@ const DEFAULT_DISPATCH: Record<string, Record<string, unknown>> = {
   'openai-api': { base_url: '', model: '', max_tokens: 1024, temperature: 0.0, timeout_seconds: 120 },
   'gemini-api': { model: '', max_tokens: 2048, temperature: 0.0, timeout_seconds: 120 },
   'openrouter-api': { model: '', max_tokens: 4096, temperature: 0.0, timeout_seconds: 180 },
-  'claude-code': { prompt_file: 'prompts/prompt.md', prompt: null, extra_args: [], dangerously_skip_permissions: true, cwd: 'project_root', timeout_seconds: 600, env: {} },
+  'claude-code': { prompt_file: 'prompts/prompt.md', prompt: null, extra_args: ['--dangerously-skip-permissions'], cwd: 'project_root', timeout_seconds: 600, env: {} },
 }
 
 function intervalLabel(s: number): string {
@@ -292,9 +292,8 @@ function CliFields({ cfg, onChange }: { cfg: Record<string, unknown>; onChange: 
 }
 
 function ClaudeCodeFields({ cfg, onChange }: { cfg: Record<string, unknown>; onChange: (field: string, value: unknown) => void }) {
-  const extraArgsText = Array.isArray(cfg.extra_args) ? (cfg.extra_args as string[]).join('\n') : ''
+  const extraArgsText = Array.isArray(cfg.extra_args) ? (cfg.extra_args as string[]).join('\n') : '--dangerously-skip-permissions'
   const envText = cfg.env ? JSON.stringify(cfg.env, null, 2) : '{}'
-  const skipPerms = cfg.dangerously_skip_permissions !== false
 
   return (
     <div className="space-y-3">
@@ -320,21 +319,10 @@ function ClaudeCodeFields({ cfg, onChange }: { cfg: Record<string, unknown>; onC
         <TextareaInput
           value={extraArgsText}
           onChange={(v) => onChange('extra_args', v.split('\n').filter(Boolean))}
-          rows={2}
+          rows={3}
           mono
         />
-        <p className="text-[10px] text-zinc-600 mt-1">One arg per line; appended after --dangerously-skip-permissions</p>
-      </FieldRow>
-      <FieldRow label="Skip Permissions">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={skipPerms}
-            onChange={(e) => onChange('dangerously_skip_permissions', e.target.checked)}
-            className="accent-primary"
-          />
-          <span className="text-xs text-zinc-300">--dangerously-skip-permissions (enabled by default)</span>
-        </label>
+        <p className="text-[10px] text-zinc-600 mt-1">One arg per line — include --dangerously-skip-permissions to bypass permission prompts</p>
       </FieldRow>
       <FieldRow label="CWD">
         <SelectInput
@@ -461,6 +449,53 @@ export default function AgentConfigDialog({
     })
   }, [])
 
+  const updateFallbackField = useCallback((taskId: string, field: string, value: unknown) => {
+    setConfig((prev) => {
+      if (!prev || isRuntimeConfig(prev)) return prev
+      const next = JSON.parse(JSON.stringify(prev)) as AgentConfig
+      const fb = next.tasks[taskId].fallback_dispatch
+      if (!fb) return prev
+      const key = TYPE_KEY_MAP[fb.type]
+      if (key && fb[key]) {
+        (fb[key] as unknown as Record<string, unknown>)[field] = value
+      }
+      return next
+    })
+  }, [])
+
+  const updateFallbackType = useCallback((taskId: string, newType: string) => {
+    setConfig((prev) => {
+      if (!prev || isRuntimeConfig(prev)) return prev
+      const next = JSON.parse(JSON.stringify(prev)) as AgentConfig
+      const task = next.tasks[taskId]
+      if (!task.fallback_dispatch) return prev
+      const oldKey = TYPE_KEY_MAP[task.fallback_dispatch.type]
+      const newKey = TYPE_KEY_MAP[newType]
+      if (oldKey) delete task.fallback_dispatch[oldKey]
+      task.fallback_dispatch.type = newType as DispatchConfig['type']
+      if (newKey) {
+        task.fallback_dispatch[newKey] = { ...(DEFAULT_DISPATCH[newType] ?? {}) } as never
+      }
+      return next
+    })
+  }, [])
+
+  const toggleFallback = useCallback((taskId: string, enabled: boolean) => {
+    setConfig((prev) => {
+      if (!prev || isRuntimeConfig(prev)) return prev
+      const next = JSON.parse(JSON.stringify(prev)) as AgentConfig
+      if (enabled) {
+        next.tasks[taskId].fallback_dispatch = {
+          type: 'cli',
+          cli: { ...(DEFAULT_DISPATCH['cli'] ?? {}) } as never,
+        }
+      } else {
+        delete next.tasks[taskId].fallback_dispatch
+      }
+      return next
+    })
+  }, [])
+
   const updateTopLevel = useCallback((field: string, value: unknown) => {
     setConfig((prev) => {
       if (!prev || isRuntimeConfig(prev)) return prev
@@ -520,6 +555,9 @@ export default function AgentConfigDialog({
                   onTaskChange={updateTask}
                   onDispatchChange={updateDispatchField}
                   onDispatchTypeChange={updateDispatchType}
+                  onFallbackChange={updateFallbackField}
+                  onFallbackTypeChange={updateFallbackType}
+                  onFallbackToggle={toggleFallback}
                 />
               )}
             </div>
@@ -590,116 +628,214 @@ function RuntimeForm({ config, onChange }: { config: RuntimeConfig; onChange: (f
 }
 
 // ---------------------------------------------------------------------------
-// Agent form
+// Tab primitives
 // ---------------------------------------------------------------------------
 
-function AgentForm({
-  config, onTopLevelChange, onTaskChange, onDispatchChange, onDispatchTypeChange,
-}: {
-  config: AgentConfig
-  onTopLevelChange: (field: string, value: unknown) => void
-  onTaskChange: (taskId: string, field: string, value: unknown) => void
-  onDispatchChange: (taskId: string, field: string, value: unknown) => void
-  onDispatchTypeChange: (taskId: string, newType: string) => void
+interface TabDef { id: string; label: string; badge?: string }
+
+function Tabs({ tabs, active, onChange }: {
+  tabs: TabDef[]
+  active: string
+  onChange: (id: string) => void
 }) {
-  const taskEntries = Object.entries(config.tasks)
-
   return (
-    <div className="space-y-6">
-      {config.cleanupDays !== undefined && (
-        <div>
-          <div className="text-[10px] uppercase tracking-widest text-zinc-500 mb-3">Top-level</div>
-          <div className="space-y-3">
-            <FieldRow label="Cleanup Days">
-              <NumberInput value={config.cleanupDays} onChange={(v) => onTopLevelChange('cleanupDays', v)} min={1} />
-            </FieldRow>
-          </div>
-        </div>
-      )}
-
-      {taskEntries.map(([taskId, task], idx) => (
-        <div key={taskId}>
-          {idx > 0 && <div className="border-t border-surface-3" />}
-          <div className="text-[10px] uppercase tracking-widest text-zinc-500 mb-3 font-mono">{taskId}</div>
-          <TaskForm
-            taskId={taskId}
-            task={task}
-            onTaskChange={onTaskChange}
-            onDispatchChange={onDispatchChange}
-            onDispatchTypeChange={onDispatchTypeChange}
-          />
-        </div>
+    <div className="flex border-b border-surface-3 mb-4 gap-0">
+      {tabs.map((tab) => (
+        <button
+          key={tab.id}
+          onClick={() => onChange(tab.id)}
+          className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 -mb-px transition-colors ${
+            active === tab.id
+              ? 'text-zinc-100 border-primary'
+              : 'text-zinc-500 border-transparent hover:text-zinc-300 hover:border-surface-3'
+          }`}
+        >
+          {tab.label}
+          {tab.badge && (
+            <span className={`text-[9px] px-1 py-0.5 rounded font-mono ${
+              active === tab.id ? 'bg-primary/20 text-primary' : 'bg-surface-3 text-zinc-500'
+            }`}>{tab.badge}</span>
+          )}
+        </button>
       ))}
     </div>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Task form
+// Dispatch helpers (shared by Dispatch + Fallback tabs)
+// ---------------------------------------------------------------------------
+
+const DISPATCH_OPTIONS = [
+  { value: 'claude-api', label: 'Claude API' },
+  { value: 'claude-code', label: 'Claude Code CLI' },
+  { value: 'openai-api', label: 'OpenAI API' },
+  { value: 'gemini-api', label: 'Gemini API' },
+  { value: 'openrouter-api', label: 'OpenRouter API' },
+  { value: 'cli', label: 'CLI' },
+]
+
+function DispatchFields({ dispatch, onChange }: {
+  dispatch: DispatchConfig
+  onChange: (field: string, value: unknown) => void
+}) {
+  const key = TYPE_KEY_MAP[dispatch.type]
+  const cfg = (key ? dispatch[key] : null) as Record<string, unknown> | null
+  if (!cfg) return null
+  if (dispatch.type === 'claude-api') return <ClaudeApiFields cfg={cfg} onChange={onChange} />
+  if (dispatch.type === 'openai-api') return <OpenAIApiFields cfg={cfg} onChange={onChange} />
+  if (dispatch.type === 'gemini-api' || dispatch.type === 'openrouter-api') return <GeminiOrOpenRouterFields cfg={cfg} onChange={onChange} />
+  if (dispatch.type === 'cli') return <CliFields cfg={cfg} onChange={onChange} />
+  if (dispatch.type === 'claude-code') return <ClaudeCodeFields cfg={cfg} onChange={onChange} />
+  return null
+}
+
+// ---------------------------------------------------------------------------
+// Agent form — tabs per task when multiple tasks exist
+// ---------------------------------------------------------------------------
+
+function AgentForm({
+  config, onTopLevelChange, onTaskChange, onDispatchChange, onDispatchTypeChange,
+  onFallbackChange, onFallbackTypeChange, onFallbackToggle,
+}: {
+  config: AgentConfig
+  onTopLevelChange: (field: string, value: unknown) => void
+  onTaskChange: (taskId: string, field: string, value: unknown) => void
+  onDispatchChange: (taskId: string, field: string, value: unknown) => void
+  onDispatchTypeChange: (taskId: string, newType: string) => void
+  onFallbackChange: (taskId: string, field: string, value: unknown) => void
+  onFallbackTypeChange: (taskId: string, newType: string) => void
+  onFallbackToggle: (taskId: string, enabled: boolean) => void
+}) {
+  const taskEntries = Object.entries(config.tasks)
+  const [activeTask, setActiveTask] = useState(taskEntries[0]?.[0] ?? '')
+
+  const taskTabs: TabDef[] = taskEntries.map(([id]) => ({ id, label: id }))
+  const activeEntry = taskEntries.find(([id]) => id === activeTask)
+
+  return (
+    <div className="space-y-4">
+      {config.cleanupDays !== undefined && (
+        <FieldRow label="Cleanup Days">
+          <NumberInput value={config.cleanupDays} onChange={(v) => onTopLevelChange('cleanupDays', v)} min={1} />
+        </FieldRow>
+      )}
+
+      {taskEntries.length > 1 && (
+        <Tabs tabs={taskTabs} active={activeTask} onChange={setActiveTask} />
+      )}
+
+      {activeEntry && (
+        <TaskForm
+          taskId={activeEntry[0]}
+          task={activeEntry[1]}
+          onTaskChange={onTaskChange}
+          onDispatchChange={onDispatchChange}
+          onDispatchTypeChange={onDispatchTypeChange}
+          onFallbackChange={onFallbackChange}
+          onFallbackTypeChange={onFallbackTypeChange}
+          onFallbackToggle={onFallbackToggle}
+        />
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Task form — tabs: General | Dispatch | Fallback
 // ---------------------------------------------------------------------------
 
 function TaskForm({
   taskId, task, onTaskChange, onDispatchChange, onDispatchTypeChange,
+  onFallbackChange, onFallbackTypeChange, onFallbackToggle,
 }: {
   taskId: string
   task: import('@/lib/types').TaskConfig
   onTaskChange: (taskId: string, field: string, value: unknown) => void
   onDispatchChange: (taskId: string, field: string, value: unknown) => void
   onDispatchTypeChange: (taskId: string, newType: string) => void
+  onFallbackChange: (taskId: string, field: string, value: unknown) => void
+  onFallbackTypeChange: (taskId: string, newType: string) => void
+  onFallbackToggle: (taskId: string, enabled: boolean) => void
 }) {
-  const dispatch = task.dispatch
-  const dispatchKey = TYPE_KEY_MAP[dispatch.type]
-  const dispatchCfg = (dispatchKey ? dispatch[dispatchKey] : null) as Record<string, unknown> | null
+  const [activeTab, setActiveTab] = useState<'general' | 'dispatch' | 'fallback'>('general')
+  const fb = task.fallback_dispatch
+
+  const tabs: TabDef[] = [
+    { id: 'general', label: 'General' },
+    { id: 'dispatch', label: 'Dispatch', badge: task.dispatch.type },
+    { id: 'fallback', label: 'Fallback', badge: fb ? fb.type : undefined },
+  ]
 
   return (
-    <div className="space-y-3">
-      <FieldRow label="Description">
-        <TextInput value={task.description} onChange={(v) => onTaskChange(taskId, 'description', v)} />
-      </FieldRow>
-      <FieldRow label="Interval (s)">
-        <NumberInput value={task.intervalSeconds} onChange={(v) => onTaskChange(taskId, 'intervalSeconds', v)} min={60} />
-        <p className="text-[10px] text-zinc-600 mt-1">= {intervalLabel(task.intervalSeconds)}</p>
-      </FieldRow>
+    <div>
+      <Tabs tabs={tabs} active={activeTab} onChange={(id) => setActiveTab(id as typeof activeTab)} />
 
-      <TagList tags={task.signal_triggers ?? []} label="Signal Triggers" />
-      <TagList tags={task.emits_signals ?? []} label="Emits Signals" />
+      {activeTab === 'general' && (
+        <div className="space-y-3">
+          <FieldRow label="Description">
+            <TextInput value={task.description} onChange={(v) => onTaskChange(taskId, 'description', v)} />
+          </FieldRow>
+          <FieldRow label="Interval (s)">
+            <NumberInput value={task.intervalSeconds} onChange={(v) => onTaskChange(taskId, 'intervalSeconds', v)} min={60} />
+            <p className="text-[10px] text-zinc-600 mt-1">= {intervalLabel(task.intervalSeconds)}</p>
+          </FieldRow>
+          <TagList tags={task.signal_triggers ?? []} label="Signal Triggers" />
+          <TagList tags={task.emits_signals ?? []} label="Emits Signals" />
+        </div>
+      )}
 
-      {/* Dispatch */}
-      <div className="mt-4 pt-4 border-t border-surface-3/50">
-        <div className="text-[10px] uppercase tracking-widest text-zinc-600 mb-3">Dispatch</div>
+      {activeTab === 'dispatch' && (
         <div className="space-y-3">
           <FieldRow label="Type">
             <SelectInput
-              value={dispatch.type}
+              value={task.dispatch.type}
               onChange={(v) => onDispatchTypeChange(taskId, v)}
-              options={[
-                { value: 'claude-api', label: 'Claude API' },
-                { value: 'claude-code', label: 'Claude Code CLI' },
-                { value: 'openai-api', label: 'OpenAI API' },
-                { value: 'gemini-api', label: 'Gemini API' },
-                { value: 'openrouter-api', label: 'OpenRouter API' },
-                { value: 'cli', label: 'CLI' },
-              ]}
+              options={DISPATCH_OPTIONS}
             />
           </FieldRow>
+          <DispatchFields dispatch={task.dispatch} onChange={(f, v) => onDispatchChange(taskId, f, v)} />
+        </div>
+      )}
 
-          {dispatchCfg && dispatch.type === 'claude-api' && (
-            <ClaudeApiFields cfg={dispatchCfg} onChange={(f, v) => onDispatchChange(taskId, f, v)} />
-          )}
-          {dispatchCfg && dispatch.type === 'openai-api' && (
-            <OpenAIApiFields cfg={dispatchCfg} onChange={(f, v) => onDispatchChange(taskId, f, v)} />
-          )}
-          {dispatchCfg && (dispatch.type === 'gemini-api' || dispatch.type === 'openrouter-api') && (
-            <GeminiOrOpenRouterFields cfg={dispatchCfg} onChange={(f, v) => onDispatchChange(taskId, f, v)} />
-          )}
-          {dispatchCfg && dispatch.type === 'cli' && (
-            <CliFields cfg={dispatchCfg} onChange={(f, v) => onDispatchChange(taskId, f, v)} />
-          )}
-          {dispatchCfg && dispatch.type === 'claude-code' && (
-            <ClaudeCodeFields cfg={dispatchCfg} onChange={(f, v) => onDispatchChange(taskId, f, v)} />
+      {activeTab === 'fallback' && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-zinc-500">
+              {fb
+                ? 'Tried automatically if primary dispatch exits non-zero.'
+                : 'No fallback configured — failed runs stay failed.'}
+            </p>
+            {fb ? (
+              <button
+                onClick={() => onFallbackToggle(taskId, false)}
+                className="text-[10px] text-danger/70 hover:text-danger transition-colors shrink-0 ml-3"
+              >
+                Remove
+              </button>
+            ) : (
+              <button
+                onClick={() => onFallbackToggle(taskId, true)}
+                className="text-[10px] text-primary/70 hover:text-primary transition-colors shrink-0 ml-3"
+              >
+                + Add Fallback
+              </button>
+            )}
+          </div>
+          {fb && (
+            <>
+              <FieldRow label="Type">
+                <SelectInput
+                  value={fb.type}
+                  onChange={(v) => onFallbackTypeChange(taskId, v)}
+                  options={DISPATCH_OPTIONS}
+                />
+              </FieldRow>
+              <DispatchFields dispatch={fb} onChange={(f, v) => onFallbackChange(taskId, f, v)} />
+            </>
           )}
         </div>
-      </div>
+      )}
     </div>
   )
 }
