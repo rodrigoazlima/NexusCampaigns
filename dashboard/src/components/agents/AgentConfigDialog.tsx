@@ -101,8 +101,9 @@ function TextInput({
 }
 
 function NumberInput({
-  value, onChange, min, max, step,
-}: { value: number | undefined; onChange: (v: number) => void; min?: number; max?: number; step?: number }) {
+  value, onChange, min, max, step, warn,
+}: { value: number | undefined; onChange: (v: number) => void; min?: number; max?: number; step?: number; warn?: boolean }) {
+  const overLimit = warn && max != null && value != null && value > max
   return (
     <input
       type="number"
@@ -111,7 +112,9 @@ function NumberInput({
       min={min}
       max={max}
       step={step ?? 1}
-      className="w-full bg-surface-2 border border-surface-3 rounded px-2 py-1.5 text-xs font-mono text-zinc-200 focus:outline-none focus:border-primary/60"
+      className={`w-full bg-surface-2 border rounded px-2 py-1.5 text-xs font-mono text-zinc-200 focus:outline-none focus:border-primary/60 ${
+        overLimit ? 'border-warning/60 focus:border-warning' : 'border-surface-3'
+      }`}
     />
   )
 }
@@ -463,32 +466,47 @@ function CodexCliFields({ cfg, onChange }: { cfg: Record<string, unknown>; onCha
   )
 }
 
+interface LmStudioModelMeta {
+  id: string
+  contextLength: number | null
+  arch: string | null
+  quantization: string | null
+  state: string | null
+  type: string | null
+}
+
 function LmStudioFields({ cfg, onChange }: { cfg: Record<string, unknown>; onChange: (field: string, value: unknown) => void }) {
-  const [models, setModels] = useState<string[]>([])
+  const [modelMetas, setModelMetas] = useState<LmStudioModelMeta[]>([])
   const [fetchStatus, setFetchStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle')
   const baseUrl = (cfg.base_url as string) || 'http://localhost:1234/v1'
+  const currentModel = (cfg.model as string) ?? ''
 
   const fetchModels = useCallback(() => {
     setFetchStatus('loading')
     fetch(`/api/lm-studio/models?baseUrl=${encodeURIComponent(baseUrl)}`)
       .then(r => r.json())
-      .then((d: { data?: { id: string }[] }) => {
-        const ids = (d.data ?? []).map(m => m.id)
-        setModels(ids)
-        setFetchStatus(ids.length > 0 ? 'ok' : 'error')
+      .then((d: { data?: LmStudioModelMeta[] }) => {
+        const metas = d.data ?? []
+        setModelMetas(metas)
+        setFetchStatus(metas.length > 0 ? 'ok' : 'error')
       })
       .catch(() => {
-        setModels([])
+        setModelMetas([])
         setFetchStatus('error')
       })
   }, [baseUrl])
 
   useEffect(() => { fetchModels() }, [])
 
-  const currentModel = (cfg.model as string) ?? ''
-  const modelOptions = models.includes(currentModel) || !currentModel
-    ? models
-    : [currentModel, ...models]
+  const modelIds = modelMetas.map(m => m.id)
+  const modelOptions = modelIds.includes(currentModel) || !currentModel
+    ? modelIds
+    : [currentModel, ...modelIds]
+
+  const selectedMeta: LmStudioModelMeta | null =
+    modelMetas.find(m => m.id === currentModel) ?? null
+
+  const contextLength = selectedMeta?.contextLength ?? null
 
   return (
     <div className="space-y-3">
@@ -519,10 +537,68 @@ function LmStudioFields({ cfg, onChange }: { cfg: Record<string, unknown>; onCha
             {fetchStatus === 'loading' ? '…' : '↻'}
           </button>
         </div>
-        {fetchStatus === 'error' && <p className="text-[10px] text-red-500/70 mt-1">LM Studio not reachable — enter model ID manually</p>}
+        {fetchStatus === 'error' && (
+          <p className="text-[10px] text-red-500/70 mt-1">LM Studio not reachable — enter model ID manually</p>
+        )}
       </FieldRow>
+
+      {/* Read-only model metadata — properties set at load time, cannot change via API */}
+      {selectedMeta && (contextLength || selectedMeta.arch || selectedMeta.quantization || selectedMeta.state) && (
+        <div className="rounded border border-surface-3 bg-surface-2/40 px-3 py-2.5 space-y-1.5">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-zinc-600 mb-2">Model Properties</div>
+
+          {contextLength != null && (
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-zinc-500 flex items-center gap-1.5">
+                <span title="Set at load time — cannot be changed via API">🔒</span>
+                Context window
+              </span>
+              <span className="text-[11px] font-mono text-zinc-300">{contextLength.toLocaleString()} tokens</span>
+            </div>
+          )}
+          {selectedMeta.arch && (
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-zinc-500">Architecture</span>
+              <span className="text-[11px] font-mono text-zinc-400">{selectedMeta.arch}</span>
+            </div>
+          )}
+          {selectedMeta.quantization && (
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-zinc-500">Quantization</span>
+              <span className="text-[11px] font-mono text-zinc-400">{selectedMeta.quantization}</span>
+            </div>
+          )}
+          {selectedMeta.state && (
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-zinc-500">State</span>
+              <span className={`text-[11px] font-mono ${
+                selectedMeta.state === 'loaded' ? 'text-success' : 'text-zinc-500'
+              }`}>{selectedMeta.state}</span>
+            </div>
+          )}
+          {contextLength != null && (
+            <p className="text-[10px] text-zinc-600 border-t border-surface-3/60 pt-1.5 mt-1">
+              🔒 properties set when model loads — reload model in LM Studio to change them
+            </p>
+          )}
+        </div>
+      )}
+
       <FieldRow label="Max Tokens">
-        <NumberInput value={cfg.max_tokens as number} onChange={(v) => onChange('max_tokens', v)} min={1} />
+        <NumberInput
+          value={cfg.max_tokens as number}
+          onChange={(v) => onChange('max_tokens', v)}
+          min={1}
+          max={contextLength ?? undefined}
+          warn={contextLength != null}
+        />
+        {contextLength != null ? (
+          <p className="text-[10px] text-zinc-600 mt-1">
+            Tokens to generate per response — context window: {contextLength.toLocaleString()}
+          </p>
+        ) : (
+          <p className="text-[10px] text-zinc-600 mt-1">Tokens to generate per response</p>
+        )}
       </FieldRow>
       <FieldRow label="Temperature">
         <TemperatureField value={cfg.temperature as number} onChange={(v) => onChange('temperature', v)} />
