@@ -4,8 +4,8 @@ Layer 1 (dataclasses): VaultConfig / VaultPaths / SystemPaths / LLMEndpointConfi
   Pure structure, no I/O. Loader lives in shared.loaders.
 
 Layer 2 (get_config): Two-level JSON config system.
-  .system/config/global.json  ← always loaded first
-  .system/config/<script>.json ← loaded second, overrides global
+  .system/.shared/config/global.json  ← always loaded first
+  .system/.shared/config/<script>.json ← loaded second, overrides global
   Environment variables NEXUS_* override both JSON layers.
   Falls back to embedded defaults when JSON files are absent.
 """
@@ -129,7 +129,7 @@ _GLOBAL_DEFAULTS: dict[str, Any] = {
 }
 
 # Relative location of the config directory inside the project root.
-_CONFIG_SUBDIR = ".system/config"
+_CONFIG_SUBDIR = ".system/.shared/config"
 
 
 # ---------------------------------------------------------------------------
@@ -360,8 +360,8 @@ def get_config(
 
     Resolution order (later overrides earlier):
       1. Embedded Python defaults (_GLOBAL_DEFAULTS)
-      2. .system/config/global.json
-      3. .system/config/<script_stem>.json
+      2. .system/.shared/config/global.json
+      3. .system/.shared/config/<script_stem>.json
       4. NEXUS_* environment variables
 
     Args:

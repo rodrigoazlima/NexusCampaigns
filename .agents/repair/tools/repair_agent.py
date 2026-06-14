@@ -153,9 +153,9 @@ def _create_missing_dirs(log: Logger) -> int:
 # ---------------------------------------------------------------------------
 
 def _sha256_of_file(path: Path) -> str:
-    h = hashlib.sha256()
+    h = hashlib.blake2b(digest_size=32)
     with open(path, "rb") as fh:
-        for chunk in iter(lambda: fh.read(65536), b""):
+        for chunk in iter(lambda: fh.read(4_194_304), b""):
             h.update(chunk)
     return h.hexdigest()
 

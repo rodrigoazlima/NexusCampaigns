@@ -4,6 +4,7 @@ Python runtime — the only static code in the agent pipeline.
 Discovers agents from agent.json files, checks intervals, dispatches Claude agents.
 
 CLI: python runner.py [--once] [--task TASK_ID] [--interval SECONDS]
+     python runner.py --chat-id <uuid>   # dispatch one chat queue item
 """
 
 from __future__ import annotations
@@ -15,9 +16,12 @@ import re
 import subprocess
 import sys
 import time
+import urllib.error
+import urllib.request
+import uuid as _uuid_mod
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 # .agents/ must be on sys.path so `import shared` resolves
 _AGENTS_DIR  = Path(__file__).resolve().parents[2]
@@ -54,6 +58,24 @@ _COSTS_DIR     = _RUNTIME_STATE / "costs"
 
 _LOCK_STALE_SECONDS = 1800   # 30 min
 _DEFAULT_INTERVAL   = 60     # orchestrator poll cadence
+
+_SYSTEM_STATE  = _PROJECT_ROOT / ".system" / "state"
+_CHAT_QUEUE    = _SYSTEM_STATE / "chat-queue.json"
+_INBOX_QUEUE   = _SYSTEM_STATE / "inbox-queue.json"
+_VAULT_ROOT    = _PROJECT_ROOT / "knowledge-base"
+
+_IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tiff"}
+
+# Maps dashboard agent name → task_id used in agent.json
+_AGENT_NAME_TO_TASK: dict[str, str] = {
+    "lore":           "lore-agent",
+    "wiki":           "wiki-agent",
+    "classification": "classification-agent",
+    "vision":         "vision-agent",
+    "ingestion":      "ingestion-agent",
+    "repair":         "repair-agent",
+    "review":         "review-agent",
+}
 _MAX_METRICS_RUNS   = 100
 
 # Parses itemsProcessed / itemsFailed from agent DONE lines.
@@ -551,7 +573,7 @@ class Runtime(IOrchestrator):
         self._state = _load_state()
         self._log.info(f"Discovered {len(self._tasks)} tasks from agent.json files")
 
-    def run_cycle(self, task_filter: Optional[str] = None) -> None:
+    def run_cycle(self, task_filter: Optional[str] = None, force: bool = False) -> None:
         """One scheduling cycle: check all tasks, dispatch due and signal-triggered ones."""
         self.reload()
         _SIGNALS_DIR.mkdir(parents=True, exist_ok=True)
@@ -562,12 +584,19 @@ class Runtime(IOrchestrator):
             if task_filter and task_id != task_filter:
                 continue
 
-            due       = self.is_due(task_id)
-            signalled = task_id in signal_triggered
+            if force:
+                self._log.info(f"Force dispatch {task_id} (bypassing due/precondition checks)")
+            else:
+                due       = self.is_due(task_id)
+                signalled = task_id in signal_triggered
 
-            if not due and not signalled:
-                self._log.info(f"Skip {task_id} — not due, no signal")
-                continue
+                if not due and not signalled:
+                    self._log.info(f"Skip {task_id} — not due, no signal")
+                    continue
+
+                # Precondition: skip if agent has no pending work (saves tokens)
+                if not _check_preconditions(task_id, self._log):
+                    continue
 
             # Pre-check: if agent.json is missing, skip without updating lastRun
             # (spec: agent.json missing → log error, skip, lastRun not updated)
@@ -625,6 +654,281 @@ class Runtime(IOrchestrator):
 
 
 # ---------------------------------------------------------------------------
+# Precondition checks — skip dispatch when agent has no work
+# ---------------------------------------------------------------------------
+
+def _read_inbox_queue() -> dict:
+    if not _INBOX_QUEUE.exists():
+        return {}
+    try:
+        return json.loads(_INBOX_QUEUE.read_text(encoding="utf-8").lstrip("﻿"))
+    except Exception:
+        return {}
+
+
+def _inbox_has_slot(slot: str) -> bool:
+    """Return True if inbox-queue has at least one entry with agents.<slot> == 'pending'."""
+    queue = _read_inbox_queue()
+    for entry in queue.values():
+        agents = entry.get("agents", {}) if isinstance(entry, dict) else {}
+        if agents.get(slot) == "pending":
+            return True
+    return False
+
+
+def _inbox_has_new_files() -> bool:
+    """Return True if 00-Inbox/images/ or 00-Inbox/docs/ contains processable files."""
+    images_dir = _VAULT_ROOT / "00-Inbox" / "images"
+    docs_dir   = _VAULT_ROOT / "00-Inbox" / "docs"
+    if images_dir.exists():
+        for f in images_dir.rglob("*"):
+            if f.is_file() and f.suffix.lower() in _IMAGE_EXTS:
+                return True
+    if docs_dir.exists():
+        for f in docs_dir.rglob("*"):
+            if f.is_file() and f.suffix.lower() in {".docx", ".doc", ".pdf", ".md", ".txt"}:
+                return True
+    return False
+
+
+def _token_has_pending() -> bool:
+    """Return True if any classified image lacks a generated token."""
+    vision_state_path = _AGENTS_DIR / "vision" / "state" / "processed-images.json"
+    gen_tokens_path   = _AGENTS_DIR / "token"  / "state" / "generated-tokens.json"
+    try:
+        vs = json.loads(vision_state_path.read_text(encoding="utf-8"))
+        gt = json.loads(gen_tokens_path.read_text(encoding="utf-8")) if gen_tokens_path.exists() else {}
+        images = vs.get("images", {})
+        for img_key, entry in images.items():
+            if (
+                entry.get("status") == "ok"
+                and not entry.get("isToken", False)
+                and img_key not in gt
+            ):
+                return True
+    except Exception:
+        pass
+    return False
+
+
+def _wikilink_has_pending() -> bool:
+    """Return True if 02-Library/ has files unprocessed or modified since last wikilink run."""
+    library = _VAULT_ROOT / "02-Library"
+    if not library.exists():
+        return False
+    state_path = _AGENTS_DIR / "wikilink" / "state" / "wikilink-state.json"
+    try:
+        state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.exists() else {}
+    except Exception:
+        state = {}
+    for f in library.rglob("*.md"):
+        rel = str(f.relative_to(_PROJECT_ROOT)).replace("\\", "/")
+        if rel not in state:
+            return True  # never processed
+        try:
+            processed_ts = datetime.fromisoformat(state[rel]["processedAt"]).timestamp()
+            if f.stat().st_mtime > processed_ts:
+                return True  # modified after last run
+        except Exception:
+            return True  # state corrupt → re-process
+    return False
+
+
+def _processing_has_files() -> bool:
+    """Return True if 01-Processing/ has at least one .md file."""
+    proc = _VAULT_ROOT / "01-Processing"
+    if not proc.exists():
+        return False
+    return any(proc.rglob("*.md"))
+
+
+def _has_old_logs(days: int = 7) -> bool:
+    """Return True if log files older than `days` exist."""
+    import time as _time
+    cutoff = _time.time() - days * 86400
+    logs_dir = _AGENTS_DIR / "runtime" / "state" / "logs"
+    if not logs_dir.exists():
+        return False
+    for f in logs_dir.iterdir():
+        if f.is_file() and f.stat().st_mtime < cutoff:
+            return True
+    return False
+
+
+# Map task_id → precondition function (returns bool; True = has work, False = skip)
+_PRECONDITIONS: dict[str, "Callable[[], bool]"] = {}
+
+def _build_preconditions() -> None:
+    """Populate _PRECONDITIONS after module-level paths are set."""
+    _PRECONDITIONS.update({
+        "ingestion-agent":              _inbox_has_new_files,
+        "vision-agent":                 lambda: _inbox_has_slot("vision"),
+        "lore-agent":                   lambda: _inbox_has_slot("lore"),
+        "classification-agent":         lambda: _inbox_has_slot("classification"),
+        "wiki-agent":                   lambda: _inbox_has_slot("wiki"),
+        "token-agent":                  _token_has_pending,
+        "wikilink-agent":               _wikilink_has_pending,
+        "review-agent-short-files":     _processing_has_files,
+        "cleanup-agent":                lambda: _has_old_logs(days=7),
+        # review-agent and repair-agent always run (health monitors)
+    })
+
+_build_preconditions()
+
+
+def _check_preconditions(task_id: str, log: _Logger) -> bool:
+    """Return True if task has work. False = skip (no tokens consumed)."""
+    check = _PRECONDITIONS.get(task_id)
+    if check is None:
+        return True  # no precondition defined → always run
+    try:
+        result = check()
+        if not result:
+            log.info(f"Skip {task_id} — precondition: no pending work")
+        return result
+    except Exception as exc:
+        log.warning(f"Precondition check failed for {task_id}: {exc} — running anyway")
+        return True
+
+
+# ---------------------------------------------------------------------------
+# Chat queue dispatch
+# ---------------------------------------------------------------------------
+
+def _read_chat_queue() -> list[dict]:
+    if not _CHAT_QUEUE.exists():
+        return []
+    try:
+        data = json.loads(_CHAT_QUEUE.read_text(encoding="utf-8").lstrip("﻿"))
+        if isinstance(data, dict):
+            return [data]
+        return data if isinstance(data, list) else []
+    except Exception:
+        return []
+
+
+def _write_chat_queue(items: list[dict]) -> None:
+    _SYSTEM_STATE.mkdir(parents=True, exist_ok=True)
+    tmp = _CHAT_QUEUE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(items, indent=2), encoding="utf-8")
+    tmp.replace(_CHAT_QUEUE)
+
+
+def _chat_update(items: list[dict], chat_id: str, **fields) -> None:
+    for item in items:
+        if item.get("id") == chat_id:
+            item.update(fields)
+            item["updatedAt"] = datetime.now(timezone.utc).isoformat()
+            break
+
+
+def _load_system_prompt(agent_name: str) -> str:
+    candidates = [
+        _AGENTS_DIR / agent_name / "prompts" / "system.md",
+        _AGENTS_DIR / agent_name / "prompts" / "system.txt",
+    ]
+    for p in candidates:
+        if p.exists():
+            return p.read_text(encoding="utf-8").strip()
+    return (
+        "You are a Dungeon Master knowledge assistant for a tabletop RPG campaign. "
+        "Help with worldbuilding, NPC creation, locations, quests, factions, lore, and narrative. "
+        "Be concise, creative, and specific."
+    )
+
+
+def _call_lm_studio(cfg: dict, system: str, user_message: str) -> str:
+    """Send chat message to LM Studio (OpenAI-compatible) endpoint."""
+    base_url   = cfg["base_url"].rstrip("/")
+    url        = f"{base_url}/chat/completions"
+    timeout_s  = int(cfg.get("timeout_seconds", 120))
+    payload    = {
+        "model":       cfg["model"],
+        "messages":    [
+            {"role": "system", "content": system},
+            {"role": "user",   "content": user_message},
+        ],
+        "temperature": float(cfg.get("temperature", 0.0)),
+        "max_tokens":  int(cfg.get("max_tokens", 2048)),
+        "stream":      False,
+    }
+    body    = json.dumps(payload).encode("utf-8")
+    headers = {"Content-Type": "application/json", "Authorization": "Bearer lm-studio"}
+    req     = urllib.request.Request(url, data=body, headers=headers, method="POST")
+    with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+    return data["choices"][0]["message"]["content"]
+
+
+def _call_claude(cfg: dict, system: str, user_message: str) -> str:
+    """Send chat message to Anthropic Claude API."""
+    try:
+        import anthropic
+    except ImportError:
+        raise RuntimeError("anthropic package not installed")
+    api_key = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")
+    if not api_key:
+        raise RuntimeError("ANTHROPIC_API_KEY not set")
+    client   = anthropic.Anthropic(api_key=api_key, timeout=float(cfg.get("timeout_seconds", 120)))
+    response = client.messages.create(
+        model=cfg.get("model", "claude-haiku-4-5-20251001"),
+        max_tokens=int(cfg.get("max_tokens", 2048)),
+        system=system,
+        messages=[{"role": "user", "content": user_message}],
+    )
+    return "".join(
+        block.text for block in response.content if block.type == "text"
+    )
+
+
+def _dispatch_chat(chat_id: str) -> int:
+    """Dispatch a single chat queue item by ID. Returns exit code."""
+    log = _Logger("chat")
+
+    items = _read_chat_queue()
+    item  = next((i for i in items if i.get("id") == chat_id), None)
+    if item is None:
+        log.error(f"Chat item {chat_id!r} not found in queue")
+        return 1
+
+    agent_name  = item.get("agentName", "")
+    user_message = item.get("message", "")
+    task_id     = _AGENT_NAME_TO_TASK.get(agent_name, f"{agent_name}-agent")
+
+    _chat_update(items, chat_id, status="processing")
+    _write_chat_queue(items)
+
+    log.info(f"Chat dispatch: agent={agent_name} task={task_id} id={chat_id}")
+
+    try:
+        dispatch_cfg = _load_agent_dispatch(task_id, log)
+        if dispatch_cfg is None:
+            raise RuntimeError(f"Cannot load dispatch config for task {task_id!r}")
+
+        sub = _extract_dispatch_sub(dispatch_cfg)
+        system = _load_system_prompt(agent_name)
+        dispatch_type = dispatch_cfg.type
+
+        if dispatch_type in ("lm-studio", "openai-api"):
+            response = _call_lm_studio(sub, system, user_message)
+        elif dispatch_type == "claude-api":
+            response = _call_claude(sub, system, user_message)
+        else:
+            raise RuntimeError(f"Unsupported dispatch type for chat: {dispatch_type!r}")
+
+        _chat_update(items, chat_id, status="done", response=response)
+        _write_chat_queue(items)
+        log.info(f"Chat done: {chat_id}")
+        return 0
+
+    except Exception as exc:
+        log.error(f"Chat dispatch failed: {exc}")
+        _chat_update(items, chat_id, status="error", error=str(exc))
+        _write_chat_queue(items)
+        return 1
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -634,6 +938,8 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--once", action="store_true", help="Run one scheduling cycle then exit")
     parser.add_argument("--task", metavar="TASK_ID", default=None, help="Run only this specific task")
+    parser.add_argument("--chat-id", metavar="UUID", default=None, help="Dispatch one chat queue item by ID then exit")
+    parser.add_argument("--force", action="store_true", help="Bypass due-time and precondition checks (for testing)")
     parser.add_argument(
         "--interval", type=int, default=_DEFAULT_INTERVAL, metavar="SECONDS",
         help=f"Poll interval between cycles (default: {_DEFAULT_INTERVAL}s)",
@@ -645,6 +951,9 @@ def main() -> None:
     args = _parse_args()
     log = _Logger("runtime")
 
+    if args.chat_id:
+        sys.exit(_dispatch_chat(args.chat_id))
+
     if not _acquire_lock(log):
         sys.exit(1)
 
@@ -653,7 +962,7 @@ def main() -> None:
         runtime = Runtime()
 
         if args.once or args.task:
-            runtime.run_cycle(task_filter=args.task)
+            runtime.run_cycle(task_filter=args.task, force=args.force)
             log.done(t0)
         else:
             log.info(f"Entering scheduler loop (interval={args.interval}s)")
