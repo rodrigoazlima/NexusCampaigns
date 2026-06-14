@@ -50,7 +50,7 @@ export default function ItemDetailView({ item: initial }: Props) {
   const [approveQuality, setApproveQuality] = useState<number | null>(item.quality || null)
 
   const imageSrc = item.source[0]
-    ? `/api/image?path=${encodeURIComponent(`knowledge-base/00-Inbox/${item.source[0]}`)}`
+    ? `/api/image?path=${encodeURIComponent(item.source[0])}`
     : null
 
   const tokenSrc = item.tokenPath
@@ -202,7 +202,7 @@ export default function ItemDetailView({ item: initial }: Props) {
     if (!item.source[0]) return
     setGenerating(true)
     try {
-      const imagePath = `knowledge-base/00-Inbox/${item.source[0]}`
+      const imagePath = item.source[0]
       const data = await apiPost('/api/gm/token/generate', { imagePath })
       if (data.ok) {
         showToast('Token generated', 'success')

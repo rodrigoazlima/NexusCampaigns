@@ -7,3 +7,4 @@ Pillow>=10.3,<11
 deepface>=0.0.93
 tf-keras>=2.16
 python-slugify>=8.0,<9
+playwright>=1.40

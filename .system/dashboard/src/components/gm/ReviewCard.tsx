@@ -23,10 +23,10 @@ interface ReviewCardProps {
   item: ReviewItem
   onApprove: (filename: string, quality: number) => Promise<void>
   onReject: (filename: string) => Promise<void>
-  onFlag: (filename: string) => Promise<void>
+  onReprocess: (filename: string) => Promise<void>
 }
 
-export default function ReviewCard({ item, onApprove, onReject, onFlag }: ReviewCardProps) {
+export default function ReviewCard({ item, onApprove, onReject, onReprocess }: ReviewCardProps) {
   const [modalOpen, setModalOpen] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
   const [chatMessages, setChatMessages] = useState<{ role: string; content: string }[]>([])
@@ -35,7 +35,7 @@ export default function ReviewCard({ item, onApprove, onReject, onFlag }: Review
   const [loading, setLoading] = useState(false)
 
   const imageSrc = item.source[0]
-    ? `/api/image?path=${encodeURIComponent(`knowledge-base/00-Inbox/${item.source[0]}`)}`
+    ? `/api/image?path=${encodeURIComponent(item.source[0])}`
     : null
 
   const handleApprove = async (q: number) => {
@@ -50,9 +50,9 @@ export default function ReviewCard({ item, onApprove, onReject, onFlag }: Review
     setLoading(false)
   }
 
-  const handleFlag = async () => {
+  const handleReprocess = async () => {
     setLoading(true)
-    await onFlag(item.filename)
+    await onReprocess(item.filename)
     setLoading(false)
   }
 
@@ -173,7 +173,7 @@ export default function ReviewCard({ item, onApprove, onReject, onFlag }: Review
             filename={item.filename}
             onApprove={handleApprove}
             onReject={handleReject}
-            onFlag={handleFlag}
+            onReprocess={handleReprocess}
             onChat={() => setChatOpen(!chatOpen)}
             loading={loading}
           />

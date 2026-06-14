@@ -81,7 +81,7 @@ export default function GMReviewPage() {
     }
   }
 
-  const handleFlag = async (filename: string) => {
+  const handleReprocess = async (filename: string) => {
     try {
       const res = await fetch('/api/gm/flag', {
         method: 'POST',
@@ -90,13 +90,13 @@ export default function GMReviewPage() {
       })
       const data = await res.json()
       if (data.ok) {
-        showToast('Flagged for reprocessing', 'success')
+        showToast('Queued for reprocessing', 'success')
         fetchItems()
       } else {
-        showToast(data.error ?? 'Flag failed', 'error')
+        showToast(data.error ?? 'Reprocess failed', 'error')
       }
     } catch {
-      showToast('Flag failed', 'error')
+      showToast('Reprocess failed', 'error')
     }
   }
 
@@ -245,7 +245,7 @@ export default function GMReviewPage() {
               item={item}
               onApprove={handleApprove}
               onReject={handleReject}
-              onFlag={handleFlag}
+              onReprocess={handleReprocess}
             />
           ))}
         </div>

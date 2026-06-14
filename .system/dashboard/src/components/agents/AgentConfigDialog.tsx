@@ -73,6 +73,11 @@ function isRuntimeConfig(data: ConfigData): data is RuntimeConfig {
   return 'intervalSec' in data
 }
 
+interface AgentFiles {
+  prompts: string[]
+  scripts: string[]
+}
+
 // ---------------------------------------------------------------------------
 // Field helpers
 // ---------------------------------------------------------------------------
@@ -135,6 +140,23 @@ function SelectInput({
   )
 }
 
+function FileSelectInput({
+  value, onChange, options, emptyLabel = '(none)',
+}: { value: string | null | undefined; onChange: (v: string | null) => void; options: string[]; emptyLabel?: string }) {
+  return (
+    <select
+      value={value ?? ''}
+      onChange={(e) => onChange(e.target.value || null)}
+      className="w-full bg-surface-2 border border-surface-3 rounded px-2 py-1.5 text-xs font-mono text-zinc-200 focus:outline-none focus:border-primary/60"
+    >
+      <option value="">{emptyLabel}</option>
+      {options.map((o) => (
+        <option key={o} value={o}>{o}</option>
+      ))}
+    </select>
+  )
+}
+
 function TemperatureField({ value, onChange }: { value: number | undefined; onChange: (v: number) => void }) {
   const val = value ?? 0
   return (
@@ -180,10 +202,11 @@ function TextareaInput({ value, onChange, rows, mono }: { value: string; onChang
 // ---------------------------------------------------------------------------
 
 function ClaudeApiFields({
-  cfg, onChange,
+  cfg, onChange, prompts,
 }: {
   cfg: Record<string, unknown>
   onChange: (field: string, value: unknown) => void
+  prompts: string[]
 }) {
   return (
     <div className="space-y-3">
@@ -211,13 +234,13 @@ function ClaudeApiFields({
         <p className="text-[10px] text-zinc-600 mt-1">Leave empty for no limit</p>
       </FieldRow>
       <FieldRow label="System File">
-        <TextInput value={(cfg.system_file as string) ?? ''} onChange={(v) => onChange('system_file', v || null)} placeholder="prompts/system.md" mono />
+        <FileSelectInput value={cfg.system_file as string | null} onChange={(v) => onChange('system_file', v)} options={prompts} />
       </FieldRow>
       <FieldRow label="Tools Module">
         <TextInput value={(cfg.tools_module as string) ?? ''} onChange={(v) => onChange('tools_module', v || null)} placeholder="agent.tools.module_name" mono />
       </FieldRow>
       <FieldRow label="Prompt File">
-        <TextInput value={(cfg.prompt_file as string) ?? ''} onChange={(v) => onChange('prompt_file', v || null)} placeholder="prompts/prompt.md" mono />
+        <FileSelectInput value={cfg.prompt_file as string | null} onChange={(v) => onChange('prompt_file', v)} options={prompts} />
       </FieldRow>
       <FieldRow label="History File">
         <TextInput value={(cfg.history_file as string) ?? ''} onChange={(v) => onChange('history_file', v || null)} placeholder="history.json" mono />
@@ -226,7 +249,7 @@ function ClaudeApiFields({
   )
 }
 
-function OpenAIApiFields({ cfg, onChange }: { cfg: Record<string, unknown>; onChange: (field: string, value: unknown) => void }) {
+function OpenAIApiFields({ cfg, onChange, prompts }: { cfg: Record<string, unknown>; onChange: (field: string, value: unknown) => void; prompts: string[] }) {
   return (
     <div className="space-y-3">
       <FieldRow label="Base URL">
@@ -245,16 +268,16 @@ function OpenAIApiFields({ cfg, onChange }: { cfg: Record<string, unknown>; onCh
         <NumberInput value={cfg.timeout_seconds as number} onChange={(v) => onChange('timeout_seconds', v)} min={1} />
       </FieldRow>
       <FieldRow label="System File">
-        <TextInput value={(cfg.system_file as string) ?? ''} onChange={(v) => onChange('system_file', v || null)} mono />
+        <FileSelectInput value={cfg.system_file as string | null} onChange={(v) => onChange('system_file', v)} options={prompts} />
       </FieldRow>
       <FieldRow label="Prompt File">
-        <TextInput value={(cfg.prompt_file as string) ?? ''} onChange={(v) => onChange('prompt_file', v || null)} mono />
+        <FileSelectInput value={cfg.prompt_file as string | null} onChange={(v) => onChange('prompt_file', v)} options={prompts} />
       </FieldRow>
     </div>
   )
 }
 
-function GeminiOrOpenRouterFields({ cfg, onChange }: { cfg: Record<string, unknown>; onChange: (field: string, value: unknown) => void }) {
+function GeminiOrOpenRouterFields({ cfg, onChange, prompts }: { cfg: Record<string, unknown>; onChange: (field: string, value: unknown) => void; prompts: string[] }) {
   return (
     <div className="space-y-3">
       <FieldRow label="Model">
@@ -270,32 +293,51 @@ function GeminiOrOpenRouterFields({ cfg, onChange }: { cfg: Record<string, unkno
         <NumberInput value={cfg.timeout_seconds as number} onChange={(v) => onChange('timeout_seconds', v)} min={1} />
       </FieldRow>
       <FieldRow label="System File">
-        <TextInput value={(cfg.system_file as string) ?? ''} onChange={(v) => onChange('system_file', v || null)} mono />
+        <FileSelectInput value={cfg.system_file as string | null} onChange={(v) => onChange('system_file', v)} options={prompts} />
       </FieldRow>
       <FieldRow label="Prompt File">
-        <TextInput value={(cfg.prompt_file as string) ?? ''} onChange={(v) => onChange('prompt_file', v || null)} mono />
+        <FileSelectInput value={cfg.prompt_file as string | null} onChange={(v) => onChange('prompt_file', v)} options={prompts} />
       </FieldRow>
     </div>
   )
 }
 
-function CliFields({ cfg, onChange }: { cfg: Record<string, unknown>; onChange: (field: string, value: unknown) => void }) {
-  const argsText = Array.isArray(cfg.args) ? (cfg.args as string[]).join('\n') : ''
+function CliFields({ cfg, onChange, scripts }: { cfg: Record<string, unknown>; onChange: (field: string, value: unknown) => void; scripts: string[] }) {
+  const args = Array.isArray(cfg.args) ? (cfg.args as string[]) : []
+  const script = args[0] ?? ''
+  const extraArgs = args.slice(1).join('\n')
   const envText = cfg.env ? JSON.stringify(cfg.env, null, 2) : '{}'
+
+  function setScript(v: string | null) {
+    const rest = args.slice(1)
+    onChange('args', v ? [v, ...rest] : rest)
+  }
+  function setExtraArgs(v: string) {
+    const rest = v.split('\n').filter(Boolean)
+    onChange('args', script ? [script, ...rest] : rest)
+  }
 
   return (
     <div className="space-y-3">
       <FieldRow label="Command">
         <TextInput value={cfg.command as string} onChange={(v) => onChange('command', v)} mono />
       </FieldRow>
-      <FieldRow label="Args">
+      <FieldRow label="Script">
+        {scripts.length > 0 ? (
+          <FileSelectInput value={script || null} onChange={setScript} options={scripts} emptyLabel="(choose script)" />
+        ) : (
+          <TextInput value={script} onChange={(v) => setScript(v || null)} placeholder=".agents/name/tools/script.py" mono />
+        )}
+        <p className="text-[10px] text-zinc-600 mt-1">First arg — path relative to project root</p>
+      </FieldRow>
+      <FieldRow label="Extra Args">
         <TextareaInput
-          value={argsText}
-          onChange={(v) => onChange('args', v.split('\n').filter(Boolean))}
-          rows={3}
+          value={extraArgs}
+          onChange={setExtraArgs}
+          rows={2}
           mono
         />
-        <p className="text-[10px] text-zinc-600 mt-1">One arg per line</p>
+        <p className="text-[10px] text-zinc-600 mt-1">One arg per line (after the script path)</p>
       </FieldRow>
       <FieldRow label="CWD">
         <SelectInput
@@ -325,19 +367,23 @@ function CliFields({ cfg, onChange }: { cfg: Record<string, unknown>; onChange: 
   )
 }
 
-function ClaudeCodeFields({ cfg, onChange }: { cfg: Record<string, unknown>; onChange: (field: string, value: unknown) => void }) {
+function ClaudeCodeFields({ cfg, onChange, prompts }: { cfg: Record<string, unknown>; onChange: (field: string, value: unknown) => void; prompts: string[] }) {
   const extraArgsText = Array.isArray(cfg.extra_args) ? (cfg.extra_args as string[]).join('\n') : '--dangerously-skip-permissions'
   const envText = cfg.env ? JSON.stringify(cfg.env, null, 2) : '{}'
 
   return (
     <div className="space-y-3">
       <FieldRow label="Prompt File">
-        <TextInput
-          value={(cfg.prompt_file as string) ?? ''}
-          onChange={(v) => onChange('prompt_file', v || null)}
-          placeholder="prompts/prompt.md"
-          mono
-        />
+        {prompts.length > 0 ? (
+          <FileSelectInput value={cfg.prompt_file as string | null} onChange={(v) => onChange('prompt_file', v)} options={prompts} />
+        ) : (
+          <TextInput
+            value={(cfg.prompt_file as string) ?? ''}
+            onChange={(v) => onChange('prompt_file', v || null)}
+            placeholder="prompts/prompt.md"
+            mono
+          />
+        )}
         <p className="text-[10px] text-zinc-600 mt-1">Path relative to agent dir; supports {'{{project_root}}'} placeholders</p>
       </FieldRow>
       <FieldRow label="Inline Prompt">
@@ -386,19 +432,23 @@ function ClaudeCodeFields({ cfg, onChange }: { cfg: Record<string, unknown>; onC
   )
 }
 
-function CodexCliFields({ cfg, onChange }: { cfg: Record<string, unknown>; onChange: (field: string, value: unknown) => void }) {
+function CodexCliFields({ cfg, onChange, prompts }: { cfg: Record<string, unknown>; onChange: (field: string, value: unknown) => void; prompts: string[] }) {
   const extraArgsText = Array.isArray(cfg.extra_args) ? (cfg.extra_args as string[]).join('\n') : ''
   const envText = cfg.env ? JSON.stringify(cfg.env, null, 2) : '{}'
 
   return (
     <div className="space-y-3">
       <FieldRow label="Prompt File">
-        <TextInput
-          value={(cfg.prompt_file as string) ?? ''}
-          onChange={(v) => onChange('prompt_file', v || null)}
-          placeholder="prompts/prompt.md"
-          mono
-        />
+        {prompts.length > 0 ? (
+          <FileSelectInput value={cfg.prompt_file as string | null} onChange={(v) => onChange('prompt_file', v)} options={prompts} />
+        ) : (
+          <TextInput
+            value={(cfg.prompt_file as string) ?? ''}
+            onChange={(v) => onChange('prompt_file', v || null)}
+            placeholder="prompts/prompt.md"
+            mono
+          />
+        )}
         <p className="text-[10px] text-zinc-600 mt-1">Path relative to agent dir</p>
       </FieldRow>
       <FieldRow label="Inline Prompt">
@@ -485,7 +535,7 @@ interface ModelInfoResult {
   source: string | null
 }
 
-function LmStudioFields({ cfg, onChange }: { cfg: Record<string, unknown>; onChange: (field: string, value: unknown) => void }) {
+function LmStudioFields({ cfg, onChange, prompts }: { cfg: Record<string, unknown>; onChange: (field: string, value: unknown) => void; prompts: string[] }) {
   const [modelMetas, setModelMetas] = useState<LmStudioModelMeta[]>([])
   const [fetchStatus, setFetchStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle')
   const [modelInfo, setModelInfo] = useState<ModelInfoResult | null>(null)
@@ -704,10 +754,10 @@ function LmStudioFields({ cfg, onChange }: { cfg: Record<string, unknown>; onCha
         <p className="text-[10px] text-zinc-600 mt-1">= {intervalLabel(cfg.timeout_seconds as number)}</p>
       </FieldRow>
       <FieldRow label="System File">
-        <TextInput value={(cfg.system_file as string) ?? ''} onChange={(v) => onChange('system_file', v || null)} mono />
+        <FileSelectInput value={cfg.system_file as string | null} onChange={(v) => onChange('system_file', v)} options={prompts} />
       </FieldRow>
       <FieldRow label="Prompt File">
-        <TextInput value={(cfg.prompt_file as string) ?? ''} onChange={(v) => onChange('prompt_file', v || null)} mono />
+        <FileSelectInput value={cfg.prompt_file as string | null} onChange={(v) => onChange('prompt_file', v)} options={prompts} />
       </FieldRow>
     </div>
   )
@@ -721,6 +771,7 @@ export default function AgentConfigDialog({
   agentName, agentDisplayName, open, onClose,
 }: AgentConfigDialogProps) {
   const [config, setConfig] = useState<ConfigData | null>(null)
+  const [agentFiles, setAgentFiles] = useState<AgentFiles>({ prompts: [], scripts: [] })
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
@@ -737,15 +788,26 @@ export default function AgentConfigDialog({
   useEffect(() => {
     if (!open) return
     setConfig(null)
+    setAgentFiles({ prompts: [], scripts: [] })
     setFetchError(null)
     setSaveStatus('idle')
     setLoading(true)
-    fetch(`/api/config/${agentName}`)
+
+    const configReq = fetch(`/api/config/${agentName}`)
       .then(async (res) => {
         if (!res.ok) throw new Error(res.status === 404 ? 'No configuration file found for this agent.' : `HTTP ${res.status}`)
         return res.json()
       })
-      .then((data) => setConfig(data))
+
+    const filesReq = fetch(`/api/config/${agentName}/files`)
+      .then(async (res) => res.ok ? res.json() : { prompts: [], scripts: [] })
+      .catch(() => ({ prompts: [], scripts: [] }))
+
+    Promise.all([configReq, filesReq])
+      .then(([data, files]) => {
+        setConfig(data)
+        setAgentFiles(files as AgentFiles)
+      })
       .catch((e) => setFetchError(e.message))
       .finally(() => setLoading(false))
   }, [open, agentName])
@@ -761,7 +823,14 @@ export default function AgentConfigDialog({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config),
       })
-      if (!res.ok) throw new Error(`Save failed: HTTP ${res.status}`)
+      if (!res.ok) {
+        let msg = `HTTP ${res.status}`
+        try {
+          const body = await res.json() as { error?: string }
+          if (body.error) msg = body.error
+        } catch { /* ignore parse failure */ }
+        throw new Error(msg)
+      }
       setSaveStatus('success')
       setTimeout(() => onClose(), 800)
     } catch (e) {
@@ -911,6 +980,7 @@ export default function AgentConfigDialog({
                 <AgentForm
                   agentName={agentName}
                   config={config}
+                  agentFiles={agentFiles}
                   onTopLevelChange={updateTopLevel}
                   onTaskChange={updateTask}
                   onIntelligenceChange={updateIntelligenceField}
@@ -1104,23 +1174,24 @@ function CapabilityWarnings({ providerType, required }: { providerType: string; 
   )
 }
 
-function IntelligenceFields({ intelligence, onChange, requiredCapabilities }: {
+function IntelligenceFields({ intelligence, onChange, requiredCapabilities, agentFiles }: {
   intelligence: IntelligenceConfig
   onChange: (field: string, value: unknown) => void
   requiredCapabilities?: AgentCapability[]
+  agentFiles: AgentFiles
 }) {
   const key = TYPE_KEY_MAP[intelligence.type]
   const cfg = (key ? intelligence[key] : null) as Record<string, unknown> | null
   const warnings = <CapabilityWarnings providerType={intelligence.type} required={requiredCapabilities ?? []} />
   if (!cfg) return warnings
   const fields = (() => {
-    if (intelligence.type === 'claude-api') return <ClaudeApiFields cfg={cfg} onChange={onChange} />
-    if (intelligence.type === 'openai-api') return <OpenAIApiFields cfg={cfg} onChange={onChange} />
-    if (intelligence.type === 'gemini-api' || intelligence.type === 'openrouter-api') return <GeminiOrOpenRouterFields cfg={cfg} onChange={onChange} />
-    if (intelligence.type === 'cli') return <CliFields cfg={cfg} onChange={onChange} />
-    if (intelligence.type === 'claude-code') return <ClaudeCodeFields cfg={cfg} onChange={onChange} />
-    if (intelligence.type === 'codex-cli') return <CodexCliFields cfg={cfg} onChange={onChange} />
-    if (intelligence.type === 'lm-studio') return <LmStudioFields cfg={cfg} onChange={onChange} />
+    if (intelligence.type === 'claude-api') return <ClaudeApiFields cfg={cfg} onChange={onChange} prompts={agentFiles.prompts} />
+    if (intelligence.type === 'openai-api') return <OpenAIApiFields cfg={cfg} onChange={onChange} prompts={agentFiles.prompts} />
+    if (intelligence.type === 'gemini-api' || intelligence.type === 'openrouter-api') return <GeminiOrOpenRouterFields cfg={cfg} onChange={onChange} prompts={agentFiles.prompts} />
+    if (intelligence.type === 'cli') return <CliFields cfg={cfg} onChange={onChange} scripts={agentFiles.scripts} />
+    if (intelligence.type === 'claude-code') return <ClaudeCodeFields cfg={cfg} onChange={onChange} prompts={agentFiles.prompts} />
+    if (intelligence.type === 'codex-cli') return <CodexCliFields cfg={cfg} onChange={onChange} prompts={agentFiles.prompts} />
+    if (intelligence.type === 'lm-studio') return <LmStudioFields cfg={cfg} onChange={onChange} prompts={agentFiles.prompts} />
     return null
   })()
   return <>{warnings}{fields}</>
@@ -1131,11 +1202,12 @@ function IntelligenceFields({ intelligence, onChange, requiredCapabilities }: {
 // ---------------------------------------------------------------------------
 
 function AgentForm({
-  agentName, config, onTopLevelChange, onTaskChange, onIntelligenceChange, onIntelligenceTypeChange,
+  agentName, config, agentFiles, onTopLevelChange, onTaskChange, onIntelligenceChange, onIntelligenceTypeChange,
   onFallbackChange, onFallbackTypeChange, onFallbackToggle,
 }: {
   agentName: string
   config: AgentConfig
+  agentFiles: AgentFiles
   onTopLevelChange: (field: string, value: unknown) => void
   onTaskChange: (taskId: string, field: string, value: unknown) => void
   onIntelligenceChange: (taskId: string, field: string, value: unknown) => void
@@ -1167,6 +1239,7 @@ function AgentForm({
           agentName={agentName}
           taskId={activeEntry[0]}
           task={activeEntry[1]}
+          agentFiles={agentFiles}
           onTaskChange={onTaskChange}
           onIntelligenceChange={onIntelligenceChange}
           onIntelligenceTypeChange={onIntelligenceTypeChange}
@@ -1193,12 +1266,13 @@ function getIntelligencePromptFile(intelligence: IntelligenceConfig): string | n
 }
 
 function TaskForm({
-  agentName, taskId, task, onTaskChange, onIntelligenceChange, onIntelligenceTypeChange,
+  agentName, taskId, task, agentFiles, onTaskChange, onIntelligenceChange, onIntelligenceTypeChange,
   onFallbackChange, onFallbackTypeChange, onFallbackToggle,
 }: {
   agentName: string
   taskId: string
   task: import('@/lib/types').TaskConfig
+  agentFiles: AgentFiles
   onTaskChange: (taskId: string, field: string, value: unknown) => void
   onIntelligenceChange: (taskId: string, field: string, value: unknown) => void
   onIntelligenceTypeChange: (taskId: string, newType: string) => void
@@ -1243,7 +1317,12 @@ function TaskForm({
               options={dispatchOptionsWithWarnings(task.required_capabilities ?? [])}
             />
           </FieldRow>
-          <IntelligenceFields intelligence={task.dispatch} onChange={(f, v) => onIntelligenceChange(taskId, f, v)} requiredCapabilities={task.required_capabilities} />
+          <IntelligenceFields
+            intelligence={task.dispatch}
+            onChange={(f, v) => onIntelligenceChange(taskId, f, v)}
+            requiredCapabilities={task.required_capabilities}
+            agentFiles={agentFiles}
+          />
           {(() => {
             const pf = getIntelligencePromptFile(task.dispatch)
             if (!pf) return null
@@ -1294,7 +1373,11 @@ function TaskForm({
                   options={dispatchOptionsWithWarnings(task.required_capabilities ?? [])}
                 />
               </FieldRow>
-              <IntelligenceFields intelligence={fb} onChange={(f, v) => onFallbackChange(taskId, f, v)} />
+              <IntelligenceFields
+                intelligence={fb}
+                onChange={(f, v) => onFallbackChange(taskId, f, v)}
+                agentFiles={agentFiles}
+              />
               {(() => {
                 const pf = getIntelligencePromptFile(fb)
                 if (!pf) return null

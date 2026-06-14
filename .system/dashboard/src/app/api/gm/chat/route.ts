@@ -1,83 +1,107 @@
-import Anthropic from '@anthropic-ai/sdk'
+import { execFile } from 'child_process'
 import fs from 'fs'
 import path from 'path'
+import { promisify } from 'util'
 import { NextRequest, NextResponse } from 'next/server'
-import { PROJECT_ROOT, VAULT_ROOT } from '@/lib/vault'
+import { PROJECT_ROOT } from '@/lib/vault'
 
 export const dynamic = 'force-dynamic'
 
-export async function POST(req: NextRequest) {
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) {
-    return NextResponse.json({ error: 'ANTHROPIC_API_KEY not configured' }, { status: 500 })
-  }
+const execFileAsync = promisify(execFile)
 
+const CHAT_QUEUE = path.join(PROJECT_ROOT, '.system', 'state', 'chat-queue.json')
+const RUNNER     = path.join(PROJECT_ROOT, '.agents', 'runtime', 'tools', 'runner.py')
+const PYTHON     = 'python'
+const CHAT_TIMEOUT_MS = 120_000
+
+interface ChatQueueItem {
+  id: string
+  agentName: string
+  message: string
+  status: 'pending' | 'processing' | 'done' | 'error'
+  response: string | null
+  error: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+function readQueue(): ChatQueueItem[] {
   try {
-    const body = await req.json() as {
-      message: string
-      agent: string
-      context?: string
-      save?: boolean
-    }
-    const { message, agent, context, save } = body
+    const dir = path.dirname(CHAT_QUEUE)
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+    if (!fs.existsSync(CHAT_QUEUE)) return []
+    return JSON.parse(fs.readFileSync(CHAT_QUEUE, 'utf-8')) as ChatQueueItem[]
+  } catch {
+    return []
+  }
+}
+
+function writeQueue(items: ChatQueueItem[]): void {
+  const dir = path.dirname(CHAT_QUEUE)
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+  const tmp = CHAT_QUEUE + '.tmp'
+  fs.writeFileSync(tmp, JSON.stringify(items, null, 2), 'utf-8')
+  fs.renameSync(tmp, CHAT_QUEUE)
+}
+
+function enqueue(agentName: string, message: string): string {
+  const id   = crypto.randomUUID()
+  const now  = new Date().toISOString()
+  const item: ChatQueueItem = {
+    id, agentName, message,
+    status: 'pending', response: null, error: null,
+    createdAt: now, updatedAt: now,
+  }
+  const items = readQueue()
+  items.push(item)
+  writeQueue(items)
+  return id
+}
+
+function findById(id: string): ChatQueueItem | null {
+  return readQueue().find(i => i.id === id) ?? null
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json() as { message: string; agent: string; context?: string; save?: boolean }
+    const { message, agent, context } = body
 
     if (!message || !agent) {
       return NextResponse.json({ error: 'message and agent required' }, { status: 400 })
     }
 
-    // Try to load agent system prompt
-    let systemPrompt =
-      'You are a Dungeon Master knowledge assistant for a tabletop RPG campaign. ' +
-      'Help with worldbuilding, NPC creation, locations, quests, factions, lore, and narrative. ' +
-      'Be concise, creative, and specific to the context provided.'
+    const fullMessage = message + (context ? '\n\nContext:\n' + context : '')
+    const chatId = enqueue(agent, fullMessage)
 
-    const promptCandidates = [
-      path.join(PROJECT_ROOT, '.agents', agent, 'prompts', 'system.md'),
-      path.join(PROJECT_ROOT, '.agents', agent, 'prompts', 'classify-image.txt'),
-    ]
-
-    for (const p of promptCandidates) {
-      try {
-        if (fs.existsSync(p)) {
-          systemPrompt = fs.readFileSync(p, 'utf-8')
-          break
-        }
-      } catch {
-        // continue
+    try {
+      await execFileAsync(PYTHON, [RUNNER, '--chat-id', chatId], {
+        timeout: CHAT_TIMEOUT_MS,
+        env: { ...process.env },
+      })
+    } catch (execErr) {
+      // runner may exit non-zero on LLM error — read queue for actual error
+      const item = findById(chatId)
+      if (item?.status === 'error') {
+        return NextResponse.json({ error: item.error ?? 'Agent dispatch failed' }, { status: 500 })
+      }
+      // If still pending/processing something went wrong with the subprocess itself
+      if (!item || item.status !== 'done') {
+        return NextResponse.json({ error: String(execErr) }, { status: 500 })
       }
     }
 
-    const userContent = message + (context ? '\n\nContext:\n' + context : '')
-
-    const client = new Anthropic({ apiKey })
-    const response = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 2048,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userContent }],
-    })
-
-    const responseText = response.content
-      .filter((c) => c.type === 'text')
-      .map((c) => (c as { type: 'text'; text: string }).text)
-      .join('')
-
-    if (save && responseText) {
-      try {
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-        const outputPath = path.join(VAULT_ROOT, '01-Processing', `gm-custom-${timestamp}.md`)
-        const today = new Date().toISOString().split('T')[0]
-        const fileContent =
-          `---\ntype: lore\nstatus: pending\ncreated: ${today}\ntags:\n  - gm-generated\n---\n\n${responseText}`
-        fs.writeFileSync(outputPath, fileContent, 'utf-8')
-      } catch {
-        // ignore write failures — don't fail the response
-      }
+    const result = findById(chatId)
+    if (!result || result.status !== 'done') {
+      return NextResponse.json(
+        { error: result?.error ?? 'Agent did not return a response' },
+        { status: 500 }
+      )
     }
 
     return NextResponse.json({
       role: 'assistant',
-      content: responseText,
+      content: result.response,
       timestamp: new Date().toISOString(),
       agent,
     })

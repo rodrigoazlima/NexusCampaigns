@@ -14,7 +14,7 @@ Provides operational visibility, content quality control, human review workflows
 and knowledge-base analytics over an Obsidian vault.
 
 **Audience:** DM (human operator) running the local pipeline.
-**Location:** `dashboard/` · **URL:** http://localhost:3131
+**Location:** `.system/dashboard/` · **URL:** http://localhost:3131
 
 ---
 
@@ -268,9 +268,9 @@ Sidebar shows "Live · 30s refresh" indicator.
 ## 9. Running
 
 ```bash
-cd dashboard
+cd .system/dashboard
 npm install
 npm run dev   # http://localhost:3131
 ```
 
-Requires Node.js 18+. Override vault path: set `VAULT_ROOT` in `dashboard/.env.local`.
+Requires Node.js 18+. Override vault path: set `VAULT_ROOT` in `.system/dashboard/.env.local`.

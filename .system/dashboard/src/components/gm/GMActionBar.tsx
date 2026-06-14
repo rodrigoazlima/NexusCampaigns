@@ -2,13 +2,13 @@
 
 import { useState } from 'react'
 import QualityPicker from './QualityPicker'
-import { CheckCircle, XCircle, Flag, MessageSquare } from 'lucide-react'
+import { CheckCircle, XCircle, RefreshCw, MessageSquare } from 'lucide-react'
 
 interface GMActionBarProps {
   filename: string
   onApprove: (quality: number) => void
   onReject: () => void
-  onFlag: () => void
+  onReprocess: () => void
   onChat: () => void
   loading?: boolean
 }
@@ -16,7 +16,7 @@ interface GMActionBarProps {
 export default function GMActionBar({
   onApprove,
   onReject,
-  onFlag,
+  onReprocess,
   onChat,
   loading,
 }: GMActionBarProps) {
@@ -76,12 +76,12 @@ export default function GMActionBar({
         </button>
 
         <button
-          onClick={onFlag}
+          onClick={onReprocess}
           disabled={loading}
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded bg-warning/10 text-warning border border-warning/30 hover:bg-warning/20 transition-colors disabled:opacity-50"
         >
-          <Flag size={13} />
-          Flag
+          <RefreshCw size={13} />
+          Re-process
         </button>
 
         <button

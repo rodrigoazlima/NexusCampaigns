@@ -10,7 +10,7 @@
 
 ## Entry Point
 
-Component: `dashboard/src/components/agents/AgentConfigDialog.tsx`  
+Component: `.system/dashboard/src/components/agents/AgentConfigDialog.tsx`  
 Opened from: agent list or agent card click.  
 Props: `agentName`, `agentDisplayName`, `open`, `onClose`.
 
@@ -181,7 +181,7 @@ Command + Args (one per line) + CWD + Timeout + Env Vars.
 ## Types
 
 ```typescript
-// dashboard/src/lib/types.ts
+// .system/dashboard/src/lib/types.ts
 
 type AgentCapability = 'vision' | 'text' | 'speech' | 'tool-call'
 

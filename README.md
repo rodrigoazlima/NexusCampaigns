@@ -9,6 +9,45 @@ AI-powered Nexus Campaigns that transforms raw campaign inspiration (images, doc
 
 ---
 
+## Quick Start — User Actions
+
+### 1. Dashboard
+
+```powershell
+cd .system\dashboard
+npm run dev
+```
+
+Binds `0.0.0.0:3131` — accessible on local LAN:
+- Local: http://localhost:3131
+- LAN: http://`<your-ip>`:3131
+
+### 2. Agent Daemon
+
+Start:
+```powershell
+powershell -NonInteractive -File .agents\runtime\tools\daemon.ps1
+```
+
+Restart (kill existing first):
+```powershell
+Get-Process python | Where-Object { $_.CommandLine -like "*runner.py*" } | Stop-Process -Force
+powershell -NonInteractive -WindowStyle Hidden -File .agents\runtime\tools\daemon.ps1
+```
+
+### 3. Monitor Live
+
+```powershell
+# Live log tail
+Get-Content '.agents\runtime\state\logs\automation.log' -Tail 50 -Wait
+
+# Config paths
+# - Agent config: .system\.shared\config\global.json
+# - Dashboard env: .system\dashboard\.env.local
+```
+
+---
+
 ## System Architecture
 
 ```

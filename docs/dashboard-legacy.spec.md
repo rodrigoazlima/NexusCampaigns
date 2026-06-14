@@ -340,7 +340,7 @@ Future WebSocket: add `wss://` endpoint in Next.js Route Handler using
 ## 14. Running
 
 ```bash
-cd dashboard
+cd .system/dashboard
 npm install
 npm run dev         # http://localhost:3131
 ```

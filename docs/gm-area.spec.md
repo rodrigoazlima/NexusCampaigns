@@ -265,7 +265,7 @@ GM types message → POST /api/gm/chat
   → If save=true: write to 01-Processing/{slug}-custom-{timestamp}.md
 ```
 
-Env var: `ANTHROPIC_API_KEY` in `dashboard/.env.local`.
+Env var: `ANTHROPIC_API_KEY` in `.system/dashboard/.env.local`.
 Fallback: if key missing, return `{ error: 'ANTHROPIC_API_KEY not set' }`.
 
 Agent system prompts already exist at:

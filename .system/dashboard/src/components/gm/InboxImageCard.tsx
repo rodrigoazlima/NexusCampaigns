@@ -1,6 +1,10 @@
+'use client'
+
+import { useState } from 'react'
 import type { InboxImage } from '@/lib/types'
 import { formatRelative } from '@/lib/utils'
 import { AlertTriangle } from 'lucide-react'
+import ImageModal from './ImageModal'
 
 const AGENT_COLORS: Record<string, string> = {
   done: 'bg-success',
@@ -15,12 +19,17 @@ interface InboxImageCardProps {
 }
 
 export default function InboxImageCard({ item }: InboxImageCardProps) {
+  const [modalOpen, setModalOpen] = useState(false)
   const src = `/api/image?path=${encodeURIComponent(item.path)}`
 
   return (
     <div className={`panel overflow-hidden ${item.isStuck ? 'border-danger/40' : ''}`}>
       {/* Image thumbnail */}
-      <div className="aspect-square overflow-hidden bg-surface-3 relative">
+      <button
+        className="aspect-square overflow-hidden bg-surface-3 relative w-full cursor-zoom-in block"
+        onClick={() => setModalOpen(true)}
+        title="Click to enlarge"
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={src}
@@ -42,7 +51,7 @@ export default function InboxImageCard({ item }: InboxImageCardProps) {
             Token
           </div>
         )}
-      </div>
+      </button>
 
       {/* Info */}
       <div className="p-3">
@@ -63,6 +72,13 @@ export default function InboxImageCard({ item }: InboxImageCardProps) {
           ))}
         </div>
       </div>
+
+      <ImageModal
+        src={src}
+        alt={item.filename}
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+      />
     </div>
   )
 }

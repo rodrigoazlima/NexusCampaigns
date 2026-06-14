@@ -11,8 +11,8 @@
 
 Next.js dashboard for the Nexus Campaigns. Reads live vault and agent state from the filesystem. No database — vault is the single source of truth.
 
-**Location:** `dashboard/` (project root)  
-**Run:** `cd dashboard && npm run dev` → http://localhost:3131
+**Location:** `.system/dashboard/` (project root)  
+**Run:** `cd .system/dashboard && npm run dev` → http://localhost:3131
 
 ---
 
@@ -58,7 +58,7 @@ All paths relative to `PROJECT_ROOT` (`C:\opt\GitHub\NexusCampaigns`).
 
 ## Environment Variables
 
-`dashboard/.env.local`:
+`.system/dashboard/.env.local`:
 ```
 VAULT_ROOT=C:\opt\GitHub\NexusCampaigns\knowledge-base
 PROJECT_ROOT=C:\opt\GitHub\NexusCampaigns
