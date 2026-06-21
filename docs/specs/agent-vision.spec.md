@@ -2,7 +2,7 @@
 
 **Trigger:** hourly  
 **Input:** `00-Inbox/images/**/*.{png,jpg,jpeg,webp}` not yet in `.agents/vision/state/processed-images.json`  
-**Output:** renamed image files, `01-Processing/*.md` drafts, `01-Processing/Images Index.md`, `.agents/vision/state/processed-images.json`  
+**Output:** renamed image files, `01-Processing/*.md` drafts, `.agents/vision/state/processed-images.json`  
 **Dependency:** LM Studio at `http://localhost:1234` with model `qwen3-vl-4b-instruct`  
 **Dispatch:** `claude-api` · `claude-sonnet-4-6` · `tools_module: vision.tools.classify_images`
 
@@ -22,9 +22,8 @@
 5. Rename image
 6. Compute SHA256 of renamed file
 7. Write-ImageMarkdown → 01-Processing/{slug}.md
-8. Append-WikiRow → Images Index.md
-9. Update processed-images.json (v2 schema)
-10. Update inbox-queue.json agents.vision = done
+8. Update processed-images.json (v2 schema)
+9. Update inbox-queue.json agents.vision = done
 ```
 
 **Batch size:** 10 images per run. Non-PNG images processed first (tokens are PNG).  

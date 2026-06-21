@@ -52,7 +52,6 @@ _PROC_IMAGES  = _AGENT_STATE / "processed-images.json"
 _TOKEN_LINKS  = _AGENT_STATE / "token-links.json"
 _QUEUE_FILE   = _SHARED_STATE / "inbox-queue.json"
 _PROMPT_FILE  = _AGENTS_DIR / "vision" / "prompts" / "classify-image.txt"
-_INDEX_MD     = _PROCESSING / "Images Index.md"
 _SIGNALS_DIR  = _AGENTS_DIR / "runtime" / "state" / "signals"
 
 _IMAGE_EXTS = frozenset({".png", ".jpg", ".jpeg", ".webp"})
@@ -409,34 +408,6 @@ def _write_draft(
 
 
 # ---------------------------------------------------------------------------
-# Images Index
-# ---------------------------------------------------------------------------
-
-def _append_index(
-    image_path: Path,
-    clf: VisionClassification,
-    entity_slug: str,
-) -> None:
-    _INDEX_MD.parent.mkdir(parents=True, exist_ok=True)
-    today    = date.today().isoformat()
-    rel      = image_path.relative_to(_PROJECT_ROOT).as_posix()
-    ancestry = clf.ancestry if clf.ancestry != "none" else clf.creature_type
-    row = (
-        f"| {today} | [[{entity_slug}]] | {clf.type.value} "
-        f"| {ancestry} | {clf.element.value} | `{rel}` |\n"
-    )
-    if not _INDEX_MD.exists():
-        _INDEX_MD.write_text(
-            "# Images Index\n\n"
-            "| Date | Entity | Type | Ancestry | Element | Source |\n"
-            "|------|--------|------|----------|---------|--------|\n",
-            encoding="utf-8",
-        )
-    with open(_INDEX_MD, "a", encoding="utf-8") as fh:
-        fh.write(row)
-
-
-# ---------------------------------------------------------------------------
 # Single-image classification
 # ---------------------------------------------------------------------------
 
@@ -564,8 +535,6 @@ def main() -> None:
         out_path = _resolve_entity_path(e_slug)
         _write_draft(out_path, clf, img_path, sha256=sha)
 
-        # --- Append index (step 8) ---
-        _append_index(img_path, clf, out_path.stem)
         log.info(f"Classified: {img_path.name} → {out_path.name} ({clf.type.value})")
 
         # --- Update processed-images.json (step 9) ---

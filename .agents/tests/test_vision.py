@@ -79,7 +79,6 @@ def patch_roots(vault, tmp_path, monkeypatch):
     monkeypatch.setattr(_mod, "_PROC_IMAGES",  agent_state / "processed-images.json")
     monkeypatch.setattr(_mod, "_TOKEN_LINKS",  agent_state / "token-links.json")
     monkeypatch.setattr(_mod, "_QUEUE_FILE",   shared_state / "inbox-queue.json")
-    monkeypatch.setattr(_mod, "_INDEX_MD",     vault / "01-Processing" / "Images Index.md")
     monkeypatch.setattr(_mod, "_SIGNALS_DIR",  signals_dir)
     return vault
 
@@ -743,57 +742,6 @@ class TestRenameImage:
         c = _clf(type_="portrait", ancestry="human", char_class="fighter", element="dark")
         new_path = _mod._rename_image(src, c)
         assert new_path.name == "human-fighter-dark.portrait-01.jpg"
-
-
-# ---------------------------------------------------------------------------
-# _append_index
-# ---------------------------------------------------------------------------
-
-class TestAppendIndex:
-    def test_creates_index_with_header_when_missing(self, patch_roots, vault):
-        img = vault / "00-Inbox" / "images" / "A1" / "human-fighter-dark.portrait.jpg"
-        img.parent.mkdir(parents=True, exist_ok=True)
-        img.write_bytes(b"\xff\xd8\xff" + b"\x00" * 64)
-        c = _clf(type_="portrait", ancestry="human", char_class="fighter", element="dark")
-        _mod._append_index(img, c, "portrait-human-fighter-dark")
-        index = vault / "01-Processing" / "Images Index.md"
-        assert index.exists()
-        content = index.read_text(encoding="utf-8")
-        assert "# Images Index" in content
-        assert "| Date | Entity | Type | Ancestry | Element | Source |" in content
-
-    def test_appends_row_with_correct_fields(self, patch_roots, vault, tmp_path):
-        img = vault / "00-Inbox" / "images" / "A1" / "human-fighter-dark.portrait.jpg"
-        img.parent.mkdir(parents=True, exist_ok=True)
-        img.write_bytes(b"\xff\xd8\xff" + b"\x00" * 64)
-        c = _clf(type_="portrait", ancestry="human", char_class="fighter", element="dark")
-        _mod._append_index(img, c, "portrait-human-fighter-dark")
-        content = (vault / "01-Processing" / "Images Index.md").read_text(encoding="utf-8")
-        assert "[[portrait-human-fighter-dark]]" in content
-        assert "portrait" in content
-        assert "human" in content
-        assert "dark" in content
-
-    def test_appends_multiple_rows(self, patch_roots, vault, tmp_path):
-        folder = vault / "00-Inbox" / "images" / "A1"
-        folder.mkdir(parents=True, exist_ok=True)
-        for name, elt in [("img1.jpg", "dark"), ("img2.jpg", "fire")]:
-            img = folder / name
-            img.write_bytes(b"\xff\xd8\xff" + b"\x00" * 64)
-            c = _clf(element=elt)
-            _mod._append_index(img, c, f"portrait-human-fighter-{elt}")
-        content = (vault / "01-Processing" / "Images Index.md").read_text(encoding="utf-8")
-        rows = [ln for ln in content.splitlines() if ln.startswith("|") and "portrait" in ln]
-        assert len(rows) == 2
-
-    def test_row_uses_creature_type_when_ancestry_is_none(self, patch_roots, vault, tmp_path):
-        img = vault / "00-Inbox" / "images" / "dragon.jpg"
-        img.parent.mkdir(parents=True, exist_ok=True)
-        img.write_bytes(b"\xff\xd8\xff" + b"\x00" * 64)
-        c = _clf(ancestry="none", creature_type="dragon", element="fire")
-        _mod._append_index(img, c, "portrait-dragon-fire")
-        content = (vault / "01-Processing" / "Images Index.md").read_text(encoding="utf-8")
-        assert "dragon" in content
 
 
 # ---------------------------------------------------------------------------

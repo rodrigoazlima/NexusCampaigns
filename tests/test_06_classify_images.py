@@ -12,7 +12,7 @@ No real LM Studio server, System.Drawing, or Python face-matcher needed.
 Behaviors under test:
   1.  LM Studio offline      — early exit 0, no files renamed, index unchanged
   2.  No unprocessed images  — exit 0, "No unprocessed images" logged
-  3.  Portrait happy path    — rename, draft md, JSON index, wiki row
+  3.  Portrait happy path    — rename, draft md, JSON index
   4.  Battlemap happy path   — battlemap-{env}.ext naming + location entity type
   5.  Scene happy path       — scene-{env}.ext naming + location entity type
   6.  Body happy path        — {race}-{class}-{element}.body.ext naming
@@ -21,16 +21,14 @@ Behaviors under test:
   9.  JSON index v2 schema   — sha256 key, pathIndex, required fields
  10.  Already indexed        — pathIndex entry → skipped on second run
  11.  Draft markdown         — AGENTS.md-compliant YAML frontmatter + embed
- 12.  Wiki index init        — Images Index.md created on first run
- 13.  Wiki row appended      — row with file/type/race/class/element/token/folder
- 14.  LLM failed             — pseudoKey "path:..." in index, failed count logged
- 15.  LLM connection-error   — image NOT indexed, classified count unaffected
- 16.  Logging                — START/DONE markers, timestamp format, task prefix
- 17.  Idempotency            — second run adds no new index entries, exits 0
- 18.  Queue vision update    — inbox-queue.json vision=done for processed image
- 19.  Multiple image formats — .png/.jpg/.jpeg files discovered and renamed
- 20.  Parametrized types     — all four types produce correct filename suffix
- 21.  Invalid LLM values     — unknown type/race/element sanitized to defaults
+ 12.  LLM failed             — pseudoKey "path:..." in index, failed count logged
+ 13.  LLM connection-error   — image NOT indexed, classified count unaffected
+ 14.  Logging                — START/DONE markers, timestamp format, task prefix
+ 15.  Idempotency            — second run adds no new index entries, exits 0
+ 16.  Queue vision update    — inbox-queue.json vision=done for processed image
+ 17.  Multiple image formats — .png/.jpg/.jpeg files discovered and renamed
+ 18.  Parametrized types     — all four types produce correct filename suffix
+ 19.  Invalid LLM values     — unknown type/race/element sanitized to defaults
 """
 
 from __future__ import annotations
@@ -211,10 +209,6 @@ def _json_index_path(vault: Path) -> Path:
     return vault / ".automation" / "processed-images.json"
 
 
-def _wiki_index_path(vault: Path) -> Path:
-    return vault / "01-Processing" / "Images Index.md"
-
-
 def _images_dir(vault: Path) -> Path:
     return vault / "00-Inbox" / "images"
 
@@ -292,7 +286,7 @@ class TestLMStudioOffline:
 
 
 class TestNoUnprocessedImages:
-    """Empty inbox → exit 0, log message, wiki index still initialised."""
+    """Empty inbox → exit 0, log message."""
 
     def test_exits_zero_with_empty_inbox(self, vault: Path) -> None:
         result = run_classify(vault)
@@ -302,11 +296,6 @@ class TestNoUnprocessedImages:
         run_classify(vault)
         log = _log_path(vault).read_text(encoding="utf-8")
         assert "No unprocessed images found" in log
-
-    def test_wiki_index_created_even_without_images(self, vault: Path) -> None:
-        """Wiki index must be initialised on first run even with no images."""
-        run_classify(vault)
-        assert _wiki_index_path(vault).exists()
 
 
 # ---------------------------------------------------------------------------
@@ -728,70 +717,7 @@ class TestDraftMarkdown:
 
 
 # ---------------------------------------------------------------------------
-# 12. Wiki index initialization
-# ---------------------------------------------------------------------------
-
-
-class TestWikiIndexInit:
-    """Images Index.md must be created with correct header on first run."""
-
-    def test_wiki_index_file_created(self, vault: Path) -> None:
-        run_classify(vault)
-        assert _wiki_index_path(vault).exists()
-
-    def test_wiki_index_has_yaml_frontmatter(self, vault: Path) -> None:
-        run_classify(vault)
-        content = _wiki_index_path(vault).read_text(encoding="utf-8")
-        assert "title:" in content
-        assert "images" in content
-
-    def test_wiki_index_has_table_header(self, vault: Path) -> None:
-        run_classify(vault)
-        content = _wiki_index_path(vault).read_text(encoding="utf-8")
-        assert "| File |" in content
-        assert "| Type |" in content
-
-    def test_wiki_index_not_overwritten_on_second_run(self, vault: Path) -> None:
-        run_classify(vault)
-        first_content = _wiki_index_path(vault).read_text(encoding="utf-8")
-        run_classify(vault)
-        second_content = _wiki_index_path(vault).read_text(encoding="utf-8")
-        # Content must not shrink; rows accumulate via append
-        assert len(second_content) >= len(first_content)
-
-
-# ---------------------------------------------------------------------------
-# 13. Wiki row appended
-# ---------------------------------------------------------------------------
-
-
-class TestWikiRowAppended:
-    """A table row is appended to Images Index.md for each processed image."""
-
-    def test_row_appended_with_filename(self, vault: Path) -> None:
-        make_png(_images_dir(vault) / "A1" / "portrait001.png")
-        run_classify(vault)
-        content = _wiki_index_path(vault).read_text(encoding="utf-8")
-        assert "human-warrior-none.portrait.png" in content
-
-    def test_row_contains_type_column(self, vault: Path) -> None:
-        make_png(_images_dir(vault) / "A1" / "portrait001.png")
-        run_classify(vault)
-        assert "| portrait |" in _wiki_index_path(vault).read_text(encoding="utf-8")
-
-    def test_non_token_row_has_no_token_mark(self, vault: Path) -> None:
-        make_png(_images_dir(vault) / "A1" / "portrait001.png")
-        run_classify(vault)
-        assert "| no |" in _wiki_index_path(vault).read_text(encoding="utf-8")
-
-    def test_token_row_has_yes_mark(self, vault: Path) -> None:
-        make_png(_images_dir(vault) / "A1" / "char_frame.png")
-        run_classify(vault, is_token=True)
-        assert "| yes |" in _wiki_index_path(vault).read_text(encoding="utf-8")
-
-
-# ---------------------------------------------------------------------------
-# 14. LLM failed → pseudoKey in index
+# 12. LLM failed → pseudoKey in index
 # ---------------------------------------------------------------------------
 
 _FAILED_RESULT = _stub_classify_result(status="failed")

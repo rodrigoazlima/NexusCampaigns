@@ -170,7 +170,7 @@ Do not generate lore that contradicts existing approved entities in `02-Library/
 ### Ingestion Agent
 - Detects new files in `00-Inbox/images/`
 - Generates slug name, metadata, companion `.md` in same folder
-- Updates `01-Processing/Images Index.md`
+- Updates `.agents/vision/state/processed-images.json`
 - Cannot modify `02-Library/`
 
 ### NPC Agent

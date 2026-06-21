@@ -89,8 +89,6 @@ def _draft_file() -> Path | None:
     if not _PROCESSING.exists():
         return None
     for md in sorted(_PROCESSING.glob("*.md")):
-        if md.name == "Images Index.md":
-            continue
         try:
             if MARKER in md.read_text(encoding="utf-8"):
                 return md

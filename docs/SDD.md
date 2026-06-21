@@ -75,7 +75,7 @@ Agents are defined by their **actions** — discrete, named operations each agen
 
 ### Vision
 
-**Trigger:** hourly | **Reads:** `00-Inbox/images/`, `processed-images.json` | **Writes:** `01-Processing/*.md`, `Images Index.md`, `processed-images.json`
+**Trigger:** hourly | **Reads:** `00-Inbox/images/`, `processed-images.json` | **Writes:** `01-Processing/*.md`, `.agents/vision/state/processed-images.json`
 
 | Action | Description |
 |--------|-------------|
@@ -84,7 +84,7 @@ Agents are defined by their **actions** — discrete, named operations each agen
 | `ClassifyImage` | Call vision LLM to produce type / race / class / element / environment classification. |
 | `RenameToSlug` | Rename image file to canonical slug format. Bump filename on collision. |
 | `WriteDraft` | Write AGENTS.md-compliant image metadata draft to `01-Processing/`. |
-| `UpdateImagesIndex` | Append row to `01-Processing/Images Index.md`. |
+| `UpdateJsonIndex` | Update entry in `.agents/vision/state/processed-images.json`. |
 | `MarkQueueDone` | Set `agents.vision = done` in `inbox-queue.json`. |
 
 ---
