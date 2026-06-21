@@ -105,7 +105,7 @@ class TestConfigToPathResolution:
     def test_system_paths_resolve_from_same_root(self, vault):
         cfg = load_vault_config(vault)
         assert cfg.system_paths.project_root == vault
-        assert cfg.system_paths.system_state == vault / ".system" / "state"
+        assert cfg.system_paths.shared_state == vault / ".system" / "state"
 
     def test_llm_endpoints_accessible_from_config(self, vault):
         cfg = load_vault_config(vault)

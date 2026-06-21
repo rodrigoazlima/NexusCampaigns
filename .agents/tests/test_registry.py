@@ -122,7 +122,7 @@ class TestLoadRegistry:
         assert registry.agents_dir == ".agents"
 
     def test_shared_dir(self, registry: RegistryConfig) -> None:
-        assert registry.system_dir == ".system"
+        assert registry.shared_dir == ".system"
 
     def test_raises_when_no_registry(self, tmp_path: Path) -> None:
         (tmp_path / "knowledge-base").mkdir()
@@ -198,18 +198,18 @@ class TestExecutionOrder:
 
 class TestSharedStateFiles:
     def test_inbox_queue_present(self, registry: RegistryConfig) -> None:
-        assert "inbox-queue.json" in registry.system_state_files
+        assert "inbox-queue.json" in registry.shared_state_files
 
     def test_inbox_queue_owner(self, registry: RegistryConfig) -> None:
-        spec = registry.system_state_files["inbox-queue.json"]
+        spec = registry.shared_state_files["inbox-queue.json"]
         assert spec.owner == "ingestion"
 
     def test_inbox_queue_updaters(self, registry: RegistryConfig) -> None:
-        spec = registry.system_state_files["inbox-queue.json"]
+        spec = registry.shared_state_files["inbox-queue.json"]
         assert "vision" in spec.updaters
 
     def test_spec_is_shared_state_file_spec(self, registry: RegistryConfig) -> None:
-        spec = registry.system_state_files["inbox-queue.json"]
+        spec = registry.shared_state_files["inbox-queue.json"]
         assert isinstance(spec, SharedStateFileSpec)
 
 
@@ -253,22 +253,22 @@ class TestAgentEntries:
 
 class TestAgentSharedState:
     def test_vision_reads_inbox_queue(self, registry: RegistryConfig) -> None:
-        ss = registry.agents["vision"].system_state
+        ss = registry.agents["vision"].shared_state
         assert ss is not None
         assert any("inbox-queue.json" in p for p in ss.reads)
 
     def test_vision_updates_inbox_queue(self, registry: RegistryConfig) -> None:
-        ss = registry.agents["vision"].system_state
+        ss = registry.agents["vision"].shared_state
         assert ss is not None
         assert any("inbox-queue.json" in p for p in ss.updates)
 
     def test_ingestion_writes_inbox_queue(self, registry: RegistryConfig) -> None:
-        ss = registry.agents["ingestion"].system_state
+        ss = registry.agents["ingestion"].shared_state
         assert ss is not None
         assert any("inbox-queue.json" in p for p in ss.writes)
 
     def test_shared_state_is_spec(self, registry: RegistryConfig) -> None:
-        ss = registry.agents["ingestion"].system_state
+        ss = registry.agents["ingestion"].shared_state
         assert isinstance(ss, AgentSharedStateSpec)
 
 
@@ -362,7 +362,7 @@ class TestLiveRegistryConsistency:
                     f"Agent '{name}' references unknown llm alias '{llm}'"
 
     def test_shared_state_owners_exist(self) -> None:
-        for fname, spec in self.reg.system_state_files.items():
+        for fname, spec in self.reg.shared_state_files.items():
             assert spec.owner in self.reg.agents, \
                 f"shared_state_files '{fname}' owner '{spec.owner}' not in agents"
 

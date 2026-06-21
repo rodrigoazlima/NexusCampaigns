@@ -43,7 +43,7 @@ class TestSystemPaths:
     def test_derived_paths(self, tmp_path):
         sp = SystemPaths(project_root=tmp_path)
         assert sp.agents_dir   == tmp_path / ".agents"
-        assert sp.system_state == tmp_path / ".system" / "state"
+        assert sp.shared_state == tmp_path / ".system" / "state"
         assert sp.logs_dir     == tmp_path / ".agents" / "runtime" / "state" / "logs"
         assert sp.reports_dir  == tmp_path / ".agents" / "review" / "state" / "reports"
 

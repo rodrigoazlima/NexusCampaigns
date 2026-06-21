@@ -603,7 +603,7 @@ class Runtime(IOrchestrator):
             if _load_agent_dispatch(task_id, self._log) is None:
                 continue
 
-            reason = "signalled" if signalled and not due else "due"
+            reason = "force" if force else ("signalled" if signalled and not due else "due")
             self._log.info(f"Dispatching {task_id} ({entry.description}) [{reason}]")
             started_at  = datetime.now(timezone.utc)
             exit_code, result = self.dispatch(task_id)
