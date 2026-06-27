@@ -677,17 +677,17 @@ def _inbox_has_slot(slot: str) -> bool:
 
 
 def _inbox_has_new_files() -> bool:
-    """Return True if 00-Inbox/images/ or 00-Inbox/docs/ contains processable files."""
-    images_dir = _VAULT_ROOT / "00-Inbox" / "images"
-    docs_dir   = _VAULT_ROOT / "00-Inbox" / "docs"
-    if images_dir.exists():
-        for f in images_dir.rglob("*"):
-            if f.is_file() and f.suffix.lower() in _IMAGE_EXTS:
-                return True
-    if docs_dir.exists():
-        for f in docs_dir.rglob("*"):
-            if f.is_file() and f.suffix.lower() in {".docx", ".doc", ".pdf", ".md", ".txt"}:
-                return True
+    """Return True if 00-Inbox has any file not yet registered in inbox-queue.json."""
+    inbox = _VAULT_ROOT / "00-Inbox"
+    if not inbox.exists():
+        return False
+    queue = _read_inbox_queue()
+    for f in inbox.rglob("*"):
+        if not f.is_file():
+            continue
+        rel = f.relative_to(_PROJECT_ROOT).as_posix()
+        if rel not in queue:
+            return True
     return False
 
 
