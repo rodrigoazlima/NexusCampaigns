@@ -571,6 +571,10 @@ def main() -> None:
         # --- Update inbox-queue.json (step 10) ---
         if orig_rel in queue and isinstance(queue[orig_rel].get("agents"), dict):
             queue[orig_rel]["agents"]["vision"] = "done"
+            # Rename queue key to match new image path so classification/lore
+            # can trace source frontmatter back to the correct queue entry.
+            if new_rel != orig_rel:
+                queue[new_rel] = queue.pop(orig_rel)
             _save_queue(queue)
 
         # --- Emit signal for Lore agent (fire-and-forget per G5) ---

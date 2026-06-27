@@ -105,6 +105,17 @@ def _do_cleanup(root: Path) -> None:
         except Exception:
             pass
 
+    # Remove classification bad-docs.txt entries for e2e images
+    bad_docs = root / ".agents" / "classification" / "state" / "bad-docs.txt"
+    if bad_docs.exists():
+        try:
+            lines = bad_docs.read_text(encoding="utf-8").splitlines()
+            kept  = [ln for ln in lines if "e2e-test" not in ln]
+            if len(kept) != len(lines):
+                bad_docs.write_text("\n".join(kept) + ("\n" if kept else ""), encoding="utf-8")
+        except Exception:
+            pass
+
 
 def _e2e_sha_set(root: Path) -> set[str]:
     """Return sha256 keys from processed-images.json that belong to e2e-test."""

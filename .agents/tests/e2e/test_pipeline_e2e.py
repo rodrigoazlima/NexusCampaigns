@@ -1,18 +1,21 @@
 """
-E2E test: Mileena MK image through the full agent pipeline via runner.py.
+E2E test: image through the full agent pipeline via runner.py.
 
 Requires:
   - LM Studio running on localhost:1234 with a vision model loaded
+  - LocalRouter running on localhost:8080 (for classification LLM)
   - Pillow, numpy (for token generation)
 
 Pipeline stages:
-  1. Download  — JPEG lands in 00-Inbox/images/e2e-test/
-  2. Ingestion — runner dispatches ingestion_agent.py → inbox-queue.json updated
-  3. Vision    — runner dispatches classify_images.py → LM Studio classifies,
-                 renames image, writes draft to 01-Processing/
-  4. Lore      — runner dispatches generate_npcs.py → NPC sheet written to 01-Processing/
-  5. Token     — runner dispatches generate_tokens.py → token PNG created
-  6. Review    — draft entity in 01-Processing/ flagged for human review
+  1. Download    — JPEG lands in 00-Inbox/images/e2e-test/
+  2. Ingestion   — runner dispatches ingestion_agent.py → inbox-queue.json updated
+  3. Vision      — runner dispatches classify_images.py → LM Studio classifies,
+                   renames image, writes body draft to 01-Processing/
+  4. Lore        — runner dispatches generate_npcs.py → NPC sheet written to 01-Processing/
+  5. Classification — runner dispatches enrich_tags.py → tags/type enriched,
+                   queue classification slot marked done
+  6. Token       — runner dispatches generate_tokens.py → token PNG created
+  7. Review      — draft entity in 01-Processing/ flagged for human review
 
 Run normally (auto-cleanup):
   pytest .agents/tests/e2e/test_pipeline_e2e.py -v
@@ -91,10 +94,27 @@ def _e2e_inbox_key() -> str | None:
 
 
 def _find_e2e_draft() -> Path | None:
-    """Find the 01-Processing/ draft that references the e2e-test image."""
+    """Find any 01-Processing/ draft that references the e2e-test image."""
     if not _PROCESSING.exists():
         return None
-    for md in _PROCESSING.glob("*.md"):
+    for md in sorted(_PROCESSING.glob("*.md")):
+        try:
+            if "e2e-test" in md.read_text(encoding="utf-8"):
+                return md
+        except Exception:
+            pass
+    return None
+
+
+def _find_e2e_npc_draft() -> Path | None:
+    """Find the lore NPC draft (npc-*.md) in 01-Processing/ referencing e2e-test.
+
+    Vision writes body-*.md; lore writes npc-*.md. This helper specifically
+    targets the lore output so assertions can check PF2e NPC fields.
+    """
+    if not _PROCESSING.exists():
+        return None
+    for md in sorted(_PROCESSING.glob("npc-*.md")):
         try:
             if "e2e-test" in md.read_text(encoding="utf-8"):
                 return md
@@ -162,6 +182,7 @@ def test_stage2_ingestion():
     assert _QUEUE_FILE.exists(), "inbox-queue.json not created"
 
     queue = _read_json(_QUEUE_FILE)
+    # Use original filename — ingestion registers images before any rename
     img_rel = img_path.relative_to(_PROJECT_ROOT).as_posix()
 
     assert img_rel in queue, (
@@ -179,7 +200,12 @@ def test_stage2_ingestion():
 # ---------------------------------------------------------------------------
 
 def test_stage3_vision():
-    """classify_images.py classifies image via LM Studio, writes draft to 01-Processing/."""
+    """classify_images.py classifies image via LM Studio, writes draft to 01-Processing/.
+
+    Vision renames the image to a canonical slug (e.g. human-rogue-dark.body.jpg)
+    and updates the inbox-queue.json key from the original name to the new name so
+    downstream agents (lore, classification) can trace source back to the queue entry.
+    """
     assert _QUEUE_FILE.exists(), "Run test_stage2 first"
 
     result = _run_agent("vision-agent", timeout=LLM_AGENT_TIMEOUT)
@@ -204,7 +230,7 @@ def test_stage3_vision():
         f"Vision did not classify image type: {entry.get('type')}"
     )
 
-    # Draft entity must exist in 01-Processing/
+    # Draft entity (body-*.md or scene-*.md) must exist in 01-Processing/
     draft = _find_e2e_draft()
     assert draft is not None, "No draft entity in 01-Processing/ referencing e2e-test image"
 
@@ -212,7 +238,10 @@ def test_stage3_vision():
     assert "status: draft" in content
     assert "reviewed: false" in content
 
-    # inbox-queue must mark vision as done
+    # Source field in draft must reference the RENAMED image path
+    assert "e2e-test" in content, "Draft source does not reference e2e-test folder"
+
+    # inbox-queue key is updated to the renamed image path; vision=done
     queue = _read_json(_QUEUE_FILE)
     key = _e2e_inbox_key()
     assert key is not None, "e2e image not found in inbox-queue after vision"
@@ -226,7 +255,14 @@ def test_stage3_vision():
 # ---------------------------------------------------------------------------
 
 def test_stage4_lore():
-    """generate_npcs.py enriches draft with NPC content from LM Studio."""
+    """generate_npcs.py writes PF2e NPC sheet into 01-Processing/ for character images.
+
+    Checks:
+    - npc-*.md draft exists referencing e2e-test image
+    - PF2e frontmatter fields present: name, ancestry, stat block (str/dex/etc.)
+    - Body sections present: ## Description, ## Abilities
+    - inbox-queue lore slot marked done
+    """
     entry = _find_e2e_vision_entry()
     assert entry is not None, "Run test_stage3 first"
 
@@ -241,6 +277,13 @@ def test_stage4_lore():
     if not active:
         pytest.skip("No active scenarios — lore agent skipped")
 
+    # Only character types (portrait, body, token) get NPC generation
+    vision_type = entry.get("type", "")
+    if vision_type not in ("portrait", "body", "token"):
+        pytest.skip(
+            f"Image classified as '{vision_type}' — lore only runs on character images"
+        )
+
     result = _run_agent("lore-agent", timeout=LLM_AGENT_TIMEOUT)
 
     combined = result.stdout + result.stderr
@@ -251,22 +294,82 @@ def test_stage4_lore():
         f"lore-agent failed (exit {result.returncode})\n{result.stdout[-2000:]}"
     )
 
-    # Draft should now have NPC content (name, traits, etc.)
-    draft = _find_e2e_draft()
-    assert draft is not None, "Draft entity missing after lore"
+    # Lore writes npc-*.md, distinct from vision's body-*.md
+    npc_draft = _find_e2e_npc_draft()
+    assert npc_draft is not None, (
+        "No NPC draft (npc-*.md) in 01-Processing/ after lore agent. "
+        "Lore generates a separate file with PF2e stat block."
+    )
 
-    content = draft.read_text(encoding="utf-8")
-    # Lore agent writes PF2e NPC fields
-    assert any(kw in content for kw in ("name:", "traits:", "## Background", "## Personality")), (
-        "Draft entity missing NPC content after lore agent"
+    content = npc_draft.read_text(encoding="utf-8")
+
+    # PF2e frontmatter fields written by _write_npc_draft()
+    assert "name:" in content, "NPC draft missing 'name:' frontmatter field"
+    assert any(kw in content for kw in ("ancestry:", "str:", "dex:")), (
+        "NPC draft missing PF2e stat block fields (ancestry/str/dex)"
+    )
+
+    # Body sections written by _output_to_body()
+    assert "## Description" in content, "NPC draft missing '## Description' section"
+    assert "## Abilities" in content, "NPC draft missing '## Abilities' section"
+
+    # Queue lore slot updated — works because vision updated the queue key to the
+    # renamed image path, which matches img_entry["path"] used by lore
+    queue = _read_json(_QUEUE_FILE)
+    key = _e2e_inbox_key()
+    assert key is not None, "e2e image not found in inbox-queue after lore"
+    assert queue[key]["agents"].get("lore") == "done", (
+        f"lore slot not done in inbox-queue: {queue[key]['agents']}"
     )
 
 
 # ---------------------------------------------------------------------------
-# Stage 5 — Token generation
+# Stage 5 — Classification (tag enrichment + type inference)
 # ---------------------------------------------------------------------------
 
-def test_stage5_token():
+def test_stage5_classification():
+    """enrich_tags.py enriches draft entities with tags and type, marks queue done.
+
+    Classification processes all .md files in 01-Processing/ and traces their
+    'source' frontmatter field back to the inbox-queue to mark classification=done.
+    Files with 3+ tags and a type set are auto-marked done without an LLM call.
+    """
+    assert _QUEUE_FILE.exists(), "Run test_stage2 first"
+    assert _find_e2e_draft() is not None, "Run test_stage3 first — no draft to classify"
+
+    result = _run_agent("classification-agent", timeout=120)
+
+    # Exit code 1 means at least one permanent LLM failure; 0 means clean run.
+    # Both are acceptable here — we check queue state directly.
+    combined = result.stdout + result.stderr
+    assert "Traceback" not in combined or "classified:" in combined, (
+        f"classification-agent crashed unexpectedly:\n{combined[-2000:]}"
+    )
+
+    # Inbox-queue classification slot must be done or skip
+    queue = _read_json(_QUEUE_FILE)
+    key = _e2e_inbox_key()
+    assert key is not None, "e2e image not found in inbox-queue after classification"
+
+    c_slot = queue[key]["agents"].get("classification")
+    assert c_slot in ("done", "skip"), (
+        f"classification slot not done/skip after agent run: {queue[key]['agents']}\n"
+        f"Agent output: {combined[-2000:]}"
+    )
+
+    # Draft must have type and at least one tag (written by vision, enriched by classification)
+    draft = _find_e2e_draft()
+    assert draft is not None, "Draft missing after classification"
+    content = draft.read_text(encoding="utf-8")
+    assert "type:" in content, "Draft missing 'type:' field after classification"
+    assert "tags:" in content, "Draft missing 'tags:' field after classification"
+
+
+# ---------------------------------------------------------------------------
+# Stage 6 — Token generation
+# ---------------------------------------------------------------------------
+
+def test_stage6_token():
     """generate_tokens.py creates a circular portrait token PNG."""
     entry = _find_e2e_vision_entry()
     assert entry is not None, "Run test_stage3 first"
@@ -300,10 +403,10 @@ def test_stage5_token():
 
 
 # ---------------------------------------------------------------------------
-# Stage 6 — Human review flag
+# Stage 7 — Human review flag
 # ---------------------------------------------------------------------------
 
-def test_stage6_review_flag():
+def test_stage7_review_flag():
     """Draft entity in 01-Processing/ must be ready for human review."""
     draft = _find_e2e_draft()
     assert draft is not None, (

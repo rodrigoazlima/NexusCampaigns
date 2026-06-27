@@ -106,21 +106,31 @@ def _detect_and_delete_image():
 
 
 def _cleanup_state():
-    """Clean queue entries, processed-images, and drafts. Inbox image is preserved."""
-    # Remove inbox-queue entries
+    """Clean queue entries, processed-images (images + pathIndex), and drafts.
+
+    Inbox image is preserved so the user can inspect it on the dashboard.
+    """
+    # Remove inbox-queue entries (key may be original or renamed path after vision)
     if _QUEUE_FILE.exists():
         q = _read_json(_QUEUE_FILE)
         cleaned = {k: v for k, v in q.items() if MARKER not in k}
         _QUEUE_FILE.write_text(json.dumps(cleaned, indent=2), encoding="utf-8")
 
-    # Remove processed-images entries
+    # Remove processed-images entries AND their pathIndex pointers
     if _PROC_IMAGES.exists():
-        state = _read_json(_PROC_IMAGES)
-        images = state.get("images", {})
-        state["images"] = {k: v for k, v in images.items() if MARKER not in v.get("path", "")}
+        state      = _read_json(_PROC_IMAGES)
+        images     = state.get("images", {})
+        path_index = state.get("pathIndex", {})
+        bad_shas   = [k for k, v in images.items() if MARKER in v.get("path", "")]
+        for sha in bad_shas:
+            bad_path = images[sha].get("path", "")
+            images.pop(sha, None)
+            path_index.pop(bad_path, None)
+        state["images"]    = images
+        state["pathIndex"] = path_index
         _PROC_IMAGES.write_text(json.dumps(state, indent=2), encoding="utf-8")
 
-    # Remove 01-Processing drafts
+    # Remove 01-Processing drafts referencing this marker
     if _PROCESSING.exists():
         for md in list(_PROCESSING.glob("*.md")):
             try:
