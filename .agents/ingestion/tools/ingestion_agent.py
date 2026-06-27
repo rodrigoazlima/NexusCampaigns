@@ -148,9 +148,11 @@ def _strip_emoji(text: str) -> str:
 def strip_emoji_filenames(inbox: Path, log: Logger) -> int:
     """Rename files in inbox/ that contain emoji. Idempotent. Returns count renamed."""
     renamed = 0
+    scanned = 0
     for path in sorted(inbox.rglob("*")):
         if not path.is_file():
             continue
+        scanned += 1
         if not _EMOJI_RE.search(path.stem):
             continue
 
@@ -167,6 +169,7 @@ def strip_emoji_filenames(inbox: Path, log: Logger) -> int:
         log.info(f"Emoji strip: {path.name!r} → {candidate.name!r}")
         renamed += 1
 
+    log.info(f"Emoji check: {scanned} files scanned, {renamed} renamed")
     return renamed
 
 
@@ -291,6 +294,7 @@ def process_docx_files(log: Logger) -> tuple[int, int]:
 
     batch = all_docx[:BATCH_SIZE]
     if not batch:
+        log.info(f"DOCX check: 0 unprocessed docx found (pandoc available, {len(processed)} already converted)")
         return 0, 0
 
     log.info(f"DOCX batch: {len(batch)} of {len(all_docx)} unprocessed file(s)")
@@ -333,11 +337,15 @@ def register_new_files(log: Logger) -> tuple[int, int]:
     """Scan 00-Inbox/ recursively; add files absent from queue. Returns (added, 0)."""
     queue = _load_queue()
     added = 0
+    scanned = 0
 
+    inbox_paths: set[str] = set()
     for path in sorted(_INBOX.rglob("*")):
         if not path.is_file():
             continue
+        scanned += 1
         rel = path.relative_to(_PROJECT_ROOT).as_posix()
+        inbox_paths.add(rel)
         if rel in queue:
             continue
 
@@ -349,6 +357,15 @@ def register_new_files(log: Logger) -> tuple[int, int]:
         )
         log.info(f"Queued [{ft}]: {rel}")
         added += 1
+
+    phantom = [k for k in queue if k.startswith("knowledge-base/00-Inbox/") and k not in inbox_paths]
+    log.info(
+        f"Queue scan: {scanned} inbox files, {scanned - added} already queued, "
+        f"{added} new, {len(phantom)} phantom (queued but missing from disk)"
+    )
+    if phantom:
+        for p in phantom:
+            log.info(f"  Phantom entry: {p}")
 
     if added:
         _save_queue(queue)
