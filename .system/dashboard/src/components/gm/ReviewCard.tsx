@@ -38,6 +38,10 @@ export default function ReviewCard({ item, onApprove, onReject, onReprocess }: R
     ? `/api/image?path=${encodeURIComponent(item.source[0])}`
     : null
 
+  const tokenSrc = item.tokenPath
+    ? `/api/image?path=${encodeURIComponent(item.tokenPath)}`
+    : null
+
   const handleApprove = async (q: number) => {
     setLoading(true)
     await onApprove(item.filename, q)
@@ -87,31 +91,70 @@ export default function ReviewCard({ item, onApprove, onReject, onReprocess }: R
   return (
     <div className="panel overflow-hidden">
       <div className="flex flex-col md:flex-row">
-        {/* Left: image column */}
-        <div className="md:w-44 flex-shrink-0 p-3 flex flex-col gap-2 border-b md:border-b-0 md:border-r border-surface-3">
-          {imageSrc ? (
-            <button
-              className="w-full aspect-square overflow-hidden rounded-md bg-surface-3 border border-surface-3 hover:border-primary/40 transition-colors cursor-zoom-in"
-              onClick={() => setModalOpen(true)}
-              title="Click to enlarge"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
+        {/* Left: image column — original behind, token in front */}
+        <div className="md:w-52 flex-shrink-0 p-3 flex flex-col gap-2 border-b md:border-b-0 md:border-r border-surface-3">
+          <button
+            className="relative w-full aspect-square overflow-hidden rounded-xl bg-surface-3 border border-surface-3 hover:border-primary/40 transition-all cursor-zoom-in group"
+            onClick={() => setModalOpen(true)}
+            title="Click to enlarge"
+          >
+            {/* Original image — blurred background */}
+            {imageSrc ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
               <img
                 src={imageSrc}
-                alt={item.id}
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  const t = e.target as HTMLImageElement
-                  t.parentElement!.innerHTML =
-                    '<div class="w-full h-full flex items-center justify-center text-zinc-600 text-xs">No image</div>'
-                }}
+                alt=""
+                aria-hidden="true"
+                className="absolute inset-0 w-full h-full object-cover scale-110 blur-sm brightness-50 saturate-75 transition-all group-hover:brightness-40"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
               />
-            </button>
-          ) : (
-            <div className="w-full aspect-square rounded-md bg-surface-3 flex items-center justify-center text-zinc-600 text-xs">
-              No image
-            </div>
-          )}
+            ) : (
+              <div className="absolute inset-0 bg-surface-3" />
+            )}
+
+            {/* Gradient vignette */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20 z-10" />
+
+            {/* Token in front — centred, slightly lifted */}
+            {tokenSrc ? (
+              <div className="absolute inset-0 flex items-center justify-center z-20 p-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={tokenSrc}
+                  alt={item.id}
+                  className="w-4/5 h-4/5 object-contain drop-shadow-[0_4px_24px_rgba(0,0,0,0.8)] transition-transform group-hover:scale-105"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                />
+              </div>
+            ) : imageSrc ? (
+              /* No token yet — show source image normally */
+              <div className="absolute inset-0 flex items-center justify-center z-20 p-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={imageSrc}
+                  alt={item.id}
+                  className="w-full h-full object-cover rounded-lg"
+                  onError={(e) => {
+                    const t = e.target as HTMLImageElement
+                    t.parentElement!.innerHTML =
+                      '<div class="w-full h-full flex items-center justify-center text-zinc-600 text-xs">No image</div>'
+                  }}
+                />
+              </div>
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center text-zinc-600 text-xs z-20">
+                No image
+              </div>
+            )}
+
+            {/* Token badge */}
+            {tokenSrc && (
+              <div className="absolute bottom-1.5 right-1.5 z-30 bg-primary/80 backdrop-blur-sm text-white text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full">
+                token
+              </div>
+            )}
+          </button>
+
           <div className="text-[10px] text-zinc-600 font-mono text-center truncate" title={item.filename}>
             {item.filename}
           </div>
@@ -165,6 +208,24 @@ export default function ReviewCard({ item, onApprove, onReject, onReprocess }: R
                   #{tag}
                 </span>
               ))}
+            </div>
+          )}
+
+          {/* Source + token paths */}
+          {(item.source.length > 0 || item.tokenPath) && (
+            <div className="flex flex-wrap gap-x-4 gap-y-1 mb-3 text-[10px] text-zinc-600 font-mono">
+              {item.source[0] && (
+                <span title={item.source[0]}>
+                  <span className="text-zinc-500">src:</span>{' '}
+                  {item.source[0].split('/').pop()}
+                </span>
+              )}
+              {item.tokenPath && (
+                <span title={item.tokenPath} className="text-primary/60">
+                  <span className="text-zinc-500">token:</span>{' '}
+                  {item.tokenPath.split('/').pop()}
+                </span>
+              )}
             </div>
           )}
 
@@ -232,10 +293,10 @@ export default function ReviewCard({ item, onApprove, onReject, onReprocess }: R
         </div>
       )}
 
-      {/* Image modal */}
-      {imageSrc && (
+      {/* Image modal — prefer token, fallback to source */}
+      {(tokenSrc || imageSrc) && (
         <ImageModal
-          src={imageSrc}
+          src={tokenSrc ?? imageSrc!}
           alt={item.id}
           open={modalOpen}
           onClose={() => setModalOpen(false)}

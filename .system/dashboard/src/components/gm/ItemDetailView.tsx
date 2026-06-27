@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft, CheckCircle, Archive, XCircle, Flag,
-  Loader2, CircleDot, ZoomIn
+  Loader2, CircleDot, ZoomIn, Upload, RefreshCw, ImagePlus
 } from 'lucide-react'
 import type { ItemDetail } from '@/lib/types'
 import QualityBar from '@/components/widgets/QualityBar'
@@ -44,7 +44,10 @@ export default function ItemDetailView({ item: initial }: Props) {
   const [toast, setToast] = useState<Toast | null>(null)
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const [uploadingBase, setUploadingBase] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
+  const [modalSrc, setModalSrc] = useState<string | null>(null)
   const [renameInput, setRenameInput] = useState(item.id)
   const [showApproveQuality, setShowApproveQuality] = useState(false)
   const [approveQuality, setApproveQuality] = useState<number | null>(item.quality || null)
@@ -217,6 +220,51 @@ export default function ItemDetailView({ item: initial }: Props) {
     }
   }
 
+  const handleReplaceImage = async (file: File) => {
+    if (!item.source[0]) return
+    setUploadingImage(true)
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      form.append('targetPath', item.source[0])
+      const res = await fetch('/api/gm/upload-image', { method: 'POST', body: form })
+      const data = await res.json()
+      if (data.ok) {
+        showToast('Image replaced', 'success')
+        // Force re-render by appending cache-buster to image src
+        setItem((i) => ({ ...i }))
+      } else {
+        showToast(data.error ?? 'Upload failed', 'error')
+      }
+    } catch (err) {
+      showToast(String(err), 'error')
+    } finally {
+      setUploadingImage(false)
+    }
+  }
+
+  const handleUploadTokenBase = async (file: File) => {
+    if (!item.source[0]) return
+    setUploadingBase(true)
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      form.append('sourcePath', item.source[0])
+      const res = await fetch('/api/gm/token/upload-base', { method: 'POST', body: form })
+      const data = await res.json()
+      if (data.ok) {
+        showToast('Token generated from uploaded base', 'success')
+        setItem((i) => ({ ...i, tokenPath: data.tokenPath }))
+      } else {
+        showToast(data.error ?? 'Upload failed', 'error')
+      }
+    } catch (err) {
+      showToast(String(err), 'error')
+    } finally {
+      setUploadingBase(false)
+    }
+  }
+
   const typeBadgeClass = TYPE_COLORS[item.type] ?? 'bg-zinc-700 text-zinc-400'
   const statusBadgeClass =
     item.status === 'approved' ? 'bg-success/10 text-success' :
@@ -271,42 +319,74 @@ export default function ItemDetailView({ item: initial }: Props) {
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
         {/* LEFT: Media */}
         <div className="lg:col-span-3 space-y-4">
-          {/* Source image */}
+          {/* Composite hero: original bg + token overlay */}
           <div className="panel p-4">
-            <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-3">Source Image</div>
-            {imageSrc ? (
-              <div className="relative group">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Preview</div>
+              {tokenSrc && (
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-semibold uppercase tracking-wide">
+                  token ready
+                </span>
+              )}
+            </div>
+            <button
+              className="relative w-full aspect-video overflow-hidden rounded-xl bg-surface-3 border border-surface-3 hover:border-primary/30 transition-all cursor-zoom-in group"
+              onClick={() => {
+                setModalSrc(tokenSrc ?? imageSrc)
+                setModalOpen(true)
+              }}
+              title="Click to enlarge"
+            >
+              {/* Background: original image blurred */}
+              {imageSrc && (
+                /* eslint-disable-next-line @next/next/no-img-element */
                 <img
                   src={imageSrc}
-                  alt={item.id}
-                  className="w-full max-h-80 object-contain rounded-lg bg-surface-3 cursor-zoom-in"
-                  onClick={() => setModalOpen(true)}
-                  onError={(e) => {
-                    const t = e.currentTarget
-                    t.parentElement!.innerHTML =
-                      '<div class="w-full h-32 flex items-center justify-center text-zinc-600 text-xs bg-surface-3 rounded-lg">Image not found</div>'
-                  }}
+                  alt=""
+                  aria-hidden="true"
+                  className="absolute inset-0 w-full h-full object-cover scale-110 blur-md brightness-40 saturate-75"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
                 />
-                <button
-                  onClick={() => setModalOpen(true)}
-                  className="absolute top-2 right-2 p-1.5 bg-black/60 rounded text-zinc-300 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <ZoomIn size={14} />
-                </button>
+              )}
+              {/* Gradient overlay */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-black/30 z-10" />
+
+              {/* Foreground: token or original */}
+              {tokenSrc ? (
+                <div className="absolute inset-0 flex items-center justify-center z-20 p-6">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={tokenSrc}
+                    alt={item.id}
+                    className="max-h-full max-w-[60%] object-contain drop-shadow-[0_8px_32px_rgba(0,0,0,0.9)] transition-transform group-hover:scale-105"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                  />
+                </div>
+              ) : imageSrc ? (
+                <div className="absolute inset-0 flex items-center justify-center z-20 p-4">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={imageSrc}
+                    alt={item.id}
+                    className="max-h-full max-w-full object-contain rounded-lg transition-transform group-hover:scale-[1.02]"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                  />
+                </div>
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center z-20 text-zinc-600 text-sm">
+                  No image
+                </div>
+              )}
+
+              {/* Zoom hint */}
+              <div className="absolute top-2 right-2 z-30 p-1.5 bg-black/50 rounded text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm">
+                <ZoomIn size={14} />
               </div>
-            ) : (
-              <div className="w-full h-32 flex items-center justify-center text-zinc-600 text-xs bg-surface-3 rounded-lg">
-                No image
-              </div>
-            )}
-            {item.source.length > 0 && (
-              <div className="mt-2 text-[10px] text-zinc-600 font-mono truncate" title={item.source[0]}>
-                {item.source[0]}
-              </div>
-            )}
+            </button>
+
+            {/* Classification pills */}
             {item.imageClassification && (
-              <div className="mt-2 flex flex-wrap gap-1">
+              <div className="mt-3 flex flex-wrap gap-1">
                 {(['type','ancestry','char_class','element','environment'] as const).map((field) => {
                   const cls = item.imageClassification!
                   const val = cls[field as keyof typeof cls] as string | undefined
@@ -321,55 +401,108 @@ export default function ItemDetailView({ item: initial }: Props) {
             )}
           </div>
 
-          {/* Token panel */}
+          {/* Source image controls */}
           <div className="panel p-4">
-            <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-3">Token</div>
-            {tokenSrc ? (
-              <div className="flex items-center gap-4">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={tokenSrc}
-                  alt={`${item.id} token`}
-                  className="w-24 h-24 object-contain rounded-full border border-surface-3"
-                />
-                <div className="text-xs text-zinc-500">
-                  <div className="text-zinc-300 font-mono mb-1">{item.tokenPath?.split('/').pop()}</div>
-                  <div>Token generated</div>
-                  {item.tokenEligible && (
-                    <button
-                      onClick={handleGenerateToken}
-                      disabled={generating}
-                      className="mt-2 flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-surface-3 text-zinc-400 hover:text-zinc-200 transition-colors disabled:opacity-50"
-                    >
-                      {generating ? <Loader2 size={11} className="animate-spin" /> : <CircleDot size={11} />}
-                      Regenerate
-                    </button>
-                  )}
+            <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-3">Source Image</div>
+            {item.source.length > 0 ? (
+              <>
+                <div className="text-[10px] text-zinc-600 font-mono truncate mb-3" title={item.source[0]}>
+                  {item.source[0]}
                 </div>
+                <label className="flex items-center gap-2 cursor-pointer w-fit">
+                  <input
+                    type="file"
+                    accept="image/*,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tiff,.tif,.avif,.heic,.heif,.jfif"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0]
+                      if (f) handleReplaceImage(f)
+                      e.target.value = ''
+                    }}
+                    disabled={uploadingImage}
+                  />
+                  <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded bg-surface-3 text-zinc-400 border border-surface-3 hover:border-zinc-600 hover:text-zinc-200 transition-colors cursor-pointer disabled:opacity-50">
+                    {uploadingImage ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
+                    Replace Image
+                  </span>
+                </label>
+              </>
+            ) : (
+              <div className="text-xs text-zinc-600 italic">No source image linked</div>
+            )}
+          </div>
+
+          {/* Token controls */}
+          <div className="panel p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Token</div>
+              {item.tokenPath && (
+                <div className="text-[10px] text-zinc-600 font-mono truncate max-w-[60%]" title={item.tokenPath}>
+                  {item.tokenPath.split('/').pop()}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-4">
+              {/* Token preview circle */}
+              <div className="relative flex-shrink-0">
+                {tokenSrc ? (
+                  <button
+                    className="w-20 h-20 rounded-full overflow-hidden border-2 border-primary/30 hover:border-primary/60 transition-colors shadow-lg"
+                    onClick={() => { setModalSrc(tokenSrc); setModalOpen(true) }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={tokenSrc} alt="token" className="w-full h-full object-cover" />
+                  </button>
+                ) : (
+                  <div className="w-20 h-20 rounded-full border-2 border-dashed border-surface-3 flex items-center justify-center bg-surface-3">
+                    <CircleDot size={20} className="text-zinc-600" />
+                  </div>
+                )}
               </div>
-            ) : item.tokenEligible ? (
-              <div className="flex items-center gap-3">
-                <div className="w-24 h-24 rounded-full border border-dashed border-surface-3 flex items-center justify-center bg-surface-3">
-                  <CircleDot size={22} className="text-zinc-600" />
-                </div>
-                <div>
-                  <div className="text-xs text-zinc-400 mb-2">No token yet</div>
+
+              {/* Token action buttons */}
+              <div className="flex flex-wrap gap-2">
+                {(item.tokenEligible || tokenSrc) && (
                   <button
                     onClick={handleGenerateToken}
                     disabled={generating || !item.source[0]}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20 transition-colors disabled:opacity-50"
                   >
-                    {generating ? <Loader2 size={13} className="animate-spin" /> : <CircleDot size={13} />}
-                    Generate Token
+                    {generating ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+                    {tokenSrc ? 'Regenerate' : 'Generate Token'}
                   </button>
-                </div>
+                )}
+
+                {/* Upload custom base image */}
+                {item.source[0] && (
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="file"
+                      accept="image/*,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tiff,.tif,.avif,.heic,.heif,.jfif"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0]
+                        if (f) handleUploadTokenBase(f)
+                        e.target.value = ''
+                      }}
+                      disabled={uploadingBase}
+                    />
+                    <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded bg-surface-3 text-zinc-400 border border-surface-3 hover:border-zinc-600 hover:text-zinc-200 transition-colors cursor-pointer">
+                      {uploadingBase ? <Loader2 size={13} className="animate-spin" /> : <ImagePlus size={13} />}
+                      Upload Base Image
+                    </span>
+                  </label>
+                )}
+
+                {!item.tokenEligible && !tokenSrc && (
+                  <div className="text-xs text-zinc-600 italic self-center">
+                    Tokens for portrait/body types
+                    {item.imageClassification && ` · this: ${item.imageClassification.type}`}
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="text-xs text-zinc-600 italic">
-                Tokens available for portrait/body images only
-                {item.imageClassification && ` (this: ${item.imageClassification.type})`}
-              </div>
-            )}
+            </div>
           </div>
         </div>
 
@@ -532,12 +665,12 @@ export default function ItemDetailView({ item: initial }: Props) {
       )}
 
       {/* Image modal */}
-      {imageSrc && (
+      {(modalSrc ?? imageSrc) && (
         <ImageModal
-          src={imageSrc}
+          src={modalSrc ?? imageSrc!}
           alt={item.id}
           open={modalOpen}
-          onClose={() => setModalOpen(false)}
+          onClose={() => { setModalOpen(false); setModalSrc(null) }}
         />
       )}
     </div>

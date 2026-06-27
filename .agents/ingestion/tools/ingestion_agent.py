@@ -333,6 +333,12 @@ def _make_slots(file_type: str) -> AgentSlots:
     return AgentSlots(vision=s, lore=s, classification=s, wiki=s)
 
 
+def _is_token_file(p: "Path") -> bool:
+    """Return True for generated token files (not original source images)."""
+    stem = p.stem
+    return stem.endswith("-token") or ".token" in stem
+
+
 def register_new_files(log: Logger) -> tuple[int, int]:
     """Scan 00-Inbox/ recursively; add files absent from queue. Returns (added, 0)."""
     queue = _load_queue()
@@ -347,6 +353,9 @@ def register_new_files(log: Logger) -> tuple[int, int]:
         rel = path.relative_to(_PROJECT_ROOT).as_posix()
         inbox_paths.add(rel)
         if rel in queue:
+            continue
+
+        if _is_token_file(path):
             continue
 
         ft            = _file_type(path)
