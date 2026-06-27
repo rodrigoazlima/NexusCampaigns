@@ -64,6 +64,25 @@ _CHARACTER_TYPES = frozenset({"portrait", "body", "token"})
 _GATE            = QualityGate()
 _MAX_REVISIONS   = 2
 
+_STAT_FIELDS = frozenset({"str", "dex", "con", "int", "wis", "cha"})
+
+
+def _normalize_stats(raw: dict) -> dict:
+    """Convert D&D-style ability scores (1-20) to PF2e modifiers (-5 to +5).
+
+    LLMs sometimes return scores instead of modifiers. Values >5 are treated
+    as scores and converted via (score - 10) // 2, then clamped to [-5, 5].
+    """
+    result = dict(raw)
+    for field in _STAT_FIELDS:
+        v = result.get(field)
+        if isinstance(v, int):
+            if v > 5:
+                result[field] = max(-5, min(5, (v - 10) // 2))
+            else:
+                result[field] = max(-5, min(5, v))
+    return result
+
 
 # ---------------------------------------------------------------------------
 # Logger
@@ -130,7 +149,7 @@ class _NPCGeneratorImpl:
             system="You are a Pathfinder 2e NPC generator. Return ONLY valid JSON.",
             max_tokens=800,
         )
-        return NPCLLMOutput.model_validate(raw)
+        return NPCLLMOutput.model_validate(_normalize_stats(raw))
 
     def generate_with_critique(
         self,
@@ -159,7 +178,7 @@ class _NPCGeneratorImpl:
             system="You are a Pathfinder 2e NPC generator. Return ONLY valid JSON.",
             max_tokens=900,
         )
-        return NPCLLMOutput.model_validate(raw)
+        return NPCLLMOutput.model_validate(_normalize_stats(raw))
 
 
 # ---------------------------------------------------------------------------

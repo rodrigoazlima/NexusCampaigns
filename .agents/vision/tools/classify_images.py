@@ -42,7 +42,7 @@ BATCH_SIZE      = 10
 
 _VAULT_ROOT   = _PROJECT_ROOT / "knowledge-base"
 _INBOX        = _VAULT_ROOT / "00-Inbox"
-_INBOX_IMAGES = _INBOX / "images"
+_INBOX_IMAGES = _INBOX  # scan entire inbox, not just images/ subdir
 _PROCESSING   = _VAULT_ROOT / "01-Processing"
 _AGENT_STATE  = _AGENTS_DIR / "vision" / "state"
 _LOGS_DIR     = _AGENT_STATE / "logs"

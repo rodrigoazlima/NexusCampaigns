@@ -198,7 +198,8 @@ def _parse_agent_items(task_id: str, after: datetime) -> tuple[int, int]:
         return 0, 0
     try:
         tag = f"[{task_id}]"
-        ts_after = after.strftime("%Y-%m-%d %H:%M:%S")
+        # Log timestamps are local time (datetime.now()), so convert UTC 'after' to local
+        ts_after = after.astimezone().strftime("%Y-%m-%d %H:%M:%S")
         for line in _MASTER_LOG.read_text(encoding="utf-8").splitlines():
             if tag not in line or "--- DONE" not in line:
                 continue

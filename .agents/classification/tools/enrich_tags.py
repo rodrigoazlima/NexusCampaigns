@@ -189,17 +189,42 @@ def _is_queue_done(queue: dict[str, Any], rel: str) -> bool:
 
 
 def _mark_queue_done(queue: dict[str, Any], rel: str) -> None:
-    """Atomically mark classification slot done for rel in inbox-queue.json."""
+    """Mark classification slot done for rel in queue.
+
+    rel may be an .md path (01-Processing/) or a direct inbox image path.
+    For .md files, also marks the source image's queue entry done via
+    the frontmatter 'source' field.
+    """
+    changed = False
+
+    # Direct queue entry (inbox image path)
     entry = queue.get(rel)
-    if entry is None:
-        return
-    agents = entry.get("agents")
-    if not isinstance(agents, dict) or agents.get("classification") != "pending":
-        return
-    agents["classification"] = "done"
-    tmp = _QUEUE_FILE.with_suffix(".tmp")
-    tmp.write_text(_json.dumps(queue, indent=2, default=str), encoding="utf-8")
-    tmp.replace(_QUEUE_FILE)
+    if entry is not None:
+        agents = entry.get("agents")
+        if isinstance(agents, dict) and agents.get("classification") == "pending":
+            agents["classification"] = "done"
+            changed = True
+
+    # Indirect: rel is a .md file; trace back to source image via frontmatter
+    md_path = _PROJECT_ROOT / rel
+    if md_path.suffix == ".md" and md_path.exists():
+        try:
+            fm, _ = FrontmatterIO().read(md_path)
+            for src in fm.get("source") or []:
+                src_entry = queue.get(src)
+                if src_entry is None:
+                    continue
+                src_agents = src_entry.get("agents")
+                if isinstance(src_agents, dict) and src_agents.get("classification") == "pending":
+                    src_agents["classification"] = "done"
+                    changed = True
+        except Exception:
+            pass
+
+    if changed:
+        tmp = _QUEUE_FILE.with_suffix(".tmp")
+        tmp.write_text(_json.dumps(queue, indent=2, default=str), encoding="utf-8")
+        tmp.replace(_QUEUE_FILE)
 
 
 # ---------------------------------------------------------------------------
@@ -240,7 +265,7 @@ def _run_enrich_tags() -> tuple[int, int]:
 
         existing_tags = fm.get("tags") or []
         has_type      = bool(fm.get("type"))
-        needs_tags    = len(existing_tags) <= 5
+        needs_tags    = len(existing_tags) <= 2
         needs_type    = not has_type
 
         if not needs_tags and not needs_type:
@@ -259,11 +284,19 @@ def _run_enrich_tags() -> tuple[int, int]:
 
         try:
             raw        = client.chat([{"role": "user", "content": prompt}], max_tokens=80)
+            if not raw or not raw.strip():
+                log.warning(f"Empty LLM response for {md_path.name} — skipping (transient)")
+                time.sleep(0.3)
+                continue
             enrichment = TagEnrichmentOutput.model_validate(_json.loads(raw))
         except LLMOfflineError:
             log.warning("LLM offline — aborting batch")
             break
-        except (LLMResponseError, Exception) as exc:
+        except (LLMResponseError, _json.JSONDecodeError) as exc:
+            log.warning(f"LLM response error for {md_path.name}: {exc} — skipping (transient)")
+            time.sleep(0.3)
+            continue
+        except Exception as exc:
             log.error(f"LLM error for {md_path.name}: {exc}")
             _append_bad(rel)
             failed += 1
