@@ -41,5 +41,4 @@ state_files:
   - state/10-generate-tokens.json
 commit_scope:
   - knowledge-base/00-Inbox/images
-  - .agents/token/state
 ---

@@ -37,15 +37,5 @@ restrictions:
 state_files:
   - state/logs/12-repair-agent_YYYY-MM-DD.log
 commit_scope:
-  - .agents/runtime/state
-  - .agents/ingestion/state
-  - .agents/vision/state
-  - .agents/lore/state
-  - .agents/token/state
-  - .agents/classification/state
-  - .agents/wiki/state
-  - .agents/review/state
-  - .agents/repair/state
-  - .agents/wikilink/state
-  - .system/state
+  # none — repair-agent edits code/state only; must not auto-commit (no knowledge-base output)
 ---

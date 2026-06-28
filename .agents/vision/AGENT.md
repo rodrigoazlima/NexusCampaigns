@@ -50,8 +50,6 @@ state_files:
 commit_scope:
   - knowledge-base/00-Inbox/images
   - knowledge-base/01-Processing
-  - .agents/vision/state
-  - .system/state
 ---
 
 ## Valid Classification Values

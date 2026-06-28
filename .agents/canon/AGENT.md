@@ -36,5 +36,5 @@ state_files:
   - state/reports/
   - state/logs/canon_YYYY-MM-DD.log
 commit_scope:
-  - .agents/canon/state
+  # none — agent produces no knowledge-base content; must not auto-commit
 ---

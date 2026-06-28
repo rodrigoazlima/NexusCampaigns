@@ -35,5 +35,4 @@ state_files:
   - state/wikilink-state.json
 commit_scope:
   - knowledge-base/02-Library
-  - .agents/wikilink/state
 ---

@@ -537,6 +537,15 @@ class Runtime(IOrchestrator):
             )
             return
 
+        # Clear the index first so any stray pre-staged file (leftover from a
+        # prior partial run, manual `git add`, etc.) cannot leak into the auto
+        # commit. After this, the index holds ONLY the scope paths staged below.
+        subprocess.run(
+            ["git", "reset", "-q"],
+            cwd=str(_PROJECT_ROOT),
+            capture_output=True,
+        )
+
         for path in scope:
             subprocess.run(
                 ["git", "add", "--", path],
@@ -554,7 +563,7 @@ class Runtime(IOrchestrator):
         ts  = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         msg = f"chore(auto): {task_id} run at {ts}"
         subprocess.run(
-            ["git", "commit", "-m", msg],
+            ["git", "commit", "-m", msg, "--", *scope],
             cwd=str(_PROJECT_ROOT),
             check=True,
         )

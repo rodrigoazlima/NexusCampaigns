@@ -36,5 +36,5 @@ state_files:
   - state/reports/
   - state/logs/deduplication_YYYY-MM-DD.log
 commit_scope:
-  - .agents/deduplication/state
+  # none — agent produces no knowledge-base content; must not auto-commit
 ---

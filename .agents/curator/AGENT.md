@@ -34,5 +34,5 @@ state_files:
   - state/curator-report-latest.json
   - state/logs/curator_YYYY-MM-DD.log
 commit_scope:
-  - .agents/curator/state
+  # none — agent produces no knowledge-base content; must not auto-commit
 ---

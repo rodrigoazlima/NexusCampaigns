@@ -48,8 +48,6 @@ state_files:
 commit_scope:
   - knowledge-base/00-Inbox
   - knowledge-base/01-Processing
-  - .agents/classification/state
-  - .system/state
 ---
 
 ## Valid Tags (28)

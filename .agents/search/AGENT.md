@@ -33,5 +33,5 @@ state_files:
   - state/search-index.json
   - state/logs/search_YYYY-MM-DD.log
 commit_scope:
-  - .agents/search/state
+  # none — agent produces no knowledge-base content; must not auto-commit
 ---

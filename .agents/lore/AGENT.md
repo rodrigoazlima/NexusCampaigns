@@ -49,6 +49,4 @@ state_files:
   - state/scenarios.json
 commit_scope:
   - knowledge-base/01-Processing
-  - .agents/lore/state
-  - .system/state
 ---

@@ -39,5 +39,4 @@ state_files:
   - state/logs/relationship_YYYY-MM-DD.log
 commit_scope:
   - knowledge-base/04-Relationships
-  - .agents/relationship/state
 ---

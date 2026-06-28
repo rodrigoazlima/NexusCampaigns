@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import ast
 import json
+import re
 import subprocess
 import sys
 import textwrap
@@ -249,18 +250,54 @@ def _request_human_review(item: str, reason: str, context: dict, task_id: str) -
     return f"Review requested for: {item}"
 
 
+_COMMIT_SCOPE_RE = re.compile(r"^commit_scope:\s*\n((?:[ \t]+-[^\n]+\n?)+)", re.MULTILINE)
+_SCOPE_ITEM_RE   = re.compile(r"^\s+-\s+(.+)$", re.MULTILINE)
+
+
+def _agent_name_from_task_id(task_id: str) -> str:
+    """Map task_id → agent directory name (e.g. review-agent-short-files → review)."""
+    name = re.sub(r"-agent(?:-.*)?$", "", task_id)
+    return name or task_id
+
+
+def _read_commit_scope(project_root, task_id: str) -> list[str]:
+    """Parse commit_scope from the agent's AGENT.md. Returns [] if absent."""
+    agent_md = Path(project_root) / ".agents" / _agent_name_from_task_id(task_id) / "AGENT.md"
+    if not agent_md.exists():
+        return []
+    try:
+        content = agent_md.read_text(encoding="utf-8")
+        m = _COMMIT_SCOPE_RE.search(content)
+        if not m:
+            return []
+        return [item.strip() for item in _SCOPE_ITEM_RE.findall(m.group(1)) if item.strip()]
+    except Exception:
+        return []
+
+
 def _git_commit(message: str, context: dict, task_id: str) -> str:
     project_root = context["project_root"]
+    scope = _read_commit_scope(project_root, task_id)
+    if not scope:
+        return f"Commit skipped: no commit_scope declared for {task_id}"
     full_msg = f"chore(auto): {message}"
     try:
+        # Clear the index so stray pre-staged files cannot leak, then stage ONLY
+        # the declared scope and restrict the commit to those same paths.
+        subprocess.run(["git", "reset", "-q"], cwd=project_root, capture_output=True, text=True)
+        for path in scope:
+            subprocess.run(["git", "add", "--", path], cwd=project_root, capture_output=True, text=True)
+        staged = subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=project_root)
+        if staged.returncode == 0:
+            return "Commit skipped: no changes within commit_scope"
         result = subprocess.run(
-            ["git", "commit", "-m", full_msg],
+            ["git", "commit", "-m", full_msg, "--", *scope],
             cwd=project_root,
             capture_output=True,
             text=True,
         )
         if result.returncode == 0:
-            return f"Committed: {full_msg}"
+            return f"Committed (scope={scope}): {full_msg}"
         return f"Commit skipped (nothing staged or error): {result.stderr.strip()}"
     except Exception as exc:
         return f"Commit failed: {exc}"

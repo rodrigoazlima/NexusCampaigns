@@ -37,5 +37,5 @@ state_files:
   - state/logs/automation.log
   - state/logs/runner_YYYY-MM-DD.log
 commit_scope:
-  - .agents/runtime/state/tasks-state.json
+  # none — orchestrator state is local runtime bookkeeping; must not auto-commit
 ---
