@@ -252,6 +252,11 @@ __marimo__/
 **/.env.local
 */tsconfig.tsbuildinfo
 
+# Playwright governance tests (.system/tests) — generated artifacts
+**/test-results/
+**/playwright-report/
+.system/tests/.last-run.json
+
 
 # Obsidian
 **/.smart-env/

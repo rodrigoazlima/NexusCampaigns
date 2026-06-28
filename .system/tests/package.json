@@ -1,0 +1,12 @@
+{
+  "name": "nexus-governance-tests",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Playwright governance tests for the agent runtime (repo invariants, not browser E2E).",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}
