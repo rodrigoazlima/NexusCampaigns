@@ -49,7 +49,8 @@ _LOGS_DIR     = _AGENT_STATE / "logs"
 _MASTER_LOG   = _AGENTS_DIR / "runtime" / "state" / "logs" / "automation.log"
 _VISION_STATE = _AGENTS_DIR / "vision" / "state" / "processed-images.json"
 _GEN_TOKENS   = _AGENT_STATE / "generated-tokens.json"
-_CONFIG_FILE  = _AGENT_STATE / "10-generate-tokens.json"
+_CONFIG_FILE  = _AGENT_STATE / "10-generate-tokens.json"  # legacy fallback
+_AGENT_JSON   = _AGENTS_DIR / "token" / "agent.json"
 _QUEUE_FILE   = _PROJECT_ROOT / ".system" / "state" / "inbox-queue.json"
 
 _DEFAULT_CFG: dict[str, Any] = {
@@ -82,12 +83,22 @@ def _make_logger() -> Logger:
 
 
 def _load_config() -> dict[str, Any]:
+    # Primary: read token_config from agent.json (edited via dashboard config dialog)
+    if _AGENT_JSON.exists():
+        try:
+            agent = json.loads(_AGENT_JSON.read_text(encoding="utf-8"))
+            if "token_config" in agent:
+                cfg = dict(_DEFAULT_CFG)
+                cfg.update(agent["token_config"])
+                return cfg
+        except Exception:
+            pass
+    # Fallback: legacy state config file
     if not _CONFIG_FILE.exists():
         _AGENT_STATE.mkdir(parents=True, exist_ok=True)
         _CONFIG_FILE.write_text(json.dumps(_DEFAULT_CFG, indent=2), encoding="utf-8")
         return dict(_DEFAULT_CFG)
     stored = json.loads(_CONFIG_FILE.read_text(encoding="utf-8"))
-    # fill missing keys with defaults (forward-compat)
     cfg = dict(_DEFAULT_CFG)
     cfg.update(stored)
     return cfg

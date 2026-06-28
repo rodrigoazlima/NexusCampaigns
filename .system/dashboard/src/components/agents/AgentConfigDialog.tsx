@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { X, AlertTriangle, Loader2, CheckCircle } from 'lucide-react'
-import type { AgentConfig, RuntimeConfig, IntelligenceConfig, AgentCapability } from '@/lib/types'
+import type { AgentConfig, RuntimeConfig, IntelligenceConfig, AgentCapability, TokenGeneratorConfig } from '@/lib/types'
 
 interface AgentConfigDialogProps {
   agentName: string
@@ -764,6 +764,180 @@ function LmStudioFields({ cfg, onChange, prompts }: { cfg: Record<string, unknow
 }
 
 // ---------------------------------------------------------------------------
+// Token agent settings panel
+// ---------------------------------------------------------------------------
+
+const DEFAULT_TOKEN_CONFIG: TokenGeneratorConfig = {
+  size: 512,
+  padding: 0.18,
+  forehead_ratio: 0.35,
+  body_ratio: 0.30,
+  focus_head: [0, 0, 0, 0],
+  moldura_path: '',
+  moldura_by_type: {},
+}
+
+function FocusHeadInput({ value, onChange }: {
+  value: number[]
+  onChange: (v: number[]) => void
+}) {
+  const [t, r, b, l] = [value[0] ?? 0, value[1] ?? 0, value[2] ?? 0, value[3] ?? 0]
+  const set = (idx: number, v: number) => {
+    const next = [t, r, b, l]
+    next[idx] = v
+    onChange(next)
+  }
+  return (
+    <div className="grid grid-cols-4 gap-1.5">
+      {(['Top', 'Right', 'Bottom', 'Left'] as const).map((label, i) => (
+        <div key={label}>
+          <div className="text-[10px] text-zinc-600 mb-0.5">{label}</div>
+          <input
+            type="number"
+            value={[t, r, b, l][i]}
+            onChange={(e) => set(i, parseFloat(e.target.value) || 0)}
+            step={1}
+            className="w-full bg-surface-2 border border-surface-3 rounded px-1.5 py-1 text-xs font-mono text-zinc-200 focus:outline-none focus:border-primary/60"
+          />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function MolduraByTypeInput({ value, onChange }: {
+  value: Record<string, string>
+  onChange: (v: Record<string, string>) => void
+}) {
+  const entries = Object.entries(value)
+  const [newType, setNewType] = useState('')
+  const [newPath, setNewPath] = useState('')
+
+  const remove = (type: string) => {
+    const next = { ...value }
+    delete next[type]
+    onChange(next)
+  }
+  const add = () => {
+    if (!newType.trim()) return
+    onChange({ ...value, [newType.trim()]: newPath.trim() })
+    setNewType(''); setNewPath('')
+  }
+
+  return (
+    <div className="space-y-1.5">
+      {entries.map(([type, path]) => (
+        <div key={type} className="flex items-center gap-1.5">
+          <span className="text-[10px] font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded shrink-0">{type}</span>
+          <span className="flex-1 text-[10px] font-mono text-zinc-400 truncate" title={path}>{path || '(default)'}</span>
+          <button onClick={() => remove(type)} className="text-zinc-600 hover:text-danger transition-colors text-xs shrink-0">×</button>
+        </div>
+      ))}
+      <div className="flex gap-1.5 pt-1">
+        <input
+          value={newType}
+          onChange={(e) => setNewType(e.target.value)}
+          placeholder="type (e.g. creature)"
+          className="w-28 bg-surface-2 border border-surface-3 rounded px-1.5 py-1 text-[10px] font-mono text-zinc-200 focus:outline-none focus:border-primary/60"
+        />
+        <input
+          value={newPath}
+          onChange={(e) => setNewPath(e.target.value)}
+          placeholder="frame path"
+          className="flex-1 bg-surface-2 border border-surface-3 rounded px-1.5 py-1 text-[10px] font-mono text-zinc-200 focus:outline-none focus:border-primary/60"
+        />
+        <button
+          onClick={add}
+          disabled={!newType.trim()}
+          className="shrink-0 px-2 py-1 text-[10px] bg-primary/10 text-primary border border-primary/30 rounded hover:bg-primary/20 disabled:opacity-40 transition-colors"
+        >
+          Add
+        </button>
+      </div>
+      <p className="text-[10px] text-zinc-600">Per-type moldura override. Leave path empty to use default.</p>
+    </div>
+  )
+}
+
+function TokenConfigPanel({ cfg, onChange }: {
+  cfg: TokenGeneratorConfig
+  onChange: (field: keyof TokenGeneratorConfig, value: unknown) => void
+}) {
+  return (
+    <div className="space-y-3">
+      <FieldRow label="Output Size (px)">
+        <NumberInput value={cfg.size} onChange={(v) => onChange('size', v)} min={64} max={2048} step={64} />
+        <p className="text-[10px] text-zinc-600 mt-1">Final token canvas size (square). Default: 512.</p>
+      </FieldRow>
+
+      <FieldRow label="Padding">
+        <div className="flex items-center gap-2">
+          <input
+            type="range" min={0} max={0.49} step={0.01}
+            value={cfg.padding}
+            onChange={(e) => onChange('padding', parseFloat(e.target.value))}
+            className="flex-1 accent-primary h-1"
+          />
+          <span className="text-xs font-mono text-zinc-300 w-10 text-right">{(cfg.padding * 100).toFixed(0)}%</span>
+        </div>
+        <p className="text-[10px] text-zinc-600 mt-1">Gap between circle edge and character content.</p>
+      </FieldRow>
+
+      <FieldRow label="Forehead Ratio">
+        <div className="flex items-center gap-2">
+          <input
+            type="range" min={0} max={1} step={0.01}
+            value={cfg.forehead_ratio}
+            onChange={(e) => onChange('forehead_ratio', parseFloat(e.target.value))}
+            className="flex-1 accent-primary h-1"
+          />
+          <span className="text-xs font-mono text-zinc-300 w-10 text-right">{cfg.forehead_ratio.toFixed(2)}</span>
+        </div>
+        <p className="text-[10px] text-zinc-600 mt-1">Extra space above detected face (fraction of face height).</p>
+      </FieldRow>
+
+      <FieldRow label="Body Ratio">
+        <div className="flex items-center gap-2">
+          <input
+            type="range" min={0} max={1} step={0.01}
+            value={cfg.body_ratio}
+            onChange={(e) => onChange('body_ratio', parseFloat(e.target.value))}
+            className="flex-1 accent-primary h-1"
+          />
+          <span className="text-xs font-mono text-zinc-300 w-10 text-right">{cfg.body_ratio.toFixed(2)}</span>
+        </div>
+        <p className="text-[10px] text-zinc-600 mt-1">Extra space below detected face (neck / chest reveal).</p>
+      </FieldRow>
+
+      <FieldRow label="Focus Head (%)">
+        <FocusHeadInput
+          value={cfg.focus_head}
+          onChange={(v) => onChange('focus_head', v)}
+        />
+        <p className="text-[10px] text-zinc-600 mt-1.5">Shift crop center: [top, right, bottom, left] as % of crop size.</p>
+      </FieldRow>
+
+      <FieldRow label="Default Frame">
+        <TextInput
+          value={cfg.moldura_path}
+          onChange={(v) => onChange('moldura_path', v)}
+          placeholder="knowledge-base/00-Inbox/tokens/Molduras/moldura_default.png"
+          mono
+        />
+        <p className="text-[10px] text-zinc-600 mt-1">Relative to project root. Applied to all types unless overridden below.</p>
+      </FieldRow>
+
+      <FieldRow label="Frame by Type">
+        <MolduraByTypeInput
+          value={cfg.moldura_by_type}
+          onChange={(v) => onChange('moldura_by_type', v)}
+        />
+      </FieldRow>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Main dialog
 // ---------------------------------------------------------------------------
 
@@ -931,6 +1105,15 @@ export default function AgentConfigDialog({
     })
   }, [])
 
+  const updateTokenConfig = useCallback((field: keyof TokenGeneratorConfig, value: unknown) => {
+    setConfig((prev) => {
+      if (!prev || isRuntimeConfig(prev)) return prev
+      const next = JSON.parse(JSON.stringify(prev)) as AgentConfig
+      next.token_config = { ...(next.token_config ?? DEFAULT_TOKEN_CONFIG), [field]: value }
+      return next
+    })
+  }, [])
+
   const updateRuntime = useCallback((field: string, value: unknown) => {
     setConfig((prev) => {
       if (!prev || !isRuntimeConfig(prev)) return prev
@@ -988,6 +1171,7 @@ export default function AgentConfigDialog({
                   onFallbackChange={updateFallbackField}
                   onFallbackTypeChange={updateFallbackType}
                   onFallbackToggle={toggleFallback}
+                  onTokenConfigChange={updateTokenConfig}
                 />
               )}
             </div>
@@ -1203,7 +1387,7 @@ function IntelligenceFields({ intelligence, onChange, requiredCapabilities, agen
 
 function AgentForm({
   agentName, config, agentFiles, onTopLevelChange, onTaskChange, onIntelligenceChange, onIntelligenceTypeChange,
-  onFallbackChange, onFallbackTypeChange, onFallbackToggle,
+  onFallbackChange, onFallbackTypeChange, onFallbackToggle, onTokenConfigChange,
 }: {
   agentName: string
   config: AgentConfig
@@ -1215,12 +1399,20 @@ function AgentForm({
   onFallbackChange: (taskId: string, field: string, value: unknown) => void
   onFallbackTypeChange: (taskId: string, newType: string) => void
   onFallbackToggle: (taskId: string, enabled: boolean) => void
+  onTokenConfigChange: (field: keyof TokenGeneratorConfig, value: unknown) => void
 }) {
   const taskEntries = Object.entries(config.tasks)
   const [activeTask, setActiveTask] = useState(taskEntries[0]?.[0] ?? '')
+  const hasTokenConfig = config.token_config !== undefined
 
-  const taskTabs: TabDef[] = taskEntries.map(([id]) => ({ id, label: id }))
-  const activeEntry = taskEntries.find(([id]) => id === activeTask)
+  // Top-level tabs: task(s) + token settings (when present)
+  const topTabs: TabDef[] = [
+    ...taskEntries.map(([id]) => ({ id: `task:${id}`, label: id })),
+    ...(hasTokenConfig ? [{ id: 'token', label: 'Token Settings' }] : []),
+  ]
+  const [activeTopTab, setActiveTopTab] = useState(topTabs[0]?.id ?? '')
+
+  const activeEntry = taskEntries.find(([id]) => `task:${id}` === activeTopTab)
 
   return (
     <div className="space-y-4">
@@ -1230,8 +1422,8 @@ function AgentForm({
         </FieldRow>
       )}
 
-      {taskEntries.length > 1 && (
-        <Tabs tabs={taskTabs} active={activeTask} onChange={setActiveTask} />
+      {topTabs.length > 1 && (
+        <Tabs tabs={topTabs} active={activeTopTab} onChange={setActiveTopTab} />
       )}
 
       {activeEntry && (
@@ -1246,6 +1438,13 @@ function AgentForm({
           onFallbackChange={onFallbackChange}
           onFallbackTypeChange={onFallbackTypeChange}
           onFallbackToggle={onFallbackToggle}
+        />
+      )}
+
+      {activeTopTab === 'token' && config.token_config && (
+        <TokenConfigPanel
+          cfg={config.token_config}
+          onChange={onTokenConfigChange}
         />
       )}
     </div>
