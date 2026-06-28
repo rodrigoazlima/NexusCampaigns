@@ -326,11 +326,46 @@ def _file_type(path: Path) -> str:
 def _make_slots(file_type: str) -> AgentSlots:
     p = AgentSlotStatus.pending
     s = AgentSlotStatus.skip
+    d = AgentSlotStatus.done
+    # ingestion is always done (the entry exists because this agent ingested the file).
+    # wikilink is a library-stage agent and never runs on inbox items -> skip.
+    # review tracks the automated review pass over the draft(s) a file produces.
     if file_type == "image":
-        return AgentSlots(vision=p, lore=p, classification=p, wiki=s, token=p)
+        return AgentSlots(ingestion=d, vision=p, lore=p, classification=p,
+                          wiki=s, wikilink=s, token=p, review=p)
     if file_type == "document":
-        return AgentSlots(vision=s, lore=s, classification=p, wiki=p, token=s)
-    return AgentSlots(vision=s, lore=s, classification=s, wiki=s, token=s)
+        return AgentSlots(ingestion=d, vision=s, lore=s, classification=p,
+                          wiki=p, wikilink=s, token=s, review=p)
+    return AgentSlots(ingestion=d, vision=s, lore=s, classification=s,
+                      wiki=s, wikilink=s, token=s, review=s)
+
+
+def _reconcile_slots(log: Logger) -> int:
+    """Backfill missing agent slots in existing queue entries (idempotent).
+
+    Re-validates each entry's agents through AgentSlots so newly introduced
+    slots (ingestion / wikilink / review) appear with their defaults in
+    canonical field order, without disturbing slots an agent has already set.
+    Returns the number of entries changed.
+    """
+    if not _QUEUE_FILE.exists():
+        return 0
+    raw: dict = json.loads(_QUEUE_FILE.read_text(encoding="utf-8"))
+    changed = 0
+    for entry in raw.values():
+        old_agents = entry.get("agents", {})
+        new_agents = AgentSlots.model_validate(old_agents).model_dump(mode="json")
+        new_agents["ingestion"] = AgentSlotStatus.done.value   # entry exists => ingested
+        if new_agents != old_agents:
+            entry["agents"] = new_agents
+            changed += 1
+    if changed:
+        _SHARED_STATE.mkdir(parents=True, exist_ok=True)
+        tmp = _QUEUE_FILE.with_suffix(".tmp")
+        tmp.write_text(json.dumps(raw, indent=2, default=str), encoding="utf-8")
+        tmp.replace(_QUEUE_FILE)
+        log.info(f"Reconciled agent slots in {changed} queue entry/entries")
+    return changed
 
 
 def _is_token_file(p: "Path") -> bool:
@@ -422,6 +457,8 @@ class IngestionAgent(BaseAgent):
         added, _ = register_new_files(log)
         total_count += added
 
+        _reconcile_slots(log)
+
         return total_count, total_failed
 
 
@@ -481,6 +518,7 @@ def call_tool(name: str, args: dict, context: dict) -> str:
         return f"Converted {ok} docx file(s); {failed} failed"
     if name == "register_queue":
         ok, failed = register_new_files(log)
+        _reconcile_slots(log)
         return f"Registered {ok} file(s); {failed} failed"
 
     raise ValueError(f"Unknown tool: {name!r}")

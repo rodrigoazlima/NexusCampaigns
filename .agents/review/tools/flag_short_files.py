@@ -8,6 +8,7 @@ No LLM. No 02-Library writes.
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -29,6 +30,7 @@ _PROCESSING  = _VAULT_ROOT / "01-Processing"
 _AGENT_STATE = _AGENTS_DIR / "review" / "state"
 _LOGS_DIR    = _AGENT_STATE / "logs"
 _MASTER_LOG  = _AGENTS_DIR / "runtime" / "state" / "logs" / "automation.log"
+_QUEUE_FILE  = _PROJECT_ROOT / ".system" / "state" / "inbox-queue.json"
 
 
 def _make_logger() -> Logger:
@@ -57,12 +59,52 @@ def _flag_short_file(path: Path, fio: FrontmatterIO, log: Logger) -> None:
         log.warning(f"Could not flag {path.name}: {exc}")
 
 
+def _draft_source(fm: dict) -> str | None:
+    """Return the first source path of a draft (normalized), or None."""
+    src = fm.get("source")
+    if isinstance(src, list) and src:
+        return str(src[0]).replace("\\", "/")
+    if isinstance(src, str) and src:
+        return src.replace("\\", "/")
+    return None
+
+
+def _mark_reviewed(sources: set[str], log: Logger) -> int:
+    """Set agents.review = done in inbox-queue.json for each source the review
+    pass scanned. Idempotent. Returns the number of queue entries updated."""
+    if not sources or not _QUEUE_FILE.exists():
+        return 0
+    try:
+        queue = json.loads(_QUEUE_FILE.read_text(encoding="utf-8"))
+    except Exception as exc:
+        log.warning(f"Could not read inbox-queue.json: {exc}")
+        return 0
+
+    updated = 0
+    for rel in sources:
+        entry = queue.get(rel)
+        if not entry:
+            continue
+        agents = entry.setdefault("agents", {})
+        if agents.get("review") != "done":
+            agents["review"] = "done"
+            updated += 1
+
+    if updated:
+        tmp = _QUEUE_FILE.with_suffix(".tmp")
+        tmp.write_text(json.dumps(queue, indent=2, default=str), encoding="utf-8")
+        tmp.replace(_QUEUE_FILE)
+        log.info(f"Marked agents.review=done for {updated} queue entry/entries")
+    return updated
+
+
 def main() -> None:
     log = _make_logger()
     t0  = log.start()
     fio = FrontmatterIO()
     flagged = 0
     scanned = 0
+    reviewed_sources: set[str] = set()
 
     if not _PROCESSING.exists():
         log.info("01-Processing/ does not exist — nothing to scan")
@@ -77,6 +119,10 @@ def main() -> None:
             log.warning(f"Read error {md_path.name}: {exc}")
             continue
 
+        src = _draft_source(fm)
+        if src:
+            reviewed_sources.add(src)
+
         body_lines = [ln for ln in body.splitlines() if ln.strip()]
         if len(body_lines) < MIN_BODY_LINES:
             flagged += 1
@@ -84,6 +130,8 @@ def main() -> None:
                 f"Short file ({len(body_lines)} body lines): {md_path.relative_to(_PROJECT_ROOT).as_posix()}"
             )
             _flag_short_file(md_path, fio, log)
+
+    _mark_reviewed(reviewed_sources, log)
 
     log.info(f"Scanned {scanned} files — {flagged} flagged as short (< {MIN_BODY_LINES} lines)")
     log.done(t0, key="processed", count=flagged, failed=0)

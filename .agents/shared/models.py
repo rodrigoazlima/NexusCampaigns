@@ -261,18 +261,26 @@ class NPCFrontmatter(EntityFrontmatter):
 # ---------------------------------------------------------------------------
 
 class AgentSlots(BaseModel):
-    """Per-file agent processing slots inside inbox-queue.json."""
+    """Per-file agent processing slots inside inbox-queue.json.
+
+    Field order is the canonical pipeline order and is also the display order
+    used by the dashboard queue page (rows render agents in JSON key order).
+    """
+    ingestion:      AgentSlotStatus = AgentSlotStatus.done      # entry exists => file already ingested
     vision:         AgentSlotStatus = AgentSlotStatus.pending
     lore:           AgentSlotStatus = AgentSlotStatus.pending
     classification: AgentSlotStatus = AgentSlotStatus.pending
     wiki:           AgentSlotStatus = AgentSlotStatus.pending
+    wikilink:       AgentSlotStatus = AgentSlotStatus.skip       # library-stage agent; n/a to inbox items
     token:          AgentSlotStatus = AgentSlotStatus.skip
+    review:         AgentSlotStatus = AgentSlotStatus.pending
 
 
 class InboxQueueEntry(BaseModel):
     ingestedAt: datetime
     type:       Literal["image", "document", "other"]
     agents:     AgentSlots
+    reruns:     int = 0     # manual reprocess/re-run count (set by dashboard action)
 
 
 # Type alias — the full queue is a str→entry dict

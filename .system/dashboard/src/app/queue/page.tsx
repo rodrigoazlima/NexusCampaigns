@@ -1,21 +1,12 @@
 export const dynamic = 'force-dynamic'
 
-import { readQueue } from '@/lib/vault'
+import { readQueue, readAgents } from '@/lib/vault'
 import PageHeader from '@/components/widgets/PageHeader'
 import AutoRefresh from '@/components/AutoRefresh'
+import QueuePipeline from '@/components/queue/QueuePipeline'
 import { Inbox } from 'lucide-react'
 import { formatRelative } from '@/lib/utils'
-import type { QueueItem } from '@/lib/types'
-
-function agentStatusBadge(status: string) {
-  switch (status) {
-    case 'done': return 'bg-success/10 text-success'
-    case 'pending': return 'bg-warning/10 text-warning'
-    case 'skip': return 'bg-zinc-700 text-zinc-400'
-    case 'error': return 'bg-danger/10 text-danger'
-    default: return 'bg-zinc-700 text-zinc-400'
-  }
-}
+import type { QueueItem, QueueAgentStat } from '@/lib/types'
 
 function isStuck(item: QueueItem): boolean {
   const cutoff = Date.now() - 24 * 60 * 60 * 1000
@@ -33,6 +24,13 @@ function isDone(item: QueueItem): boolean {
 
 export default async function QueuePage() {
   const queue = readQueue()
+
+  // Per-agent runtime stats (last run / times ran) for the pipeline tooltips,
+  // keyed by registry agent name (= queue slot name).
+  const agentStats: Record<string, QueueAgentStat> = {}
+  for (const a of readAgents()) {
+    agentStats[a.name] = { status: a.status, lastRun: a.lastRun, totalRuns: a.totalRuns }
+  }
 
   const stuckItems = queue.items.filter(isStuck)
   const pendingItems = queue.items.filter((i) => !isDone(i) && !isStuck(i))
@@ -98,7 +96,7 @@ export default async function QueuePage() {
                   <th className="px-4 py-2 text-left">File</th>
                   <th className="px-4 py-2 text-left">Type</th>
                   <th className="px-4 py-2 text-left">Ingested</th>
-                  <th className="px-4 py-2 text-left">Agents</th>
+                  <th className="px-4 py-2 text-left">Pipeline</th>
                 </tr>
               </thead>
               <tbody>
@@ -108,13 +106,7 @@ export default async function QueuePage() {
                     <td className="px-4 py-2 text-zinc-400">{item.type}</td>
                     <td className="px-4 py-2 text-zinc-400">{formatRelative(item.ingestedAt)}</td>
                     <td className="px-4 py-2">
-                      <div className="flex gap-1 flex-wrap">
-                        {Object.entries(item.agents).map(([a, s]) => (
-                          <span key={a} className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${agentStatusBadge(s)}`}>
-                            {a}: {s}
-                          </span>
-                        ))}
-                      </div>
+                      <QueuePipeline item={item} agentStats={agentStats} />
                     </td>
                   </tr>
                 ))}
@@ -137,7 +129,7 @@ export default async function QueuePage() {
                   <th className="px-4 py-2 text-left">File</th>
                   <th className="px-4 py-2 text-left">Type</th>
                   <th className="px-4 py-2 text-left">Ingested</th>
-                  <th className="px-4 py-2 text-left">Agents</th>
+                  <th className="px-4 py-2 text-left">Pipeline</th>
                 </tr>
               </thead>
               <tbody>
@@ -147,13 +139,7 @@ export default async function QueuePage() {
                     <td className="px-4 py-2 text-zinc-400">{item.type}</td>
                     <td className="px-4 py-2 text-zinc-400">{formatRelative(item.ingestedAt)}</td>
                     <td className="px-4 py-2">
-                      <div className="flex gap-1 flex-wrap">
-                        {Object.entries(item.agents).map(([a, s]) => (
-                          <span key={a} className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${agentStatusBadge(s)}`}>
-                            {a}: {s}
-                          </span>
-                        ))}
-                      </div>
+                      <QueuePipeline item={item} agentStats={agentStats} />
                     </td>
                   </tr>
                 ))}
@@ -178,7 +164,7 @@ export default async function QueuePage() {
                   <th className="px-4 py-2 text-left">File</th>
                   <th className="px-4 py-2 text-left">Type</th>
                   <th className="px-4 py-2 text-left">Ingested</th>
-                  <th className="px-4 py-2 text-left">Agents</th>
+                  <th className="px-4 py-2 text-left">Pipeline</th>
                 </tr>
               </thead>
               <tbody>
@@ -188,13 +174,7 @@ export default async function QueuePage() {
                     <td className="px-4 py-2 text-zinc-500">{item.type}</td>
                     <td className="px-4 py-2 text-zinc-500">{formatRelative(item.ingestedAt)}</td>
                     <td className="px-4 py-2">
-                      <div className="flex gap-1 flex-wrap">
-                        {Object.entries(item.agents).map(([a, s]) => (
-                          <span key={a} className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${agentStatusBadge(s)}`}>
-                            {a}: {s}
-                          </span>
-                        ))}
-                      </div>
+                      <QueuePipeline item={item} agentStats={agentStats} />
                     </td>
                   </tr>
                 ))}
