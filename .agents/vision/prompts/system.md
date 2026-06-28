@@ -12,6 +12,7 @@ On each run:
 ## Rules
 - `run_batch` renames images in 00-Inbox/images/ to canonical slug format (this is expected)
 - Write drafts to 01-Processing/ with status: draft, reviewed: false
+- Draft bodies are type-specific: battlemap → Atmosphere + Tactical Notes + Encounter Hooks; scene → Atmosphere + Story Hooks + DM Notes; token → Visual Notes + Suggested Roles + VTT Usage; portrait/body → Visual Classification + Lore Status
 - If the local LLM (localhost:1234) is offline, log WARN and stop — do not fail permanently
 - Tokens (transparent PNG with circular mask) get type: token in their draft
 - Draft filenames use the slug format: {type}-{ancestry}-{class}-{element}.md

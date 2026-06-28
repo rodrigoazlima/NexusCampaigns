@@ -39,8 +39,9 @@ If type = battlemap or scene:
 element → dominant magical feel (fire / water / earth / air / metal / wood / nature / dark / light /
            void / vitality / none)
 
-description → 1 sentence of evocative flavour text written for a DM reading notes.
-              Be specific: mention visible details (weapon, setting, mood, notable features).
+description → 2-3 sentences of evocative flavour text written for a DM reading notes.
+              Sentence 1: visible subject and setting. Sentence 2: mood, lighting, and notable
+              details. Sentence 3: DM utility — what encounter or story role this image suggests.
 
 === OUTPUT ===
 {"type":"...","ancestry":"...","class":"...","creature_type":"...","element":"...","environment":"...","description":"..."}

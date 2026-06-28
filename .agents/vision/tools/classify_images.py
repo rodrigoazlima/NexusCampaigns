@@ -360,6 +360,266 @@ def _rename_image(src: Path, clf: VisionClassification) -> Path:
 # Draft writing
 # ---------------------------------------------------------------------------
 
+def _atmosphere_lines(clf: VisionClassification) -> str:
+    """Generate atmosphere bullet points from classification data."""
+    env  = clf.environment.value if clf.environment.value != "none" else None
+    elem = clf.element.value     if clf.element.value     != "none" else None
+
+    lighting_map = {
+        "dark":     "Dim, shadowy — torchlight or moonlight only",
+        "light":    "Bright and open, natural or magical illumination",
+        "fire":     "Flickering orange glow, heat haze near the source",
+        "void":     "Absolute darkness with pinpricks of cold starlight",
+        "vitality": "Warm golden light, life energy visible as soft radiance",
+    }
+    mood_map = {
+        "dark":     "Dread and tension — something watches from the shadows",
+        "fire":     "Urgency and danger — heat presses in from all sides",
+        "water":    "Eerie calm, reflections distort what is real",
+        "earth":    "Solid and ancient — the weight of stone above is palpable",
+        "air":      "Vertiginous openness — wind howls and pulls at equipment",
+        "void":     "Cosmic isolation — existence feels fragile here",
+        "vitality": "Hopeful and sacred — wounds ache less, resolve strengthens",
+        "nature":   "Alive and watching — rustles and growths respond to presence",
+        "metal":    "Cold and mechanical — every footstep rings against hard floors",
+        "wood":     "Organic and overgrown — roots and vines creep through cracks",
+    }
+    sound_map = {
+        "cave":      "Dripping water, distant echoes, the crunch of gravel underfoot",
+        "dungeon":   "Stone settling, faint moans, the scrape of old iron chains",
+        "forest":    "Wind through canopy, birdsong that abruptly goes silent",
+        "city":      "Crowd murmur, hawkers calling, distant bells",
+        "tavern":    "Lute and laughter, the clink of mugs, a fire popping",
+        "temple":    "Hollow silence broken by chanting, incense thick in the air",
+        "volcano":   "Deep rumbles, hissing steam vents, cracking lava crust",
+        "ruins":     "Wind through broken walls, loose stone underfoot, owls",
+        "castle":    "Echoing boots on stone, distant orders shouted across battlements",
+        "sea":       "Constant wave crash, salt spray, creaking rigging",
+        "swamp":     "Frogs, insect chorus, the suck of mud at every step",
+        "desert":    "Wind-driven sand, vast silence, the creak of parched wood",
+        "snow":      "Muffled sound, breath visible, the creak of ice underfoot",
+        "mountain":  "Howling updrafts, distant rockfall, thin air that burns the lungs",
+        "underwater": "Muffled rushing, pressure in the ears, bubbles rising",
+    }
+
+    atm_lines = [f"- **Setting**: {env.capitalize() if env else 'Unknown'} environment"]
+    if elem and elem in lighting_map:
+        atm_lines.append(f"- **Lighting**: {lighting_map[elem]}")
+    if elem and elem in mood_map:
+        atm_lines.append(f"- **Mood**: {mood_map[elem]}")
+    if env and env in sound_map:
+        atm_lines.append(f"- **Sounds**: {sound_map[env]}")
+    return "\n".join(atm_lines)
+
+
+def _battlemap_body(clf: VisionClassification) -> str:
+    env  = clf.environment.value if clf.environment.value != "none" else "unknown"
+    elem = clf.element.value     if clf.element.value     != "none" else "none"
+
+    tactical_map: dict[str, list[str]] = {
+        "cave":      ["Narrow chokepoints force single-file movement",
+                      "Stalagmites provide half-cover; stalactites can be dropped as hazards",
+                      "Darkness beyond 30 ft unless light sources are carried"],
+        "dungeon":   ["Corridors limit flanking opportunities",
+                      "Doorways create fatal-funnel chokepoints",
+                      "Rubble and debris create difficult terrain patches"],
+        "forest":    ["Trees grant three-quarters cover at range",
+                      "Dense undergrowth is difficult terrain (5 ft of movement per 5 ft)",
+                      "High canopy may allow flying or climbing ambush"],
+        "city":      ["Rooftops accessible for archers — watch vertical threats",
+                      "Alleyways split groups; coordinating between lanes is difficult",
+                      "Civilians scatter — area spells risk collateral consequences"],
+        "ruins":     ["Unstable floors — failing checks drop combatants one level",
+                      "Partial walls give half-cover without blocking movement",
+                      "Rubble fields are difficult terrain throughout"],
+        "volcano":   ["Lava pools deal 4d10 fire damage on contact (or per round)",
+                      "Steam vents are hazardous terrain — DC 15 Acrobatics to avoid",
+                      "Ground cracks can open as environmental hazards"],
+        "temple":    ["Pillars grant cover and can be toppled as an action",
+                      "Raised dais gives +1 circumstance bonus on attacks",
+                      "Ritual circles on the floor may interact with spells"],
+        "sea":       ["Open water = difficult terrain for non-swimmers",
+                      "Ship deck limits large creature movement significantly",
+                      "Masts and rigging allow Climb DC 15 for high-ground advantage"],
+        "castle":    ["Arrow slits grant near-total cover to defenders inside",
+                      "Portcullis can be dropped to split the party",
+                      "Parapets grant cover and advantage on ranged attacks"],
+    }
+    hooks_map: dict[str, list[str]] = {
+        "cave":    ["Something moves in the deeper darkness — bones crunch underfoot",
+                    "A hidden fissure leads to an unexplored passage",
+                    "Ancient markings on the walls predate the current inhabitants"],
+        "dungeon": ["A cell block holds something that shouldn't still be alive",
+                    "The lock mechanism on the far door is set to trap the next opener",
+                    "Rations and gear scattered — the previous expedition ended badly here"],
+        "forest":  ["Tracks converge on a specific tree — a den or lair above or below",
+                    "The silence radius suggests a predator is active nearby",
+                    "Fallen shrine in the clearing hints at a forgotten pact"],
+        "ruins":   ["A sealed vault door bears a sigil that matches a faction crest",
+                    "Fresh campfire ash — someone camped here very recently",
+                    "The collapse pattern suggests this wasn't accidental"],
+        "volcano": ["Cultists performing a ritual at the caldera edge at midnight",
+                    "A heat-warped chest juts from the cooled lava — survivors' cache?",
+                    "The eruption cycle is accelerating; the party has limited time"],
+        "temple":  ["The altar responds to blood — what does it summon?",
+                    "A hidden reliquary behind the main idol holds something valuable",
+                    "The priests here serve a god whose name causes the walls to vibrate"],
+        "city":    ["A crowd has gathered around something — or someone — on the ground",
+                    "Wanted posters on every wall bearing a face that looks familiar",
+                    "A merchant's stall is a front; the real business is in the back room"],
+    }
+
+    default_tactics = ["Open terrain dominates — movement and positioning are key",
+                        "Identify the highest point — height advantage is decisive here",
+                        "Flanking lanes are wide; spread out or be surrounded"]
+    default_hooks   = ["Something has been disturbed here recently — evidence of passage",
+                        "An item of interest is visible but retrieving it is the challenge",
+                        "The environment itself becomes an antagonist as the fight progresses"]
+
+    tactics = tactical_map.get(env, default_tactics)
+    hooks   = hooks_map.get(env,   default_hooks)
+
+    return (
+        f"\n## Description\n\n{clf.description}\n\n"
+        f"## Atmosphere\n\n{_atmosphere_lines(clf)}\n\n"
+        f"## Tactical Notes\n\n"
+        + "\n".join(f"- {t}" for t in tactics) + "\n\n"
+        f"## Encounter Hooks\n\n"
+        + "\n".join(f"- {h}" for h in hooks) + "\n\n"
+        f"## Details\n\n"
+        f"- **Type**: Battlemap\n"
+        f"- **Environment**: {env}\n"
+        f"- **Element**: {elem}\n\n"
+        f"## Related\n\n"
+    )
+
+
+def _scene_body(clf: VisionClassification) -> str:
+    env  = clf.environment.value if clf.environment.value != "none" else "unknown"
+    elem = clf.element.value     if clf.element.value     != "none" else "none"
+
+    hooks_map: dict[str, list[str]] = {
+        "cave":      ["A figure stands at the cave mouth — ally, enemy, or something else?",
+                      "The light source in this scene will not last much longer",
+                      "What the figure sees ahead should terrify any sane adventurer"],
+        "dungeon":   ["This is the moment before the door opens — what waits beyond?",
+                      "The party must choose: press on or fall back with what they have",
+                      "Someone in this image knows more than they are saying"],
+        "forest":    ["The encounter began with an arrow — from which direction?",
+                      "A figure emerges from the treeline; their intent is unclear",
+                      "The beast here is not acting like prey — it is hunting"],
+        "volcano":   ["The ritual can still be stopped — but the window is closing",
+                      "Escape routes are being cut off by the eruption",
+                      "The antagonist has planned for this terrain; the party has not"],
+        "city":      ["The crowd turns hostile — who gave the signal?",
+                      "The chase leads somewhere the party did not expect",
+                      "A witness to something they should not have seen"],
+        "interior":  ["The object that matters is somewhere in this room",
+                      "The conversation happening here will change everything",
+                      "Someone in this scene is lying"],
+    }
+    default_hooks = [
+        "The scene captures a pivotal moment — what came just before?",
+        "A detail in the background tells a different story than the foreground",
+        "The emotional stakes here can anchor a session's dramatic peak",
+    ]
+    notes_map: dict[str, list[str]] = {
+        "dark":  ["Use this scene at a low point in the campaign arc",
+                  "Dim the lights at the table when describing this moment"],
+        "fire":  ["Read aloud the heat and urgency — time pressure is the mechanic",
+                  "This works as an action climax or an emotional confrontation"],
+        "light": ["Scene suggests revelation or triumph — pair with a party achievement",
+                  "High contrast lighting suggests a moral choice moment"],
+    }
+    default_notes = ["Scene works as an establishing shot for a new location or encounter",
+                     "Use the description to set the tone before the players act"]
+
+    hooks = hooks_map.get(env,  default_hooks)
+    notes = notes_map.get(elem, default_notes)
+
+    return (
+        f"\n## Description\n\n{clf.description}\n\n"
+        f"## Atmosphere\n\n{_atmosphere_lines(clf)}\n\n"
+        f"## Story Hooks\n\n"
+        + "\n".join(f"- {h}" for h in hooks) + "\n\n"
+        f"## DM Notes\n\n"
+        + "\n".join(f"- {n}" for n in notes) + "\n\n"
+        f"## Details\n\n"
+        f"- **Type**: Scene\n"
+        f"- **Environment**: {env}\n"
+        f"- **Element**: {elem}\n\n"
+        f"## Related\n\n"
+    )
+
+
+def _token_body(clf: VisionClassification) -> str:
+    ancestry      = clf.ancestry      if clf.ancestry      != "none" else None
+    creature_type = clf.creature_type if clf.creature_type != "none" else None
+    char_class    = clf.char_class    if clf.char_class    != "none" else None
+    elem          = clf.element.value if clf.element.value != "none" else None
+
+    subject = ancestry or creature_type or "Unknown"
+    role_hints: list[str] = []
+    if creature_type:
+        creature_roles = {
+            "dragon":    ["Boss encounter", "Ancient rival", "Unlikely ally with a price"],
+            "undead":    ["Recurring villain", "Tragic cursed NPC", "Guardian of a sealed tomb"],
+            "fiend":     ["Patron in disguise", "Antagonist pulling strings from afar", "Deal-maker"],
+            "celestial": ["Divine messenger", "Quest giver", "Moral compass NPC"],
+            "construct": ["Guard automaton", "Arcane experiment escaped", "Loyal servitor"],
+            "beast":     ["Wilderness encounter", "Companion animal", "Territorial hazard"],
+            "humanoid":  ["Recurring NPC", "Faction representative", "Ambiguous moral agent"],
+        }
+        role_hints = creature_roles.get(creature_type, ["Encounter creature", "Faction-aligned being"])
+    elif ancestry:
+        role_hints = ["Player character", "Named NPC ally or rival", "Recurring face in the campaign"]
+    else:
+        role_hints = ["Unnamed encounter participant", "Background NPC", "Crowd member with a secret"]
+
+    vtt_notes = [
+        "512×512 circular portrait — drop directly into Foundry VTT or Roll20",
+        "Scale to 1×1 grid square for Medium creatures; 2×2 for Large",
+    ]
+    if elem:
+        vtt_notes.append(f"Consider a {elem}-coloured aura overlay for visual identification")
+
+    return (
+        f"\n## Description\n\n{clf.description}\n\n"
+        f"## Visual Notes\n\n"
+        f"- **Subject**: {subject.capitalize()}"
+        + (f" {char_class}" if char_class else "") + "\n"
+        + (f"- **Element**: {elem.capitalize()}\n" if elem else "")
+        + "\n"
+        f"## Suggested Roles\n\n"
+        + "\n".join(f"- {r}" for r in role_hints) + "\n\n"
+        f"## VTT Usage\n\n"
+        + "\n".join(f"- {n}" for n in vtt_notes) + "\n\n"
+        f"## Details\n\n"
+        f"- **Ancestry**: {clf.ancestry}\n"
+        f"- **Class**: {clf.char_class}\n"
+        f"- **Creature type**: {clf.creature_type}\n"
+        f"- **Element**: {clf.element.value}\n\n"
+        f"## Related\n\n"
+    )
+
+
+def _portrait_body(clf: VisionClassification) -> str:
+    """Minimal body for portrait/body types — lore agent will enrich these."""
+    return (
+        f"\n## Description\n\n{clf.description}\n\n"
+        f"## Visual Classification\n\n"
+        f"- **Ancestry**: {clf.ancestry}\n"
+        f"- **Class**: {clf.char_class}\n"
+        f"- **Creature type**: {clf.creature_type}\n"
+        f"- **Element**: {clf.element.value}\n"
+        f"- **Environment**: {clf.environment.value}\n\n"
+        f"## Lore Status\n\n"
+        f"- Pending NPC sheet generation by Lore Agent\n"
+        f"- Classification complete — awaiting scenario pairing\n\n"
+        f"## Related\n\n"
+    )
+
+
 def _write_draft(
     path: Path,
     clf: VisionClassification,
@@ -377,10 +637,14 @@ def _write_draft(
         tags.append(clf.creature_type)
     if clf.element and clf.element.value != "none":
         tags.append(clf.element.value)
+    if clf.environment and clf.environment.value != "none":
+        tags.append(clf.environment.value)
+
+    entity_type = "npc" if clf.type.value in ("portrait", "body", "token") else "location"
 
     frontmatter: dict[str, Any] = {
         "id":            slug,
-        "type":          "npc" if clf.type.value in ("portrait", "body", "token") else "location",
+        "type":          entity_type,
         "status":        "draft",
         "quality":       0,
         "created":       today,
@@ -393,16 +657,15 @@ def _write_draft(
     if sha256:
         frontmatter["sha256"] = sha256
 
-    body = (
-        f"\n## Description\n\n{clf.description}\n\n"
-        f"## Details\n\n"
-        f"- **Ancestry**: {clf.ancestry}\n"
-        f"- **Class**: {clf.char_class}\n"
-        f"- **Creature type**: {clf.creature_type}\n"
-        f"- **Element**: {clf.element.value}\n"
-        f"- **Environment**: {clf.environment.value}\n\n"
-        f"## Related\n\n"
-    )
+    t = clf.type.value
+    if t == "battlemap":
+        body = _battlemap_body(clf)
+    elif t == "scene":
+        body = _scene_body(clf)
+    elif t == "token":
+        body = _token_body(clf)
+    else:
+        body = _portrait_body(clf)
 
     FrontmatterIO().write(path, frontmatter, body)
 

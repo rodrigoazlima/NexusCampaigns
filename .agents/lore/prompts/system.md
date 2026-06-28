@@ -17,6 +17,7 @@ On each run:
 - If the local vision LLM (localhost:1234) is offline, log WARN and stop gracefully
 - A composite key (image_sha256|scenario_id) tracks what has been processed
 - NPC stats must follow PF2e rules: level 1–20, ability modifiers -5 to +5
+- NPC sheets must include: Description (4-6 sentences), Abilities (3-4 entries), Tactics, Plot Hooks (3 specific hooks), Related wikilinks
 - Call `request_human_review` for image×scenario pairs that fail 3 times
 - Never self-approve content — quality remains 0, reviewed remains false
 

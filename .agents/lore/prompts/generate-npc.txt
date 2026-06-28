@@ -1,4 +1,4 @@
-You are a Pathfinder 2e NPC generator. Given the character image and scenario context, generate a complete NPC character sheet.
+You are a Pathfinder 2e NPC generator. Given the character image and scenario context, generate a complete, richly detailed NPC character sheet.
 
 Scenario: {scenario_name}
 Description: {scenario_description}
@@ -9,24 +9,35 @@ Existing canon entities (do NOT contradict these):
 
 Return ONLY valid JSON — no explanation, no markdown fences:
 {
-  "name": "Full Name",
-  "ancestry": "ancestry (e.g. Human, Elf)",
-  "heritage": "heritage (e.g. Skilled Heritage)",
-  "class": "class (e.g. Fighter, Wizard)",
+  "name": "Full Name (evocative, setting-appropriate)",
+  "ancestry": "PF2e ancestry (e.g. Human, Elf, Dragon, Undead)",
+  "heritage": "specific heritage (e.g. Skilled Heritage, Ancient Elf) or empty string",
+  "class": "PF2e class or creature role (e.g. Fighter, Wizard, Dragon, Construct)",
   "level": 1-20,
-  "background": "background name",
+  "background": "background name or origin (e.g. Merchant, Soldier, Cultist)",
   "str": -5 to 5,
   "dex": -5 to 5,
   "con": -5 to 5,
   "int": -5 to 5,
   "wis": -5 to 5,
   "cha": -5 to 5,
-  "abilities": ["ability1", "ability2", "ability3"],
-  "trait": "one defining trait",
-  "ideal": "what they believe in",
-  "bond": "what they care about most",
-  "flaw": "their weakness",
-  "role": "their role in the campaign (ally/villain/neutral)",
-  "relationships": ["[[entity-slug]]"],
-  "description": "2-3 sentence flavour text"
+  "abilities": [
+    "Signature ability 1 with brief mechanical note",
+    "Signature ability 2 with brief mechanical note",
+    "Signature ability 3 with brief mechanical note",
+    "Optional ability 4 if this is a high-level or complex creature"
+  ],
+  "trait": "one defining personality trait (single vivid phrase)",
+  "ideal": "what they genuinely believe in (one sentence)",
+  "bond": "the person, place, or cause they would die for (one sentence)",
+  "flaw": "their most dangerous weakness or blind spot (one sentence)",
+  "role": "ally / villain / neutral / rival",
+  "relationships": ["[[entity-slug-1]]", "[[entity-slug-2]]"],
+  "description": "4-9 sentences. Sentence 1-2: physical appearance and first impression. Sentence 3: personality and how they present themselves to strangers. Sentence 4-5: their history or situation relevant to this scenario. Sentence 6: what the DM needs to know to roleplay them convincingly.",
+  "plot_hooks": [
+    "Hook 1: specific scene or event that puts this NPC in the party's path",
+    "Hook 2: a secret they carry that could change the campaign if revealed",
+    "Hook 3: a request they might make of the party, and what they offer in return"
+  ],
+  "tactics": "2-3 sentences on how they fight or negotiate. Include preferred range, signature moves, and when they retreat or surrender."
 }

@@ -147,7 +147,7 @@ class _NPCGeneratorImpl:
         raw = self._client.vision_chat(
             image_path, prompt,
             system="You are a Pathfinder 2e NPC generator. Return ONLY valid JSON.",
-            max_tokens=800,
+            max_tokens=1200,
         )
         return NPCLLMOutput.model_validate(_normalize_stats(raw))
 
@@ -176,7 +176,7 @@ class _NPCGeneratorImpl:
         raw = self._client.vision_chat(
             image_path, revision_prompt,
             system="You are a Pathfinder 2e NPC generator. Return ONLY valid JSON.",
-            max_tokens=900,
+            max_tokens=1200,
         )
         return NPCLLMOutput.model_validate(_normalize_stats(raw))
 
@@ -197,15 +197,19 @@ def _output_to_frontmatter(npc: NPCLLMOutput, image_rel: str, scenario: dict) ->
 
 
 def _output_to_body(npc: NPCLLMOutput, scenario: dict) -> str:
-    """Build minimal body string for quality scoring."""
+    """Build body string for quality scoring."""
     rels = [f"[[{scenario['id']}]]"] + [r for r in npc.relationships if r != f"[[{scenario['id']}]]"]
-    return (
+    body = (
         f"\n## Description\n\n{npc.description}\n\n"
         f"## Abilities\n\n"
         + "\n".join(f"- {a}" for a in npc.abilities) + "\n\n"
-        f"## Related\n\n"
-        + "\n".join(rels) + "\n"
     )
+    if npc.tactics:
+        body += f"## Tactics\n\n{npc.tactics}\n\n"
+    if npc.plot_hooks:
+        body += "## Plot Hooks\n\n" + "\n".join(f"- {h}" for h in npc.plot_hooks) + "\n\n"
+    body += "## Related\n\n" + "\n".join(rels) + "\n"
+    return body
 
 
 def _build_critique(fm: dict, body: str, score: int) -> str:
@@ -225,6 +229,12 @@ def _build_critique(fm: dict, body: str, score: int) -> str:
 
     if not fm.get("source"):
         gaps.append("- Missing source field")
+
+    if not re.search(r"^##\s+plot\s+hooks\b", body, re.I | re.M):
+        gaps.append("- Missing '## Plot Hooks' section with 3 specific hooks")
+
+    if not re.search(r"^##\s+tactics\b", body, re.I | re.M):
+        gaps.append("- Missing '## Tactics' section describing how they fight or negotiate")
 
     if not gaps:
         gaps.append("- Description section lacks meaningful content (too short or generic)")
@@ -406,9 +416,12 @@ def _write_npc_draft(
         f"\n## Description\n\n{npc.description}\n\n"
         f"## Abilities\n\n"
         + "\n".join(f"- {a}" for a in npc.abilities) + "\n\n"
-        f"## Related\n\n"
-        + "\n".join(rels) + "\n"
     )
+    if npc.tactics:
+        body += f"## Tactics\n\n{npc.tactics}\n\n"
+    if npc.plot_hooks:
+        body += "## Plot Hooks\n\n" + "\n".join(f"- {h}" for h in npc.plot_hooks) + "\n\n"
+    body += "## Related\n\n" + "\n".join(rels) + "\n"
 
     if npc.needs_human_review:
         body += (

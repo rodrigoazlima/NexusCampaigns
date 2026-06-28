@@ -197,6 +197,8 @@ class NPCLLMOutput(BaseModel):
     role:       str         = ""
     relationships: list[str] = Field(default_factory=list)
     description:   str      = ""
+    plot_hooks:    list[str] = Field(default_factory=list)
+    tactics:       str       = ""
     # Reflexion loop metadata — never comes from LLM; set by _flag_for_human_review
     needs_human_review: bool = False
     review_notes:       str  = ""
