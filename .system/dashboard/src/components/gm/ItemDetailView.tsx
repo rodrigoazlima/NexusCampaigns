@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft, CheckCircle, Archive, XCircle, Flag,
-  Loader2, CircleDot, ZoomIn, Upload, RefreshCw, ImagePlus, FileText, ChevronRight
+  Loader2, CircleDot, ZoomIn, Upload, RefreshCw, ImagePlus, FileText, ChevronRight, Pencil
 } from 'lucide-react'
 import type { ItemDetail } from '@/lib/types'
 import QualityBar from '@/components/widgets/QualityBar'
@@ -480,6 +480,16 @@ export default function ItemDetailView({ item: initial }: Props) {
                       Upload Base Image
                     </span>
                   </label>
+                )}
+
+                {item.source[0] && (
+                  <Link
+                    href={`/gm/view/${item.id}/token`}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded bg-surface-3 text-zinc-400 border border-surface-3 hover:border-zinc-600 hover:text-zinc-200 transition-colors"
+                  >
+                    <Pencil size={13} />
+                    Edit Token
+                  </Link>
                 )}
 
                 {!item.tokenEligible && !tokenSrc && (
