@@ -1,6 +1,7 @@
 'use client'
 
 import { Fragment, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { Check, Minus, AlertTriangle, Dot, RotateCcw, Loader2 } from 'lucide-react'
 import type { QueueItem, QueueAgentStat } from '@/lib/types'
@@ -25,6 +26,7 @@ function NodeIcon({ status }: { status: string }) {
   return <Dot size={14} />   // pending
 }
 
+interface PopState { agent: string; top: number; left: number }
 interface Props {
   item: QueueItem
   agentStats: Record<string, QueueAgentStat>
@@ -32,80 +34,104 @@ interface Props {
 
 export default function QueuePipeline({ item, agentStats }: Props) {
   const router = useRouter()
-  const [busy, setBusy] = useState(false)
+  const [pop, setPop] = useState<PopState | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
 
-  const reprocess = async () => {
-    setBusy(true)
+  const toggle = (agent: string, el: HTMLElement) => {
+    if (pop?.agent === agent) { setPop(null); return }
+    const r = el.getBoundingClientRect()
+    setPop({ agent, top: r.bottom + 6, left: r.left + r.width / 2 })
+  }
+
+  const reprocess = async (agent: string) => {
+    setBusy(agent)
     try {
       const res = await fetch('/api/gm/queue/reprocess', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: item.path }),
+        body: JSON.stringify({ path: item.path, agent }),
       })
-      if (res.ok) router.refresh()
+      if (res.ok) { setPop(null); router.refresh() }
     } finally {
-      setBusy(false)
+      setBusy(null)
     }
   }
 
   return (
-    <div className="flex items-center gap-3">
-      {/* Pipeline timeline */}
-      <div className="flex items-center">
-        {PIPELINE.map((agent, i) => {
-          const status = item.agents[agent] ?? 'pending'
-          const stat = agentStats[agent]
-          const lastRun = stat?.lastRun ? formatRelative(stat.lastRun) : 'never'
-          const ran = stat?.totalRuns ?? 0
-          const prevDone = i > 0 && item.agents[PIPELINE[i - 1]] === 'done'
-          return (
-            <Fragment key={agent}>
-              {i > 0 && (
-                <div className={`h-px w-3 ${prevDone ? 'bg-success/40' : 'bg-surface-3'}`} />
+    <div className="flex items-center">
+      {PIPELINE.map((agent, i) => {
+        const status = item.agents[agent] ?? 'pending'
+        const count = item.reruns[agent] ?? 0
+        const prevDone = i > 0 && item.agents[PIPELINE[i - 1]] === 'done'
+        return (
+          <Fragment key={agent}>
+            {i > 0 && (
+              <div className={`h-px w-3 ${prevDone ? 'bg-success/40' : 'bg-surface-3'}`} />
+            )}
+            <button
+              type="button"
+              onClick={(e) => toggle(agent, e.currentTarget)}
+              title={`${agentDisplayName(agent)} — ${status} (click for re-run options)`}
+              className="relative flex items-center justify-center"
+            >
+              <span className={`w-5 h-5 rounded-full border flex items-center justify-center transition-shadow ${NODE_STYLE[status] ?? NODE_STYLE.skip} ${pop?.agent === agent ? 'ring-2 ring-primary/60' : ''} ${status === 'pending' ? 'animate-pulse' : ''}`}>
+                <NodeIcon status={status} />
+              </span>
+              {count > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 text-[8px] leading-none px-1 py-0.5 rounded-full bg-primary/20 text-primary font-mono border border-primary/30">
+                  {count}
+                </span>
               )}
-              <div
-                className="group relative flex items-center justify-center"
-                title={`${agentDisplayName(agent)} — ${status}\nlast run: ${lastRun}\ntimes ran: ${ran}\nmanual re-runs: ${item.reruns}`}
-              >
-                <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${NODE_STYLE[status] ?? NODE_STYLE.skip} ${status === 'pending' ? 'animate-pulse' : ''}`}>
-                  <NodeIcon status={status} />
-                </div>
+            </button>
+          </Fragment>
+        )
+      })}
 
-                {/* Styled hover card */}
-                <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-50 w-44 p-2.5 rounded-lg bg-surface-2 border border-surface-3 shadow-xl text-left">
-                  <div className="flex items-center justify-between gap-2 mb-1.5">
-                    <span className="text-xs font-semibold text-zinc-200">{agentDisplayName(agent)}</span>
-                    <span className={`text-[9px] px-1 py-0.5 rounded font-semibold uppercase ${NODE_STYLE[status] ?? NODE_STYLE.skip}`}>{status}</span>
+      {pop && createPortal(
+        <>
+          {/* click-away backdrop */}
+          <div className="fixed inset-0 z-40" onClick={() => setPop(null)} />
+          <div
+            className="fixed z-50 w-52 p-3 rounded-lg bg-surface-2 border border-surface-3 shadow-2xl -translate-x-1/2"
+            style={{ top: pop.top, left: pop.left }}
+          >
+            {(() => {
+              const agent = pop.agent
+              const status = item.agents[agent] ?? 'pending'
+              const stat = agentStats[agent]
+              return (
+                <>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="text-sm font-semibold text-zinc-100">{agentDisplayName(agent)}</span>
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-semibold uppercase ${NODE_STYLE[status] ?? NODE_STYLE.skip}`}>
+                      {status}
+                    </span>
                   </div>
-                  <div className="space-y-0.5 text-[10px] text-zinc-500 font-mono">
-                    <div className="flex justify-between"><span>last run</span><span className="text-zinc-300">{lastRun}</span></div>
-                    <div className="flex justify-between"><span>times ran</span><span className="text-zinc-300">{ran}</span></div>
-                    <div className="flex justify-between"><span>manual re-runs</span><span className="text-zinc-300">{item.reruns}</span></div>
+                  <div className="space-y-1 text-[11px] text-zinc-500 font-mono mb-3">
+                    <div className="flex justify-between"><span>last run</span><span className="text-zinc-300">{stat?.lastRun ? formatRelative(stat.lastRun) : 'never'}</span></div>
+                    <div className="flex justify-between"><span>times ran</span><span className="text-zinc-300">{stat?.totalRuns ?? 0}</span></div>
+                    <div className="flex justify-between"><span>manual re-runs</span><span className="text-zinc-300">{item.reruns[agent] ?? 0}</span></div>
                   </div>
-                </div>
-              </div>
-            </Fragment>
-          )
-        })}
-      </div>
-
-      {/* Manual re-run count */}
-      {item.reruns > 0 && (
-        <span className="flex items-center gap-0.5 text-[10px] text-zinc-500 font-mono" title={`${item.reruns} manual re-run(s)`}>
-          <RotateCcw size={10} /> {item.reruns}
-        </span>
+                  {agent === 'ingestion' ? (
+                    <div className="text-[10px] text-zinc-600 italic">Ingestion can’t be re-run.</div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => reprocess(agent)}
+                      disabled={busy === agent}
+                      className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 text-[11px] font-medium rounded bg-warning/10 text-warning border border-warning/30 hover:bg-warning/20 transition-colors disabled:opacity-50"
+                    >
+                      {busy === agent ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+                      Reprocess {agentDisplayName(agent)}
+                    </button>
+                  )}
+                </>
+              )
+            })()}
+          </div>
+        </>,
+        document.body,
       )}
-
-      {/* Reprocess / re-run button */}
-      <button
-        onClick={reprocess}
-        disabled={busy}
-        title="Flag for re-run / reprocess — resets completed stages to pending and flags this source's drafts as needs_reprocessing"
-        className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded bg-warning/10 text-warning border border-warning/30 hover:bg-warning/20 transition-colors disabled:opacity-50 whitespace-nowrap"
-      >
-        {busy ? <Loader2 size={11} className="animate-spin" /> : <RotateCcw size={11} />}
-        Reprocess
-      </button>
     </div>
   )
 }

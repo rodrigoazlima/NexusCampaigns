@@ -280,7 +280,7 @@ class InboxQueueEntry(BaseModel):
     ingestedAt: datetime
     type:       Literal["image", "document", "other"]
     agents:     AgentSlots
-    reruns:     int = 0     # manual reprocess/re-run count (set by dashboard action)
+    reruns:     dict[str, int] = Field(default_factory=dict)   # per-agent manual reprocess count (dashboard action)
 
 
 # Type alias — the full queue is a str→entry dict
