@@ -1,54 +1,121 @@
-# NexusCampaigns — Vault Nexus Campaigns
+<!-- Improved compatibility of back to top link: See: https://github.com/othneildrew/Best-README-Template/pull/73 -->
+<a id="readme-top"></a>
 
-AI-powered Nexus Campaigns that transforms raw campaign inspiration (images, documents, notes) into reusable, linked, quality-gated knowledge assets for Dungeon Masters.
+<!-- PROJECT SHIELDS -->
+[![Contributors][contributors-shield]][contributors-url]
+[![Forks][forks-shield]][forks-url]
+[![Stargazers][stars-shield]][stars-url]
+[![Issues][issues-shield]][issues-url]
+[![License][license-shield]][license-url]
+[![LinkedIn][linkedin-shield]][linkedin-url]
 
-**Vault root:** `knowledge-base/`  
-**Version:** 1.0 · **Date:** 2026-06-09
+
+
+<!-- PROJECT LOGO -->
+<br />
+<div align="center">
+  <a href="https://github.com/rodrigoazlima/NexusCampaigns">
+    <img src="images/logo.png" alt="Logo" width="80" height="80">
+  </a>
+
+  <h3 align="center">Nexus Campaigns</h3>
+
+  <p align="center">
+    AI-powered Dungeon Master vault that turns raw campaign inspiration into reusable, linked, quality-gated knowledge assets.
+    <br />
+    <a href="https://github.com/rodrigoazlima/NexusCampaigns"><strong>Explore the docs »</strong></a>
+    <br />
+    <br />
+    <a href="https://github.com/rodrigoazlima/NexusCampaigns">View Demo</a>
+    &middot;
+    <a href="https://github.com/rodrigoazlima/NexusCampaigns/issues/new?labels=bug">Report Bug</a>
+    &middot;
+    <a href="https://github.com/rodrigoazlima/NexusCampaigns/issues/new?labels=enhancement">Request Feature</a>
+  </p>
+</div>
+
+
+
+<!-- TABLE OF CONTENTS -->
+<details>
+  <summary>Table of Contents</summary>
+  <ol>
+    <li>
+      <a href="#about-the-project">About The Project</a>
+      <ul>
+        <li><a href="#built-with">Built With</a></li>
+        <li><a href="#system-architecture">System Architecture</a></li>
+      </ul>
+    </li>
+    <li>
+      <a href="#getting-started">Getting Started</a>
+      <ul>
+        <li><a href="#prerequisites">Prerequisites</a></li>
+        <li><a href="#installation">Installation</a></li>
+      </ul>
+    </li>
+    <li>
+      <a href="#usage">Usage</a>
+      <ul>
+        <li><a href="#dashboard">Dashboard</a></li>
+        <li><a href="#agent-daemon">Agent Daemon</a></li>
+        <li><a href="#monitoring">Monitoring</a></li>
+      </ul>
+    </li>
+    <li>
+      <a href="#reference">Reference</a>
+      <ul>
+        <li><a href="#folder-structure">Folder Structure</a></li>
+        <li><a href="#pipeline-workflow">Pipeline Workflow</a></li>
+        <li><a href="#agents">Agents</a></li>
+        <li><a href="#configuration">Configuration</a></li>
+        <li><a href="#metadata-standard">Metadata Standard</a></li>
+        <li><a href="#naming-convention">Naming Convention</a></li>
+        <li><a href="#wikilinks--linking-rules">Wikilinks &amp; Linking Rules</a></li>
+        <li><a href="#logging">Logging</a></li>
+        <li><a href="#security-constraints">Security Constraints</a></li>
+      </ul>
+    </li>
+    <li><a href="#roadmap">Roadmap</a></li>
+    <li><a href="#contributing">Contributing</a></li>
+    <li><a href="#license">License</a></li>
+    <li><a href="#contact">Contact</a></li>
+    <li><a href="#acknowledgments">Acknowledgments</a></li>
+  </ol>
+</details>
+
+
+
+<!-- ABOUT THE PROJECT -->
+## About The Project
+
+Nexus Campaigns is an AI-powered vault that transforms raw campaign inspiration — images, documents, and notes — into reusable, linked, quality-gated knowledge assets for Dungeon Masters.
+
+A pipeline of scheduled agents ingests source material, classifies it with vision and language models, generates NPC sheets and circular tokens, enriches metadata, and weaves `[[wikilinks]]` between entities. A human reviews every draft and is the only one who can promote content to canon.
+
+* **Vault root:** `knowledge-base/`
+* **Version:** 1.0 · **Date:** 2026-06-09
 
 > Every agent reads `AGENTS.md` before making changes. It is the operating system of this vault.
 
----
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-## Quick Start — User Actions
 
-### 1. Dashboard
 
-```powershell
-cd .system\dashboard
-npm run dev
-```
+### Built With
 
-Binds `0.0.0.0:3131` — accessible on local LAN:
-- Local: http://localhost:3131
-- LAN: http://`<your-ip>`:3131
+* [![Next][Next.js]][Next-url]
+* [![React][React.js]][React-url]
+* [![TypeScript][TypeScript.com]][TypeScript-url]
+* [![Tailwind][Tailwind.com]][Tailwind-url]
+* [![Python][Python.com]][Python-url]
+* [![Anthropic][Anthropic.com]][Anthropic-url]
 
-### 2. Agent Daemon
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-Start:
-```powershell
-powershell -NonInteractive -File .agents\runtime\tools\daemon.ps1
-```
 
-Restart (kill existing first):
-```powershell
-Get-Process python | Where-Object { $_.CommandLine -like "*runner.py*" } | Stop-Process -Force
-powershell -NonInteractive -WindowStyle Hidden -File .agents\runtime\tools\daemon.ps1
-```
 
-### 3. Monitor Live
-
-```powershell
-# Live log tail
-Get-Content '.agents\runtime\state\logs\automation.log' -Tail 50 -Wait
-
-# Config paths
-# - Agent config: .system\.shared\config\global.json
-# - Dashboard env: .system\dashboard\.env.local
-```
-
----
-
-## System Architecture
+### System Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -79,9 +146,94 @@ Get-Content '.agents\runtime\state\logs\automation.log' -Tail 50 -Wait
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
----
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-## Folder Structure
+
+
+<!-- GETTING STARTED -->
+## Getting Started
+
+To get a local copy up and running follow these steps.
+
+### Prerequisites
+
+* [Node.js](https://nodejs.org/) (for the dashboard)
+* [Python 3.x](https://www.python.org/) (for the agent runtime)
+* A locally-hosted LLM endpoint (e.g. `qwen3-vl-4b-instruct`) for vision/lore agents — no external API keys required
+
+### Installation
+
+1. Clone the repo
+   ```sh
+   git clone https://github.com/rodrigoazlima/NexusCampaigns.git
+   cd NexusCampaigns
+   ```
+2. Install dashboard dependencies
+   ```powershell
+   cd .system\dashboard
+   npm install
+   ```
+3. Configure the vault root and dashboard env
+   ```powershell
+   # Agent config:  .system\.shared\config\global.json
+   # Dashboard env:  .system\dashboard\.env.local
+   ```
+   | Variable | Default | Description |
+   |----------|---------|-------------|
+   | `VAULT_ROOT` | `D:\Library\rpg\dm\pathway\knowledge-base` | Path to the vault directory |
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
+
+<!-- USAGE EXAMPLES -->
+## Usage
+
+### Dashboard
+
+```powershell
+cd .system\dashboard
+npm run dev
+```
+
+Binds `0.0.0.0:3131` — accessible on local LAN:
+- Local: http://localhost:3131
+- LAN: http://`<your-ip>`:3131
+
+### Agent Daemon
+
+Start:
+```powershell
+powershell -NonInteractive -File .agents\runtime\tools\daemon.ps1
+```
+
+Restart (kill existing first):
+```powershell
+Get-Process python | Where-Object { $_.CommandLine -like "*runner.py*" } | Stop-Process -Force
+powershell -NonInteractive -WindowStyle Hidden -File .agents\runtime\tools\daemon.ps1
+```
+
+### Monitoring
+
+```powershell
+# Live log tail
+Get-Content '.agents\runtime\state\logs\automation.log' -Tail 50 -Wait
+
+# Status check
+pwsh -File '.agents\runtime\tools\setup-service.ps1' -Status
+
+# Uninstall
+pwsh -File '.agents\runtime\tools\setup-service.ps1' -Uninstall
+```
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
+
+<!-- REFERENCE -->
+## Reference
+
+### Folder Structure
 
 | Folder | Purpose | Rules |
 |--------|---------|-------|
@@ -97,9 +249,7 @@ Get-Content '.agents\runtime\state\logs\automation.log' -Tail 50 -Wait
 | `05-Assets/` | Approved media (portraits, tokens, maps) | Every asset must link to ≥1 Library entity. |
 | `99-Archive/` | Retired approved content | Never permanently delete. |
 
----
-
-## Pipeline Workflow
+### Pipeline Workflow
 
 ```
 00-Inbox  →  01-Processing  →  (human review)  →  02-Library
@@ -115,12 +265,10 @@ Get-Content '.agents\runtime\state\logs\automation.log' -Tail 50 -Wait
 4. Approved content promoted to `02-Library/` (or `03-Campaigns/`, `05-Assets/`)
 5. Relationships auto-indexed into `04-Relationships/`
 
-**Quality gate for `02-Library/`:** `status: approved` + `quality >= 7` + `reviewed: true`  
+**Quality gate for `02-Library/`:** `status: approved` + `quality >= 7` + `reviewed: true`
 No agent may write these fields as `true` / `approved`.
 
----
-
-## Agents
+### Agents
 
 | Agent | Role |
 |-------|------|
@@ -135,30 +283,9 @@ No agent may write these fields as `true` / `approved`.
 | Repair | Fixes stale locks, missing dirs, broken image refs; detects overdue agents |
 | Cleanup | Purges logs/reports older than configured retention |
 
-### LLM Integration
+LLM calls run at `temperature: 0`, up to 3 retries with 3s backoff. Connection errors → skip batch, retry next run.
 
-Agents use locally-hosted LLMs:
-
-| Agent | Endpoint | Model | Purpose |
-|-------|----------|-------|---------|
-| Vision | Configurable | `qwen3-vl-4b-instruct` or similar | Image classification |
-| Lore | Configurable | `qwen3-vl-4b-instruct` or similar | NPC generation |
-
-All LLM calls: `temperature: 0`, up to 3 retries with 3s backoff. Connection errors → skip batch, retry next run.
-
----
-
-## Configuration
-
-The system reads configuration from environment variables and JSON files in `.system/`.
-
-### Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `VAULT_ROOT` | `D:\Library\rpg\dm\pathway\knowledge-base` | Path to the vault directory |
-
-### Task Configuration
+### Configuration
 
 Tasks are defined in each agent's `agent.json`. The runtime discovers them automatically:
 
@@ -181,19 +308,13 @@ Tasks are defined in each agent's `agent.json`. The runtime discovers them autom
 }
 ```
 
-### Agent Scheduling
-
-Each agent runs at its configured interval:
-
 | Interval | Tasks |
 |----------|-------|
 | Short (e.g., 900s) | Review, Repair |
 | Hourly | Ingestion, Vision, Lore, Token, Classification, Wiki, Wikilink |
 | Daily | Cleanup |
 
----
-
-## Metadata Standard
+### Metadata Standard
 
 All `01-Processing/` and `02-Library/` entities use this frontmatter:
 
@@ -216,7 +337,7 @@ relationships:
 ---
 ```
 
-**Allowed `type` values:**  
+**Allowed `type` values:**
 `npc` · `character` · `faction` · `location` · `city` · `village` · `dungeon` · `item` · `artifact` · `quest` · `encounter` · `creature` · `monster` · `event` · `religion` · `organization` · `timeline` · `lore`
 
 **Quality scores:**
@@ -228,9 +349,7 @@ relationships:
 | 7–8 | Good |
 | 9–10 | Library candidate |
 
----
-
-## Naming Convention
+### Naming Convention
 
 Slug format: `{type}-{descriptors}.md`
 
@@ -243,9 +362,7 @@ battlemap-dungeon-cirit-01.md
 
 Forbidden: `final_v2`, `new`, `cool`, `Untitled`, uppercase, spaces (except arc folder names like `A9 Desert`).
 
----
-
-## Wikilinks & Linking Rules
+### Wikilinks & Linking Rules
 
 Use `[[slug-name]]` — match exact filename without extension. Every entity must link to ≥1 other. No orphans.
 
@@ -258,9 +375,7 @@ Use `[[slug-name]]` — match exact filename without extension. Every entity mus
 | item | quest or owner NPC |
 | encounter | location + creature |
 
----
-
-## Logging
+### Logging
 
 **Log format:** `[YYYY-MM-DD HH:mm:ss] [<task-id>] <message>`
 
@@ -269,14 +384,12 @@ Use `[[slug-name]]` — match exact filename without extension. Every entity mus
 | `.system/logs/automation.log` | Consolidated all-agent log |
 | `.system/logs/<script-basename>_YYYY-MM-DD.log` | Per-script daily rotation |
 
-Every script emits `--- START ---` and `--- DONE ---`. `--- DONE ---` format:  
+Every script emits `--- START ---` and `--- DONE ---`. `--- DONE ---` format:
 `--- DONE (classified: N, failed: N, elapsed: N.Ns) ---`
 
 **Encoding:** All file I/O must use UTF-8. BOM stripping required when reading JSON files.
 
----
-
-## Security Constraints
+### Security Constraints
 
 - No agent may self-approve content (`reviewed: true` — human-only)
 - No agent may write to `02-Library/` without `reviewed: true` already set by human
@@ -284,28 +397,106 @@ Every script emits `--- START ---` and `--- DONE ---`. `--- DONE ---` format:
 - Breaking canon requires explicit human git commit with reason in message
 - LLM endpoints are localhost-only; no external API keys required
 
----
-
-## Git Integration
-
-After every successful run, changes are committed and pushed:
-
-```bash
-git add -A {agent.scope}
-git commit -m "vault: {task-id} YYYY-MM-DD HH:mm"
-git push
-```
-
-Commit skipped if no working-tree changes.
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
-# How to Monitor
 
-## Live log tail
-Get-Content 'C:\opt\GitHub\NexusCampaigns\.agents\runtime\state\logs\automation.log' -Tail 50 -Wait
+<!-- ROADMAP -->
+## Roadmap
 
-## Status check
-pwsh -File '.agents\runtime\tools\setup-service.ps1' -Status
+- [x] Agent pipeline (ingestion → vision → lore → token → classification)
+- [x] Wikilink graph generation
+- [x] Token frame management + face cropping
+- [x] Dashboard with live agent monitoring
+- [ ] Relationship map auto-rendering in `04-Relationships/`
+- [ ] Multi-campaign workspace switching
+- [ ] Battlemap generation agent
 
-## Uninstall
-pwsh -File '.agents\runtime\tools\setup-service.ps1' -Uninstall
+See the [open issues](https://github.com/rodrigoazlima/NexusCampaigns/issues) for a full list of proposed features (and known issues).
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
+
+<!-- CONTRIBUTING -->
+## Contributing
+
+Contributions are what make the open source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
+
+If you have a suggestion that would make this better, please fork the repo and create a pull request. You can also simply open an issue with the tag "enhancement".
+Don't forget to give the project a star! Thanks again!
+
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+### Top contributors:
+
+<a href="https://github.com/rodrigoazlima/NexusCampaigns/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=rodrigoazlima/NexusCampaigns" alt="contrib.rocks image" />
+</a>
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
+
+<!-- LICENSE -->
+## License
+
+Distributed under the project license. See `LICENSE` for more information.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
+
+<!-- CONTACT -->
+## Contact
+
+Rodrigo Lima - rodrigoazlima@gmail.com
+
+Project Link: [https://github.com/rodrigoazlima/NexusCampaigns](https://github.com/rodrigoazlima/NexusCampaigns)
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
+
+<!-- ACKNOWLEDGMENTS -->
+## Acknowledgments
+
+* [Best-README-Template](https://github.com/othneildrew/Best-README-Template)
+* [Obsidian](https://obsidian.md)
+* [Anthropic Claude API](https://docs.anthropic.com)
+* [Img Shields](https://shields.io)
+* [Choose an Open Source License](https://choosealicense.com)
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
+
+<!-- MARKDOWN LINKS & IMAGES -->
+[contributors-shield]: https://img.shields.io/github/contributors/rodrigoazlima/NexusCampaigns.svg?style=for-the-badge
+[contributors-url]: https://github.com/rodrigoazlima/NexusCampaigns/graphs/contributors
+[forks-shield]: https://img.shields.io/github/forks/rodrigoazlima/NexusCampaigns.svg?style=for-the-badge
+[forks-url]: https://github.com/rodrigoazlima/NexusCampaigns/network/members
+[stars-shield]: https://img.shields.io/github/stars/rodrigoazlima/NexusCampaigns.svg?style=for-the-badge
+[stars-url]: https://github.com/rodrigoazlima/NexusCampaigns/stargazers
+[issues-shield]: https://img.shields.io/github/issues/rodrigoazlima/NexusCampaigns.svg?style=for-the-badge
+[issues-url]: https://github.com/rodrigoazlima/NexusCampaigns/issues
+[license-shield]: https://img.shields.io/github/license/rodrigoazlima/NexusCampaigns.svg?style=for-the-badge
+[license-url]: https://github.com/rodrigoazlima/NexusCampaigns/blob/master/LICENSE
+[linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555
+[linkedin-url]: https://linkedin.com/in/rodrigoazlima
+[Next.js]: https://img.shields.io/badge/next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white
+[Next-url]: https://nextjs.org/
+[React.js]: https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB
+[React-url]: https://reactjs.org/
+[TypeScript.com]: https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white
+[TypeScript-url]: https://www.typescriptlang.org/
+[Tailwind.com]: https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white
+[Tailwind-url]: https://tailwindcss.com/
+[Python.com]: https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white
+[Python-url]: https://www.python.org/
+[Anthropic.com]: https://img.shields.io/badge/Anthropic-191919?style=for-the-badge&logo=anthropic&logoColor=white
+[Anthropic-url]: https://www.anthropic.com/
