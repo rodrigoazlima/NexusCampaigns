@@ -327,10 +327,10 @@ def _make_slots(file_type: str) -> AgentSlots:
     p = AgentSlotStatus.pending
     s = AgentSlotStatus.skip
     if file_type == "image":
-        return AgentSlots(vision=p, lore=p, classification=p, wiki=s)
+        return AgentSlots(vision=p, lore=p, classification=p, wiki=s, token=p)
     if file_type == "document":
-        return AgentSlots(vision=s, lore=s, classification=p, wiki=p)
-    return AgentSlots(vision=s, lore=s, classification=s, wiki=s)
+        return AgentSlots(vision=s, lore=s, classification=p, wiki=p, token=s)
+    return AgentSlots(vision=s, lore=s, classification=s, wiki=s, token=s)
 
 
 def _is_token_file(p: "Path") -> bool:

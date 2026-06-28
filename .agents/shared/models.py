@@ -266,6 +266,7 @@ class AgentSlots(BaseModel):
     lore:           AgentSlotStatus = AgentSlotStatus.pending
     classification: AgentSlotStatus = AgentSlotStatus.pending
     wiki:           AgentSlotStatus = AgentSlotStatus.pending
+    token:          AgentSlotStatus = AgentSlotStatus.skip
 
 
 class InboxQueueEntry(BaseModel):

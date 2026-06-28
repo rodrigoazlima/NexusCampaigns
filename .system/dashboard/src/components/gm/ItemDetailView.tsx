@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft, CheckCircle, Archive, XCircle, Flag,
-  Loader2, CircleDot, ZoomIn, Upload, RefreshCw, ImagePlus
+  Loader2, CircleDot, ZoomIn, Upload, RefreshCw, ImagePlus, FileText, ChevronRight
 } from 'lucide-react'
 import type { ItemDetail } from '@/lib/types'
 import QualityBar from '@/components/widgets/QualityBar'
@@ -332,38 +332,15 @@ export default function ItemDetailView({ item: initial }: Props) {
             <button
               className="relative w-full aspect-video overflow-hidden rounded-xl bg-surface-3 border border-surface-3 hover:border-primary/30 transition-all cursor-zoom-in group"
               onClick={() => {
-                setModalSrc(tokenSrc ?? imageSrc)
+                setModalSrc(imageSrc ?? tokenSrc)
                 setModalOpen(true)
               }}
               title="Click to enlarge"
             >
-              {/* Background: original image blurred */}
-              {imageSrc && (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img
-                  src={imageSrc}
-                  alt=""
-                  aria-hidden="true"
-                  className="absolute inset-0 w-full h-full object-cover scale-110 blur-md brightness-40 saturate-75"
-                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-                />
-              )}
-              {/* Gradient overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-black/30 z-10" />
-
-              {/* Foreground: token or original */}
-              {tokenSrc ? (
-                <div className="absolute inset-0 flex items-center justify-center z-20 p-6">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={tokenSrc}
-                    alt={item.id}
-                    className="max-h-full max-w-[60%] object-contain drop-shadow-[0_8px_32px_rgba(0,0,0,0.9)] transition-transform group-hover:scale-105"
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-                  />
-                </div>
-              ) : imageSrc ? (
-                <div className="absolute inset-0 flex items-center justify-center z-20 p-4">
+              {/* Item view shows the MAIN image clear — never blurred.
+                  The token has its own dedicated panel below. */}
+              {imageSrc ? (
+                <div className="absolute inset-0 flex items-center justify-center z-10 p-4">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={imageSrc}
@@ -372,8 +349,18 @@ export default function ItemDetailView({ item: initial }: Props) {
                     onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
                   />
                 </div>
+              ) : tokenSrc ? (
+                <div className="absolute inset-0 flex items-center justify-center z-10 p-6">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={tokenSrc}
+                    alt={item.id}
+                    className="max-h-full max-w-[60%] object-contain transition-transform group-hover:scale-105"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                  />
+                </div>
               ) : (
-                <div className="absolute inset-0 flex items-center justify-center z-20 text-zinc-600 text-sm">
+                <div className="absolute inset-0 flex items-center justify-center z-10 text-zinc-600 text-sm">
                   No image
                 </div>
               )}
@@ -661,6 +648,42 @@ export default function ItemDetailView({ item: initial }: Props) {
         <div className="panel p-4 mt-4">
           <div className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 mb-2">Content Preview</div>
           <p className="text-xs text-zinc-400 leading-relaxed">{item.excerpt}</p>
+        </div>
+      )}
+
+      {/* Linked drafts — other md files generated from the same source image */}
+      {item.history.length > 0 && (
+        <div className="panel p-4 mt-4">
+          <div className="flex items-center gap-2 mb-3">
+            <FileText size={13} className="text-zinc-500" />
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+              Linked Drafts · same source
+            </span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-surface-3 text-zinc-500 font-mono">
+              {item.history.length}
+            </span>
+          </div>
+          <div className="space-y-1.5">
+            {item.history.map((h) => (
+              <Link
+                key={h.id}
+                href={`/gm/view/${h.id}`}
+                className="flex items-center gap-3 px-3 py-2 rounded-lg bg-surface-3 border border-surface-3 hover:border-primary/30 transition-colors group"
+              >
+                <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold uppercase ${TYPE_COLORS[h.type] ?? 'bg-zinc-700 text-zinc-400'}`}>
+                  {h.type}
+                </span>
+                <span className="font-mono text-xs text-zinc-300 truncate flex-1">{h.id}</span>
+                {h.reviewed && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-semibold uppercase">reviewed</span>
+                )}
+                {h.quality > 0 && (
+                  <span className="text-[10px] text-zinc-500 font-mono">q{h.quality}</span>
+                )}
+                <ChevronRight size={14} className="text-zinc-600 group-hover:text-primary transition-colors" />
+              </Link>
+            ))}
+          </div>
         </div>
       )}
 

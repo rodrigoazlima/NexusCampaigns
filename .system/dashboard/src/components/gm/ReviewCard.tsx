@@ -188,6 +188,14 @@ export default function ReviewCard({ item, onApprove, onReject, onReprocess }: R
                 reviewed
               </span>
             )}
+            {item.history.length > 0 && (
+              <span
+                className="text-[10px] px-1.5 py-0.5 rounded bg-surface-3 text-zinc-400 font-mono"
+                title={`Shares source with: ${item.history.map((h) => h.id).join(', ')}`}
+              >
+                +{item.history.length} draft{item.history.length > 1 ? 's' : ''}
+              </span>
+            )}
           </div>
 
           {/* Quality */}

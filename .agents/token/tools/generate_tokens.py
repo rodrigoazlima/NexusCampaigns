@@ -3,6 +3,11 @@
 Generates 512×512 circular portrait tokens from classified character images.
 Face detection: MediaPipe → OpenCV Haar → upper-center crop fallback.
 No LLM. Batch: 10 per run.
+
+New logic (2026-06):
+  - Purges stale generated-tokens.json entries where tokenPath no longer exists
+  - Skips source images whose stem ends in -token or contains .token (defense-in-depth)
+  - Updates inbox-queue.json token slot: done after generation, skip for ineligible types
 """
 
 from __future__ import annotations
@@ -36,6 +41,7 @@ _MASTER_LOG   = _AGENTS_DIR / "runtime" / "state" / "logs" / "automation.log"
 _VISION_STATE = _AGENTS_DIR / "vision" / "state" / "processed-images.json"
 _GEN_TOKENS   = _AGENT_STATE / "generated-tokens.json"
 _CONFIG_FILE  = _AGENT_STATE / "10-generate-tokens.json"
+_QUEUE_FILE   = _PROJECT_ROOT / ".system" / "state" / "inbox-queue.json"
 
 _DEFAULT_CFG: dict[str, Any] = {
     "size":           512,
@@ -49,6 +55,12 @@ _DEFAULT_CFG: dict[str, Any] = {
 _SKIP_TYPES = frozenset({"battlemap", "scene"})
 
 _MODULE_FILE = Path(__file__)
+
+
+def _is_token_stem(p: Path) -> bool:
+    """Return True if path looks like a generated token file (defense-in-depth guard)."""
+    stem = p.stem
+    return stem.endswith("-token") or ".token" in stem
 
 
 def _make_logger() -> Logger:
@@ -85,6 +97,47 @@ def _save_gen_tokens(data: dict) -> None:
     tmp = _GEN_TOKENS.with_suffix(".tmp")
     tmp.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
     tmp.replace(_GEN_TOKENS)
+
+
+def _purge_stale_gen_tokens(log: Logger) -> int:
+    """Remove generated-tokens.json entries whose tokenPath no longer exists on disk."""
+    gen = _load_gen_tokens()
+    stale = [k for k, v in gen.items() if not (_PROJECT_ROOT / v["tokenPath"]).exists()]
+    if stale:
+        for k in stale:
+            log.info(f"Purging stale token entry: {gen[k]['tokenPath']}")
+            del gen[k]
+        _save_gen_tokens(gen)
+    return len(stale)
+
+
+def _load_queue() -> dict[str, Any]:
+    if not _QUEUE_FILE.exists():
+        return {}
+    return json.loads(_QUEUE_FILE.read_text(encoding="utf-8"))
+
+
+def _save_queue(queue: dict[str, Any]) -> None:
+    tmp = _QUEUE_FILE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(queue, indent=2, default=str), encoding="utf-8")
+    tmp.replace(_QUEUE_FILE)
+
+
+def _set_queue_token_slot(source_rel: str, status: str, log: Logger) -> bool:
+    """Set agents.token slot for source_rel path in inbox-queue.json. Returns True if updated."""
+    queue = _load_queue()
+    if source_rel not in queue:
+        return False
+    entry = queue[source_rel]
+    agents = entry.get("agents", {})
+    if agents.get("token") == status:
+        return False
+    agents["token"] = status
+    entry["agents"] = agents
+    queue[source_rel] = entry
+    _save_queue(queue)
+    log.info(f"Queue token slot [{status}]: {source_rel.split('/')[-1]}")
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -231,17 +284,43 @@ def main() -> None:
         log.done(t0, key="generated", count=0, failed=0)
         sys.exit(1)
 
+    # 1. Purge stale entries from generated-tokens.json before processing
+    purged = _purge_stale_gen_tokens(log)
+    if purged:
+        log.info(f"Purged {purged} stale token index entries")
+
     cfg          = _load_config()
     vision_state = _load_vision_state()
     gen_tokens   = _load_gen_tokens()
 
+    all_images = vision_state.get("images", {})
+
+    # 2. Mark skip-type images in queue before processing eligible batch
+    for img_key, entry in all_images.items():
+        if entry.get("status") == "ok" and not entry.get("isToken", False):
+            if entry.get("type") in _SKIP_TYPES:
+                _set_queue_token_slot(entry["path"], "skip", log)
+
+    # 3. Reconcile queue slots for all already-generated tokens BEFORE the
+    #    eligibility short-circuit, so reconciliation runs even when there are
+    #    no new images to tokenize (handles tokens generated before slot tracking).
+    reconciled = 0
+    for entry_data in gen_tokens.values():
+        src_rel = entry_data.get("sourcePath", "")
+        if src_rel and _set_queue_token_slot(src_rel, "done", log):
+            reconciled += 1
+    if reconciled:
+        log.info(f"Reconciled {reconciled} existing token queue slots")
+
     eligible = [
         (img_key, entry)
-        for img_key, entry in vision_state.get("images", {}).items()
+        for img_key, entry in all_images.items()
         if entry.get("status") == "ok"
         if not entry.get("isToken", False)
         if entry.get("type") not in _SKIP_TYPES
         if img_key not in gen_tokens
+        # 4. Defense-in-depth: skip any source that matches the token file pattern
+        if not _is_token_stem(_PROJECT_ROOT / entry["path"])
     ]
 
     if not eligible:
@@ -255,21 +334,25 @@ def main() -> None:
     log.info(f"Batch: {len(batch)} of {len(eligible)} image(s)")
 
     for img_key, entry in batch:
-        img_path = _PROJECT_ROOT / entry["path"]
+        src_rel  = entry["path"]
+        img_path = _PROJECT_ROOT / src_rel
         if not img_path.exists():
-            log.warning(f"Source gone: {entry['path']}")
+            log.warning(f"Source gone: {src_rel}")
             failed += 1
             continue
 
         out_path = img_path.with_name(f"{img_path.stem}-token.png")
         if out_path.exists():
             log.info(f"Token already exists: {out_path.name}")
+            out_rel = out_path.relative_to(_PROJECT_ROOT).as_posix()
             gen_tokens[img_key] = {
-                "sourcePath":  entry["path"],
-                "tokenPath":   out_path.relative_to(_PROJECT_ROOT).as_posix(),
+                "sourcePath":  src_rel,
+                "tokenPath":   out_rel,
                 "generatedAt": datetime.now(timezone.utc).isoformat(),
             }
             _save_gen_tokens(gen_tokens)
+            # 5. Update queue slot — token already present
+            _set_queue_token_slot(src_rel, "done", log)
             count += 1
             continue
 
@@ -277,11 +360,13 @@ def main() -> None:
         if ok:
             out_rel = out_path.relative_to(_PROJECT_ROOT).as_posix()
             gen_tokens[img_key] = {
-                "sourcePath":  entry["path"],
+                "sourcePath":  src_rel,
                 "tokenPath":   out_rel,
                 "generatedAt": datetime.now(timezone.utc).isoformat(),
             }
             _save_gen_tokens(gen_tokens)
+            # 5. Update queue slot — token just generated
+            _set_queue_token_slot(src_rel, "done", log)
             log.info(f"Token created: {out_path.name}")
             count += 1
         else:
@@ -304,6 +389,10 @@ def run_single(image_path: str, moldura_override: str | None = None) -> int:
     if not img_path.exists():
         log.error(f"Image not found: {img_path}")
         return 1
+    # Defense-in-depth: refuse to tokenize a file that is itself a token
+    if _is_token_stem(img_path):
+        log.warning(f"Skipping token file as source: {img_path.name}")
+        return 1
     out_path = img_path.parent / (img_path.stem + "-token.png")
     ok = _make_token(img_path, out_path, cfg, log)
     if ok:
@@ -312,13 +401,16 @@ def run_single(image_path: str, moldura_override: str | None = None) -> int:
         vision_state = _load_vision_state()
         sha_key = vision_state.get("pathIndex", {}).get(rel, "")
         key = sha_key if sha_key and not sha_key.startswith("path:") else f"path:{rel}"
+        tok_rel = out_path.relative_to(_PROJECT_ROOT).as_posix()
         gen[key] = {
             "sourcePath": rel,
-            "tokenPath": out_path.relative_to(_PROJECT_ROOT).as_posix(),
+            "tokenPath": tok_rel,
             "generatedAt": datetime.now(timezone.utc).isoformat(),
         }
         _save_gen_tokens(gen)
-        print(out_path.relative_to(_PROJECT_ROOT).as_posix(), flush=True)
+        # Update queue slot for this source image
+        _set_queue_token_slot(rel, "done", log)
+        print(tok_rel, flush=True)
         return 0
     return 1
 
