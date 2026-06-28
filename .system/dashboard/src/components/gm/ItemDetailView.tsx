@@ -253,14 +253,13 @@ export default function ItemDetailView({ item: initial }: Props) {
       const res = await fetch('/api/gm/token/upload-base', { method: 'POST', body: form })
       const data = await res.json()
       if (data.ok) {
-        showToast('Token generated from uploaded base', 'success')
-        setItem((i) => ({ ...i, tokenPath: data.tokenPath }))
+        router.push(`/gm/view/${item.id}/token`)
       } else {
         showToast(data.error ?? 'Upload failed', 'error')
+        setUploadingBase(false)
       }
     } catch (err) {
       showToast(String(err), 'error')
-    } finally {
       setUploadingBase(false)
     }
   }
@@ -435,11 +434,11 @@ export default function ItemDetailView({ item: initial }: Props) {
               <div className="relative flex-shrink-0">
                 {tokenSrc ? (
                   <button
-                    className="w-20 h-20 rounded-full overflow-hidden border-2 border-primary/30 hover:border-primary/60 transition-colors shadow-lg"
+                    className="w-20 h-20 flex items-center justify-center hover:opacity-80 transition-opacity"
                     onClick={() => { setModalSrc(tokenSrc); setModalOpen(true) }}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={tokenSrc} alt="token" className="w-full h-full object-cover" />
+                    <img src={tokenSrc} alt="token" className="w-full h-full object-contain" />
                   </button>
                 ) : (
                   <div className="w-20 h-20 rounded-full border-2 border-dashed border-surface-3 flex items-center justify-center bg-surface-3">
@@ -648,11 +647,6 @@ export default function ItemDetailView({ item: initial }: Props) {
         </div>
       </div>
 
-      {/* Chat panel */}
-      {item.activeAgents.length > 0 && (
-        <ItemChatPanel item={item} agents={item.activeAgents} />
-      )}
-
       {/* Excerpt */}
       {item.excerpt && (
         <div className="panel p-4 mt-4">
@@ -696,6 +690,9 @@ export default function ItemDetailView({ item: initial }: Props) {
           </div>
         </div>
       )}
+
+      {/* Chat panel — always at the bottom */}
+      <ItemChatPanel item={item} agents={item.activeAgents} />
 
       {/* Image modal */}
       {(modalSrc ?? imageSrc) && (

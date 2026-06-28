@@ -36,6 +36,10 @@ export default function TokenEditorCanvas({ item, imageSrc, tokenSrc }: Props) {
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null)
   const [savedTokenUrl, setSavedTokenUrl] = useState<string | null>(null)
 
+  // Auto-save refs
+  const saveTokenRef = useRef<() => Promise<void>>(async () => {})
+  const initDone = useRef(false)
+
   // Load frames
   useEffect(() => {
     fetch('/api/gm/token/frames')
@@ -211,7 +215,7 @@ export default function TokenEditorCanvas({ item, imageSrc, tokenSrc }: Props) {
   }
 
   // Save token
-  async function saveToken() {
+  const saveToken = useCallback(async () => {
     const canvas = canvasRef.current
     if (!canvas) return
     setSaving(true); setMsg(null)
@@ -225,13 +229,29 @@ export default function TokenEditorCanvas({ item, imageSrc, tokenSrc }: Props) {
       if (!r.ok) throw new Error(await r.text())
       const data = await r.json() as { ok: boolean; tokenUrl: string }
       setSavedTokenUrl(data.tokenUrl + '&t=' + Date.now())
-      setMsg({ text: 'Token saved', ok: true })
+      setMsg({ text: 'Auto-saved', ok: true })
     } catch (err) {
       setMsg({ text: String(err), ok: false })
     } finally {
       setSaving(false)
     }
-  }
+  }, [item.filename])
+
+  // Keep ref current so auto-save timer always calls the latest version
+  useEffect(() => { saveTokenRef.current = saveToken }, [saveToken])
+
+  // Mark init done 200ms after src+frames are ready, then auto-save on any change
+  useEffect(() => {
+    if (!srcLoaded || !frames.length) return
+    const id = setTimeout(() => { initDone.current = true }, 200)
+    return () => clearTimeout(id)
+  }, [srcLoaded, frames.length])
+
+  useEffect(() => {
+    if (!initDone.current) return
+    const id = setTimeout(() => saveTokenRef.current(), 1500)
+    return () => clearTimeout(id)
+  }, [offset.x, offset.y, zoom, frameIdx])
 
   function resetView() {
     setOffset({ x: 0, y: 0 })
@@ -280,7 +300,7 @@ export default function TokenEditorCanvas({ item, imageSrc, tokenSrc }: Props) {
               : 'opacity-40 cursor-not-allowed border-surface-3 bg-surface-2 text-zinc-500'
           }`}
         >
-          {saving ? '…' : '💾 Save Token'}
+          {saving ? '…' : '💾 Save'}
         </button>
       </div>
 
