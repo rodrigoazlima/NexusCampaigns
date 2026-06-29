@@ -642,6 +642,22 @@ Get-Process powershell, pwsh, python -ErrorAction SilentlyContinue |
     Where-Object { $_.CommandLine -like "*daemon.ps1*" -or $_.CommandLine -like "*runner.py*" } |
     ForEach-Object { Log "  Stopping process PID=$($_.Id)"; Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }
 
+# Free the dashboard port. A stale process squatting $DashboardPort (e.g. a manual
+# `next start` from a prior session, NOT a managed service) survives service removal
+# above and makes the new NSSM service hit EADDRINUSE → stuck PAUSED, while the dead
+# process keeps serving an old .next whose chunk hashes no longer match → ChunkLoadError
+# 500 in the browser. Kill whatever still holds the port before (re)installing.
+if (-not $NoDashboard) {
+    $portHold = Get-NetTCPConnection -State Listen -LocalPort $DashboardPort -ErrorAction SilentlyContinue
+    if ($portHold) {
+        $portHold.OwningProcess | Sort-Object -Unique | ForEach-Object {
+            $hp = Get-Process -Id $_ -ErrorAction SilentlyContinue
+            Log "  Freeing port ${DashboardPort}: stopping PID=$_ ($($hp.Name))"
+            Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 # ---------------------------------------------------------------------------
 # Pre-flight checks
 # ---------------------------------------------------------------------------
