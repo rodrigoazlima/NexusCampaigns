@@ -1,11 +1,13 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import {
   ArrowLeft, CheckCircle, Archive, XCircle, Flag,
-  Loader2, CircleDot, ZoomIn, Upload, RefreshCw, ImagePlus, FileText, ChevronRight, Pencil
+  Loader2, Maximize2, Upload, RefreshCw, ImagePlus, FileText, ChevronRight,
+  Pencil, Check, X, Sparkles, ChevronDown, Save
 } from 'lucide-react'
 import type { ItemDetail } from '@/lib/types'
 import QualityBar from '@/components/widgets/QualityBar'
@@ -14,6 +16,51 @@ import ImageModal from './ImageModal'
 import TagEditor from './TagEditor'
 import RelationshipEditor from './RelationshipEditor'
 import ItemChatPanel from './ItemChatPanel'
+import { Tip } from './Tip'
+
+import '@uiw/react-md-editor/markdown-editor.css'
+import '@uiw/react-markdown-preview/markdown.css'
+
+const MDEditor = dynamic(() => import('@uiw/react-md-editor'), { ssr: false })
+
+// Split a vault md file into its YAML frontmatter block and the body below it.
+// Tolerant of CRLF — vault files are written on Windows.
+function splitFrontmatter(raw: string): { fm: string; body: string } {
+  const m = raw.match(/^(---\r?\n[\s\S]*?\r?\n---\r?\n?)([\s\S]*)$/)
+  return m ? { fm: m[1], body: m[2] } : { fm: '', body: raw }
+}
+
+// Smart icon action button with tooltip + color variant
+function ActionBtn({
+  onClick, disabled, label, side = 'bottom', children, variant = 'ghost', busy = false,
+}: {
+  onClick?: () => void
+  disabled?: boolean
+  label: string
+  side?: 'top' | 'bottom' | 'left' | 'right'
+  children: ReactNode
+  variant?: 'ghost' | 'success' | 'danger' | 'warning' | 'primary'
+  busy?: boolean
+}) {
+  const v = {
+    ghost:   'border-surface-3 bg-surface-2 text-zinc-400 hover:border-zinc-600 hover:text-zinc-100',
+    success: 'border-success/40 bg-success/10 text-success hover:bg-success/20',
+    danger:  'border-danger/40 bg-danger/10 text-danger hover:bg-danger/20',
+    warning: 'border-warning/40 bg-warning/10 text-warning hover:bg-warning/20',
+    primary: 'border-primary/40 bg-primary/10 text-primary hover:bg-primary/20',
+  }[variant]
+  return (
+    <Tip label={label} side={side}>
+      <button
+        onClick={onClick}
+        disabled={disabled}
+        className={`inline-flex items-center justify-center w-8 h-8 rounded-lg border transition-all ${v} ${disabled ? 'opacity-30 !cursor-not-allowed' : 'cursor-pointer'}`}
+      >
+        {busy ? <Loader2 size={14} className="animate-spin" /> : children}
+      </button>
+    </Tip>
+  )
+}
 
 const ENTITY_TYPES = [
   'npc','character','faction','location','city','village','dungeon',
@@ -34,6 +81,39 @@ const TYPE_COLORS: Record<string, string> = {
   lore: 'bg-teal-500/10 text-teal-400',
 }
 
+const STATUS_COLORS: Record<string, string> = {
+  approved: 'bg-success/10 text-success',
+  rejected: 'bg-danger/10 text-danger',
+  archived: 'bg-zinc-700 text-zinc-500',
+  review: 'bg-warning/10 text-warning',
+  draft: 'bg-zinc-700 text-zinc-400',
+}
+
+// Native select styled as an inline colored badge
+function BadgeSelect({
+  value, options, onChange, colorClass,
+}: {
+  value: string
+  options: string[]
+  onChange: (v: string) => void
+  colorClass: string
+}) {
+  return (
+    <div className={`relative inline-flex items-center rounded ${colorClass}`}>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="appearance-none bg-transparent text-[10px] font-semibold uppercase tracking-wide pl-1.5 pr-5 py-0.5 outline-none cursor-pointer"
+      >
+        {options.map((o) => (
+          <option key={o} value={o} className="bg-surface-2 text-zinc-200 normal-case">{o}</option>
+        ))}
+      </select>
+      <ChevronDown size={11} className="absolute right-1 pointer-events-none opacity-60" />
+    </div>
+  )
+}
+
 interface Toast { message: string; type: 'success' | 'error' }
 
 interface Props { item: ItemDetail }
@@ -49,14 +129,24 @@ export default function ItemDetailView({ item: initial }: Props) {
   const [modalOpen, setModalOpen] = useState(false)
   const [modalSrc, setModalSrc] = useState<string | null>(null)
   const [renameInput, setRenameInput] = useState(item.id)
+  const [editingName, setEditingName] = useState(false)
   const [showApproveQuality, setShowApproveQuality] = useState(false)
   const [approveQuality, setApproveQuality] = useState<number | null>(item.quality || null)
   const [mdContent, setMdContent] = useState<string | null>(null)
+  const [body, setBody] = useState('')
+  const [bodyDirty, setBodyDirty] = useState(false)
+  const [savingContent, setSavingContent] = useState(false)
 
   useEffect(() => {
     fetch(`/api/gm/content?filename=${encodeURIComponent(item.filename)}`)
       .then((r) => r.json())
-      .then((d) => { if (d.content) setMdContent(d.content) })
+      .then((d) => {
+        if (d.content) {
+          setMdContent(d.content)
+          setBody(splitFrontmatter(d.content).body)
+          setBodyDirty(false)
+        }
+      })
       .catch(() => {})
   }, [item.filename])
 
@@ -272,121 +362,250 @@ export default function ItemDetailView({ item: initial }: Props) {
     }
   }
 
-  const typeBadgeClass = TYPE_COLORS[item.type] ?? 'bg-zinc-700 text-zinc-400'
-  const statusBadgeClass =
-    item.status === 'approved' ? 'bg-success/10 text-success' :
-    item.status === 'rejected' ? 'bg-danger/10 text-danger' :
-    item.status === 'archived' ? 'bg-zinc-700 text-zinc-500' :
-    'bg-zinc-700 text-zinc-400'
+  // Save the edited body. Re-fetch the file first so frontmatter edited via the
+  // rail (type/status/quality/tags) isn't clobbered by a stale copy.
+  const handleSaveContent = async () => {
+    setSavingContent(true)
+    try {
+      const fresh = await fetch(`/api/gm/content?filename=${encodeURIComponent(item.filename)}`).then((r) => r.json())
+      const fm = splitFrontmatter(fresh.content ?? mdContent ?? '').fm
+      const newRaw = fm + body
+      const res = await fetch('/api/gm/content', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: item.filename, content: newRaw }),
+      })
+      const data = await res.json()
+      if (!data.ok) throw new Error(data.error ?? 'Save failed')
+      setMdContent(newRaw)
+      setBodyDirty(false)
+      showToast('Content saved', 'success')
+    } catch (err) {
+      showToast(String(err), 'error')
+    } finally {
+      setSavingContent(false)
+    }
+  }
+
+  const canToken = item.tokenEligible || !!tokenSrc
 
   return (
-    <div className="min-h-screen p-4 md:p-6">
+    <div className="min-h-screen flex flex-col">
       {/* Toast */}
       {toast && (
-        <div className={`fixed top-4 right-4 z-50 px-4 py-2 rounded-lg text-sm font-medium shadow-lg ${
-          toast.type === 'success' ? 'bg-success text-white' : 'bg-danger text-white'
+        <div className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 rounded-full border shadow-2xl backdrop-blur-sm text-sm font-medium ${
+          toast.type === 'success'
+            ? 'bg-success/10 border-success/40 text-success'
+            : 'bg-danger/10 border-danger/40 text-danger'
         }`}>
+          {toast.type === 'success' ? <Check size={14} /> : <X size={14} />}
           {toast.message}
         </div>
       )}
 
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-xs text-zinc-500 mb-4">
-        <Link href="/gm" className="hover:text-zinc-300 transition-colors">GM Hub</Link>
-        <span>/</span>
-        <Link href="/gm/review" className="hover:text-zinc-300 transition-colors">Review Queue</Link>
-        <span>/</span>
-        <span className="text-zinc-300 font-mono">{item.id}</span>
-      </div>
-
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-6 flex-wrap">
+      {/* ── Sticky header ── */}
+      <header className="sticky top-0 z-30 bg-surface-1/95 backdrop-blur border-b border-surface-3 px-4 md:px-6 py-2.5 flex items-center gap-2 flex-wrap">
         <Link
           href="/gm/review"
-          className="flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+          className="flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-300 transition-colors shrink-0"
         >
-          <ArrowLeft size={14} />
-          Back
+          <ArrowLeft size={14} /> back
         </Link>
-        <h1 className="font-mono text-lg font-semibold text-zinc-100">{item.id}</h1>
-        <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold uppercase ${typeBadgeClass}`}>
-          {item.type}
-        </span>
-        <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold uppercase ${statusBadgeClass}`}>
-          {item.status}
-        </span>
+        <span className="text-surface-4">/</span>
+
+        {/* id + inline rename */}
+        {editingName ? (
+          <div className="flex items-center gap-1">
+            <input
+              autoFocus
+              value={renameInput}
+              onChange={(e) => setRenameInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleRename()
+                if (e.key === 'Escape') { setEditingName(false); setRenameInput(item.id) }
+              }}
+              className="bg-surface-3 border border-primary/40 text-zinc-100 text-sm rounded px-2 py-1 outline-none font-mono w-56"
+              placeholder="new-slug"
+            />
+            <ActionBtn
+              label="Confirm rename" variant="success" busy={loading}
+              disabled={loading || !renameInput.trim() || renameInput.trim() === item.id}
+              onClick={handleRename}
+            ><Check size={14} /></ActionBtn>
+            <ActionBtn
+              label="Cancel" variant="ghost"
+              onClick={() => { setEditingName(false); setRenameInput(item.id) }}
+            ><X size={14} /></ActionBtn>
+          </div>
+        ) : (
+          <button
+            onClick={() => { setRenameInput(item.id); setEditingName(true) }}
+            className="group flex items-center gap-1.5 font-mono text-sm font-semibold text-zinc-100 hover:text-white transition-colors"
+            title="Rename"
+          >
+            {item.id}
+            <Pencil size={12} className="opacity-0 group-hover:opacity-60 transition-opacity" />
+          </button>
+        )}
+
+        {/* type / status as inline editable badges */}
+        <BadgeSelect
+          value={item.type}
+          options={ENTITY_TYPES}
+          onChange={handleTypeChange}
+          colorClass={TYPE_COLORS[item.type] ?? 'bg-zinc-700 text-zinc-400'}
+        />
+        <BadgeSelect
+          value={item.status}
+          options={ENTITY_STATUSES}
+          onChange={handleStatusChange}
+          colorClass={STATUS_COLORS[item.status] ?? 'bg-zinc-700 text-zinc-400'}
+        />
         {item.reviewed && (
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-semibold uppercase">
             reviewed
           </span>
         )}
-      </div>
 
-      {/* Two-column layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
-        {/* LEFT: Media */}
+        <div className="flex-1" />
+
+        {/* quality chip */}
+        {item.quality > 0 && (
+          <Tip label={`Quality ${item.quality}/10`} side="bottom">
+            <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-surface-3 text-zinc-300">
+              Q{item.quality}
+            </span>
+          </Tip>
+        )}
+
+        {/* action buttons */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            onClick={handlePromote}
+            disabled={loading || (showApproveQuality && approveQuality === null)}
+            className="flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-lg bg-success/10 text-success border border-success/40 hover:bg-success/20 transition-colors disabled:opacity-40"
+          >
+            {loading ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
+            {showApproveQuality ? (approveQuality !== null ? `Promote (${approveQuality})` : 'Pick score') : 'Promote'}
+          </button>
+          {showApproveQuality && (
+            <ActionBtn
+              label="Cancel promote" variant="ghost"
+              onClick={() => { setShowApproveQuality(false); setApproveQuality(item.quality || null) }}
+            ><X size={14} /></ActionBtn>
+          )}
+          <ActionBtn label="Flag for reprocessing" variant="warning" disabled={loading} onClick={handleFlag}>
+            <Flag size={14} />
+          </ActionBtn>
+          <ActionBtn label="Archive to 99-Archive" variant="ghost" disabled={loading} onClick={handleArchive}>
+            <Archive size={14} />
+          </ActionBtn>
+          <ActionBtn label="Reject (quality → 1)" variant="danger" disabled={loading} onClick={handleReject}>
+            <XCircle size={14} />
+          </ActionBtn>
+        </div>
+      </header>
+
+      {/* promote quality picker drops below header */}
+      {showApproveQuality && (
+        <div className="bg-surface-1 border-b border-surface-3 px-4 md:px-6 py-3 flex items-center gap-3">
+          <span className="text-[11px] text-zinc-500 uppercase tracking-wide shrink-0">Quality to promote</span>
+          <QualityPicker value={approveQuality} onChange={setApproveQuality} />
+        </div>
+      )}
+
+      {/* ── Body ── */}
+      <div className="flex-1 p-4 md:p-6 grid grid-cols-1 lg:grid-cols-5 gap-6">
+
+        {/* LEFT: integrated media */}
         <div className="lg:col-span-3 space-y-4">
-          {/* Composite hero: original bg + token overlay */}
-          <div className="panel p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Preview</div>
-              {tokenSrc && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-semibold uppercase tracking-wide">
-                  token ready
-                </span>
+
+          {/* Hero — source image with token integrated */}
+          <div className="relative group rounded-2xl overflow-hidden bg-surface-2 border border-surface-3 flex items-center justify-center" style={{ minHeight: 380 }}>
+            {imageSrc ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={imageSrc}
+                alt={item.id}
+                className="max-h-[60vh] w-full object-contain cursor-zoom-in"
+                onClick={() => { setModalSrc(imageSrc); setModalOpen(true) }}
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+              />
+            ) : tokenSrc ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={tokenSrc} alt={item.id}
+                className="max-h-[50vh] max-w-[60%] object-contain cursor-zoom-in"
+                onClick={() => { setModalSrc(tokenSrc); setModalOpen(true) }}
+              />
+            ) : (
+              <div className="text-zinc-600 text-sm py-20">No image</div>
+            )}
+
+            {/* hover toolbar */}
+            <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+              {imageSrc && (
+                <ActionBtn label="Enlarge" variant="ghost" side="left"
+                  onClick={() => { setModalSrc(imageSrc); setModalOpen(true) }}
+                ><Maximize2 size={14} /></ActionBtn>
+              )}
+              {item.source[0] && (
+                <label className="inline-flex">
+                  <input
+                    type="file"
+                    accept="image/*,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tiff,.tif,.avif,.heic,.heif,.jfif"
+                    className="hidden"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) handleReplaceImage(f); e.target.value = '' }}
+                    disabled={uploadingImage}
+                  />
+                  <Tip label="Replace source image" side="left">
+                    <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-surface-3 bg-surface-2/90 text-zinc-400 hover:border-zinc-600 hover:text-zinc-100 cursor-pointer transition-all">
+                      {uploadingImage ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                    </span>
+                  </Tip>
+                </label>
               )}
             </div>
-            <button
-              className="relative w-full aspect-video overflow-hidden rounded-xl bg-surface-3 border border-surface-3 hover:border-primary/30 transition-all cursor-zoom-in group"
-              onClick={() => {
-                setModalSrc(imageSrc ?? tokenSrc)
-                setModalOpen(true)
-              }}
-              title="Click to enlarge"
-            >
-              {/* Item view shows the MAIN image clear — never blurred.
-                  The token has its own dedicated panel below. */}
-              {imageSrc ? (
-                <div className="absolute inset-0 flex items-center justify-center z-10 p-4">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={imageSrc}
-                    alt={item.id}
-                    className="max-h-full max-w-full object-contain rounded-lg transition-transform group-hover:scale-[1.02]"
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-                  />
-                </div>
-              ) : tokenSrc ? (
-                <div className="absolute inset-0 flex items-center justify-center z-10 p-6">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={tokenSrc}
-                    alt={item.id}
-                    className="max-h-full max-w-[60%] object-contain transition-transform group-hover:scale-105"
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-                  />
-                </div>
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center z-10 text-zinc-600 text-sm">
-                  No image
-                </div>
-              )}
 
-              {/* Zoom hint */}
-              <div className="absolute top-2 right-2 z-30 p-1.5 bg-black/50 rounded text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm">
-                <ZoomIn size={14} />
+            {/* integrated token companion (bottom-right) */}
+            {item.source[0] && (
+              <div className="absolute bottom-3 right-3 z-20">
+                {tokenSrc ? (
+                  <Link
+                    href={`/gm/view/${item.id}/token`}
+                    className="relative block w-24 h-24 rounded-full overflow-hidden border-2 border-zinc-700/70 shadow-2xl hover:border-primary/60 hover:scale-105 transition-all group/token bg-surface"
+                    title="Open token editor"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={tokenSrc} alt="token" className="w-full h-full object-contain" />
+                    <span className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover/token:opacity-100 transition-opacity">
+                      <Pencil size={16} className="text-white" />
+                    </span>
+                  </Link>
+                ) : canToken ? (
+                  <Tip label="Generate token" side="left">
+                    <button
+                      onClick={handleGenerateToken}
+                      disabled={generating}
+                      className="w-24 h-24 rounded-full border-2 border-dashed border-surface-4 flex flex-col items-center justify-center bg-surface/80 backdrop-blur text-zinc-500 hover:text-primary hover:border-primary/50 transition-all disabled:opacity-50"
+                    >
+                      {generating ? <Loader2 size={20} className="animate-spin" /> : <Sparkles size={20} />}
+                      <span className="text-[9px] mt-1 uppercase tracking-wide">token</span>
+                    </button>
+                  </Tip>
+                ) : null}
               </div>
-            </button>
+            )}
 
-            {/* Classification pills */}
+            {/* classification pills (bottom-left) */}
             {item.imageClassification && (
-              <div className="mt-3 flex flex-wrap gap-1">
+              <div className="absolute bottom-3 left-3 flex flex-wrap gap-1 max-w-[60%] opacity-0 group-hover:opacity-100 transition-opacity">
                 {(['type','ancestry','char_class','element','environment'] as const).map((field) => {
                   const cls = item.imageClassification!
                   const val = cls[field as keyof typeof cls] as string | undefined
                   if (!val || val === 'none') return null
                   return (
-                    <span key={field} className="text-[10px] px-1.5 py-0.5 rounded bg-surface-3 text-zinc-500 font-mono">
+                    <span key={field} className="text-[10px] px-1.5 py-0.5 rounded bg-black/60 backdrop-blur text-zinc-300 font-mono">
                       {field}: {val}
                     </span>
                   )
@@ -395,314 +614,155 @@ export default function ItemDetailView({ item: initial }: Props) {
             )}
           </div>
 
-          {/* Source image controls */}
-          <div className="panel p-4">
-            <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-3">Source Image</div>
-            {item.source.length > 0 ? (
-              <>
-                <div className="text-[10px] text-zinc-600 font-mono truncate mb-3" title={item.source[0]}>
-                  {item.source[0]}
-                </div>
-                <label className="flex items-center gap-2 cursor-pointer w-fit">
-                  <input
-                    type="file"
-                    accept="image/*,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tiff,.tif,.avif,.heic,.heif,.jfif"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0]
-                      if (f) handleReplaceImage(f)
-                      e.target.value = ''
-                    }}
-                    disabled={uploadingImage}
-                  />
-                  <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded bg-surface-3 text-zinc-400 border border-surface-3 hover:border-zinc-600 hover:text-zinc-200 transition-colors cursor-pointer disabled:opacity-50">
-                    {uploadingImage ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
-                    Replace Image
-                  </span>
-                </label>
-              </>
-            ) : (
-              <div className="text-xs text-zinc-600 italic">No source image linked</div>
+          {/* Token toolbar */}
+          <div className="panel p-3 flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 mr-1">Token</span>
+            {canToken && (
+              <button
+                onClick={handleGenerateToken}
+                disabled={generating || !item.source[0]}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20 transition-colors disabled:opacity-50"
+              >
+                {generating ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+                {tokenSrc ? 'Regenerate' : 'Generate'}
+              </button>
             )}
-          </div>
-
-          {/* Token controls */}
-          <div className="panel p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Token</div>
-              {item.tokenPath && (
-                <div className="text-[10px] text-zinc-600 font-mono truncate max-w-[60%]" title={item.tokenPath}>
-                  {item.tokenPath.split('/').pop()}
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center gap-4">
-              {/* Token preview circle */}
-              <div className="relative flex-shrink-0">
-                {tokenSrc ? (
-                  <button
-                    className="w-20 h-20 flex items-center justify-center hover:opacity-80 transition-opacity"
-                    onClick={() => { setModalSrc(tokenSrc); setModalOpen(true) }}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={tokenSrc} alt="token" className="w-full h-full object-contain" />
-                  </button>
-                ) : (
-                  <div className="w-20 h-20 rounded-full border-2 border-dashed border-surface-3 flex items-center justify-center bg-surface-3">
-                    <CircleDot size={20} className="text-zinc-600" />
-                  </div>
-                )}
-              </div>
-
-              {/* Token action buttons */}
-              <div className="flex flex-wrap gap-2">
-                {(item.tokenEligible || tokenSrc) && (
-                  <button
-                    onClick={handleGenerateToken}
-                    disabled={generating || !item.source[0]}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20 transition-colors disabled:opacity-50"
-                  >
-                    {generating ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
-                    {tokenSrc ? 'Regenerate' : 'Generate Token'}
-                  </button>
-                )}
-
-                {/* Upload custom base image */}
-                {item.source[0] && (
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="file"
-                      accept="image/*,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tiff,.tif,.avif,.heic,.heif,.jfif"
-                      className="hidden"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0]
-                        if (f) handleUploadTokenBase(f)
-                        e.target.value = ''
-                      }}
-                      disabled={uploadingBase}
-                    />
-                    <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded bg-surface-3 text-zinc-400 border border-surface-3 hover:border-zinc-600 hover:text-zinc-200 transition-colors cursor-pointer">
-                      {uploadingBase ? <Loader2 size={13} className="animate-spin" /> : <ImagePlus size={13} />}
-                      Upload Base Image
-                    </span>
-                  </label>
-                )}
-
-                {item.source[0] && (
-                  <Link
-                    href={`/gm/view/${item.id}/token`}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded bg-surface-3 text-zinc-400 border border-surface-3 hover:border-zinc-600 hover:text-zinc-200 transition-colors"
-                  >
-                    <Pencil size={13} />
-                    Edit Token
-                  </Link>
-                )}
-
-                {!item.tokenEligible && !tokenSrc && (
-                  <div className="text-xs text-zinc-600 italic self-center">
-                    Tokens for portrait/body types
-                    {item.imageClassification && ` · this: ${item.imageClassification.type}`}
-                  </div>
-                )}
-              </div>
-            </div>
+            {item.source[0] && (
+              <Link
+                href={`/gm/view/${item.id}/token`}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-surface-3 text-zinc-300 border border-surface-3 hover:border-zinc-600 hover:text-white transition-colors"
+              >
+                <Pencil size={13} /> Edit
+              </Link>
+            )}
+            {item.source[0] && (
+              <label className="inline-flex">
+                <input
+                  type="file"
+                  accept="image/*,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tiff,.tif,.avif,.heic,.heif,.jfif"
+                  className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUploadTokenBase(f); e.target.value = '' }}
+                  disabled={uploadingBase}
+                />
+                <Tip label="Upload custom base image for the token">
+                  <span className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-surface-3 text-zinc-300 border border-surface-3 hover:border-zinc-600 hover:text-white transition-colors cursor-pointer">
+                    {uploadingBase ? <Loader2 size={13} className="animate-spin" /> : <ImagePlus size={13} />}
+                    Base
+                  </span>
+                </Tip>
+              </label>
+            )}
+            {!canToken && (
+              <span className="text-xs text-zinc-600 italic">
+                Portrait/body types only
+                {item.imageClassification && ` · this: ${item.imageClassification.type}`}
+              </span>
+            )}
+            {item.source[0] && (
+              <span className="ml-auto text-[10px] text-zinc-600 font-mono truncate max-w-[200px]" title={item.source[0]}>
+                {item.source[0].split('/').pop()}
+              </span>
+            )}
           </div>
         </div>
 
-        {/* RIGHT: Metadata + Actions */}
+        {/* RIGHT: metadata rail */}
         <div className="lg:col-span-2 space-y-4">
           <div className="panel p-4 space-y-4">
-            {/* Type */}
-            <div>
-              <label className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 block mb-1">Type</label>
-              <select
-                value={item.type}
-                onChange={(e) => handleTypeChange(e.target.value)}
-                className="w-full bg-surface-3 border border-surface-3 focus:border-primary/40 text-zinc-200 text-xs rounded px-2 py-1.5 outline-none transition-colors"
-              >
-                {ENTITY_TYPES.map((t) => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Status */}
-            <div>
-              <label className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 block mb-1">Status</label>
-              <select
-                value={item.status}
-                onChange={(e) => handleStatusChange(e.target.value)}
-                className="w-full bg-surface-3 border border-surface-3 focus:border-primary/40 text-zinc-200 text-xs rounded px-2 py-1.5 outline-none transition-colors"
-              >
-                {ENTITY_STATUSES.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Quality */}
             <div>
               <label className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 block mb-2">Quality</label>
-              <div className="mb-2">
-                <QualityBar score={item.quality} />
-              </div>
-              <QualityPicker
-                value={item.quality || null}
-                onChange={handleQualityChange}
-              />
+              <div className="mb-2"><QualityBar score={item.quality} /></div>
+              <QualityPicker value={item.quality || null} onChange={handleQualityChange} />
             </div>
 
-            {/* Tags */}
             <div>
               <label className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 block mb-2">Tags</label>
               <TagEditor tags={item.tags} onChange={handleTagsChange} />
             </div>
 
-            {/* Relationships */}
             <div>
               <label className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 block mb-2">Relationships</label>
               <RelationshipEditor relationships={item.relationships} onChange={handleRelsChange} />
             </div>
 
-            {/* Rename */}
-            <div>
-              <label className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 block mb-1">Rename (slug)</label>
-              <div className="flex gap-2">
-                <input
-                  value={renameInput}
-                  onChange={(e) => setRenameInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') handleRename() }}
-                  className="flex-1 bg-surface-3 border border-surface-3 focus:border-primary/40 text-zinc-200 text-xs rounded px-2 py-1.5 outline-none transition-colors font-mono"
-                  placeholder="new-slug"
-                />
-                <button
-                  onClick={handleRename}
-                  disabled={loading || !renameInput.trim() || renameInput.trim() === item.id}
-                  className="px-2 py-1.5 text-xs rounded bg-surface-3 text-zinc-400 hover:text-zinc-200 border border-surface-3 hover:border-zinc-600 transition-colors disabled:opacity-40"
-                >
-                  Rename
-                </button>
-              </div>
-            </div>
-
-            {/* Meta */}
-            <div className="text-[10px] text-zinc-600 space-y-0.5 pt-1 border-t border-surface-3">
+            <div className="text-[10px] text-zinc-600 space-y-0.5 pt-3 border-t border-surface-3">
               <div>Created: {item.created}</div>
               <div>Updated: {item.updated}</div>
               <div className="font-mono truncate" title={item.filename}>{item.filename}</div>
             </div>
           </div>
-
-          {/* Action buttons */}
-          <div className="panel p-4 space-y-3">
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 mb-2">Actions</div>
-
-            {showApproveQuality && (
-              <div className="p-3 bg-surface-3 rounded-lg border border-surface-3">
-                <div className="text-[10px] text-zinc-500 mb-2">Select quality score to promote:</div>
-                <QualityPicker value={approveQuality} onChange={setApproveQuality} />
-              </div>
-            )}
-
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={handlePromote}
-                disabled={loading || (showApproveQuality && approveQuality === null)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded bg-success/10 text-success border border-success/30 hover:bg-success/20 transition-colors disabled:opacity-50"
-              >
-                {loading ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle size={13} />}
-                {showApproveQuality ? (approveQuality !== null ? `Promote (${approveQuality})` : 'Pick score…') : 'Promote to Library'}
-              </button>
-
-              {showApproveQuality && (
-                <button
-                  onClick={() => { setShowApproveQuality(false); setApproveQuality(item.quality || null) }}
-                  className="px-3 py-1.5 text-xs rounded bg-surface-3 text-zinc-400 hover:text-zinc-200 transition-colors"
-                >
-                  Cancel
-                </button>
-              )}
-
-              <button
-                onClick={handleArchive}
-                disabled={loading}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded bg-zinc-700/50 text-zinc-400 border border-zinc-700 hover:bg-zinc-700 transition-colors disabled:opacity-50"
-              >
-                <Archive size={13} />
-                Archive
-              </button>
-
-              <button
-                onClick={handleReject}
-                disabled={loading}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded bg-danger/10 text-danger border border-danger/30 hover:bg-danger/20 transition-colors disabled:opacity-50"
-              >
-                <XCircle size={13} />
-                Reject
-              </button>
-
-              <button
-                onClick={handleFlag}
-                disabled={loading}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded bg-warning/10 text-warning border border-warning/30 hover:bg-warning/20 transition-colors disabled:opacity-50"
-              >
-                <Flag size={13} />
-                Flag Reprocess
-              </button>
-            </div>
-          </div>
         </div>
       </div>
 
-      {/* Content Preview — full markdown file */}
-      {mdContent && (
-        <div className="panel p-4 mt-4">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 mb-2">Content Preview</div>
-          <pre className="text-xs text-zinc-400 leading-relaxed whitespace-pre-wrap font-mono max-h-96 overflow-y-auto bg-surface-3 rounded p-3 border border-surface-3">
-            {mdContent}
-          </pre>
-        </div>
-      )}
-
-      {/* Linked drafts — other md files generated from the same source image */}
-      {item.history.length > 0 && (
-        <div className="panel p-4 mt-4">
-          <div className="flex items-center gap-2 mb-3">
-            <FileText size={13} className="text-zinc-500" />
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
-              Linked Drafts · same source
-            </span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-surface-3 text-zinc-500 font-mono">
-              {item.history.length}
-            </span>
-          </div>
-          <div className="space-y-1.5">
-            {item.history.map((h) => (
-              <Link
-                key={h.id}
-                href={`/gm/view/${h.id}`}
-                className="flex items-center gap-3 px-3 py-2 rounded-lg bg-surface-3 border border-surface-3 hover:border-primary/30 transition-colors group"
+      {/* Content editor — narrative body (history, lore, location, gods, …) */}
+      {mdContent !== null && (
+        <div className="px-4 md:px-6 pb-4">
+          <div className="panel p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <FileText size={13} className="text-zinc-500" />
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Content</span>
+              {bodyDirty && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-warning/10 text-warning font-medium">unsaved</span>
+              )}
+              <div className="flex-1" />
+              <button
+                onClick={handleSaveContent}
+                disabled={savingContent || !bodyDirty}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-success/10 text-success border border-success/40 hover:bg-success/20 transition-colors disabled:opacity-40"
               >
-                <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold uppercase ${TYPE_COLORS[h.type] ?? 'bg-zinc-700 text-zinc-400'}`}>
-                  {h.type}
-                </span>
-                <span className="font-mono text-xs text-zinc-300 truncate flex-1">{h.id}</span>
-                {h.reviewed && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-semibold uppercase">reviewed</span>
-                )}
-                {h.quality > 0 && (
-                  <span className="text-[10px] text-zinc-500 font-mono">q{h.quality}</span>
-                )}
-                <ChevronRight size={14} className="text-zinc-600 group-hover:text-primary transition-colors" />
-              </Link>
-            ))}
+                {savingContent ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                {savingContent ? 'Saving…' : 'Save Content'}
+              </button>
+            </div>
+            <div data-color-mode="dark">
+              <MDEditor
+                value={body}
+                onChange={(v) => { setBody(v ?? ''); setBodyDirty(true) }}
+                height={420}
+                visibleDragbar={false}
+                textareaProps={{ placeholder: 'Add history, name, location, lore, gods, abilities…' }}
+              />
+            </div>
           </div>
         </div>
       )}
 
-      {/* Chat panel — always at the bottom */}
-      <ItemChatPanel item={item} agents={item.activeAgents} />
+      {/* Linked drafts */}
+      {item.history.length > 0 && (
+        <div className="px-4 md:px-6 pb-4">
+          <div className="panel p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <FileText size={13} className="text-zinc-500" />
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Linked Drafts · same source</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-surface-3 text-zinc-500 font-mono">{item.history.length}</span>
+            </div>
+            <div className="space-y-1.5">
+              {item.history.map((h) => (
+                <Link
+                  key={h.id}
+                  href={`/gm/view/${h.id}`}
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg bg-surface-3 border border-surface-3 hover:border-primary/30 transition-colors group"
+                >
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold uppercase ${TYPE_COLORS[h.type] ?? 'bg-zinc-700 text-zinc-400'}`}>
+                    {h.type}
+                  </span>
+                  <span className="font-mono text-xs text-zinc-300 truncate flex-1">{h.id}</span>
+                  {h.reviewed && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-semibold uppercase">reviewed</span>
+                  )}
+                  {h.quality > 0 && <span className="text-[10px] text-zinc-500 font-mono">q{h.quality}</span>}
+                  <ChevronRight size={14} className="text-zinc-600 group-hover:text-primary transition-colors" />
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Chat panel */}
+      <div className="px-4 md:px-6 pb-6">
+        <ItemChatPanel item={item} agents={item.activeAgents} />
+      </div>
 
       {/* Image modal */}
       {(modalSrc ?? imageSrc) && (
