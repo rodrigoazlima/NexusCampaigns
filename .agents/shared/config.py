@@ -124,7 +124,7 @@ _GLOBAL_DEFAULTS: dict[str, Any] = {
     "state_dir":            ".system/state",
     "retry_attempts":       3,
     "retry_delay_seconds":  5,
-    "token_moldura":        "00-Inbox/tokens/Molduras/moldura_default.png",
+    "token_moldura":        "05-Assets/tokens/frames/frame.png",
     "quality_threshold":    7,
 }
 
@@ -167,7 +167,7 @@ class AppConfig(BaseModel):
     state_dir:           Path          = Path(".system/state")
     retry_attempts:      int           = 3
     retry_delay_seconds: int           = 5
-    token_moldura:       Path          = Path("00-Inbox/tokens/Molduras/moldura_default.png")
+    token_moldura:       Path          = Path("05-Assets/tokens/frames/frame.png")
     quality_threshold:   int           = 7
     extra:               dict[str, Any] = Field(default_factory=dict)
 

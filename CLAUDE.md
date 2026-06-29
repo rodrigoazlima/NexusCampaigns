@@ -123,7 +123,7 @@ Preferred relationships:
 |----------|------|
 | Inbox images | `$VaultRoot\00-Inbox\images` |
 | Processing dir | `$VaultRoot\01-Processing` |
-| Token moldura | `00-Inbox\tokens\Molduras\moldura_default.png` |
+| Token moldura | `05-Assets\tokens\frames\frame.png` |
 
 ### Encoding
 All file I/O **must** use `-Encoding UTF8` explicitly. Never rely on PS default encoding.

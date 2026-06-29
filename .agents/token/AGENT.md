@@ -8,7 +8,7 @@ purpose: >
 inputs:
   - .agents/vision/state/processed-images.json (read-only)
   - state/10-generate-tokens.json (config)
-  - vault://00-Inbox/tokens/Molduras/moldura_default.png (frame asset)
+  - vault://05-Assets/tokens/frames/frame.png (frame asset)
   - vault://00-Inbox/images/**/*.{png,jpg,jpeg,webp}
 outputs:
   - vault://00-Inbox/images/**/{stem}-token.png (circular token)

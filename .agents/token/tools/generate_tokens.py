@@ -59,7 +59,7 @@ _DEFAULT_CFG: dict[str, Any] = {
     "forehead_ratio": 0.35,       # extra head room above face bbox top
     "body_ratio":     0.30,       # extra body room below face bbox bottom
     "focus_head":     [0, 0, 0, 0],  # [top, right, bottom, left] % of crop_size
-    "moldura_path":   "knowledge-base/00-Inbox/tokens/Molduras/moldura_default.png",
+    "moldura_path":   "knowledge-base/05-Assets/tokens/frames/frame.png",
     "moldura_by_type": {},        # e.g. {"creature": "path/to/creature_frame.png"}
 }
 
