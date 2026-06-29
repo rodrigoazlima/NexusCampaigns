@@ -156,26 +156,37 @@ A pipeline of scheduled agents ingests source material, classifies it with visio
 
 ### Quick Install (one command)
 
-> **Requires Administrator.** Installs everything — Python dependencies, the agent pipeline service, and the dashboard (built and served on **port 48080**) — and registers both to auto-start at boot.
+> **Requires Administrator.** Registers Python dependencies, the agent pipeline service, and the dashboard (built, auto-start on boot) — but does **not** start them. Start manually after install.
 
 ```powershell
 # 1. Clone the repo
 git clone https://github.com/rodrigoazlima/NexusCampaigns.git
 cd NexusCampaigns
 
-# 2. From an ELEVATED PowerShell 7 (Run as Administrator), one command installs it all:
+# 2. From an ELEVATED PowerShell 7 (Run as Administrator):
 pwsh -ExecutionPolicy Bypass -File .agents\runtime\tools\setup-service.ps1
 ```
 
-When it finishes, the dashboard is live at **http://localhost:48080**.
+Then start the services:
+
+```powershell
+# NSSM (Admin install)
+Start-Service vault-knowledge-factory
+Start-Service vault-dashboard
+
+# HKCU / no-Admin fallback
+pwsh -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File .agents\runtime\tools\daemon.ps1
+```
+
+Dashboard available at **http://localhost:48080** after starting.
 
 | Manage | Command |
 |--------|---------|
 | Status | `pwsh -File .agents\runtime\tools\setup-service.ps1 -Status` |
 | Uninstall | `pwsh -File .agents\runtime\tools\setup-service.ps1 -Uninstall` |
-| Options | `-NoDashboard` to skip the dashboard · `-DashboardPort 9000` for a custom port |
+| Options | `-NoDashboard` to skip dashboard · `-DashboardPort 9000` for custom port · `-SkipPreFlight` to skip test run |
 
-It also generates default settings at `.system\dashboard\.env.local` (`PROJECT_ROOT`, `VAULT_ROOT`, `PORT`, `HOSTNAME`) derived from `.system\.shared\config\global.json` — change the port once in `global.json` (`ports.dashboard`).
+Generates default settings at `.system\.env.local` (`PROJECT_ROOT`, `VAULT_ROOT`, `PORT`, `HOSTNAME`) derived from `.system\.shared\config\global.json` — change the port once in `global.json` (`ports.dashboard`). Previous installs are automatically removed before each fresh install.
 
 Without Administrator the installer falls back to a per-user (at-logon) install via the HKCU Run key. NSSM + Admin is recommended for an always-on Windows service — `winget install NSSM.NSSM`.
 
@@ -202,14 +213,14 @@ Prefer to run the pieces by hand instead of the one-command installer?
    cd .system\dashboard; npm install
    ```
 3. Configure ports and the vault root. Ports live in the codebase config; the
-   one-command installer reads them and generates `.system\dashboard\.env.local`
-   for you (re-run with `-Force` to regenerate).
+   one-command installer reads them and generates `.system\.env.local` (canonical)
+   and copies it to `.system\dashboard\.env.local` for Next.js. Re-run with `-Force` to regenerate.
 
    | Setting | Where | Default |
    |---------|-------|---------|
    | `ports.dashboard` | `.system\.shared\config\global.json` | `48080` |
    | `ports.host` | `.system\.shared\config\global.json` | `0.0.0.0` |
-   | `VAULT_ROOT` | `.env.local` (or `NEXUS_VAULT_ROOT`) | `<repo>\knowledge-base` |
+   | `VAULT_ROOT` | `.system\.env.local` (or `NEXUS_VAULT_ROOT`) | `<repo>\knowledge-base` |
 4. Start the agent daemon and dashboard — see [Usage](#usage).
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
