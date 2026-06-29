@@ -1,132 +1,197 @@
 export const dynamic = 'force-dynamic'
 
-import { readReviewItems, readQueue } from '@/lib/vault'
+import { readReviewItems, readLibraryItems } from '@/lib/vault'
+import type { ReviewItem } from '@/lib/types'
 import Link from 'next/link'
 import PageHeader from '@/components/widgets/PageHeader'
 import AutoRefresh from '@/components/AutoRefresh'
-import KPICard from '@/components/widgets/KPICard'
-import { Dices, CheckSquare, Image, CircleDot, MessageSquare } from 'lucide-react'
+import {
+  Dices, Map, Users, Flag, ScrollText, Skull, Gem,
+  Inbox, CircleDot, MessageSquare, ArrowRight, Sparkles,
+} from 'lucide-react'
+
+// A "campaign building block" — each pillar groups the entity types a Game
+// Master actually thinks in while building a world. Order = the order you
+// usually build a campaign: a place, the people in it, who's fighting, the
+// plot, the threats, then the depth that ties it together.
+const PILLARS = [
+  { key: 'world', label: 'World & Places', icon: Map, accent: 'text-green-400', ring: 'border-green-500/20 hover:border-green-500/40',
+    types: ['location', 'city', 'village', 'dungeon'], hint: 'The stage — where your story happens' },
+  { key: 'cast', label: 'Characters & NPCs', icon: Users, accent: 'text-blue-400', ring: 'border-blue-500/20 hover:border-blue-500/40',
+    types: ['npc', 'character'], hint: 'The cast — motivations, secrets, the people who drive play' },
+  { key: 'powers', label: 'Factions & Powers', icon: Flag, accent: 'text-purple-400', ring: 'border-purple-500/20 hover:border-purple-500/40',
+    types: ['faction', 'organization', 'religion'], hint: 'The conflict — who wants what, and why' },
+  { key: 'story', label: 'Quests & Story', icon: ScrollText, accent: 'text-yellow-400', ring: 'border-yellow-500/20 hover:border-yellow-500/40',
+    types: ['quest', 'event', 'timeline'], hint: 'The plot — hooks, stakes, what happens next' },
+  { key: 'bestiary', label: 'Bestiary', icon: Skull, accent: 'text-red-400', ring: 'border-red-500/20 hover:border-red-500/40',
+    types: ['creature', 'monster', 'encounter'], hint: 'The challenges — what the party fights' },
+  { key: 'lore', label: 'Treasures & Lore', icon: Gem, accent: 'text-teal-400', ring: 'border-teal-500/20 hover:border-teal-500/40',
+    types: ['item', 'artifact', 'lore'], hint: 'Reward & depth — history, myth, treasure' },
+] as const
+
+type Entry = ReviewItem & { origin: 'draft' | 'canon' }
+
+const typeChip: Record<string, string> = {
+  npc: 'bg-blue-500/10 text-blue-400', character: 'bg-blue-500/10 text-blue-400',
+  location: 'bg-green-500/10 text-green-400', city: 'bg-green-500/10 text-green-400',
+  village: 'bg-green-500/10 text-green-400', dungeon: 'bg-green-500/10 text-green-400',
+  faction: 'bg-purple-500/10 text-purple-400', organization: 'bg-purple-500/10 text-purple-400',
+  religion: 'bg-purple-500/10 text-purple-400', quest: 'bg-yellow-500/10 text-yellow-400',
+  event: 'bg-yellow-500/10 text-yellow-400', timeline: 'bg-yellow-500/10 text-yellow-400',
+  creature: 'bg-red-500/10 text-red-400', monster: 'bg-red-500/10 text-red-400',
+  encounter: 'bg-red-500/10 text-red-400', item: 'bg-orange-500/10 text-orange-400',
+  artifact: 'bg-orange-500/10 text-orange-400', lore: 'bg-teal-500/10 text-teal-400',
+}
 
 export default async function GMHubPage() {
-  const [items, queue] = await Promise.all([
-    Promise.resolve(readReviewItems()),
-    Promise.resolve(readQueue()),
-  ])
+  const drafts = readReviewItems().map((i): Entry => ({ ...i, origin: 'draft' }))
+  const canon = readLibraryItems().map((i): Entry => ({ ...i, origin: 'canon' }))
 
-  const pending = items.filter((i) => !i.reviewed).length
-  const highQuality = items.filter((i) => i.quality >= 7).length
-  const approved = items.filter((i) => i.status === 'approved').length
-  const inboxDepth = queue.total
+  // Canon wins on id collision (an approved draft also lives in Processing).
+  const byId = new Map<string, Entry>()
+  for (const e of [...drafts, ...canon]) byId.set(e.id, e)
+  const all = [...byId.values()]
 
-  const actionCards = [
-    {
-      href: '/gm/review',
-      icon: CheckSquare,
-      label: 'Review Queue',
-      count: pending,
-      description: `${items.length} total drafts · ${pending} need review`,
-      accent: 'text-warning',
-      borderClass: 'border-warning/20 hover:border-warning/40',
-    },
-    {
-      href: '/gm/inbox',
-      icon: Image,
-      label: 'Inbox Gallery',
-      count: inboxDepth,
-      description: `${queue.pending} pending · ${queue.stuck} stuck`,
-      accent: 'text-primary',
-      borderClass: 'border-primary/20 hover:border-primary/40',
-    },
-    {
-      href: '/gm/tokens',
-      icon: CircleDot,
-      label: 'Tokens',
-      count: null as number | null,
-      description: 'Browse generated tokens and frame library',
-      accent: 'text-purple-400',
-      borderClass: 'border-purple-500/20 hover:border-purple-500/40',
-    },
-    {
-      href: '/gm/chat',
-      icon: MessageSquare,
-      label: 'Agent Chat',
-      count: null as number | null,
-      description: 'lore, wiki, classification',
-      accent: 'text-success',
-      borderClass: 'border-success/20 hover:border-success/40',
-    },
-  ] as const
+  const known = new Set(PILLARS.flatMap((p) => p.types))
+  const bucket = (types: readonly string[]) =>
+    all
+      .filter((e) => types.includes(e.type))
+      .sort((a, b) => (b.updated ?? '').localeCompare(a.updated ?? ''))
+
+  const unreviewed = all.filter((e) => e.origin === 'draft' && !e.reviewed).length
+  const uncategorized = all.filter((e) => !known.has(e.type)).length
+
+  const href = (e: Entry) =>
+    e.origin === 'draft' ? `/gm/view/${encodeURIComponent(e.id)}` : '/library'
 
   return (
     <div className="p-4 md:p-6">
       <AutoRefresh />
       <PageHeader
         icon={Dices}
-        title="Game Master Area"
-        subtitle="Human-in-the-loop review and control center"
+        title="Campaign Workshop"
+        subtitle={`${all.length} building blocks${uncategorized ? ` · ${uncategorized} unsorted` : ''} · shape raw drafts into your world`}
       />
 
-      {/* KPI row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
-        <KPICard
-          label="Pending Review"
-          value={pending}
-          sub="unreviewed drafts"
-          accent="warning"
-        />
-        <KPICard
-          label="High Quality"
-          value={highQuality}
-          sub="quality ≥ 7"
-          accent="success"
-        />
-        <KPICard
-          label="Approved"
-          value={approved}
-          sub="in processing"
-          accent="primary"
-        />
-        <KPICard
-          label="Inbox Depth"
-          value={inboxDepth}
-          sub={`${queue.stuck} stuck`}
-          accent={queue.stuck > 0 ? 'danger' : 'neutral'}
-        />
-      </div>
+      {/* Needs-you banner: the only review signal that matters here */}
+      {unreviewed > 0 && (
+        <Link
+          href="/gm/review"
+          className="panel flex items-center gap-3 p-3 mb-6 border border-warning/30 bg-warning/5 hover:bg-warning/10 transition-colors group"
+        >
+          <Sparkles size={18} className="text-warning flex-shrink-0" />
+          <span className="text-sm text-zinc-200 flex-1">
+            <span className="font-semibold text-warning">{unreviewed}</span> fresh{' '}
+            {unreviewed === 1 ? 'draft is' : 'drafts are'} waiting for your review
+          </span>
+          <ArrowRight size={16} className="text-zinc-500 group-hover:text-warning group-hover:translate-x-0.5 transition-all" />
+        </Link>
+      )}
 
-      {/* Action cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-        {actionCards.map((card) => {
-          const Icon = card.icon
+      {/* Campaign pillars */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        {PILLARS.map((p) => {
+          const items = bucket(p.types)
+          const waiting = items.filter((e) => e.origin === 'draft' && !e.reviewed).length
+          const Icon = p.icon
           return (
-            <Link
-              key={card.href}
-              href={card.href}
-              className={`panel p-5 border ${card.borderClass} transition-colors hover:bg-surface-2 group block`}
-            >
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-xl bg-surface-3 border border-surface-3 flex items-center justify-center flex-shrink-0">
-                  <Icon size={22} className={card.accent} />
+            <div key={p.key} className={`panel border ${p.ring} transition-colors flex flex-col`}>
+              {/* Pillar header */}
+              <div className="flex items-start gap-3 p-4 pb-3">
+                <div className="w-10 h-10 rounded-lg bg-surface-3 border border-surface-3 flex items-center justify-center flex-shrink-0">
+                  <Icon size={20} className={p.accent} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline gap-2 mb-1">
-                    <span className="text-base font-semibold text-zinc-100">
-                      {card.label}
-                    </span>
-                    {card.count !== null && (
-                      <span className={`text-2xl font-mono font-bold ${card.accent}`}>
-                        {card.count}
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-sm font-semibold text-zinc-100">{p.label}</span>
+                    <span className={`text-lg font-mono font-bold ${p.accent}`}>{items.length}</span>
+                    {waiting > 0 && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-warning/15 text-warning font-medium">
+                        {waiting} new
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-zinc-500">{card.description}</p>
+                  <p className="text-xs text-zinc-500 mt-0.5">{p.hint}</p>
                 </div>
+              </div>
+
+              {/* Item previews — click straight through, no detour */}
+              <div className="flex-1 border-t border-surface-3/60">
+                {items.length === 0 ? (
+                  <Link
+                    href="/gm/inbox"
+                    className="block px-4 py-5 text-xs text-zinc-600 hover:text-zinc-400 transition-colors text-center"
+                  >
+                    Nothing here yet — drop sources in the Inbox →
+                  </Link>
+                ) : (
+                  items.slice(0, 4).map((e) => (
+                    <Link
+                      key={e.id}
+                      href={href(e)}
+                      className="flex items-center gap-2.5 px-4 py-2 hover:bg-surface-2 border-b border-surface-3/40 last:border-0 group"
+                    >
+                      {e.tokenPath ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={`/api/image?path=${encodeURIComponent(e.tokenPath)}`}
+                          alt=""
+                          className="w-7 h-7 rounded object-cover flex-shrink-0 bg-surface-3"
+                        />
+                      ) : (
+                        <span className={`w-7 h-7 rounded flex items-center justify-center text-[9px] font-bold uppercase flex-shrink-0 ${typeChip[e.type] ?? 'bg-surface-3 text-zinc-500'}`}>
+                          {e.type.slice(0, 3)}
+                        </span>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs text-zinc-200 truncate group-hover:text-white">{e.id}</div>
+                        <div className="text-[11px] text-zinc-600 truncate">{e.excerpt || '—'}</div>
+                      </div>
+                      {e.origin === 'canon' && (
+                        <span className="text-[9px] px-1 py-0.5 rounded bg-success/10 text-success flex-shrink-0">canon</span>
+                      )}
+                    </Link>
+                  ))
+                )}
+              </div>
+
+              {/* Footer */}
+              {items.length > 4 && (
+                <Link
+                  href="/gm/review"
+                  className="px-4 py-2 text-[11px] text-zinc-500 hover:text-zinc-300 border-t border-surface-3/60 flex items-center gap-1 transition-colors"
+                >
+                  +{items.length - 4} more in Review <ArrowRight size={11} />
+                </Link>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Workshop tools */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { href: '/gm/inbox', icon: Inbox, label: 'Inbox', sub: 'raw sources' },
+          { href: '/gm/tokens', icon: CircleDot, label: 'Tokens', sub: 'portraits & frames' },
+          { href: '/gm/chat', icon: MessageSquare, label: 'Agent Chat', sub: 'lore · wiki · vision' },
+        ].map((t) => {
+          const Icon = t.icon
+          return (
+            <Link
+              key={t.href}
+              href={t.href}
+              className="panel p-3 flex items-center gap-3 hover:bg-surface-2 border border-surface-3 hover:border-surface-4 transition-colors"
+            >
+              <Icon size={18} className="text-zinc-400 flex-shrink-0" />
+              <div className="min-w-0">
+                <div className="text-xs font-semibold text-zinc-200 truncate">{t.label}</div>
+                <div className="text-[10px] text-zinc-600 truncate">{t.sub}</div>
               </div>
             </Link>
           )
         })}
       </div>
-
     </div>
   )
 }
