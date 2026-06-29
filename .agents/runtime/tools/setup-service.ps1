@@ -1,21 +1,28 @@
-# setup-service.ps1 — Install Vault Nexus Campaigns as a Windows service
+# setup-service.ps1 — One-command install for Nexus Campaigns
+#
+# Installs EVERYTHING: pip deps, the agent pipeline service, and the Next.js
+# dashboard (built + served on port 48080). Run once from an elevated shell.
 #
 # Supported methods (auto-detected):
 #   nssm      — NSSM service manager (requires Admin; recommended for production)
-#   schtasks  — Windows Task Scheduler task (works without Admin; starts at user logon)
+#   schtasks  — Windows Task Scheduler / HKCU Run (works without Admin; starts at logon)
 #
 # Usage (requires pwsh / PowerShell 7+):
-#   # Auto-detect best method:
+#   # One command, install it all (run as Administrator):
 #   pwsh -ExecutionPolicy Bypass -File setup-service.ps1
 #
 #   # Force a specific method:
 #   pwsh -ExecutionPolicy Bypass -File setup-service.ps1 -Method schtasks
 #   pwsh -ExecutionPolicy Bypass -File setup-service.ps1 -Method nssm
 #
+#   # Custom dashboard port (default 48080) / skip dashboard:
+#   pwsh -ExecutionPolicy Bypass -File setup-service.ps1 -DashboardPort 9000
+#   pwsh -ExecutionPolicy Bypass -File setup-service.ps1 -NoDashboard
+#
 #   # Skip runner --once pre-flight (use when already verified):
 #   pwsh -ExecutionPolicy Bypass -File setup-service.ps1 -SkipPreFlight
 #
-#   # Uninstall:
+#   # Uninstall (removes both services):
 #   pwsh -ExecutionPolicy Bypass -File setup-service.ps1 -Uninstall
 #
 #   # Check status:
@@ -25,6 +32,9 @@ param(
     [string] $ProjectRoot    = "C:\opt\GitHub\NexusCampaigns",
     [string] $Python         = "python",
     [string] $Method         = "auto",    # "auto" | "nssm" | "schtasks"
+    [int]    $DashboardPort  = 48080,      # Next.js dashboard port (default from config; overrides config when passed)
+    [switch] $NoDashboard,                 # skip dashboard install/start
+    [switch] $Force,                       # overwrite generated default config (.env.local)
     [switch] $Uninstall,
     [switch] $Status,
     [switch] $SkipPreFlight           # skip runner --once verification (use after first successful run)
@@ -39,6 +49,34 @@ $Description  = "DM pipeline: ingests, classifies, and links vault entities on s
 $DaemonScript = "$ProjectRoot\.agents\runtime\tools\daemon.ps1"
 $RunnerScript = "$ProjectRoot\.agents\runtime\tools\runner.py"
 $LogDir       = "$ProjectRoot\.agents\runtime\state\logs"
+
+$DashboardSvc = "vault-dashboard"                       # NSSM service name
+$DashboardRun = "VaultDashboard"                        # HKCU Run value name
+$DashboardDir = "$ProjectRoot\.system\dashboard"
+$GlobalConfig = "$ProjectRoot\.system\.shared\config\global.json"
+
+# ---------------------------------------------------------------------------
+# Resolve defaults FROM the codebase config (.system/.shared/config/global.json)
+# so the configuration is the single source of truth for ports + vault root.
+# An explicit -DashboardPort still wins over the config value.
+# ---------------------------------------------------------------------------
+$DashboardHost = "0.0.0.0"
+$VaultRootRel  = "knowledge-base"
+if (Test-Path $GlobalConfig) {
+    try {
+        $gc = Get-Content $GlobalConfig -Raw -Encoding UTF8 | ConvertFrom-Json
+        if (-not $PSBoundParameters.ContainsKey('DashboardPort') -and $gc.ports.dashboard) {
+            $DashboardPort = [int]$gc.ports.dashboard
+        }
+        if ($gc.ports.host)  { $DashboardHost = [string]$gc.ports.host }
+        if ($gc.vault_root)  { $VaultRootRel  = [string]$gc.vault_root }
+    } catch {
+        Write-Host "WARN: could not parse $GlobalConfig — using built-in defaults. $_"
+    }
+}
+# Resolve vault root to an absolute path anchored at the project root.
+$VaultRootAbs = if ([System.IO.Path]::IsPathRooted($VaultRootRel)) { $VaultRootRel }
+                else { Join-Path $ProjectRoot $VaultRootRel }
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -67,6 +105,125 @@ function Find-NSSM {
         if (Test-Path $p) { return $p }
     }
     return $null
+}
+
+function Find-Node {
+    $node = Get-Command node -ErrorAction SilentlyContinue
+    if ($node) { return $node.Source }
+    foreach ($p in @(
+        "$env:ProgramFiles\nodejs\node.exe",
+        "$env:LOCALAPPDATA\Programs\nodejs\node.exe"
+    )) {
+        if (Test-Path $p) { return $p }
+    }
+    return $null
+}
+
+# Produce a default settings file for the dashboard, derived from the codebase
+# config (global.json) + this install's project root. Ports come from config.
+# Does not clobber an existing file unless -Force is given.
+function Write-DefaultConfig {
+    $envFile = "$DashboardDir\.env.local"
+
+    if (-not (Test-Path $DashboardDir)) {
+        Log "Dashboard dir not found: $DashboardDir — skipping config generation." "WARN"
+        return
+    }
+    if ((Test-Path $envFile) -and -not $Force) {
+        Log "Default config already exists: $envFile (use -Force to regenerate). Keeping it."
+        return
+    }
+
+    $stamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $lines = @(
+        "# Generated by setup-service.ps1 on $stamp",
+        "# Default dashboard settings derived from .system/.shared/config/global.json.",
+        "# Change the port in global.json (ports.dashboard) and re-run setup -Force, or edit here.",
+        "PROJECT_ROOT=$ProjectRoot",
+        "VAULT_ROOT=$VaultRootAbs",
+        "PORT=$DashboardPort",
+        "HOSTNAME=$DashboardHost"
+    )
+    Set-Content -Path $envFile -Value $lines -Encoding UTF8
+    Log "Produced default config: $envFile"
+    Log "  PROJECT_ROOT=$ProjectRoot"
+    Log "  VAULT_ROOT=$VaultRootAbs"
+    Log "  PORT=$DashboardPort  HOSTNAME=$DashboardHost"
+}
+
+# Build the dashboard and register it to run on $DashboardPort.
+# Uses NSSM service (admin) when available, otherwise an HKCU Run key + detached start.
+function Setup-Dashboard {
+    param([string]$Method)
+
+    Log "=== Dashboard setup (port $DashboardPort) ==="
+
+    if (-not (Test-Path $DashboardDir)) {
+        Log "Dashboard dir not found: $DashboardDir — skipping." "WARN"
+        return
+    }
+
+    $nodePath = Find-Node
+    if (-not $nodePath) {
+        Log "Node.js not found — install Node 18+ and re-run. Skipping dashboard." "WARN"
+        return
+    }
+    $npm = Join-Path (Split-Path $nodePath) "npm.cmd"
+    Log "Node: $nodePath"
+
+    # Install deps + production build
+    Push-Location $DashboardDir
+    try {
+        Log "Installing dashboard dependencies (npm install)..."
+        & $npm install
+        if ($LASTEXITCODE -ne 0) { Log "npm install failed — skipping dashboard." "ERROR"; return }
+        Log "Building dashboard (npm run build)..."
+        & $npm run build
+        if ($LASTEXITCODE -ne 0) { Log "npm run build failed — skipping dashboard." "ERROR"; return }
+    } finally {
+        Pop-Location
+    }
+
+    $nextBin = "$DashboardDir\node_modules\next\dist\bin\next"
+
+    if ($Method -eq "nssm") {
+        $nssmPath = Find-NSSM
+        $existing = Get-Service -Name $DashboardSvc -ErrorAction SilentlyContinue
+        if ($existing) {
+            Log "Removing existing dashboard service '$DashboardSvc'..."
+            if ($existing.Status -eq "Running") { & $nssmPath stop $DashboardSvc }
+            & $nssmPath remove $DashboardSvc confirm
+        }
+        Log "Installing NSSM service '$DashboardSvc'..."
+        & $nssmPath install $DashboardSvc $nodePath
+        & $nssmPath set     $DashboardSvc AppParameters  "`"$nextBin`" start --port $DashboardPort --hostname $DashboardHost"
+        & $nssmPath set     $DashboardSvc AppDirectory   $DashboardDir
+        & $nssmPath set     $DashboardSvc DisplayName    "Vault Nexus Dashboard"
+        & $nssmPath set     $DashboardSvc Description    "Nexus Campaigns admin dashboard (Next.js) on port $DashboardPort"
+        & $nssmPath set     $DashboardSvc Start          SERVICE_AUTO_START
+        & $nssmPath set     $DashboardSvc AppRestartDelay 30000
+        & $nssmPath set     $DashboardSvc AppStdout      "$LogDir\dashboard-stdout.log"
+        & $nssmPath set     $DashboardSvc AppStderr      "$LogDir\dashboard-stderr.log"
+        & $nssmPath set     $DashboardSvc AppStdoutCreationDisposition 4
+        & $nssmPath set     $DashboardSvc AppStderrCreationDisposition 4
+        & $nssmPath set     $DashboardSvc AppEnvironmentExtra "NODE_ENV=production PORT=$DashboardPort HOSTNAME=$DashboardHost"
+        & $nssmPath start   $DashboardSvc
+        Log "Dashboard service installed and started -> http://localhost:$DashboardPort"
+    } else {
+        # No admin: auto-start at logon via HKCU Run, plus start now (detached, hidden).
+        $RegPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
+        $cmd     = "`"$nodePath`" `"$nextBin`" start --port $DashboardPort --hostname $DashboardHost"
+        $existing = Get-ItemProperty $RegPath -Name $DashboardRun -ErrorAction SilentlyContinue
+        if ($existing) { Remove-ItemProperty $RegPath -Name $DashboardRun -Force }
+        Set-ItemProperty $RegPath -Name $DashboardRun -Value $cmd
+        Log "Dashboard auto-start registered: HKCU\...\Run\$DashboardRun"
+
+        $proc = Start-Process -FilePath $nodePath `
+            -ArgumentList @($nextBin, "start", "--port", "$DashboardPort", "--hostname", "$DashboardHost") `
+            -WorkingDirectory $DashboardDir -WindowStyle Hidden -PassThru
+        if ($proc) { Log "Dashboard started (PID=$($proc.Id)) -> http://localhost:$DashboardPort" }
+        else       { Log "Dashboard Start-Process returned no handle — may have launched detached." "WARN" }
+    }
 }
 
 function Get-AuthToken {
@@ -127,6 +284,26 @@ if ($Status) {
         Log "Lock file: absent (runner not currently executing a cycle)"
     }
 
+    # Dashboard
+    $dsvc = Get-Service -Name $DashboardSvc -ErrorAction SilentlyContinue
+    if ($dsvc) {
+        Log "Dashboard service '$DashboardSvc': $($dsvc.Status)"
+    } else {
+        Log "Dashboard service '$DashboardSvc': not installed"
+    }
+    $regPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
+    $dRun = Get-ItemProperty $regPath -Name $DashboardRun -ErrorAction SilentlyContinue
+    if ($dRun) { Log "Dashboard Run key '$DashboardRun': registered" }
+    $dPort = Get-NetTCPConnection -State Listen -LocalPort $DashboardPort -ErrorAction SilentlyContinue
+    if ($dPort) { Log "Dashboard: listening on port $DashboardPort -> http://localhost:$DashboardPort" }
+    else        { Log "Dashboard: port $DashboardPort not listening" }
+
+    # Config
+    Log "Configured port (global.json ports.dashboard): $DashboardPort"
+    $envFile = "$DashboardDir\.env.local"
+    if (Test-Path $envFile) { Log "Default config: $envFile (present)" }
+    else                    { Log "Default config: $envFile (not generated yet)" }
+
     exit 0
 }
 
@@ -156,6 +333,27 @@ if ($Uninstall) {
     if ($runVal) {
         Remove-ItemProperty $regPath -Name $TaskName -Force
         Log "HKCU Run key '$TaskName' removed."
+    }
+
+    # Remove dashboard service + run key
+    $dsvc = Get-Service -Name $DashboardSvc -ErrorAction SilentlyContinue
+    if ($dsvc -and $nssmPath) {
+        if ($dsvc.Status -eq "Running") { Log "Stopping dashboard service..."; & $nssmPath stop $DashboardSvc }
+        Log "Removing dashboard service..."
+        & $nssmPath remove $DashboardSvc confirm
+    }
+    $dRun = Get-ItemProperty $regPath -Name $DashboardRun -ErrorAction SilentlyContinue
+    if ($dRun) {
+        Remove-ItemProperty $regPath -Name $DashboardRun -Force
+        Log "HKCU Run key '$DashboardRun' removed."
+    }
+    # Stop any next.js dashboard process bound to the port
+    $dProc = Get-NetTCPConnection -State Listen -LocalPort $DashboardPort -ErrorAction SilentlyContinue
+    if ($dProc) {
+        $dProc.OwningProcess | Sort-Object -Unique | ForEach-Object {
+            Log "Stopping dashboard process PID=$_"
+            Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue
+        }
     }
 
     # Kill any lingering daemon/runner processes
@@ -339,6 +537,19 @@ if ($Method -eq "schtasks") {
 }
 
 # ---------------------------------------------------------------------------
+# Default config + dashboard (built + served on $DashboardPort)
+# ---------------------------------------------------------------------------
+
+# Always produce the default settings file (ports come from global.json).
+Write-DefaultConfig
+
+if ($NoDashboard) {
+    Log "Dashboard build/start skipped (-NoDashboard)."
+} else {
+    Setup-Dashboard -Method $Method
+}
+
+# ---------------------------------------------------------------------------
 # Verify
 # ---------------------------------------------------------------------------
 
@@ -362,6 +573,7 @@ if (Test-Path $masterLog) {
 
 Log "=== Setup complete ==="
 Log ""
-Log "Monitor: Get-Content '$masterLog' -Tail 50 -Wait"
-Log "Status : powershell -File setup-service.ps1 -Status"
-Log "Remove : powershell -File setup-service.ps1 -Uninstall"
+if (-not $NoDashboard) { Log "Dashboard: http://localhost:$DashboardPort" }
+Log "Monitor  : Get-Content '$masterLog' -Tail 50 -Wait"
+Log "Status   : powershell -File setup-service.ps1 -Status"
+Log "Remove   : powershell -File setup-service.ps1 -Uninstall"

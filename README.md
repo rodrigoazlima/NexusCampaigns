@@ -50,8 +50,9 @@
     <li>
       <a href="#getting-started">Getting Started</a>
       <ul>
+        <li><a href="#quick-install-one-command">Quick Install (one command)</a></li>
         <li><a href="#prerequisites">Prerequisites</a></li>
-        <li><a href="#installation">Installation</a></li>
+        <li><a href="#manual-installation">Manual Installation</a></li>
       </ul>
     </li>
     <li>
@@ -153,34 +154,63 @@ A pipeline of scheduled agents ingests source material, classifies it with visio
 <!-- GETTING STARTED -->
 ## Getting Started
 
-To get a local copy up and running follow these steps.
+### Quick Install (one command)
+
+> **Requires Administrator.** Installs everything — Python dependencies, the agent pipeline service, and the dashboard (built and served on **port 48080**) — and registers both to auto-start at boot.
+
+```powershell
+# 1. Clone the repo
+git clone https://github.com/rodrigoazlima/NexusCampaigns.git
+cd NexusCampaigns
+
+# 2. From an ELEVATED PowerShell 7 (Run as Administrator), one command installs it all:
+pwsh -ExecutionPolicy Bypass -File .agents\runtime\tools\setup-service.ps1
+```
+
+When it finishes, the dashboard is live at **http://localhost:48080**.
+
+| Manage | Command |
+|--------|---------|
+| Status | `pwsh -File .agents\runtime\tools\setup-service.ps1 -Status` |
+| Uninstall | `pwsh -File .agents\runtime\tools\setup-service.ps1 -Uninstall` |
+| Options | `-NoDashboard` to skip the dashboard · `-DashboardPort 9000` for a custom port |
+
+It also generates default settings at `.system\dashboard\.env.local` (`PROJECT_ROOT`, `VAULT_ROOT`, `PORT`, `HOSTNAME`) derived from `.system\.shared\config\global.json` — change the port once in `global.json` (`ports.dashboard`).
+
+Without Administrator the installer falls back to a per-user (at-logon) install via the HKCU Run key. NSSM + Admin is recommended for an always-on Windows service — `winget install NSSM.NSSM`.
 
 ### Prerequisites
 
-* [Node.js](https://nodejs.org/) (for the dashboard)
-* [Python 3.x](https://www.python.org/) (for the agent runtime)
+* [PowerShell 7+](https://learn.microsoft.com/powershell/) (`pwsh`)
+* [Python 3.11+](https://www.python.org/) — agent runtime
+* [Node.js 18+](https://nodejs.org/) — dashboard
+* [NSSM](https://nssm.cc/) (optional) — `winget install NSSM.NSSM`, for the always-on Windows service
 * A locally-hosted LLM endpoint (e.g. `qwen3-vl-4b-instruct`) for vision/lore agents — no external API keys required
 
-### Installation
+### Manual Installation
+
+Prefer to run the pieces by hand instead of the one-command installer?
 
 1. Clone the repo
    ```sh
    git clone https://github.com/rodrigoazlima/NexusCampaigns.git
    cd NexusCampaigns
    ```
-2. Install dashboard dependencies
+2. Install dependencies
    ```powershell
-   cd .system\dashboard
-   npm install
+   python -m pip install -r requirements.txt
+   cd .system\dashboard; npm install
    ```
-3. Configure the vault root and dashboard env
-   ```powershell
-   # Agent config:  .system\.shared\config\global.json
-   # Dashboard env:  .system\dashboard\.env.local
-   ```
-   | Variable | Default | Description |
-   |----------|---------|-------------|
-   | `VAULT_ROOT` | `D:\Library\rpg\dm\pathway\knowledge-base` | Path to the vault directory |
+3. Configure ports and the vault root. Ports live in the codebase config; the
+   one-command installer reads them and generates `.system\dashboard\.env.local`
+   for you (re-run with `-Force` to regenerate).
+
+   | Setting | Where | Default |
+   |---------|-------|---------|
+   | `ports.dashboard` | `.system\.shared\config\global.json` | `48080` |
+   | `ports.host` | `.system\.shared\config\global.json` | `0.0.0.0` |
+   | `VAULT_ROOT` | `.env.local` (or `NEXUS_VAULT_ROOT`) | `<repo>\knowledge-base` |
+4. Start the agent daemon and dashboard — see [Usage](#usage).
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -191,14 +221,16 @@ To get a local copy up and running follow these steps.
 
 ### Dashboard
 
+The Quick Install already builds and serves the dashboard on port 48080. To run it manually in dev mode:
+
 ```powershell
 cd .system\dashboard
 npm run dev
 ```
 
-Binds `0.0.0.0:3131` — accessible on local LAN:
-- Local: http://localhost:3131
-- LAN: http://`<your-ip>`:3131
+Binds `0.0.0.0:48080` — accessible on local LAN:
+- Local: http://localhost:48080
+- LAN: http://`<your-ip>`:48080
 
 ### Agent Daemon
 
