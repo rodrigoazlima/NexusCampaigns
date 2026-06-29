@@ -1,21 +1,15 @@
-# setup-service.ps1 — Install (register) Nexus Campaigns services
+# setup-service.ps1 — Install and start Nexus Campaigns services
 #
-# Installs pip deps, registers the agent pipeline service, and builds + registers
-# the Next.js dashboard to auto-start at boot. Does NOT start anything immediately.
-# Start services manually after install (see usage below).
+# Installs pip deps, registers and starts the agent pipeline service, and builds,
+# registers, and starts the Next.js dashboard on port 48080. Run once from elevated shell.
 #
 # Supported methods (auto-detected):
 #   nssm      — NSSM service manager (requires Admin; recommended for production)
 #   schtasks  — HKCU Run key (works without Admin; starts at logon)
 #
 # Usage (requires pwsh / PowerShell 7+):
-#   # Install everything (run as Administrator):
+#   # Install and start everything (run as Administrator):
 #   pwsh -ExecutionPolicy Bypass -File setup-service.ps1
-#
-#   # Start services after install:
-#   Start-Service vault-knowledge-factory          # NSSM method
-#   Start-Service vault-dashboard                  # NSSM method
-#   pwsh -File .agents\runtime\tools\daemon.ps1   # schtasks method
 #
 #   # Force a specific method:
 #   pwsh -ExecutionPolicy Bypass -File setup-service.ps1 -Method schtasks
@@ -25,8 +19,8 @@
 #   pwsh -ExecutionPolicy Bypass -File setup-service.ps1 -DashboardPort 9000
 #   pwsh -ExecutionPolicy Bypass -File setup-service.ps1 -NoDashboard
 #
-#   # Skip runner --once pre-flight (use when already verified):
-#   pwsh -ExecutionPolicy Bypass -File setup-service.ps1 -SkipPreFlight
+#   # Opt in to runner --once pre-flight verification (~60s):
+#   pwsh -ExecutionPolicy Bypass -File setup-service.ps1 -RunPreFlight
 #
 #   # Uninstall (removes both services):
 #   pwsh -ExecutionPolicy Bypass -File setup-service.ps1 -Uninstall
@@ -43,7 +37,7 @@ param(
     [switch] $Force,                       # overwrite generated default config (.env.local)
     [switch] $Uninstall,
     [switch] $Status,
-    [switch] $SkipPreFlight           # skip runner --once verification (use after first successful run)
+    [switch] $RunPreFlight            # opt-in: run runner --once before installing (slow, ~60s)
 )
 
 $ErrorActionPreference = "Stop"
@@ -91,6 +85,12 @@ $VaultRootAbs = if ([System.IO.Path]::IsPathRooted($VaultRootRel)) { $VaultRootR
 function Log([string]$Msg, [string]$Level = "INFO") {
     $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     Write-Host "[$ts] [setup-service] ${Level}: $Msg"
+}
+
+$script:ProgressPct = 0
+function Step-Progress([string]$Status, [int]$Pct) {
+    $script:ProgressPct = $Pct
+    Write-Progress -Activity "Nexus Campaigns Setup" -Status $Status -PercentComplete $Pct
 }
 
 function Is-Admin {
@@ -191,12 +191,16 @@ function Setup-Dashboard {
     # Install deps + production build
     Push-Location $DashboardDir
     try {
-        Log "Installing dashboard dependencies (npm install)..."
-        & $npm install
-        if ($LASTEXITCODE -ne 0) { Log "npm install failed — skipping dashboard." "ERROR"; return }
-        Log "Building dashboard (npm run build)..."
-        & $npm run build
-        if ($LASTEXITCODE -ne 0) { Log "npm run build failed — skipping dashboard." "ERROR"; return }
+        $npmLog = "$LogDir\npm-install.log"
+        Step-Progress "Installing dashboard npm dependencies..." 65
+        Log "Installing dashboard dependencies (npm install → $npmLog)..."
+        & $npm install 2>&1 | Out-File $npmLog -Encoding UTF8
+        if ($LASTEXITCODE -ne 0) { Log "npm install failed — check $npmLog" "ERROR"; return }
+        $buildLog = "$LogDir\npm-build.log"
+        Step-Progress "Building dashboard (npm run build)..." 75
+        Log "Building dashboard (npm run build → $buildLog)..."
+        & $npm run build 2>&1 | Out-File $buildLog -Encoding UTF8
+        if ($LASTEXITCODE -ne 0) { Log "npm run build failed — check $buildLog" "ERROR"; return }
     } finally {
         Pop-Location
     }
@@ -211,29 +215,36 @@ function Setup-Dashboard {
             if ($existing.Status -eq "Running") { & $nssmPath stop $DashboardSvc }
             & $nssmPath remove $DashboardSvc confirm
         }
-        Log "Installing NSSM service '$DashboardSvc'..."
-        & $nssmPath install $DashboardSvc $nodePath
-        & $nssmPath set     $DashboardSvc AppParameters  "`"$nextBin`" start --port $DashboardPort --hostname $DashboardHost"
-        & $nssmPath set     $DashboardSvc AppDirectory   $DashboardDir
-        & $nssmPath set     $DashboardSvc DisplayName    "Vault Nexus Dashboard"
-        & $nssmPath set     $DashboardSvc Description    "Nexus Campaigns admin dashboard (Next.js) on port $DashboardPort"
-        & $nssmPath set     $DashboardSvc Start          SERVICE_AUTO_START
-        & $nssmPath set     $DashboardSvc AppRestartDelay 30000
-        & $nssmPath set     $DashboardSvc AppStdout      "$LogDir\dashboard-stdout.log"
-        & $nssmPath set     $DashboardSvc AppStderr      "$LogDir\dashboard-stderr.log"
-        & $nssmPath set     $DashboardSvc AppStdoutCreationDisposition 4
-        & $nssmPath set     $DashboardSvc AppStderrCreationDisposition 4
-        & $nssmPath set     $DashboardSvc AppEnvironmentExtra "NODE_ENV=production PORT=$DashboardPort HOSTNAME=$DashboardHost"
-        Log "Dashboard service installed (not started). Start with: Start-Service $DashboardSvc"
+        Log "Installing NSSM service '$DashboardSvc' (details: $nssmLog)..."
+        & $nssmPath install $DashboardSvc $nodePath                                                                          2>&1 | Out-File $nssmLog -Append -Encoding UTF8
+        & $nssmPath set     $DashboardSvc AppParameters  "`"$nextBin`" start --port $DashboardPort --hostname $DashboardHost" 2>&1 | Out-File $nssmLog -Append -Encoding UTF8
+        & $nssmPath set     $DashboardSvc AppDirectory   $DashboardDir                                                       2>&1 | Out-File $nssmLog -Append -Encoding UTF8
+        & $nssmPath set     $DashboardSvc DisplayName    "Vault Nexus Dashboard"                                             2>&1 | Out-File $nssmLog -Append -Encoding UTF8
+        & $nssmPath set     $DashboardSvc Description    "Nexus Campaigns admin dashboard (Next.js) on port $DashboardPort"  2>&1 | Out-File $nssmLog -Append -Encoding UTF8
+        & $nssmPath set     $DashboardSvc Start          SERVICE_AUTO_START                                                  2>&1 | Out-File $nssmLog -Append -Encoding UTF8
+        & $nssmPath set     $DashboardSvc AppRestartDelay 30000                                                              2>&1 | Out-File $nssmLog -Append -Encoding UTF8
+        & $nssmPath set     $DashboardSvc AppStdout      "$LogDir\dashboard-stdout.log"                                      2>&1 | Out-File $nssmLog -Append -Encoding UTF8
+        & $nssmPath set     $DashboardSvc AppStderr      "$LogDir\dashboard-stderr.log"                                      2>&1 | Out-File $nssmLog -Append -Encoding UTF8
+        & $nssmPath set     $DashboardSvc AppStdoutCreationDisposition 4                                                     2>&1 | Out-File $nssmLog -Append -Encoding UTF8
+        & $nssmPath set     $DashboardSvc AppStderrCreationDisposition 4                                                     2>&1 | Out-File $nssmLog -Append -Encoding UTF8
+        & $nssmPath set     $DashboardSvc AppEnvironmentExtra "NODE_ENV=production PORT=$DashboardPort HOSTNAME=$DashboardHost" 2>&1 | Out-File $nssmLog -Append -Encoding UTF8
+        Step-Progress "Starting dashboard service..." 90
+        Log "Starting dashboard service '$DashboardSvc'..."
+        & $nssmPath start $DashboardSvc 2>&1 | Out-File $nssmLog -Append -Encoding UTF8
+        Log "Dashboard started -> http://localhost:$DashboardPort"
     } else {
-        # No admin: auto-start at logon via HKCU Run key.
+        # No admin: auto-start at logon via HKCU Run key + start now (detached, hidden).
         $RegPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
         $cmd     = "`"$nodePath`" `"$nextBin`" start --port $DashboardPort --hostname $DashboardHost"
         $existing = Get-ItemProperty $RegPath -Name $DashboardRun -ErrorAction SilentlyContinue
         if ($existing) { Remove-ItemProperty $RegPath -Name $DashboardRun -Force }
         Set-ItemProperty $RegPath -Name $DashboardRun -Value $cmd
         Log "Dashboard auto-start registered: HKCU\...\Run\$DashboardRun"
-        Log "Dashboard registered (not started). Start with: pwsh -File .agents\runtime\tools\daemon.ps1"
+        $proc = Start-Process -FilePath $nodePath `
+            -ArgumentList @($nextBin, "start", "--port", "$DashboardPort", "--hostname", "$DashboardHost") `
+            -WorkingDirectory $DashboardDir -WindowStyle Hidden -PassThru
+        if ($proc) { Log "Dashboard started (PID=$($proc.Id)) -> http://localhost:$DashboardPort" }
+        else       { Log "Dashboard Start-Process returned no handle — may have launched detached." "WARN" }
     }
 }
 
@@ -381,6 +392,7 @@ if ($Uninstall) {
 # ---------------------------------------------------------------------------
 
 Log "=== Vault Nexus Campaigns — Service Setup ==="
+Step-Progress "Removing previous installation..." 5
 Log "Checking for previous installation to remove..."
 
 $_nssmPath = Find-NSSM
@@ -416,6 +428,7 @@ Get-Process powershell, pwsh, python -ErrorAction SilentlyContinue |
 # ---------------------------------------------------------------------------
 # Pre-flight checks
 # ---------------------------------------------------------------------------
+Step-Progress "Checking prerequisites..." 15
 Log "ProjectRoot : $ProjectRoot"
 Log "Python      : $Python"
 
@@ -440,7 +453,7 @@ try {
     exit 1
 }
 
-# Install pip dependencies
+Step-Progress "Installing Python dependencies..." 25
 Log "Installing pip dependencies..."
 & $Python -m pip install -r "$ProjectRoot\requirements.txt" --quiet
 if ($LASTEXITCODE -ne 0) {
@@ -458,17 +471,17 @@ if ($auth) {
     Log "         Set ANTHROPIC_API_KEY before the service starts." "WARN"
 }
 
-# Verify one-shot run
-if ($SkipPreFlight) {
-    Log "Pre-flight skipped (-SkipPreFlight)."
-} else {
-    Log "Verifying runner --once..."
+if ($RunPreFlight) {
+    Step-Progress "Running pre-flight check (runner --once)..." 38
+    Log "Pre-flight: running runner --once..."
     if ($auth -and $auth.Var -eq "ANTHROPIC_AUTH_TOKEN") { $env:ANTHROPIC_AUTH_TOKEN = $auth.Value }
     if ($auth -and $auth.Var -eq "ANTHROPIC_API_KEY")    { $env:ANTHROPIC_API_KEY    = $auth.Value }
     & $Python $RunnerScript --once
     if ($LASTEXITCODE -ne 0) {
         Log "Runner --once exited $LASTEXITCODE. Check logs before installing service." "WARN"
     }
+} else {
+    Log "Pre-flight skipped (pass -RunPreFlight to opt in)."
 }
 
 # Create log dir
@@ -497,6 +510,7 @@ if ($Method -eq "auto") {
 }
 
 Log "Install method: $Method"
+Step-Progress "Installing agent service ($Method)..." 50
 
 # ---------------------------------------------------------------------------
 # Install via NSSM (requires Admin)
@@ -512,33 +526,26 @@ if ($Method -eq "nssm") {
         exit 1
     }
 
-    # Remove existing service if present
-    $existing = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
-    if ($existing) {
-        Log "Removing existing NSSM service '$ServiceName'..."
-        if ($existing.Status -eq "Running") { & $nssmPath stop $ServiceName }
-        & $nssmPath remove $ServiceName confirm
-    }
-
-    Log "Installing NSSM service '$ServiceName'..."
-    & $nssmPath install     $ServiceName $Python
-    & $nssmPath set         $ServiceName AppParameters  $RunnerScript
-    & $nssmPath set         $ServiceName AppDirectory   $ProjectRoot
-    & $nssmPath set         $ServiceName DisplayName    $DisplayName
-    & $nssmPath set         $ServiceName Description    $Description
-    & $nssmPath set         $ServiceName Start          SERVICE_AUTO_START
-    & $nssmPath set         $ServiceName AppRestartDelay 30000
-    & $nssmPath set         $ServiceName AppStdout      "$LogDir\service-stdout.log"
-    & $nssmPath set         $ServiceName AppStderr      "$LogDir\service-stderr.log"
-    & $nssmPath set         $ServiceName AppStdoutCreationDisposition 4
-    & $nssmPath set         $ServiceName AppStderrCreationDisposition 4
-
-    # Environment variables
+    $nssmLog = "$LogDir\nssm-install.log"
+    Log "Installing NSSM service '$ServiceName' (details: $nssmLog)..."
+    & $nssmPath install     $ServiceName $Python                                              2>&1 | Out-File $nssmLog -Append -Encoding UTF8
+    & $nssmPath set         $ServiceName AppParameters  $RunnerScript                        2>&1 | Out-File $nssmLog -Append -Encoding UTF8
+    & $nssmPath set         $ServiceName AppDirectory   $ProjectRoot                         2>&1 | Out-File $nssmLog -Append -Encoding UTF8
+    & $nssmPath set         $ServiceName DisplayName    $DisplayName                         2>&1 | Out-File $nssmLog -Append -Encoding UTF8
+    & $nssmPath set         $ServiceName Description    $Description                         2>&1 | Out-File $nssmLog -Append -Encoding UTF8
+    & $nssmPath set         $ServiceName Start          SERVICE_AUTO_START                   2>&1 | Out-File $nssmLog -Append -Encoding UTF8
+    & $nssmPath set         $ServiceName AppRestartDelay 30000                               2>&1 | Out-File $nssmLog -Append -Encoding UTF8
+    & $nssmPath set         $ServiceName AppStdout      "$LogDir\service-stdout.log"         2>&1 | Out-File $nssmLog -Append -Encoding UTF8
+    & $nssmPath set         $ServiceName AppStderr      "$LogDir\service-stderr.log"         2>&1 | Out-File $nssmLog -Append -Encoding UTF8
+    & $nssmPath set         $ServiceName AppStdoutCreationDisposition 4                      2>&1 | Out-File $nssmLog -Append -Encoding UTF8
+    & $nssmPath set         $ServiceName AppStderrCreationDisposition 4                      2>&1 | Out-File $nssmLog -Append -Encoding UTF8
     $envExtra = "GIT_AUTHOR_NAME=Vault Bot GIT_AUTHOR_EMAIL=bot@localhost"
     if ($auth) { $envExtra += " $($auth.Var)=$($auth.Value)" }
-    & $nssmPath set $ServiceName AppEnvironmentExtra $envExtra
+    & $nssmPath set         $ServiceName AppEnvironmentExtra $envExtra                       2>&1 | Out-File $nssmLog -Append -Encoding UTF8
 
-    Log "NSSM service installed (not started). Start with: Start-Service $ServiceName"
+    Log "Starting service '$ServiceName'..."
+    & $nssmPath start $ServiceName 2>&1 | Out-File $nssmLog -Append -Encoding UTF8
+    Log "Service started."
 }
 
 # ---------------------------------------------------------------------------
@@ -564,13 +571,19 @@ if ($Method -eq "schtasks") {
     Log "Auto-start registered: HKCU\...\Run\$RegValue"
     Log "  Command: $psCmd"
 
-    Log "Daemon registered (not started). Start with: pwsh -NonInteractive -File `"$DaemonScript`""
+    Log "Starting daemon..."
+    $proc = Start-Process -FilePath "pwsh.exe" `
+        -ArgumentList @("-NonInteractive", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", $DaemonScript) `
+        -WindowStyle Hidden -PassThru
+    if ($proc) { Log "Daemon started (PID=$($proc.Id))." }
+    else       { Log "Start-Process returned no handle — daemon may have launched detached." "WARN" }
 }
 
 # ---------------------------------------------------------------------------
 # Default config + dashboard (built + served on $DashboardPort)
 # ---------------------------------------------------------------------------
 
+Step-Progress "Generating environment config..." 60
 # Always produce the default settings file (ports come from global.json).
 Write-DefaultConfig
 
@@ -580,25 +593,17 @@ if ($NoDashboard) {
     Setup-Dashboard -Method $Method
 }
 
+Step-Progress "Starting services..." 95
+
 $masterLog = "$LogDir\automation.log"
 
-Log "=== Install complete — services registered but NOT started ==="
+Write-Progress -Activity "Nexus Campaigns Setup" -Completed
+
+Log "=== Setup complete ==="
 Log ""
-if ($Method -eq "nssm") {
-    Log "Start agent  : Start-Service $ServiceName"
-    if (-not $NoDashboard) { Log "Start dashboard: Start-Service $DashboardSvc" }
-} else {
-    Log "Start agent  : pwsh -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$DaemonScript`""
-    if (-not $NoDashboard) {
-        $nextBin = "$DashboardDir\node_modules\next\dist\bin\next"
-        $nodePath = Find-Node
-        if ($nodePath) {
-            Log "Start dashboard: & `"$nodePath`" `"$nextBin`" start --port $DashboardPort --hostname $DashboardHost"
-        }
-    }
-}
-Log ""
-if (-not $NoDashboard) { Log "Dashboard URL: http://localhost:$DashboardPort (after starting dashboard)" }
+if (-not $NoDashboard) { Log "Dashboard: http://localhost:$DashboardPort" }
 Log "Monitor  : Get-Content '$masterLog' -Tail 50 -Wait"
 Log "Status   : pwsh -File setup-service.ps1 -Status"
 Log "Remove   : pwsh -File setup-service.ps1 -Uninstall"
+
+exit 0

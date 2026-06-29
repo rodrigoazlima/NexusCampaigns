@@ -156,35 +156,24 @@ A pipeline of scheduled agents ingests source material, classifies it with visio
 
 ### Quick Install (one command)
 
-> **Requires Administrator.** Registers Python dependencies, the agent pipeline service, and the dashboard (built, auto-start on boot) — but does **not** start them. Start manually after install.
+> **Requires Administrator.** Installs everything — Python dependencies, the agent pipeline service, and the dashboard (built and served on **port 48080**) — registers both to auto-start at boot, and starts them immediately.
 
 ```powershell
 # 1. Clone the repo
 git clone https://github.com/rodrigoazlima/NexusCampaigns.git
 cd NexusCampaigns
 
-# 2. From an ELEVATED PowerShell 7 (Run as Administrator):
+# 2. From an ELEVATED PowerShell 7 (Run as Administrator), one command installs and starts it all:
 pwsh -ExecutionPolicy Bypass -File .agents\runtime\tools\setup-service.ps1
 ```
 
-Then start the services:
-
-```powershell
-# NSSM (Admin install)
-Start-Service vault-knowledge-factory
-Start-Service vault-dashboard
-
-# HKCU / no-Admin fallback
-pwsh -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File .agents\runtime\tools\daemon.ps1
-```
-
-Dashboard available at **http://localhost:48080** after starting.
+When it finishes, the dashboard is live at **http://localhost:48080**.
 
 | Manage | Command |
 |--------|---------|
 | Status | `pwsh -File .agents\runtime\tools\setup-service.ps1 -Status` |
 | Uninstall | `pwsh -File .agents\runtime\tools\setup-service.ps1 -Uninstall` |
-| Options | `-NoDashboard` to skip dashboard · `-DashboardPort 9000` for custom port · `-SkipPreFlight` to skip test run |
+| Options | `-NoDashboard` to skip dashboard · `-DashboardPort 9000` for custom port · `-RunPreFlight` to run agent test cycle first (~60s) |
 
 Generates default settings at `.system\.env.local` (`PROJECT_ROOT`, `VAULT_ROOT`, `PORT`, `HOSTNAME`) derived from `.system\.shared\config\global.json` — change the port once in `global.json` (`ports.dashboard`). Previous installs are automatically removed before each fresh install.
 
