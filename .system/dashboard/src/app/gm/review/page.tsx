@@ -17,8 +17,7 @@ export default function GMReviewPage() {
   const [toast, setToast] = useState<Toast | null>(null)
   const [typeFilter, setTypeFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [qualityFilter, setQualityFilter] = useState('all')
-  const [sortBy, setSortBy] = useState('quality')
+  const [sortBy, setSortBy] = useState('created')
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ message, type })
@@ -43,12 +42,12 @@ export default function GMReviewPage() {
     fetchItems()
   }, [fetchItems])
 
-  const handleApprove = async (filename: string, quality: number) => {
+  const handleApprove = async (filename: string) => {
     try {
       const res = await fetch('/api/gm/approve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename, quality }),
+        body: JSON.stringify({ filename }),
       })
       const data = await res.json()
       if (data.ok) {
@@ -106,22 +105,13 @@ export default function GMReviewPage() {
   const filtered = items
     .filter((i) => typeFilter === 'all' || i.type === typeFilter)
     .filter((i) => statusFilter === 'all' || i.status === statusFilter)
-    .filter((i) => {
-      if (qualityFilter === 'all') return true
-      if (qualityFilter === 'high') return i.quality >= 7
-      if (qualityFilter === 'mid') return i.quality >= 4 && i.quality < 7
-      if (qualityFilter === 'low') return i.quality < 4
-      return true
-    })
     .sort((a, b) => {
-      if (sortBy === 'quality') return b.quality - a.quality
       if (sortBy === 'created') return (b.created ?? '').localeCompare(a.created ?? '')
       if (sortBy === 'name') return a.id.localeCompare(b.id)
       return 0
     })
 
   const unreviewed = items.filter((i) => !i.reviewed).length
-  const highQuality = items.filter((i) => i.quality >= 7).length
   const approved = items.filter((i) => i.status === 'approved').length
 
   return (
@@ -133,16 +123,11 @@ export default function GMReviewPage() {
       />
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-3 gap-3 mb-6">
         <div className="panel p-4">
           <div className="text-xs text-zinc-500 mb-1 uppercase tracking-wide">Pending</div>
           <div className="text-3xl font-mono font-semibold text-warning">{unreviewed}</div>
           <div className="text-xs text-zinc-500 mt-1">unreviewed</div>
-        </div>
-        <div className="panel p-4">
-          <div className="text-xs text-zinc-500 mb-1 uppercase tracking-wide">High Quality</div>
-          <div className="text-3xl font-mono font-semibold text-success">{highQuality}</div>
-          <div className="text-xs text-zinc-500 mt-1">quality &ge; 7</div>
         </div>
         <div className="panel p-4">
           <div className="text-xs text-zinc-500 mb-1 uppercase tracking-wide">Approved</div>
@@ -188,17 +173,6 @@ export default function GMReviewPage() {
           ))}
         </select>
 
-        <select
-          value={qualityFilter}
-          onChange={(e) => setQualityFilter(e.target.value)}
-          className="text-xs bg-surface-3 border border-surface-3 text-zinc-300 px-2 py-1.5 rounded outline-none focus:border-primary/40 transition-colors"
-        >
-          <option value="all">All Quality</option>
-          <option value="high">High (&ge;7)</option>
-          <option value="mid">Mid (4–6)</option>
-          <option value="low">Low (&lt;4)</option>
-        </select>
-
         <div className="ml-auto flex items-center gap-2">
           <span className="text-xs text-zinc-500">Sort:</span>
           <select
@@ -206,7 +180,6 @@ export default function GMReviewPage() {
             onChange={(e) => setSortBy(e.target.value)}
             className="text-xs bg-surface-3 border border-surface-3 text-zinc-300 px-2 py-1.5 rounded outline-none focus:border-primary/40 transition-colors"
           >
-            <option value="quality">Quality</option>
             <option value="created">Created</option>
             <option value="name">Name</option>
           </select>

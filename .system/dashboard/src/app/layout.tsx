@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import Sidebar from '@/components/layout/Sidebar'
+import GlobalShortcuts from '@/components/layout/GlobalShortcuts'
 
 export const metadata: Metadata = {
   title: 'Nexus Campaigns',
@@ -15,6 +16,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className="bg-surface text-zinc-100 min-h-screen">
+        <GlobalShortcuts />
         <div className="flex h-screen overflow-hidden">
           <Sidebar />
           <main className="flex-1 overflow-y-auto bg-surface pt-14 md:pt-0">

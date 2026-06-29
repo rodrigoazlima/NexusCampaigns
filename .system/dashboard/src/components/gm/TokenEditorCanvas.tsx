@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef, useEffect, useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import type { ItemDetail } from '@/lib/types'
 
@@ -16,6 +17,7 @@ const CANVAS_SIZE = 512
 const CLIP_RADIUS = 234
 
 export default function TokenEditorCanvas({ item, imageSrc, tokenSrc }: Props) {
+  const router = useRouter()
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   const [offset, setOffset] = useState({ x: 0, y: 0 })
@@ -37,7 +39,7 @@ export default function TokenEditorCanvas({ item, imageSrc, tokenSrc }: Props) {
   const [savedTokenUrl, setSavedTokenUrl] = useState<string | null>(null)
 
   // Auto-save refs
-  const saveTokenRef = useRef<() => Promise<void>>(async () => {})
+  const saveTokenRef = useRef<() => Promise<boolean | void>>(async () => {})
   const initDone = useRef(false)
 
   // Load frames
@@ -190,11 +192,14 @@ export default function TokenEditorCanvas({ item, imageSrc, tokenSrc }: Props) {
           break
         case '[': setFrameIdx((i) => (i - 1 + frames.length) % Math.max(1, frames.length)); break
         case ']': setFrameIdx((i) => (i + 1) % Math.max(1, frames.length)); break
+        case 'Escape': router.push(`/gm/view/${item.id}`); break
+        case 's':
+        case 'S': saveAndReturnRef.current(); break
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [frames.length])
+  }, [frames.length, router, item.id])
 
   // Set default frame
   async function setAsDefault() {
@@ -214,31 +219,41 @@ export default function TokenEditorCanvas({ item, imageSrc, tokenSrc }: Props) {
     }
   }
 
-  // Save token
-  const saveToken = useCallback(async () => {
+  // Save token — returns true on success
+  const saveToken = useCallback(async (): Promise<boolean> => {
     const canvas = canvasRef.current
-    if (!canvas) return
+    if (!canvas) return false
     setSaving(true); setMsg(null)
     try {
       const imageData = canvas.toDataURL('image/png')
       const r = await fetch('/api/gm/token/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageData, filename: item.filename }),
+        body: JSON.stringify({ imageData, filename: item.filename, sourcePath: item.source[0] ?? '' }),
       })
       if (!r.ok) throw new Error(await r.text())
       const data = await r.json() as { ok: boolean; tokenUrl: string }
       setSavedTokenUrl(data.tokenUrl + '&t=' + Date.now())
-      setMsg({ text: 'Auto-saved', ok: true })
+      setMsg({ text: 'Saved', ok: true })
+      return true
     } catch (err) {
       setMsg({ text: String(err), ok: false })
+      return false
     } finally {
       setSaving(false)
     }
   }, [item.filename])
 
-  // Keep ref current so auto-save timer always calls the latest version
+  const saveAndReturn = useCallback(async () => {
+    const ok = await saveToken()
+    if (ok) router.push(`/gm/view/${item.id}`)
+  }, [saveToken, router, item.id])
+
+  // Keep ref current so auto-save timer always calls the latest version (no navigation)
   useEffect(() => { saveTokenRef.current = saveToken }, [saveToken])
+
+  const saveAndReturnRef = useRef<() => Promise<void>>(async () => {})
+  useEffect(() => { saveAndReturnRef.current = saveAndReturn }, [saveAndReturn])
 
   // Mark init done 200ms after src+frames are ready, then auto-save on any change
   useEffect(() => {
@@ -292,7 +307,7 @@ export default function TokenEditorCanvas({ item, imageSrc, tokenSrc }: Props) {
         )}
 
         <button
-          onClick={saveToken}
+          onClick={saveAndReturn}
           disabled={saving || !srcLoaded}
           className={`inline-flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium border transition-colors ${
             srcLoaded
@@ -502,6 +517,9 @@ export default function TokenEditorCanvas({ item, imageSrc, tokenSrc }: Props) {
             <section>
               <div className="text-xs font-semibold uppercase tracking-widest text-zinc-500 mb-3">Shortcuts</div>
               <div className="space-y-1.5 text-xs">
+                <ShortcutRow keys={['S']} desc="Save & return" />
+                <ShortcutRow keys={['Esc']} desc="Back to item" />
+                <ShortcutRow keys={['⌫']} desc="Back (global)" />
                 <ShortcutRow keys={['↑', '↓', '←', '→']} desc="Nudge 5px" />
                 <ShortcutRow keys={['+', '-']} desc="Zoom ±10%" />
                 <ShortcutRow keys={['0']} desc="Reset zoom to 1×" />

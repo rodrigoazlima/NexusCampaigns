@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -51,6 +51,14 @@ export default function ItemDetailView({ item: initial }: Props) {
   const [renameInput, setRenameInput] = useState(item.id)
   const [showApproveQuality, setShowApproveQuality] = useState(false)
   const [approveQuality, setApproveQuality] = useState<number | null>(item.quality || null)
+  const [mdContent, setMdContent] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch(`/api/gm/content?filename=${encodeURIComponent(item.filename)}`)
+      .then((r) => r.json())
+      .then((d) => { if (d.content) setMdContent(d.content) })
+      .catch(() => {})
+  }, [item.filename])
 
   const imageSrc = item.source[0]
     ? `/api/image?path=${encodeURIComponent(item.source[0])}`
@@ -647,11 +655,13 @@ export default function ItemDetailView({ item: initial }: Props) {
         </div>
       </div>
 
-      {/* Excerpt */}
-      {item.excerpt && (
+      {/* Content Preview — full markdown file */}
+      {mdContent && (
         <div className="panel p-4 mt-4">
           <div className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 mb-2">Content Preview</div>
-          <p className="text-xs text-zinc-400 leading-relaxed">{item.excerpt}</p>
+          <pre className="text-xs text-zinc-400 leading-relaxed whitespace-pre-wrap font-mono max-h-96 overflow-y-auto bg-surface-3 rounded p-3 border border-surface-3">
+            {mdContent}
+          </pre>
         </div>
       )}
 

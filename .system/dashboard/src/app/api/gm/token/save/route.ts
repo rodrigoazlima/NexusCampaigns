@@ -7,8 +7,8 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json() as { imageData: string; filename: string }
-    const { imageData, filename } = body
+    const body = await req.json() as { imageData: string; filename: string; sourcePath?: string }
+    const { imageData, filename, sourcePath } = body
 
     if (!imageData?.startsWith('data:image/png;base64,')) {
       return NextResponse.json({ error: 'Invalid image data' }, { status: 400 })
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
       }
       if (!updated) {
         genTokens[`manual:${slug}`] = {
-          sourcePath: '',
+          sourcePath: sourcePath ?? '',
           tokenPath,
           generatedAt: new Date().toISOString(),
         }

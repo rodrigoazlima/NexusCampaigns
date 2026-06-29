@@ -12,7 +12,7 @@ interface ItemChatPanelProps {
 }
 
 export default function ItemChatPanel({ item, agents }: ItemChatPanelProps) {
-  const activeAgents = agents.filter((a) => a.status !== 'planned')
+  const activeAgents = agents.filter((a) => a.status !== 'planned' && a.name !== 'runtime')
   const [collapsed, setCollapsed] = useState(false)
   const [selectedAgent, setSelectedAgent] = useState(activeAgents[0]?.name ?? 'lore')
   const [messages, setMessages] = useState<GMChatMessage[]>([])

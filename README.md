@@ -173,6 +173,7 @@ When it finishes, the dashboard is live at **http://localhost:48080**.
 |--------|---------|
 | Status | `pwsh -File .agents\runtime\tools\setup-service.ps1 -Status` |
 | Uninstall | `pwsh -File .agents\runtime\tools\setup-service.ps1 -Uninstall` |
+| Clean install | `pwsh -File .agents\runtime\tools\setup-service.ps1 -CleanInstall` |
 | Options | `-NoDashboard` to skip dashboard · `-DashboardPort 9000` for custom port · `-RunPreFlight` to run agent test cycle first (~60s) |
 
 Generates default settings at `.system\.env.local` (`PROJECT_ROOT`, `VAULT_ROOT`, `PORT`, `HOSTNAME`) derived from `.system\.shared\config\global.json` — change the port once in `global.json` (`ports.dashboard`). Previous installs are automatically removed before each fresh install.
@@ -256,6 +257,11 @@ pwsh -File '.agents\runtime\tools\setup-service.ps1' -Status
 
 # Uninstall
 pwsh -File '.agents\runtime\tools\setup-service.ps1' -Uninstall
+
+# Clean install — wipes all generated state, indexes, configs, and build artifacts
+# Preserves 00-Inbox (source), 02-Library, 03-Campaigns, 05-Assets, 99-Archive
+# Requires typing 'yes' to confirm
+pwsh -File '.agents\runtime\tools\setup-service.ps1' -CleanInstall
 ```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>

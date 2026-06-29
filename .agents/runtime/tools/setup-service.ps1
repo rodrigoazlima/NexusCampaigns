@@ -27,18 +27,78 @@
 #
 #   # Check status:
 #   pwsh -ExecutionPolicy Bypass -File setup-service.ps1 -Status
+#
+#   # Clean install (wipes generated state, indexes, configs, build artifacts, then installs fresh):
+#   pwsh -ExecutionPolicy Bypass -File setup-service.ps1 -CleanInstall
 
 param(
     [string] $ProjectRoot    = "C:\opt\GitHub\NexusCampaigns",
     [string] $Python         = "python",
     [string] $Method         = "auto",    # "auto" | "nssm" | "schtasks"
-    [int]    $DashboardPort  = 48080,      # Next.js dashboard port (default from config; overrides config when passed)
-    [switch] $NoDashboard,                 # skip dashboard install/start
-    [switch] $Force,                       # overwrite generated default config (.env.local)
+    [int]    $DashboardPort  = 48080,
+    [switch] $NoDashboard,
+    [switch] $Force,
     [switch] $Uninstall,
     [switch] $Status,
-    [switch] $RunPreFlight            # opt-in: run runner --once before installing (slow, ~60s)
+    [switch] $RunPreFlight,
+    [switch] $CleanInstall,
+    [switch] $Help
 )
+
+if ($Help) {
+    Write-Host @"
+
+setup-service.ps1 — Install and start Nexus Campaigns services
+
+USAGE
+  pwsh -ExecutionPolicy Bypass -File setup-service.ps1 [parameters]
+
+PARAMETERS
+  -ProjectRoot   <path>   Vault project root. Default: C:\opt\GitHub\NexusCampaigns
+  -Python        <cmd>    Python executable to use. Default: python
+  -Method        <str>    Install method: auto | nssm | schtasks. Default: auto
+                            auto     — picks nssm when admin + NSSM installed, else schtasks
+                            nssm     — Windows service via NSSM (requires Admin + NSSM)
+                            schtasks — HKCU Run key; no admin needed, starts at logon
+  -DashboardPort <int>    Next.js dashboard port. Default: read from global.json, else 48080
+  -NoDashboard            Skip dashboard build and start entirely
+  -Force                  Overwrite existing .env.local config (default: keep existing)
+  -RunPreFlight           Run runner --once before installing (~60s pre-flight check)
+  -Status                 Check if agent service and dashboard are running, then exit
+  -Uninstall              Remove both services and all Run keys, kill lingering processes
+  -CleanInstall           Wipe generated state/indexes/configs/build artifacts, then install fresh
+                            Preserved: 00-Inbox, 02-Library, 03-Campaigns, 05-Assets, 99-Archive
+                            Deleted:   01-Processing, 04-Relationships, agent state, logs, node_modules
+                            Re-seeded: tasks-state.json (all agents → epoch), agent-metrics.json ({})
+  -Help                   Show this help and exit
+
+EXAMPLES
+  # Default install (auto-detects method):
+  pwsh -ExecutionPolicy Bypass -File setup-service.ps1
+
+  # Force NSSM (must be Admin):
+  pwsh -ExecutionPolicy Bypass -File setup-service.ps1 -Method nssm
+
+  # Custom port, skip dashboard:
+  pwsh -ExecutionPolicy Bypass -File setup-service.ps1 -DashboardPort 9000 -NoDashboard
+
+  # Check service health:
+  pwsh -ExecutionPolicy Bypass -File setup-service.ps1 -Status
+
+  # Full wipe + fresh install:
+  pwsh -ExecutionPolicy Bypass -File setup-service.ps1 -CleanInstall
+
+  # Remove everything:
+  pwsh -ExecutionPolicy Bypass -File setup-service.ps1 -Uninstall
+
+LOGS
+  .agents\runtime\state\logs\automation.log      — consolidated pipeline log
+  .agents\runtime\state\logs\npm-build.log        — dashboard build output
+  .agents\runtime\state\logs\nssm-install.log     — NSSM registration output
+
+"@
+    exit 0
+}
 
 $ErrorActionPreference = "Stop"
 
@@ -264,68 +324,111 @@ function Get-AuthToken {
 }
 
 # ---------------------------------------------------------------------------
+# Validation — assert all services are healthy (port + HTTP + PID checks)
+# ---------------------------------------------------------------------------
+
+function Assert-ServicesRunning {
+    param([switch]$WaitForStartup)
+
+    $ok = $true
+
+    # Poll up to 30s for dashboard port after a fresh start
+    if ($WaitForStartup -and -not $NoDashboard) {
+        Log "Waiting for dashboard to become ready (up to 30s)..."
+        $elapsed = 0
+        do {
+            Start-Sleep -Seconds 2
+            $elapsed += 2
+            $ready = Get-NetTCPConnection -State Listen -LocalPort $DashboardPort -ErrorAction SilentlyContinue
+        } while (-not $ready -and $elapsed -lt 30)
+        if ($ready) { Log "Dashboard port $DashboardPort responded after ${elapsed}s." }
+        else         { Log "Dashboard port $DashboardPort did not respond within 30s — proceeding with validation." "WARN" }
+    }
+
+    Log "--- Service Validation ---"
+
+    # Agent service (NSSM) or daemon process (schtasks)
+    $svc = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+    if ($svc) {
+        if ($svc.Status -eq "Running") {
+            Log "  [PASS] Agent service '$ServiceName': Running"
+        } else {
+            Log "  [FAIL] Agent service '$ServiceName': $($svc.Status)" "ERROR"
+            $ok = $false
+        }
+    } else {
+        $daemonProcs = @(Get-Process powershell, pwsh -ErrorAction SilentlyContinue |
+                         Where-Object { $_.CommandLine -like "*daemon.ps1*" })
+        if ($daemonProcs.Count -gt 0) {
+            Log "  [PASS] Daemon process(es) running — PIDs: $($daemonProcs.Id -join ', ')"
+        } else {
+            Log "  [WARN] Daemon process not detected (HKCU Run key starts at next login)" "WARN"
+        }
+    }
+
+    # Runner process (active mid-cycle only — absence between cycles is normal)
+    $runnerProcs = @(Get-Process python -ErrorAction SilentlyContinue |
+                     Where-Object { $_.CommandLine -like "*runner.py*" })
+    if ($runnerProcs.Count -gt 0) {
+        Log "  [PASS] Runner process(es) active — PIDs: $($runnerProcs.Id -join ', ')"
+    } else {
+        Log "  [INFO] Runner not active (normal between cycles)"
+    }
+
+    # Lock file PID liveness
+    $lockFile = "$ProjectRoot\.agents\runtime\state\runner.lock"
+    if (Test-Path $lockFile) {
+        try {
+            $ld = Get-Content $lockFile -Raw | ConvertFrom-Json
+            $lp = Get-Process -Id ([int]$ld.pid) -ErrorAction SilentlyContinue
+            if ($lp) { Log "  [PASS] Lock PID $($ld.pid) alive ($($lp.Name))" }
+            else      { Log "  [WARN] Lock PID $($ld.pid) is dead — stale lock file" "WARN" }
+        } catch { Log "  [WARN] Lock file parse error: $_" "WARN" }
+    } else {
+        Log "  [INFO] Lock file absent (runner not mid-cycle)"
+    }
+
+    # Dashboard NSSM service status (informational — port+HTTP are authoritative)
+    $dsvc = Get-Service -Name $DashboardSvc -ErrorAction SilentlyContinue
+    if ($dsvc) {
+        if ($dsvc.Status -eq "Running") {
+            Log "  [PASS] Dashboard service '$DashboardSvc': Running"
+        } else {
+            Log "  [WARN] Dashboard service '$DashboardSvc': $($dsvc.Status) (port+HTTP checks are authoritative)" "WARN"
+        }
+    }
+
+    # Dashboard port + HTTP probe
+    if (-not $NoDashboard) {
+        $tcp = Get-NetTCPConnection -State Listen -LocalPort $DashboardPort -ErrorAction SilentlyContinue
+        if ($tcp) {
+            $ownerPid  = ($tcp | Select-Object -First 1).OwningProcess
+            $ownerProc = Get-Process -Id $ownerPid -ErrorAction SilentlyContinue
+            Log "  [PASS] Dashboard port $DashboardPort listening — PID=$ownerPid ($($ownerProc.Name))"
+            try {
+                $r = Invoke-WebRequest -Uri "http://localhost:$DashboardPort" -UseBasicParsing -TimeoutSec 10 -ErrorAction Stop
+                Log "  [PASS] Dashboard HTTP $($r.StatusCode) OK -> http://localhost:$DashboardPort"
+            } catch {
+                Log "  [WARN] Dashboard HTTP probe failed: $($_.Exception.Message)" "WARN"
+            }
+        } else {
+            Log "  [FAIL] Dashboard port $DashboardPort not listening" "ERROR"
+            $ok = $false
+        }
+    }
+
+    if ($ok) { Log "--- Validation PASSED ---" }
+    else      { Log "--- Validation FAILED — review errors above ---" "ERROR" }
+
+    return $ok
+}
+
+# ---------------------------------------------------------------------------
 # Status
 # ---------------------------------------------------------------------------
 
 if ($Status) {
-    Log "Checking service status..."
-
-    # NSSM service
-    $svc = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
-    if ($svc) {
-        Log "NSSM service '$ServiceName': $($svc.Status)"
-    } else {
-        Log "NSSM service '$ServiceName': not installed"
-    }
-
-    # HKCU Run key (schtasks method)
-    $regPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
-    $runVal  = Get-ItemProperty $regPath -Name $TaskName -ErrorAction SilentlyContinue
-    if ($runVal) {
-        Log "HKCU Run key '$TaskName': registered"
-        Log "  -> $($runVal.$TaskName)"
-    } else {
-        Log "HKCU Run key '$TaskName': not registered"
-    }
-
-    # Runner process
-    $procs = Get-Process python -ErrorAction SilentlyContinue |
-             Where-Object { $_.CommandLine -like "*runner.py*" }
-    if ($procs) {
-        Log "Runner processes: $($procs.Count) running (PIDs: $($procs.Id -join ', '))"
-    } else {
-        Log "Runner process: not detected"
-    }
-
-    # Lock file
-    $lockFile = "$ProjectRoot\.agents\runtime\state\runner.lock"
-    if (Test-Path $lockFile) {
-        $lockData = Get-Content $lockFile -Raw | ConvertFrom-Json -ErrorAction SilentlyContinue
-        Log "Lock file: present (PID=$($lockData.pid) since $($lockData.startedAt))"
-    } else {
-        Log "Lock file: absent (runner not currently executing a cycle)"
-    }
-
-    # Dashboard
-    $dsvc = Get-Service -Name $DashboardSvc -ErrorAction SilentlyContinue
-    if ($dsvc) {
-        Log "Dashboard service '$DashboardSvc': $($dsvc.Status)"
-    } else {
-        Log "Dashboard service '$DashboardSvc': not installed"
-    }
-    $regPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
-    $dRun = Get-ItemProperty $regPath -Name $DashboardRun -ErrorAction SilentlyContinue
-    if ($dRun) { Log "Dashboard Run key '$DashboardRun': registered" }
-    $dPort = Get-NetTCPConnection -State Listen -LocalPort $DashboardPort -ErrorAction SilentlyContinue
-    if ($dPort) { Log "Dashboard: listening on port $DashboardPort -> http://localhost:$DashboardPort" }
-    else        { Log "Dashboard: port $DashboardPort not listening" }
-
-    # Config
-    Log "Configured port (global.json ports.dashboard): $DashboardPort"
-    $envFile = "$DashboardDir\.env.local"
-    if (Test-Path $envFile) { Log "Default config: $envFile (present)" }
-    else                    { Log "Default config: $envFile (not generated yet)" }
-
+    if (-not (Assert-ServicesRunning)) { exit 1 }
     exit 0
 }
 
@@ -385,6 +488,120 @@ if ($Uninstall) {
 
     Log "Uninstall complete."
     exit 0
+}
+
+# ---------------------------------------------------------------------------
+# Clean Install — wipe all generated state, indexes, configs, and build artifacts
+# Only executes when -CleanInstall is passed. Requires explicit confirmation.
+# Preserves: 00-Inbox (source material), 02-Library (approved), 05-Assets (approved)
+# ---------------------------------------------------------------------------
+
+if ($CleanInstall) {
+    Write-Host ""
+    Write-Host "  !! CLEAN INSTALL !!" -ForegroundColor Yellow
+    Write-Host "  This will permanently delete:" -ForegroundColor Yellow
+    Write-Host "    - Dashboard node_modules and .next build cache" -ForegroundColor Yellow
+    Write-Host "    - All agent state files, indexes, and log files" -ForegroundColor Yellow
+    Write-Host "    - All .env.local config files" -ForegroundColor Yellow
+    Write-Host "    - 01-Processing drafts (pending review)" -ForegroundColor Yellow
+    Write-Host "    - 04-Relationships (auto-generated graphs)" -ForegroundColor Yellow
+    Write-Host "  Re-created with defaults: tasks-state.json (epoch), agent-metrics.json (empty)" -ForegroundColor Cyan
+    Write-Host "  Preserved: 00-Inbox, 02-Library, 03-Campaigns, 05-Assets, 99-Archive" -ForegroundColor Green
+    Write-Host ""
+    $confirm = Read-Host "  Type 'yes' to confirm clean install"
+    if ($confirm -ne 'yes') {
+        Write-Host "Clean install cancelled." -ForegroundColor Cyan
+        exit 0
+    }
+
+    Log "=== CLEAN INSTALL: wiping generated state ==="
+
+    # 1. Dashboard build artifacts
+    foreach ($dir in @("$DashboardDir\node_modules", "$DashboardDir\.next")) {
+        if (Test-Path $dir) {
+            Log "Removing $dir ..."
+            Remove-Item $dir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    # 2. Agent runtime state (logs, metrics, locks, task state, generated indexes)
+    $agentStateDir = "$ProjectRoot\.agents\runtime\state"
+    if (Test-Path $agentStateDir) {
+        Log "Removing agent runtime state: $agentStateDir ..."
+        Remove-Item $agentStateDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    # 3. Per-agent state directories (vision, token, review, etc.)
+    foreach ($agentDir in Get-ChildItem "$ProjectRoot\.agents" -Directory -ErrorAction SilentlyContinue) {
+        $stateDir = Join-Path $agentDir.FullName "state"
+        if (Test-Path $stateDir) {
+            Log "Removing agent state: $stateDir ..."
+            Remove-Item $stateDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    # 4. Shared system state
+    $sharedState = "$ProjectRoot\.system\state"
+    if (Test-Path $sharedState) {
+        Log "Removing shared system state: $sharedState ..."
+        Remove-Item $sharedState -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    # 5. Env config files
+    foreach ($envFile in @(
+        "$ProjectRoot\.system\.env.local",
+        "$DashboardDir\.env.local"
+    )) {
+        if (Test-Path $envFile) {
+            Log "Removing config: $envFile ..."
+            Remove-Item $envFile -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    # 6. Vault pipeline dirs (generated content only — NOT source/approved content)
+    $VaultRootForClean = if ([System.IO.Path]::IsPathRooted($VaultRootRel)) { $VaultRootRel }
+                         else { Join-Path $ProjectRoot $VaultRootRel }
+    foreach ($vaultDir in @("01-Processing", "04-Relationships")) {
+        $target = Join-Path $VaultRootForClean $vaultDir
+        if (Test-Path $target) {
+            Log "Clearing vault dir: $target ..."
+            Get-ChildItem $target -File -Recurse -ErrorAction SilentlyContinue |
+                ForEach-Object { Remove-Item $_.FullName -Force -ErrorAction SilentlyContinue }
+        }
+    }
+
+    # 7. Re-create runtime state dir + seed JSON files with clean defaults
+    $cleanStateDir = "$ProjectRoot\.agents\runtime\state"
+    New-Item -ItemType Directory -Force $cleanStateDir | Out-Null
+    New-Item -ItemType Directory -Force "$cleanStateDir\logs" | Out-Null
+
+    # tasks-state.json — scan all agent.json files for task IDs, set all to epoch
+    $epoch      = "1970-01-01T00:00:00Z"
+    $tasksState = [ordered]@{}
+    Get-ChildItem "$ProjectRoot\.agents" -Recurse -Filter "agent.json" -ErrorAction SilentlyContinue |
+        ForEach-Object {
+            try {
+                $aj = Get-Content $_.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
+                if ($aj.tasks) {
+                    $aj.tasks.PSObject.Properties.Name | ForEach-Object {
+                        $tasksState[$_] = [ordered]@{ lastRun = $epoch }
+                    }
+                }
+            } catch { Log "Could not parse $($_.FullName): $_" "WARN" }
+        }
+    $tasksState | ConvertTo-Json -Depth 3 |
+        Set-Content "$cleanStateDir\tasks-state.json" -Encoding UTF8
+    Log "Re-created tasks-state.json ($($tasksState.Count) agents → epoch)."
+
+    # agent-metrics.json — empty slate
+    '{}' | Set-Content "$cleanStateDir\agent-metrics.json" -Encoding UTF8
+    Log "Re-created agent-metrics.json (empty)."
+
+    Log "Clean complete. Proceeding with fresh install..."
+    Write-Host ""
+
+    # Force config regeneration since we wiped the old one
+    $Force = $true
 }
 
 # ---------------------------------------------------------------------------
@@ -606,4 +823,8 @@ Log "Monitor  : Get-Content '$masterLog' -Tail 50 -Wait"
 Log "Status   : pwsh -File setup-service.ps1 -Status"
 Log "Remove   : pwsh -File setup-service.ps1 -Uninstall"
 
+if (-not (Assert-ServicesRunning -WaitForStartup)) {
+    Log "Setup finished but validation detected failures. Check logs above." "ERROR"
+    exit 1
+}
 exit 0

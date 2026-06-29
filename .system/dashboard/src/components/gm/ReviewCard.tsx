@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import type { ReviewItem } from '@/lib/types'
-import QualityBar from '@/components/widgets/QualityBar'
 import GMActionBar from './GMActionBar'
 import ImageModal from './ImageModal'
 import { ExternalLink } from 'lucide-react'
@@ -21,7 +20,7 @@ const TYPE_COLORS: Record<string, string> = {
 
 interface ReviewCardProps {
   item: ReviewItem
-  onApprove: (filename: string, quality: number) => Promise<void>
+  onApprove: (filename: string) => Promise<void>
   onReject: (filename: string) => Promise<void>
   onReprocess: (filename: string) => Promise<void>
 }
@@ -33,6 +32,10 @@ export default function ReviewCard({ item, onApprove, onReject, onReprocess }: R
   const [chatInput, setChatInput] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const [editContent, setEditContent] = useState('')
+  const [editSaving, setEditSaving] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
 
   const imageSrc = item.source[0]
     ? `/api/image?path=${encodeURIComponent(item.source[0])}`
@@ -42,9 +45,9 @@ export default function ReviewCard({ item, onApprove, onReject, onReprocess }: R
     ? `/api/image?path=${encodeURIComponent(item.tokenPath)}`
     : null
 
-  const handleApprove = async (q: number) => {
+  const handleApprove = async () => {
     setLoading(true)
-    await onApprove(item.filename, q)
+    await onApprove(item.filename)
     setLoading(false)
   }
 
@@ -85,6 +88,42 @@ export default function ReviewCard({ item, onApprove, onReject, onReprocess }: R
       setChatMessages((prev) => [...prev, { role: 'assistant', content: 'Failed to reach agent.' }])
     } finally {
       setChatLoading(false)
+    }
+  }
+
+  const handleOpenEdit = async () => {
+    if (editOpen) {
+      setEditOpen(false)
+      return
+    }
+    setEditError(null)
+    try {
+      const res = await fetch(`/api/gm/content?filename=${encodeURIComponent(item.filename)}`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Failed to load')
+      setEditContent(data.content)
+      setEditOpen(true)
+    } catch (err) {
+      setEditError(String(err))
+    }
+  }
+
+  const handleSaveEdit = async () => {
+    setEditSaving(true)
+    setEditError(null)
+    try {
+      const res = await fetch('/api/gm/content', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: item.filename, content: editContent }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Save failed')
+      setEditOpen(false)
+    } catch (err) {
+      setEditError(String(err))
+    } finally {
+      setEditSaving(false)
     }
   }
 
@@ -198,11 +237,6 @@ export default function ReviewCard({ item, onApprove, onReject, onReprocess }: R
             )}
           </div>
 
-          {/* Quality */}
-          <div className="mb-3 max-w-xs">
-            <QualityBar score={item.quality} />
-          </div>
-
           {/* Excerpt */}
           {item.excerpt && (
             <p className="text-xs text-zinc-400 mb-3 line-clamp-3">{item.excerpt}</p>
@@ -244,6 +278,7 @@ export default function ReviewCard({ item, onApprove, onReject, onReprocess }: R
             onReject={handleReject}
             onReprocess={handleReprocess}
             onChat={() => setChatOpen(!chatOpen)}
+            onEdit={handleOpenEdit}
             loading={loading}
           />
         </div>
@@ -296,6 +331,42 @@ export default function ReviewCard({ item, onApprove, onReject, onReprocess }: R
               className="px-3 py-1.5 bg-primary hover:bg-primary/80 text-white text-xs rounded transition-colors disabled:opacity-50"
             >
               Send
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Inline markdown editor */}
+      {editOpen && (
+        <div className="border-t border-surface-3 p-4 bg-surface">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">
+              Edit Markdown — {item.filename}
+            </div>
+            {editError && (
+              <div className="text-xs text-danger">{editError}</div>
+            )}
+          </div>
+          <textarea
+            value={editContent}
+            onChange={(e) => setEditContent(e.target.value)}
+            className="w-full h-80 bg-surface-3 border border-surface-3 focus:border-primary/40 rounded px-3 py-2 text-xs text-zinc-200 font-mono placeholder-zinc-600 outline-none transition-colors resize-y"
+            spellCheck={false}
+          />
+          <div className="flex gap-2 mt-2">
+            <button
+              onClick={handleSaveEdit}
+              disabled={editSaving}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded bg-success/10 text-success border border-success/30 hover:bg-success/20 transition-colors disabled:opacity-50"
+            >
+              {editSaving ? 'Saving…' : 'Save'}
+            </button>
+            <button
+              onClick={() => setEditOpen(false)}
+              disabled={editSaving}
+              className="px-3 py-1.5 text-xs font-medium rounded bg-surface-3 text-zinc-400 hover:text-zinc-200 transition-colors"
+            >
+              Cancel
             </button>
           </div>
         </div>
