@@ -19,38 +19,62 @@ import {
   CircleDot,
   MessageSquare,
   FileText,
+  Map,
+  Users,
+  Flag,
+  ScrollText,
+  Skull,
+  Gem,
+  ChevronDown,
+  ChevronRight,
+  type LucideIcon,
 } from 'lucide-react'
 
-const nav = [
+interface NavItem {
+  href: string
+  label: string
+  icon: LucideIcon
+}
+
+interface NavSection {
+  group: string
+  items: NavItem[]
+  collapsible?: boolean
+  defaultOpen?: boolean
+}
+
+const nav: NavSection[] = [
   {
     group: 'GAME MASTER',
+    collapsible: true,
+    defaultOpen: true,
+    items: [
+      { href: '/gm/campaign', label: 'Campaign', icon: Dices },
+      { href: '/gm/places', label: 'Places', icon: Map },
+      { href: '/gm/npcs', label: 'NPCs', icon: Users },
+      { href: '/gm/factions', label: 'Factions', icon: Flag },
+      { href: '/gm/quests', label: 'Quests', icon: ScrollText },
+      { href: '/gm/bestiary', label: 'Bestiary', icon: Skull },
+      { href: '/gm/treasures', label: 'Treasures', icon: Gem },
+      { href: '/gm/wiki', label: 'Wiki', icon: BookOpen },
+    ],
+  },
+  {
+    group: 'LEGACY',
+    collapsible: true,
+    defaultOpen: false,
     items: [
       { href: '/gm', label: 'GM Hub', icon: Dices },
       { href: '/gm/review', label: 'Review', icon: CheckSquare },
       { href: '/gm/inbox', label: 'Inbox', icon: Image },
       { href: '/gm/tokens', label: 'Tokens', icon: CircleDot },
       { href: '/gm/chat', label: 'Agent Chat', icon: MessageSquare },
-    ],
-  },
-  {
-    group: 'OVERVIEW',
-    items: [
       { href: '/', label: 'Executive', icon: LayoutDashboard },
       { href: '/pipeline', label: 'Pipeline', icon: GitBranch },
-    ],
-  },
-  {
-    group: 'OPERATIONS',
-    items: [
       { href: '/agents', label: 'Agents', icon: Bot },
       { href: '/prompt', label: 'Prompts', icon: FileText },
       { href: '/queue', label: 'Queue', icon: Inbox },
       { href: '/errors', label: 'Errors', icon: Zap },
-    ],
-  },
-  {
-    group: 'CONTENT',
-    items: [
       { href: '/review', label: 'Review', icon: Eye },
       { href: '/library', label: 'Library', icon: BookOpen },
     ],
@@ -63,34 +87,67 @@ function isActive(href: string, pathname: string): boolean {
   return pathname === href || pathname.startsWith(href + '/')
 }
 
-function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
+function NavLink({ item, onNavigate }: { item: NavItem; onNavigate?: () => void }) {
   const pathname = usePathname()
+  const { href, label, icon: Icon } = item
+  const active = isActive(href, pathname)
+  return (
+    <Link
+      href={href}
+      onClick={onNavigate}
+      className={`flex items-center gap-2.5 px-2 py-2.5 md:py-2 rounded-md text-sm transition-colors mb-0.5 ${
+        active
+          ? 'bg-primary/20 text-white font-medium'
+          : 'text-zinc-400 hover:text-zinc-100 hover:bg-surface-3'
+      }`}
+    >
+      <Icon size={15} className={active ? 'text-primary' : 'text-zinc-500'} />
+      {label}
+    </Link>
+  )
+}
+
+function NavGroup({ section, onNavigate }: { section: NavSection; onNavigate?: () => void }) {
+  const pathname = usePathname()
+  const containsActive = section.items.some((i) => isActive(i.href, pathname))
+  // Open by default, or whenever the group owns the active route (deep link).
+  const [open, setOpen] = useState((section.defaultOpen ?? true) || containsActive)
+
+  if (!section.collapsible) {
+    return (
+      <div className="mb-5">
+        <div className="px-2 mb-1 text-[10px] font-semibold tracking-widest text-zinc-500 uppercase">
+          {section.group}
+        </div>
+        {section.items.map((item) => (
+          <NavLink key={item.href} item={item} onNavigate={onNavigate} />
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <div className="mb-3">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center gap-1 px-2 mb-1 py-1 text-[10px] font-semibold tracking-widest text-zinc-500 hover:text-zinc-300 uppercase transition-colors"
+      >
+        {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+        {section.group}
+      </button>
+      {open &&
+        section.items.map((item) => (
+          <NavLink key={item.href} item={item} onNavigate={onNavigate} />
+        ))}
+    </div>
+  )
+}
+
+function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <nav className="flex-1 px-2 py-4 overflow-y-auto">
       {nav.map((section) => (
-        <div key={section.group} className="mb-5">
-          <div className="px-2 mb-1 text-[10px] font-semibold tracking-widest text-zinc-500 uppercase">
-            {section.group}
-          </div>
-          {section.items.map(({ href, label, icon: Icon }) => {
-            const active = isActive(href, pathname)
-            return (
-              <Link
-                key={href}
-                href={href}
-                onClick={onNavigate}
-                className={`flex items-center gap-2.5 px-2 py-2.5 md:py-2 rounded-md text-sm transition-colors mb-0.5 ${
-                  active
-                    ? 'bg-primary/20 text-white font-medium'
-                    : 'text-zinc-400 hover:text-zinc-100 hover:bg-surface-3'
-                }`}
-              >
-                <Icon size={15} className={active ? 'text-primary' : 'text-zinc-500'} />
-                {label}
-              </Link>
-            )
-          })}
-        </div>
+        <NavGroup key={section.group} section={section} onNavigate={onNavigate} />
       ))}
     </nav>
   )

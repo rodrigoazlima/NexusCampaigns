@@ -4,12 +4,21 @@
 
 param(
     [string]$PromptDirectory = "docs/prompts",
-    [string]$Filter = "prompt-*.md",
+    [string]$Filter = "*.md",
     [string]$StateFile = ".system/claude-queue-state.json",
     [int]$RetryDelayMinutes = 40,
     [int]$MaxRetries = 200,
     [int]$TimeoutMinutes = 30
 )
+
+# Always operate from the codebase root so the relative defaults above resolve,
+# regardless of the directory the script was invoked from.
+# $PSScriptRoot is the absolute path to this script's folder ($PromptDirectory);
+# strip that tail to recover the repo root, so it follows $PromptDirectory's depth.
+$ScriptRoot      = $PSScriptRoot
+$RelativeFromRoot = ($PromptDirectory -replace '/', '\').TrimEnd('\')
+$RepoRoot        = $ScriptRoot.Substring(0, $ScriptRoot.Length - $RelativeFromRoot.Length).TrimEnd('\')
+Set-Location $RepoRoot
 
 $TimeoutSeconds = $TimeoutMinutes * 60
 $RetryDelaySeconds = $RetryDelayMinutes * 60
@@ -28,7 +37,10 @@ function Get-Prompts {
         return @()
     }
 
-    $promptFiles = Get-ChildItem -Path "$Directory/$GlobFilter" -File | Sort-Object Name
+    # Top-level *.md only (non-recursive): skips gen/ and prompt-done/ subfolders.
+    # Exclude README/docs so the runner never feeds itself or its own docs to claude.
+    $promptFiles = Get-ChildItem -Path "$Directory/$GlobFilter" -File -Exclude "*README*" |
+        Sort-Object Name
     return $promptFiles.FullName
 }
 

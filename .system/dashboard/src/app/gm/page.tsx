@@ -6,7 +6,7 @@ import Link from 'next/link'
 import PageHeader from '@/components/widgets/PageHeader'
 import AutoRefresh from '@/components/AutoRefresh'
 import {
-  Dices, Map, Users, Flag, ScrollText, Skull, Gem,
+  Dices, Map as MapIcon, Users, Flag, ScrollText, Skull, Gem,
   Inbox, CircleDot, MessageSquare, ArrowRight, Sparkles,
 } from 'lucide-react'
 
@@ -15,7 +15,7 @@ import {
 // usually build a campaign: a place, the people in it, who's fighting, the
 // plot, the threats, then the depth that ties it together.
 const PILLARS = [
-  { key: 'world', label: 'World & Places', icon: Map, accent: 'text-green-400', ring: 'border-green-500/20 hover:border-green-500/40',
+  { key: 'world', label: 'World & Places', icon: MapIcon, accent: 'text-green-400', ring: 'border-green-500/20 hover:border-green-500/40',
     types: ['location', 'city', 'village', 'dungeon'], hint: 'The stage — where your story happens' },
   { key: 'cast', label: 'Characters & NPCs', icon: Users, accent: 'text-blue-400', ring: 'border-blue-500/20 hover:border-blue-500/40',
     types: ['npc', 'character'], hint: 'The cast — motivations, secrets, the people who drive play' },
@@ -52,7 +52,7 @@ export default async function GMHubPage() {
   for (const e of [...drafts, ...canon]) byId.set(e.id, e)
   const all = [...byId.values()]
 
-  const known = new Set(PILLARS.flatMap((p) => p.types))
+  const known = new Set<string>(PILLARS.flatMap((p) => p.types))
   const bucket = (types: readonly string[]) =>
     all
       .filter((e) => types.includes(e.type))
