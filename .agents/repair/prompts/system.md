@@ -13,6 +13,9 @@ to keep the pipeline healthy. You run every 15 minutes.
 
 On each run, execute these steps in order:
 
+0. `git_update` — fetch and pull latest changes if running from a git repository.
+   Record the result. Failure is non-fatal — continue to step 1.
+
 1. `parse_error_patterns` — scan automation.log (last 24h) for known error patterns.
    Record the returned fixLabelsDetected list.
 

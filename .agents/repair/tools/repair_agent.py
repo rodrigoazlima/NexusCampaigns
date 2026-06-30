@@ -16,6 +16,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import subprocess
 import sys
 import time
 from datetime import datetime, timedelta, timezone
@@ -56,6 +57,31 @@ _ERROR_PATTERNS: list[tuple[re.Pattern[str], str]] = [
 ]
 
 _MODULE_FILE = Path(__file__)
+
+
+def _git_update(log: Logger) -> dict:
+    """git fetch + git pull --ff-only if project root is a git repo."""
+    if not (_PROJECT_ROOT / ".git").exists():
+        return {"skipped": True, "reason": "not a git repository"}
+
+    fetch = subprocess.run(
+        ["git", "fetch", "--quiet"],
+        cwd=str(_PROJECT_ROOT), capture_output=True, text=True
+    )
+    if fetch.returncode != 0:
+        log.warning(f"git fetch failed: {fetch.stderr.strip()}")
+        return {"skipped": False, "fetch": "failed", "stderr": fetch.stderr.strip()}
+
+    pull = subprocess.run(
+        ["git", "pull", "--ff-only", "--quiet"],
+        cwd=str(_PROJECT_ROOT), capture_output=True, text=True
+    )
+    status = "ok" if pull.returncode == 0 else "failed"
+    if pull.returncode != 0:
+        log.warning(f"git pull failed: {pull.stderr.strip()}")
+    else:
+        log.info(f"git pull: {pull.stdout.strip() or 'already up to date'}")
+    return {"skipped": False, "fetch": "ok", "pull": status, "output": pull.stdout.strip()}
 
 
 def _make_logger() -> Logger:
@@ -287,6 +313,7 @@ def _write_repair_report(
     overdue_agents: list[str],
     invalid_refs: list[str],
     log: Logger,
+    git_update: dict | None = None,
 ) -> None:
     _REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     today = datetime.now().strftime("%Y-%m-%d")
@@ -295,6 +322,7 @@ def _write_repair_report(
     report = {
         "date":              today,
         "generatedAt":       datetime.now(timezone.utc).isoformat(),
+        "gitUpdate":         git_update,
         "fixLabelsDetected": fix_labels,
         "repairsApplied":    repairs_applied,
         "overdueAgents":     overdue_agents,
@@ -315,6 +343,7 @@ def main() -> None:
     log = _make_logger()
     t0  = log.start()
 
+    git_result     = _git_update(log)
     fix_labels     = _parse_error_patterns(log)
     repairs        = 0
     repairs       += _remove_stale_lock(log)
@@ -322,7 +351,7 @@ def main() -> None:
     img_repairs, invalid_refs = _validate_image_refs(log)
     repairs       += img_repairs
     overdue        = _detect_overdue_agents(log)
-    _write_repair_report(fix_labels, repairs, overdue, invalid_refs, log)
+    _write_repair_report(fix_labels, repairs, overdue, invalid_refs, log, git_update=git_result)
 
     log.done(t0, key="repairs", count=repairs, failed=0)
     sys.exit(0)
@@ -337,6 +366,14 @@ if __name__ == "__main__":
 # ---------------------------------------------------------------------------
 
 TOOLS = SELF_MANAGEMENT_TOOLS + [
+    {
+        "name": "git_update",
+        "description": (
+            "Run git fetch + git pull --ff-only if the project is a git repository. "
+            "Call this first, before any repair actions. Failure is non-fatal."
+        ),
+        "input_schema": {"type": "object", "properties": {}},
+    },
     {
         "name": "parse_error_patterns",
         "description": (
@@ -403,6 +440,9 @@ def call_tool(name: str, args: dict, context: dict) -> str:
         return result
 
     log = _make_logger()
+
+    if name == "git_update":
+        return json.dumps(_git_update(log))
 
     if name == "parse_error_patterns":
         labels = _parse_error_patterns(log)

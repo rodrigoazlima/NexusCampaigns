@@ -5,6 +5,7 @@ purpose: >
   directories exist, and removes orphan image references from state indexes.
   No LLM calls. No vault content changes.
 inputs:
+  - .git/ (existence check only)
   - .agents/runtime/state/runner.lock
   - .agents/runtime/state/automation.log (last 24h)
   - .agents/runtime/state/tasks-state.json
@@ -23,6 +24,7 @@ dispatch_config: agent.json
 owned_tools:
   - tools/repair_agent.py
 responsibilities:
+  - GitUpdate: git fetch + git pull --ff-only if project root is a git repository; non-fatal on failure
   - ParseErrorPatterns: scan automation.log (last 24h) for stale-lock / missing-directory / missing-image-ref patterns
   - RemoveStaleLock: delete runner.lock if older than 1800 seconds (30 min)
   - CreateMissingDirs: ensure all directories in shared.defaults.REQUIRED_DIRS exist
