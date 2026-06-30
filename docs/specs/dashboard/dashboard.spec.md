@@ -2,8 +2,8 @@
 
 **Version:** 1.1
 **Date:** 2026-06-13
-**Supersedes:** `docs/dashboard-legacy.spec.md`
-**Implementation:** See `docs/admin-dashboard.spec.md`
+**Supersedes:** `docs/specs/dashboard/dashboard-legacy.spec.md`
+**Implementation:** See `docs/specs/dashboard/admin-dashboard.spec.md`
 
 ---
 

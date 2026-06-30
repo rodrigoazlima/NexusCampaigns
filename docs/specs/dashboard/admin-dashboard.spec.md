@@ -3,7 +3,7 @@
 **Version:** 2.1  
 **Date:** 2026-06-13  
 **Supersedes:** `.system/dashboard-legacy/SPEC.md` (stale paths)  
-**Augments:** `docs/dashboard.SPEC.md` (product spec, still valid for pages/components/design)
+**Augments:** `docs/specs/dashboard/dashboard.spec.md` (product spec, still valid for pages/components/design)
 
 ---
 
@@ -193,7 +193,7 @@ All use `export const dynamic = 'force-dynamic'`.
 
 ## Design System
 
-See `docs/dashboard.SPEC.md` § 9 for full token definitions. Summary:
+See `docs/specs/dashboard/dashboard.spec.md` § 9 for full token definitions. Summary:
 
 ```
 surface:   #09090b    surface-1: #111113    surface-3: #27272a

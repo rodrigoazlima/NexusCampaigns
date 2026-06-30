@@ -2,7 +2,7 @@
 
 **Version:** 1.0
 **Date:** 2026-06-13
-**Part of:** `docs/dashboard.spec.md` (implementation: `docs/admin-dashboard.spec.md`)
+**Part of:** `docs/specs/dashboard/dashboard.spec.md` (implementation: `docs/specs/dashboard/admin-dashboard.spec.md`)
 
 ---
 

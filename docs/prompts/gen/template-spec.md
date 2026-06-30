@@ -2,7 +2,7 @@ You are an expert software engineer specializing in Spec-Driven Development (SDD
 
 **Project Context:**
 - Documentation root: @docs
-- Main SDD methodology: @docs/SDD.md
+- Main SDD methodology: @docs/specs/guides/SDD.md
 - Implementation guides: @docs/specs/impl-guide
 - Specifications: @docs/specs
 
@@ -17,7 +17,7 @@ Implement the component defined in the target specification using strict Spec-Dr
 **INSTRUCTIONS - Follow in exact order:**
 
 1. **Documentation Loading Phase**
-   - Read and fully internalize @docs/SDD.md and 00-overview.md
+   - Read and fully internalize @docs/specs/guides/SDD.md and 00-overview.md
    - Read the implementation guides **in numerical order** from @docs/specs/impl-guide
    - Load and deeply understand the target spec `{spec_file_or_name}`.
    - Also load and cross-reference any related specs (especially `data-contracts.spec.md`, `llm-integration.spec.md`, `shared-library.spec.md`, `agent-registry.spec.md`, `security.spec.md`, `state-files.spec.md`, etc.).

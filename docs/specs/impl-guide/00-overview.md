@@ -1,6 +1,6 @@
 # Agentic Evolution Plan — Overview
 
-**Source:** `docs/agentic-review.md` + Claude-generated analysis (2026-06-10)  
+**Source:** `docs/specs/guides/agentic-review.md` + Claude-generated analysis (2026-06-10)  
 **Scope:** Transform NexusCampaigns from a scheduled batch pipeline into a self-improving, semi-autonomous Nexus Campaigns.
 
 ---

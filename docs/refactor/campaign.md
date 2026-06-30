@@ -2,7 +2,7 @@
 
 **Route:** `/gm` (replaces the current "Campaign Workshop" hub)
 **Icon:** `Dices` · **Nav:** GAME MASTER → Campaign
-**Source guide:** `docs/campaign-setting-guide.md`
+**Source guide:** `docs/specs/guides/campaign-setting-guide.md`
 
 The command center for a whole campaign setting. Not an entity collection — it
 is the **frame + progress + readiness** layer that sits over the six pillar

@@ -18,10 +18,13 @@ are done (or have exhausted their retries).
 
 ## What it does
 
-1. **Anchors to the repo root.** The script `Set-Location`s to the codebase
-   root (two levels up from its own folder) before doing anything, so the
-   relative defaults (`docs/prompts`, `.system/...`) resolve no matter where you
-   invoke it from.
+1. **Anchors to the repo root.** Before doing anything, the script derives the
+   codebase root by stripping the `$PromptDirectory` tail off `$PSScriptRoot`
+   (its own absolute folder) and `Set-Location`s there, so the relative defaults
+   (`docs/prompts`, `.system/...`) resolve no matter where you invoke it from.
+   The root is computed from the variables, not a hardcoded depth — move the
+   script and it still finds the right root as long as it stays under
+   `$PromptDirectory`.
 2. **Discovers prompts.** Every top-level `*.md` in `docs/prompts/` except
    `*README*`. Subfolders (`gen/`, `prompt-done/`) are not scanned.
 3. **Runs each prompt.** Pipes the file's contents into
