@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   GitBranch,
   Bot,
+  Home,
   Inbox,
   Zap,
   Eye,
@@ -46,6 +47,13 @@ interface NavSection {
 }
 
 const nav: NavSection[] = [
+  {
+    group: '',
+    collapsible: false,
+    items: [
+      { href: '/', label: 'Home', icon: Home },
+    ],
+  },
   {
     group: 'GAME MASTER',
     collapsible: true,
@@ -134,9 +142,11 @@ function NavGroup({ section, onNavigate, collapsed, first }: { section: NavSecti
   if (!section.collapsible) {
     return (
       <div className="mb-5">
-        <div className="px-2 mb-1 text-[10px] font-semibold tracking-widest text-zinc-500 uppercase">
-          {section.group}
-        </div>
+        {section.group && (
+          <div className="px-2 mb-1 text-[10px] font-semibold tracking-widest text-zinc-500 uppercase">
+            {section.group}
+          </div>
+        )}
         {section.items.map((item) => (
           <NavLink key={item.href} item={item} onNavigate={onNavigate} />
         ))}
