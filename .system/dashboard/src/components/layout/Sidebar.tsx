@@ -171,9 +171,18 @@ function NavLinks({ onNavigate, collapsed }: { onNavigate?: () => void; collapse
   )
 }
 
-const LiveIndicator = ({ collapsed }: { collapsed?: boolean }) => (
-  <div className={`py-3 border-t border-surface-3 ${collapsed ? 'px-0 flex justify-center' : 'px-4'}`}>
-    <span className="inline-block w-2 h-2 rounded-full bg-success animate-pulse" title="Live · 30s refresh" />
+const BottomBar = ({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) => (
+  <div className={`flex items-center border-t border-surface-3 ${collapsed ? 'flex-col gap-2 py-3 px-0' : 'flex-row px-3 py-2.5'}`}>
+    <span className="inline-block w-2 h-2 rounded-full bg-success animate-pulse shrink-0" title="Live · 30s refresh" />
+    {!collapsed && <span className="flex-1" />}
+    <button
+      onClick={onToggle}
+      title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      className="p-1 rounded text-zinc-500 hover:text-zinc-100 hover:bg-surface-3 transition-colors"
+    >
+      {collapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
+    </button>
   </div>
 )
 
@@ -190,18 +199,6 @@ const Logo = ({ collapsed }: { collapsed?: boolean }) => (
   </Link>
 )
 
-const CollapseToggle = ({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) => (
-  <button
-    onClick={onToggle}
-    title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-    aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-    className={`flex items-center gap-2.5 py-2.5 text-sm text-zinc-400 hover:text-zinc-100 hover:bg-surface-3 border-t border-surface-3 transition-colors ${
-      collapsed ? 'justify-center px-0' : 'px-4'
-    }`}
-  >
-    {collapsed ? <PanelLeftOpen size={16} /> : <><PanelLeftClose size={16} /> Collapse</>}
-  </button>
-)
 
 export default function Sidebar() {
   const [open, setOpen] = useState(false)
@@ -237,8 +234,7 @@ export default function Sidebar() {
           <Logo collapsed={collapsed} />
         </div>
         <NavLinks collapsed={collapsed} />
-        <CollapseToggle collapsed={collapsed} onToggle={toggleCollapsed} />
-        <LiveIndicator collapsed={collapsed} />
+        <BottomBar collapsed={collapsed} onToggle={toggleCollapsed} />
       </aside>
 
       {/* Mobile top bar — visible below md */}
