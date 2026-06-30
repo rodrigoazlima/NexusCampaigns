@@ -219,6 +219,7 @@ class TagEnrichmentOutput(BaseModel):
 class EntityFrontmatter(BaseModel):
     """AGENTS.md-compliant frontmatter for all vault entities."""
     id:                  str
+    uuid:                Optional[str]               = None
     type:                EntityType
     status:              EntityStatus                = EntityStatus.draft
     quality:             Annotated[int, Field(ge=0, le=10)] = 0

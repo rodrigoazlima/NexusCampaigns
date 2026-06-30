@@ -62,7 +62,7 @@ export default async function GMHubPage() {
   const uncategorized = all.filter((e) => !known.has(e.type)).length
 
   const href = (e: Entry) =>
-    e.origin === 'draft' ? `/gm/view/${encodeURIComponent(e.id)}` : '/library'
+    e.origin === 'draft' ? `/gm/view/${e.uuid || encodeURIComponent(e.id)}` : '/library'
 
   return (
     <div className="p-4 md:p-6">

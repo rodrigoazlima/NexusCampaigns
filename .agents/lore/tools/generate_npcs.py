@@ -14,6 +14,7 @@ import json
 import re
 import sys
 import time
+import uuid as _uuid
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -380,6 +381,7 @@ def _write_npc_draft(
 
     frontmatter: dict[str, Any] = {
         "id":          slug,
+        "uuid":        str(_uuid.uuid4()),
         "type":        "npc",
         "status":      "draft",
         "quality":     0,

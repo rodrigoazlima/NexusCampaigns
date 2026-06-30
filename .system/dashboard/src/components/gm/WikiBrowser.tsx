@@ -48,7 +48,7 @@ function score(i: WikiItem, q: string): number {
 // Read-and-navigate destination. Read view (/gm/wiki/{id}) is not built yet;
 // canon → Library, drafts → existing editor. ponytail: link to what exists.
 const hrefOf = (i: WikiItem) =>
-  i.origin === 'draft' ? `/gm/view/${encodeURIComponent(i.id)}` : '/library'
+  i.origin === 'draft' ? `/gm/view/${i.uuid || encodeURIComponent(i.id)}` : '/library'
 
 export default function WikiBrowser({ items }: { items: WikiItem[] }) {
   const [search, setSearch] = useState('')

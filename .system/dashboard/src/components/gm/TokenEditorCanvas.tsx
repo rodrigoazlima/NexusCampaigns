@@ -278,7 +278,7 @@ export default function TokenEditorCanvas({ item, imageSrc, tokenSrc }: Props) {
         case 'r': case 'R': resetView(); break
         case '[': setFrameIdx((i) => (i - 1 + frames.length) % Math.max(1, frames.length)); break
         case ']': setFrameIdx((i) => (i + 1) % Math.max(1, frames.length)); break
-        case 'Escape': router.push(`/gm/view/${item.id}`); break
+        case 'Escape': router.push(`/gm/view/${item.uuid || item.id}`); break
         case 's': case 'S': saveAndReturnRef.current(); break
       }
     }
@@ -334,7 +334,7 @@ export default function TokenEditorCanvas({ item, imageSrc, tokenSrc }: Props) {
 
   const saveAndReturn = useCallback(async () => {
     const ok = await saveToken()
-    if (ok) router.push(`/gm/view/${item.id}`)
+    if (ok) router.push(`/gm/view/${item.uuid || item.id}`)
   }, [saveToken, router, item.id])
 
   useEffect(() => { saveTokenRef.current = saveToken }, [saveToken])
@@ -382,7 +382,7 @@ export default function TokenEditorCanvas({ item, imageSrc, tokenSrc }: Props) {
       {/* ── Top bar ── */}
       <header className="shrink-0 h-10 bg-surface-1 border-b border-surface-3 px-4 flex items-center gap-2 z-20">
         <Link
-          href={`/gm/view/${item.id}`}
+          href={`/gm/view/${item.uuid || item.id}`}
           className="text-zinc-500 hover:text-zinc-300 transition-colors text-xs flex items-center gap-1 shrink-0"
         >
           ← back

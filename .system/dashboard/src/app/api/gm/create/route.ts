@@ -243,9 +243,9 @@ export async function POST(req: NextRequest) {
     const slug = name ? slugify(name) : ''
     const id = slug ? `${type}-${slug}` : `${type}-untitled-${Date.now().toString(36)}`
 
-    const filename = createDraft({ id, type, body: SKELETONS[type] })
+    const { filename, uuid } = createDraft({ id, type, body: SKELETONS[type] })
 
-    return NextResponse.json({ ok: true, id, filename })
+    return NextResponse.json({ ok: true, id, uuid, filename })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }

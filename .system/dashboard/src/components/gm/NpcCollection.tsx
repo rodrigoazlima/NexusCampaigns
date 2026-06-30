@@ -119,7 +119,7 @@ export default function NpcCollection({ items }: { items: NpcItem[] }) {
         body: JSON.stringify({ type }),
       })
       const data = await res.json()
-      if (data.ok) router.push(`/gm/view/${encodeURIComponent(data.id)}`)
+      if (data.ok) router.push(`/gm/view/${data.uuid || encodeURIComponent(data.id)}`)
       else showToast(data.error ?? 'Create failed', 'error')
     } catch {
       showToast('Create failed', 'error')
@@ -155,7 +155,7 @@ export default function NpcCollection({ items }: { items: NpcItem[] }) {
     i.tokenPath ? `/api/image?path=${encodeURIComponent(i.tokenPath)}` : null
 
   const cardHref = (i: NpcItem) =>
-    i.origin === 'draft' ? `/gm/view/${encodeURIComponent(i.id)}` : '/library'
+    i.origin === 'draft' ? `/gm/view/${i.uuid || encodeURIComponent(i.id)}` : '/library'
 
   return (
     <div className="p-4 md:p-6">
@@ -346,7 +346,7 @@ export default function NpcCollection({ items }: { items: NpcItem[] }) {
                     <ActionBtn label="Reject (quality → 1)" variant="danger" busy={busy === i.filename} onClick={() => act('reject', i.filename, 'Draft rejected')}><XCircle size={14} /></ActionBtn>
                     <ActionBtn label="Flag / reprocess" variant="warning" busy={busy === i.filename} onClick={() => act('flag', i.filename, 'Queued for reprocessing')}><Flag size={14} /></ActionBtn>
                     <ActionBtn label="Archive" busy={busy === i.filename} onClick={() => act('archive', i.filename, 'Archived')}><Archive size={14} /></ActionBtn>
-                    <Link href={`/gm/view/${encodeURIComponent(i.id)}`} className="ml-auto"><Tip label="Open editor"><span className="w-8 h-8 flex items-center justify-center rounded-lg border border-surface-3 text-zinc-400 hover:text-zinc-100 hover:bg-surface-3 transition-colors"><ExternalLink size={14} /></span></Tip></Link>
+                    <Link href={`/gm/view/${i.uuid || encodeURIComponent(i.id)}`} className="ml-auto"><Tip label="Open editor"><span className="w-8 h-8 flex items-center justify-center rounded-lg border border-surface-3 text-zinc-400 hover:text-zinc-100 hover:bg-surface-3 transition-colors"><ExternalLink size={14} /></span></Tip></Link>
                   </div>
                 )}
               </div>

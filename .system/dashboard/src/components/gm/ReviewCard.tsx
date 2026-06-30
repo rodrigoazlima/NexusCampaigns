@@ -204,7 +204,7 @@ export default function ReviewCard({ item, onApprove, onReject, onReprocess }: R
           {/* Header */}
           <div className="flex items-start gap-2 mb-2 flex-wrap">
             <Link
-              href={`/gm/view/${encodeURIComponent(item.id)}`}
+              href={`/gm/view/${item.uuid || encodeURIComponent(item.id)}`}
               className="font-mono text-sm text-zinc-100 font-semibold hover:text-primary transition-colors inline-flex items-center gap-1"
             >
               {item.id}

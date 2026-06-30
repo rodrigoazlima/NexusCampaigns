@@ -17,6 +17,7 @@ from __future__ import annotations
 import re
 import sys
 import time
+import uuid as _uuid
 from datetime import date
 from pathlib import Path
 
@@ -192,6 +193,10 @@ def _enforce_and_write(
     # Ensure id is present and slugified
     if not fm.get("id"):
         fm["id"] = f"{fm['type']}-{to_slug(Path(source_name).stem)}"
+
+    # Assign stable UUID if not already present
+    if not fm.get("uuid"):
+        fm["uuid"] = str(_uuid.uuid4())
 
     # Ensure list fields are actually lists
     if not isinstance(fm.get("relationships"), list):

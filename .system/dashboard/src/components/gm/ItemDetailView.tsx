@@ -217,7 +217,7 @@ export default function ItemDetailView({ item: initial }: Props) {
       })
       if (data.ok) {
         showToast('Renamed successfully', 'success')
-        router.push(`/gm/view/${data.newFilename.replace('.md', '')}`)
+        router.push(`/gm/view/${item.uuid || data.newFilename.replace('.md', '')}`)
       } else {
         showToast(data.error ?? 'Rename failed', 'error')
       }
@@ -351,7 +351,7 @@ export default function ItemDetailView({ item: initial }: Props) {
       const res = await fetch('/api/gm/token/upload-base', { method: 'POST', body: form })
       const data = await res.json()
       if (data.ok) {
-        router.push(`/gm/view/${item.id}/token`)
+        router.push(`/gm/view/${item.uuid || item.id}/token`)
       } else {
         showToast(data.error ?? 'Upload failed', 'error')
         setUploadingBase(false)
@@ -572,7 +572,7 @@ export default function ItemDetailView({ item: initial }: Props) {
               <div className="absolute bottom-3 right-3 z-20">
                 {tokenSrc ? (
                   <Link
-                    href={`/gm/view/${item.id}/token`}
+                    href={`/gm/view/${item.uuid || item.id}/token`}
                     className="relative block w-24 h-24 rounded-full overflow-hidden border-2 border-zinc-700/70 shadow-2xl hover:border-primary/60 hover:scale-105 transition-all group/token bg-surface"
                     title="Open token editor"
                   >
@@ -629,7 +629,7 @@ export default function ItemDetailView({ item: initial }: Props) {
             )}
             {item.source[0] && (
               <Link
-                href={`/gm/view/${item.id}/token`}
+                href={`/gm/view/${item.uuid || item.id}/token`}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-surface-3 text-zinc-300 border border-surface-3 hover:border-zinc-600 hover:text-white transition-colors"
               >
                 <Pencil size={13} /> Edit
@@ -740,7 +740,7 @@ export default function ItemDetailView({ item: initial }: Props) {
               {item.history.map((h) => (
                 <Link
                   key={h.id}
-                  href={`/gm/view/${h.id}`}
+                  href={`/gm/view/${h.uuid || h.id}`}
                   className="flex items-center gap-3 px-3 py-2 rounded-lg bg-surface-3 border border-surface-3 hover:border-primary/30 transition-colors group"
                 >
                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold uppercase ${TYPE_COLORS[h.type] ?? 'bg-zinc-700 text-zinc-400'}`}>
