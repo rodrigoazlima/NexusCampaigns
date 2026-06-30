@@ -250,7 +250,8 @@ export default function WikiBrowser({ items }: { items: WikiItem[] }) {
 }
 
 function Row({ i }: { i: WikiItem }) {
-  const src = i.tokenPath ? `/api/image?path=${encodeURIComponent(i.tokenPath)}` : null
+  const preview = i.tokenPath ?? i.source[0]
+  const src = preview ? `/api/image?path=${encodeURIComponent(preview)}` : null
   const links = i.relationships.length
   return (
     <Link href={hrefOf(i)} className="flex items-center gap-3 px-3 py-2 hover:bg-surface-2 group">
@@ -295,7 +296,8 @@ function WikiTable({ rows }: { rows: WikiItem[] }) {
         </thead>
         <tbody>
           {rows.map((i) => {
-            const src = i.tokenPath ? `/api/image?path=${encodeURIComponent(i.tokenPath)}` : null
+            const preview = i.tokenPath ?? i.source[0]
+            const src = preview ? `/api/image?path=${encodeURIComponent(preview)}` : null
             return (
               <tr key={i.id} className="border-b border-surface-3/40 hover:bg-surface-2">
                 <td className="p-2">

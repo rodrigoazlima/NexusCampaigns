@@ -166,8 +166,11 @@ export default function PlaceCollection({ items }: { items: PlaceItem[] }) {
       return (b.updated ?? '').localeCompare(a.updated ?? '') // updated (default)
     })
 
-  const tokenSrc = (i: PlaceItem) =>
-    i.tokenPath ? `/api/image?path=${encodeURIComponent(i.tokenPath)}` : null
+  // Token first (rare for places), else the source image. LOC badge only when neither.
+  const previewSrc = (i: PlaceItem) => {
+    const p = i.tokenPath ?? i.source[0]
+    return p ? `/api/image?path=${encodeURIComponent(p)}` : null
+  }
 
   const cardHref = (i: PlaceItem) =>
     i.origin === 'draft' ? `/gm/view/${encodeURIComponent(i.id)}` : '/library'
@@ -325,7 +328,7 @@ export default function PlaceCollection({ items }: { items: PlaceItem[] }) {
       ) : view === 'grid' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {filtered.map((i) => {
-            const src = tokenSrc(i)
+            const src = previewSrc(i)
             const occ = occupants(i)
             return (
               <div key={i.id} className={`panel border transition-colors flex flex-col group overflow-hidden ${isAnchor(i) ? 'border-green-500/50' : 'border-surface-3 hover:border-green-500/30'}`}>
@@ -398,7 +401,7 @@ export default function PlaceCollection({ items }: { items: PlaceItem[] }) {
             </thead>
             <tbody>
               {filtered.map((i) => {
-                const src = tokenSrc(i)
+                const src = previewSrc(i)
                 const occ = occupants(i)
                 return (
                   <tr key={i.id} className="border-b border-surface-3/40 hover:bg-surface-2">

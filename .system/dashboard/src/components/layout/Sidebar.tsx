@@ -50,10 +50,10 @@ const nav: NavSection[] = [
     defaultOpen: true,
     items: [
       { href: '/gm/campaign', label: 'Campaign', icon: Dices },
-      { href: '/gm/places', label: 'Places', icon: Map },
       { href: '/gm/npcs', label: 'NPCs', icon: Users },
-      { href: '/gm/factions', label: 'Factions', icon: Flag },
       { href: '/gm/quests', label: 'Quests', icon: ScrollText },
+      { href: '/gm/places', label: 'Places', icon: Map },
+      { href: '/gm/factions', label: 'Factions', icon: Flag },
       { href: '/gm/bestiary', label: 'Bestiary', icon: Skull },
       { href: '/gm/treasures', label: 'Treasures', icon: Gem },
       { href: '/gm/wiki', label: 'Wiki', icon: BookOpen },
