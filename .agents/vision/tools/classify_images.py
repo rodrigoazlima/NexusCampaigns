@@ -51,6 +51,7 @@ _MASTER_LOG   = _AGENTS_DIR / "runtime" / "state" / "logs" / "automation.log"
 _PROC_IMAGES  = _AGENT_STATE / "processed-images.json"
 _TOKEN_LINKS  = _AGENT_STATE / "token-links.json"
 _QUEUE_FILE   = _SHARED_STATE / "inbox-queue.json"
+_GEN_TOKENS   = _AGENTS_DIR / "token" / "state" / "generated-tokens.json"
 _PROMPT_FILE  = _AGENTS_DIR / "vision" / "prompts" / "classify-image.txt"
 _SIGNALS_DIR  = _AGENTS_DIR / "runtime" / "state" / "signals"
 
@@ -151,15 +152,35 @@ def _save_queue(queue: dict) -> None:
 # Candidate discovery
 # ---------------------------------------------------------------------------
 
+def _generated_token_paths() -> set[str]:
+    """Project-relative paths of dashboard-generated tokens.
+
+    These artifacts live next to their source in 00-Inbox but are NOT raw input —
+    re-ingesting them as new images is what duplicates tokens (each gm/view edit
+    writes a differently-named token file; _resolve_image_target then bumps each to
+    -01, -02…). Skip them here so they are never treated as source images.
+    """
+    if not _GEN_TOKENS.exists():
+        return set()
+    try:
+        gen = json.loads(_GEN_TOKENS.read_text(encoding="utf-8"))
+    except Exception:
+        return set()
+    return {v["tokenPath"] for v in gen.values() if isinstance(v, dict) and v.get("tokenPath")}
+
+
 def _candidate_images(state: dict, queue: dict) -> list[Path]:
     """Return unprocessed images, non-PNG first (tokens last per spec)."""
     path_index: set[str] = set(state.get("pathIndex", {}).keys())
+    gen_tokens: set[str] = _generated_token_paths()
     images: list[Path] = []
     for path in sorted(_INBOX_IMAGES.rglob("*")):
         if not path.is_file() or path.suffix.lower() not in _IMAGE_EXTS:
             continue
         rel = path.relative_to(_PROJECT_ROOT).as_posix()
         if rel in path_index:
+            continue
+        if rel in gen_tokens:
             continue
         agents = queue.get(rel, {}).get("agents", {})
         if isinstance(agents, dict) and agents.get("vision") == "done":
