@@ -1,7 +1,7 @@
 """token.tools.generate_tokens
 
 Generates 512×512 circular portrait tokens from classified character images.
-Face detection: MediaPipe → OpenCV Haar → upper-center crop fallback.
+Face detection: MTCNN (robust on stylized art) → OpenCV Haar (topmost) → upper-center crop fallback.
 Moldura: inner radius auto-detected from frame alpha channel.
 Moldura selection: per-type override from agent config (moldura_by_type).
 No LLM. Batch: 10 per run.
@@ -110,6 +110,29 @@ def _load_vision_state() -> dict[str, Any]:
     return json.loads(_VISION_STATE.read_text(encoding="utf-8"))
 
 
+def _store_face(src_rel: str, face: dict | None, log: Logger) -> None:
+    """Persist the detected face position onto the source image's index entry in
+    processed-images.json, so re-generation and the manual token editor can
+    reuse it. No-op when no face or the image isn't indexed.
+
+    ponytail: read-modify-write of the shared vision state — last writer wins. The
+    vision agent runs hourly and rarely overlaps a manual token gen; if contention
+    ever matters, gate both on a lock file.
+    """
+    if not face:
+        return
+    state = _load_vision_state()
+    sha = state.get("pathIndex", {}).get(src_rel)
+    entry = state.get("images", {}).get(sha) if sha and not str(sha).startswith("path:") else None
+    if entry is None:
+        return
+    entry["face"] = face
+    tmp = _VISION_STATE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(state, indent=2, default=str), encoding="utf-8")
+    tmp.replace(_VISION_STATE)
+    log.info(f"Stored face for {src_rel.split('/')[-1]}: center=({face['cx']},{face['cy']})")
+
+
 def _load_gen_tokens() -> dict[str, Any]:
     if not _GEN_TOKENS.exists():
         return {}
@@ -177,26 +200,33 @@ def _pick_moldura(entry: dict[str, Any], cfg: dict[str, Any]) -> Path:
 # Face detection  (returns center-point form: cx, cy, fw, fh)
 # ---------------------------------------------------------------------------
 
-def _detect_face_mediapipe(img_array: Any) -> tuple[int, int, int, int] | None:
+_MTCNN_DETECTOR: Any = None
+
+
+def _get_mtcnn() -> Any:
+    """Lazily build + cache the MTCNN detector (network construction is expensive)."""
+    global _MTCNN_DETECTOR
+    if _MTCNN_DETECTOR is None:
+        from mtcnn import MTCNN  # type: ignore[import]
+        _MTCNN_DETECTOR = MTCNN()
+    return _MTCNN_DETECTOR
+
+
+def _detect_face_mtcnn(img_array: Any, min_conf: float = 0.90) -> tuple[int, int, int, int] | None:
+    """Primary detector. Robust on stylized/illustrated fantasy art where Haar
+    fires false positives on armor/belts/weapons. Expects an RGB array.
+    Picks the highest-confidence face. Returns center-point form (cx, cy, fw, fh).
+    """
     try:
-        import mediapipe as mp  # type: ignore[import]
-        solutions = getattr(mp, "solutions", None)
-        if not (solutions and hasattr(solutions, "face_detection")):
+        results = _get_mtcnn().detect_faces(img_array)
+        if not results:
             return None
-        mp_face = solutions.face_detection
-        with mp_face.FaceDetection(model_selection=1, min_detection_confidence=0.3) as det:
-            rgb = img_array[:, :, ::-1].copy() if img_array.shape[2] == 3 else img_array
-            res = det.process(rgb)
-            if not res.detections:
-                return None
-            best = max(res.detections, key=lambda d: d.score[0])
-            bb = best.location_data.relative_bounding_box
-            h, w = img_array.shape[:2]
-            fw = int(bb.width  * w)
-            fh = int(bb.height * h)
-            cx = int(bb.xmin * w) + fw // 2
-            cy = int(bb.ymin * h) + fh // 2
-            return cx, cy, fw, fh
+        best = max(results, key=lambda r: r.get("confidence", 0.0))
+        if best.get("confidence", 0.0) < min_conf:
+            return None
+        x, y, fw, fh = best["box"]
+        x, y = max(0, int(x)), max(0, int(y))
+        return x + fw // 2, y + fh // 2, int(fw), int(fh)
     except Exception:
         return None
 
@@ -212,7 +242,10 @@ def _detect_face_opencv(img_array: Any) -> tuple[int, int, int, int] | None:
         faces = clf.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4, minSize=(60, 60))
         if not len(faces):
             return None
-        x, y, fw, fh = max(faces, key=lambda f: f[2] * f[3])
+        # ponytail: pick the TOPMOST detection, not the largest. Haar fires false
+        # positives on belts/gauntlets/weapons that are often bigger than the real
+        # face; in a portrait the head sits highest, so smallest-y wins.
+        x, y, fw, fh = min(faces, key=lambda f: f[1])
         cx = int(x) + fw // 2
         cy = int(y) + fh // 2
         return cx, cy, int(fw), int(fh)
@@ -279,13 +312,16 @@ def _detect_ring_radii(frame_arr: Any) -> tuple[int, int]:
 # ---------------------------------------------------------------------------
 
 def _make_token(img_path: Path, out_path: Path, cfg: dict, log: Logger,
-                moldura_path: Path | None = None) -> bool:
+                moldura_path: Path | None = None) -> tuple[bool, dict | None]:
+    """Returns (ok, face) where face is the detected face position in SOURCE
+    pixels — {cx, cy, w, h, img_w, img_h} — or None when no face was found
+    (upper-center fallback was used)."""
     try:
         from PIL import Image, ImageDraw
         import numpy as np
     except ImportError:
         log.error("Pillow not installed — cannot generate tokens")
-        return False
+        return False, None
 
     try:
         # Resolve moldura
@@ -322,9 +358,16 @@ def _make_token(img_path: Path, out_path: Path, cfg: dict, log: Logger,
         w, h  = img.size
         arr   = np.array(img.convert("RGB"))
         IH, IW = arr.shape[:2]
+        SRC_H, SRC_W = IH, IW  # original dims — IH/IW get mutated by padding below
 
-        # Detect face (center-point form)
-        face = _detect_face_mediapipe(arr) or _detect_face_opencv(arr)
+        # Detect face (center-point form). MTCNN primary (handles stylized art),
+        # Haar topmost fallback.
+        face = _detect_face_mtcnn(arr) or _detect_face_opencv(arr)
+        face_meta: dict | None = None
+        if face:
+            _fcx, _fcy, _fw, _fh = face
+            face_meta = {"cx": int(_fcx), "cy": int(_fcy), "w": int(_fw), "h": int(_fh),
+                         "img_w": int(SRC_W), "img_h": int(SRC_H)}
 
         forehead_ratio = float(cfg.get("forehead_ratio", 0.35))
         body_ratio     = float(cfg.get("body_ratio", 0.30))
@@ -403,11 +446,11 @@ def _make_token(img_path: Path, out_path: Path, cfg: dict, log: Logger,
 
         out_path.parent.mkdir(parents=True, exist_ok=True)
         canvas.save(str(out_path), format="PNG")
-        return True
+        return True, face_meta
 
     except Exception as exc:
         log.error(f"Token generation error for {img_path.name}: {exc}")
-        return False
+        return False, None
 
 
 def main() -> None:
@@ -492,7 +535,7 @@ def main() -> None:
             count += 1
             continue
 
-        ok = _make_token(img_path, out_path, cfg, log, moldura_path=moldura_path)
+        ok, face = _make_token(img_path, out_path, cfg, log, moldura_path=moldura_path)
         if ok:
             out_rel = out_path.relative_to(_PROJECT_ROOT).as_posix()
             gen_tokens[img_key] = {
@@ -501,6 +544,7 @@ def main() -> None:
                 "generatedAt": datetime.now(timezone.utc).isoformat(),
             }
             _save_gen_tokens(gen_tokens)
+            _store_face(src_rel, face, log)
             _set_queue_token_slot(src_rel, "done", log)
             log.info(f"Token created: {out_path.name}")
             count += 1
@@ -538,7 +582,7 @@ def run_single(image_path: str, moldura_override: str | None = None,
         moldura_path = None
 
     out_path = img_path.parent / (img_path.stem + "-token.png")
-    ok = _make_token(img_path, out_path, cfg, log, moldura_path=moldura_path)
+    ok, face = _make_token(img_path, out_path, cfg, log, moldura_path=moldura_path)
     if ok:
         gen = _load_gen_tokens()
         rel = img_path.relative_to(_PROJECT_ROOT).as_posix()
@@ -552,6 +596,7 @@ def run_single(image_path: str, moldura_override: str | None = None,
             "generatedAt": datetime.now(timezone.utc).isoformat(),
         }
         _save_gen_tokens(gen)
+        _store_face(rel, face, log)
         _set_queue_token_slot(rel, "done", log)
         print(tok_rel, flush=True)
         return 0
@@ -641,7 +686,7 @@ def call_tool(name: str, args: dict, context: dict) -> str:
             moldura_path = _pick_moldura({"type": args["image_type"]}, cfg)
 
         out_path = img_path.parent / (img_path.stem + "-token.png")
-        ok = _make_token(img_path, out_path, cfg, log, moldura_path=moldura_path)
+        ok, face = _make_token(img_path, out_path, cfg, log, moldura_path=moldura_path)
         if ok:
             gen = _load_gen_tokens()
             rel = img_path.relative_to(_PROJECT_ROOT).as_posix()
@@ -654,6 +699,7 @@ def call_tool(name: str, args: dict, context: dict) -> str:
                 "generatedAt": datetime.now(timezone.utc).isoformat(),
             }
             _save_gen_tokens(gen)
+            _store_face(rel, face, log)
             _set_queue_token_slot(rel, "done", log)
             return f"Token generated: {out_path.name}"
         return f"Token generation failed for: {img_path.name}"

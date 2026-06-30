@@ -249,7 +249,7 @@ Remove the `{relPath}|{scenarioId}` key from `state/processed-npcs.json`, then r
 ### Prerequisites
 
 - Python packages: `Pillow`, `numpy`
-- Optional (better face detection): `mediapipe`, `opencv-python`
+- Optional (better face detection): `mtcnn` (primary, robust on stylized art), `opencv-python` (Haar fallback)
 - **Moldura frame:** `00-Inbox/tokens/Molduras/moldura_default.png` must exist
 
 ### What it does each run
@@ -295,7 +295,7 @@ python .agents/token/tools/10-generate-tokens.py --force --vault-root "knowledge
 | Token not generated | Image not in `processed-images.json` with `status: ok` |
 | Face crop off-center | Adjust `focus_head` or `forehead_ratio` in config |
 | Moldura not found | Check `state/10-generate-tokens.json` `moldura` path |
-| Missing `mediapipe` | Falls back to OpenCV, then upper-center crop |
+| Missing `mtcnn` | Falls back to OpenCV Haar (topmost), then upper-center crop |
 
 ---
 
