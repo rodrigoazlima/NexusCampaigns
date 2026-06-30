@@ -12,6 +12,7 @@ import hashlib
 import json
 import sys
 import time
+import uuid as _uuid
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
@@ -665,6 +666,7 @@ def _write_draft(
 
     frontmatter: dict[str, Any] = {
         "id":            slug,
+        "uuid":          str(_uuid.uuid4()),
         "type":          entity_type,
         "status":        "draft",
         "quality":       0,
@@ -786,6 +788,7 @@ def main() -> None:
                 log.error(f"Classification failed for {img_path.name}: {exc}")
                 sha_fail = _sha256(img_path)
                 state["images"][f"path:{orig_rel}"] = {
+                    "uuid":          str(_uuid.uuid4()),
                     "path":          orig_rel,
                     "processedAt":   datetime.now(timezone.utc).isoformat(),
                     "originalName":  img_path.name,
@@ -823,6 +826,7 @@ def main() -> None:
 
         # --- Update processed-images.json (step 9) ---
         state["images"][sha] = {
+            "uuid":          state.get("images", {}).get(sha, {}).get("uuid") or str(_uuid.uuid4()),
             "path":          new_rel,
             "processedAt":   datetime.now(timezone.utc).isoformat(),
             "originalName":  img_path.name,
