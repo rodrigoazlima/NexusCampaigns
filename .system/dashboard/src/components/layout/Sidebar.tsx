@@ -178,7 +178,7 @@ const LiveIndicator = ({ collapsed }: { collapsed?: boolean }) => (
 )
 
 const Logo = ({ collapsed }: { collapsed?: boolean }) => (
-  <div className={`flex items-center gap-2 ${collapsed ? 'justify-center' : ''}`}>
+  <Link href="/" className={`flex items-center gap-2 ${collapsed ? 'justify-center' : ''}`}>
     {/* eslint-disable-next-line @next/next/no-img-element */}
     <img src="/logo-monogram.png" alt="Nexus Campaigns" className="w-9 h-9 shrink-0" />
     {!collapsed && (
@@ -187,7 +187,7 @@ const Logo = ({ collapsed }: { collapsed?: boolean }) => (
         <div className="text-sm font-semibold text-zinc-100 leading-tight">Campaigns</div>
       </div>
     )}
-  </div>
+  </Link>
 )
 
 const CollapseToggle = ({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) => (
@@ -251,8 +251,10 @@ export default function Sidebar() {
           <Menu size={20} />
         </button>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo-mark.png" alt="" className="w-7 h-7" />
-        <span className="text-sm font-semibold text-zinc-100">Nexus Campaigns</span>
+        <Link href="/" className="flex items-center gap-2">
+          <img src="/logo-mark.png" alt="Nexus Campaigns" className="w-7 h-7" />
+          <span className="text-sm font-semibold text-zinc-100">Nexus Campaigns</span>
+        </Link>
         <div className="ml-auto flex items-center gap-1.5 text-xs text-zinc-500 pr-1">
           <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
           Live

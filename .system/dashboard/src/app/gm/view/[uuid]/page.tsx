@@ -7,10 +7,10 @@ import ItemDetailView from '@/components/gm/ItemDetailView'
 export default async function ItemDetailPage({
   params,
 }: {
-  params: Promise<{ id: string }>
+  params: Promise<{ uuid: string }>
 }) {
-  const { id } = await params
-  const item = readItemDetail(decodeURIComponent(id))
+  const { uuid } = await params
+  const item = readItemDetail(decodeURIComponent(uuid))
 
   if (!item) {
     notFound()

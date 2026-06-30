@@ -5,11 +5,11 @@ export const dynamic = 'force-dynamic'
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ uuid: string }> }
 ) {
   try {
-    const { id } = await params
-    const item = readItemDetail(decodeURIComponent(id))
+    const { uuid } = await params
+    const item = readItemDetail(decodeURIComponent(uuid))
     if (!item) {
       return NextResponse.json({ error: 'Item not found' }, { status: 404 })
     }

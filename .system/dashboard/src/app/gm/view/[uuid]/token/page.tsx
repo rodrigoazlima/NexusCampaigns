@@ -7,10 +7,10 @@ import TokenEditorCanvas from '@/components/gm/TokenEditorCanvas'
 export default async function TokenEditorPage({
   params,
 }: {
-  params: Promise<{ id: string }>
+  params: Promise<{ uuid: string }>
 }) {
-  const { id } = await params
-  const item = readItemDetail(decodeURIComponent(id))
+  const { uuid } = await params
+  const item = readItemDetail(decodeURIComponent(uuid))
 
   if (!item) notFound()
 
