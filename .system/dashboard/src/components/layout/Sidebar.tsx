@@ -278,7 +278,7 @@ export default function Sidebar() {
               </button>
             </div>
             <NavLinks onNavigate={() => setOpen(false)} />
-            <LiveIndicator />
+            <BottomBar collapsed={false} onToggle={() => setOpen(false)} />
           </aside>
         </div>
       )}
