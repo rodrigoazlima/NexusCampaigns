@@ -71,13 +71,28 @@ _LLM_CFG = LLMEndpointConfig(
 # Minimum difflib ratio to flag a slug as similar-to a library slug
 _SIMILARITY_THRESHOLD = 0.85
 
+# Types the vision agent assigns as placeholder defaults (portrait→npc, battlemap→location).
+# These are safe to refine — a more specific type should be inferred from content.
+_VISION_DEFAULTS: frozenset[str] = frozenset({"npc", "location"})
+
+# Vision image-type tags → plausible entity types (used to build prompt hint)
+_IMAGE_TYPE_HINTS: dict[str, list[str]] = {
+    "portrait":  ["npc", "character", "creature", "monster"],
+    "body":      ["npc", "character", "creature", "monster"],
+    "token":     ["npc", "character", "creature", "monster"],
+    "battlemap": ["location", "dungeon", "encounter"],
+    "scene":     ["location", "dungeon", "event", "encounter"],
+}
+
 _TYPE_PROMPT = (
     "Return ONLY valid JSON with the entity type for this RPG note.\n"
     "Allowed types: npc, character, faction, location, city, village, dungeon, "
     "item, artifact, quest, encounter, creature, monster, event, religion, "
     "organization, timeline, lore\n"
+    "Prefer specific types: dungeon over location for tombs/caves, "
+    "creature over npc for monsters, artifact over item for relics.\n"
     "Format: {{\"type\": \"<value_or_null>\"}}\n\n"
-    "Title: {title}\nContent: {content}"
+    "Title: {title}\n{image_hint}Content: {content}"
 )
 
 
@@ -161,6 +176,15 @@ def _load_prompt_template() -> str:
 
 def _slug_similarity(a: str, b: str) -> float:
     return SequenceMatcher(None, a, b).ratio()
+
+
+def _image_hint(tags: list[str]) -> str:
+    """Return a prompt hint line when tags contain a vision image-type, else empty string."""
+    for tag in tags:
+        candidates = _IMAGE_TYPE_HINTS.get(tag)
+        if candidates:
+            return f"Image classified as '{tag}' — likely entity types: {', '.join(candidates)}.\n"
+    return ""
 
 
 # ---------------------------------------------------------------------------
@@ -264,9 +288,12 @@ def _run_enrich_tags() -> tuple[int, int]:
             continue
 
         existing_tags = fm.get("tags") or []
-        has_type      = bool(fm.get("type"))
+        current_type  = fm.get("type") or ""
         needs_tags    = len(existing_tags) <= 2
-        needs_type    = not has_type
+        # Allow refinement when vision agent wrote a placeholder default type
+        # (portrait→npc, battlemap→location) and human hasn't reviewed yet.
+        is_vision_default = current_type in _VISION_DEFAULTS and not fm.get("reviewed")
+        needs_type    = not current_type or is_vision_default
 
         if not needs_tags and not needs_type:
             _mark_queue_done(queue, rel)
@@ -275,10 +302,12 @@ def _run_enrich_tags() -> tuple[int, int]:
 
         title   = fm.get("id") or md_path.stem
         excerpt = body[:500]
+        hint    = _image_hint(existing_tags)
         prompt  = (
             prompt_tpl
             .replace("{title}", title)
             .replace("{current_tags}", ", ".join(existing_tags) if existing_tags else "none")
+            .replace("{image_hint}", hint)
             .replace("{content}", excerpt)
         )
 
@@ -315,8 +344,9 @@ def _run_enrich_tags() -> tuple[int, int]:
                 changed = True
 
         if needs_type and enrichment.type and enrichment.type in _ALLOWED_TYPES:
-            fm["type"] = enrichment.type
-            changed = True
+            if enrichment.type != current_type:
+                fm["type"] = enrichment.type
+                changed = True
 
         if changed:
             ok = _write_with_retry(md_path, fm, body, fio)
@@ -368,12 +398,21 @@ def _run_infer_type() -> tuple[int, int]:
         except Exception:
             continue
 
-        if fm.get("type"):
+        current_type = fm.get("type") or ""
+        is_vision_default = current_type in _VISION_DEFAULTS and not fm.get("reviewed")
+        if current_type and not is_vision_default:
             continue
 
+        tags    = fm.get("tags") or []
         title   = fm.get("id") or md_path.stem
         excerpt = body[:300]
-        prompt  = _TYPE_PROMPT.replace("{title}", title).replace("{content}", excerpt)
+        hint    = _image_hint(tags)
+        prompt  = (
+            _TYPE_PROMPT
+            .replace("{title}", title)
+            .replace("{image_hint}", hint)
+            .replace("{content}", excerpt)
+        )
 
         try:
             raw           = client.chat([{"role": "user", "content": prompt}], max_tokens=10)
@@ -387,11 +426,11 @@ def _run_infer_type() -> tuple[int, int]:
             time.sleep(0.3)
             continue
 
-        if inferred_type and inferred_type in _ALLOWED_TYPES:
+        if inferred_type and inferred_type in _ALLOWED_TYPES and inferred_type != current_type:
             fm["type"] = inferred_type
             ok = _write_with_retry(md_path, fm, body, fio)
             if ok:
-                log.info(f"InferType: {md_path.name} type={inferred_type}")
+                log.info(f"InferType: {md_path.name} {current_type or 'none'} → {inferred_type}")
                 count += 1
             else:
                 log.error(f"Write failed (InferType): {md_path.name}")

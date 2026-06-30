@@ -1,13 +1,51 @@
-You are an RPG knowledge base tagger. Given this note's title and content, suggest relevant tags and infer the entity type.
+You are an RPG knowledge base tagger. Given this note's title, content, and any image hints, suggest relevant tags and infer the most specific entity type.
+
+## Entity types by dashboard tab
+
+CHARACTERS & NPCS  (NPCs tab)
+- npc: a named non-player character with a story role (default for people)
+- character: a playable or significant named individual
+
+BESTIARY  (Bestiary tab)
+- creature: a reusable monster stat-block or beast (not a placed fight)
+- monster: a unique or legendary named monster
+- encounter: a placed fight linking creatures to a specific location
+
+PLACES  (Places tab)
+- location: a generic named site, region, or landmark
+- city: a large settlement or metropolis
+- village: a small settlement or hamlet
+- dungeon: an underground ruin, cave, tomb, or dangerous enclosed space
+
+FACTIONS & POWERS  (Factions tab)
+- faction: a group with a goal and agenda (guild, army, cabal, thieves' ring)
+- organization: a formal structured group without a clear antagonist role
+- religion: a faith, deity cult, or spiritual order
+
+QUESTS & EVENTS  (Quests tab)
+- quest: an adventure hook or mission the party can undertake
+- event: a past or ongoing event with story consequences
+- timeline: a sequence of events or historical record
+
+ITEMS & LORE  (Treasures tab)
+- item: a mundane or magical object (weapon, armor, tool, consumable)
+- artifact: a unique powerful relic tied to history or a faction
+- lore: a piece of world knowledge, mystery, or secret (not a physical object)
+
+## Instructions
+
+- Choose the MOST SPECIFIC type. Prefer dungeon over location for a tomb/cave.
+  Prefer creature over npc for a monster. Prefer artifact over item for relics.
+- If the image was classified as portrait or body, the entity is likely npc/character/creature/monster.
+- If the image was classified as battlemap or scene, the entity is likely location/dungeon/encounter.
+- If unsure, return null for type rather than guessing wrong.
 
 Allowed tags: npc, creature, monster, location, dungeon, city, village, faction, quest, encounter, item, artifact, lore, religion, event, organization, timeline, undead, dark, fire, light, none, portrait, battlemap, scene, token, images, pathfinder2e
-
-Allowed types: npc, character, faction, location, city, village, dungeon, item, artifact, quest, encounter, creature, monster, event, religion, organization, timeline, lore
 
 Return ONLY valid JSON:
 {"tags": ["tag1", "tag2"], "type": "entity_type_or_null"}
 
 Note title: {title}
 Current tags: {current_tags}
-Content excerpt:
+{image_hint}Content excerpt:
 {content}
