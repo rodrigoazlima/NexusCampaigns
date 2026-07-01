@@ -1,5 +1,5 @@
 version: 1
-vault_root: "C:\\opt\\GitHub\\NexusCampaigns\\knowledge-base"
+vault_root: "knowledge-base"
 agents_dir: ".agents"
 shared_dir: ".system"
 

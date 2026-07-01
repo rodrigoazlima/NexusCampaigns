@@ -10,7 +10,7 @@
 #   powershell -NonInteractive -File daemon.ps1 -ProjectRoot C:\path\to\repo
 
 param(
-    [string]$ProjectRoot = "C:\opt\GitHub\NexusCampaigns",
+    [string]$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..")).Path,
     [string]$Python      = "python",
     [int]   $IntervalSec = 60
 )

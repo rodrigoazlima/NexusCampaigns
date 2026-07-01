@@ -3,7 +3,7 @@
 # Run: powershell -ExecutionPolicy Bypass -File .automation\tests\Test-ClassifyImages.ps1
 # Exit code 0 = all pass, 1 = one or more failures
 
-$VaultRoot   = 'C:\opt\GitHub\NexusCampaigns\knowledge-base'
+$VaultRoot   = Join-Path (Resolve-Path (Join-Path $PSScriptRoot "..")).Path 'knowledge-base'
 $LMStudioUrl = 'http://localhost:1234/v1/chat/completions'
 $Model       = 'qwen3-vl-4b-instruct'
 $MaxRetries  = 3

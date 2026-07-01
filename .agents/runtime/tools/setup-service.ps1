@@ -35,7 +35,7 @@
 #   pwsh -ExecutionPolicy Bypass -File setup-service.ps1 -CleanInstall
 
 param(
-    [string] $ProjectRoot    = "C:\opt\GitHub\NexusCampaigns",
+    [string] $ProjectRoot    = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..")).Path,
     [string] $VaultRoot      = "",        # knowledge base dir; may live outside ProjectRoot
     [string] $Python         = "python",
     [string] $Method         = "auto",    # "auto" | "nssm" | "schtasks"
@@ -58,7 +58,7 @@ USAGE
   pwsh -ExecutionPolicy Bypass -File setup-service.ps1 [parameters]
 
 PARAMETERS
-  -ProjectRoot   <path>   App repo root (where this script lives). Default: C:\opt\GitHub\NexusCampaigns
+  -ProjectRoot   <path>   App repo root (where this script lives). Default: parent of .agents\runtime\tools
   -VaultRoot     <path>   Knowledge base dir. May be on another drive/repo entirely.
                             Default: read from global.json (vault_root), else <ProjectRoot>\knowledge-base
                             Linked into the app repo via a directory junction so every

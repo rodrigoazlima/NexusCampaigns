@@ -36,7 +36,7 @@ Next.js dashboard for the Nexus Campaigns. Reads live vault and agent state from
 
 ## State File Paths (authoritative)
 
-All paths relative to `PROJECT_ROOT` (`C:\opt\GitHub\NexusCampaigns`).
+All paths relative to `PROJECT_ROOT` (repo root).
 
 | Data | Actual Path |
 |------|-------------|
@@ -52,7 +52,7 @@ All paths relative to `PROJECT_ROOT` (`C:\opt\GitHub\NexusCampaigns`).
 | Generated tokens | `.agents/token/state/generated-tokens.json` |
 | Vault markdown | `knowledge-base/{00-Inbox,01-Processing,02-Library,...}/**/*.md` |
 
-`VAULT_ROOT` = `knowledge-base/` (absolute: `C:\opt\GitHub\NexusCampaigns\knowledge-base`)
+`VAULT_ROOT` = `knowledge-base/` (absolute: `<PROJECT_ROOT>\knowledge-base`)
 
 ---
 
@@ -60,8 +60,8 @@ All paths relative to `PROJECT_ROOT` (`C:\opt\GitHub\NexusCampaigns`).
 
 `.system/dashboard/.env.local`:
 ```
-VAULT_ROOT=C:\opt\GitHub\NexusCampaigns\knowledge-base
-PROJECT_ROOT=C:\opt\GitHub\NexusCampaigns
+VAULT_ROOT=<repo-root>\knowledge-base
+PROJECT_ROOT=<repo-root>
 ANTHROPIC_API_KEY=           # required for /gm/chat agent chat feature
 ```
 

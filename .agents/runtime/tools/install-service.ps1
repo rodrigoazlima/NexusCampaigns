@@ -8,7 +8,7 @@
 #   3. Set API key params below or export them as environment variables before running
 
 param(
-    [string]$ProjectRoot      = "C:\opt\GitHub\NexusCampaigns",
+    [string]$ProjectRoot      = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..")).Path,
     [string]$Python           = "python",
     [string]$ApiKey           = $env:ANTHROPIC_API_KEY,
     [string]$OpenAIKey        = $(if ($env:OPENAI_API_KEY) { $env:OPENAI_API_KEY } else { "lm-studio" }),
