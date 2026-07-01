@@ -1,14 +1,12 @@
 export const dynamic = 'force-dynamic'
 
-import { readVaultStats } from '@/lib/vault'
+import { readVaultStats, VAULT_ROOT } from '@/lib/vault'
 import PageHeader from '@/components/widgets/PageHeader'
 import AutoRefresh from '@/components/AutoRefresh'
 import { BookOpen } from 'lucide-react'
 import fs from 'fs'
 import path from 'path'
 import matter from 'gray-matter'
-
-const VAULT_ROOT = process.env.VAULT_ROOT ?? 'C:\\opt\\GitHub\\NexusCampaigns\\knowledge-base'
 
 interface LibraryEntity {
   filename: string

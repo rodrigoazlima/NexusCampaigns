@@ -19,6 +19,9 @@
 #   pwsh -ExecutionPolicy Bypass -File setup-service.ps1 -DashboardPort 9000
 #   pwsh -ExecutionPolicy Bypass -File setup-service.ps1 -NoDashboard
 #
+#   # Knowledge base on a different drive/repo than the app:
+#   pwsh -ExecutionPolicy Bypass -File setup-service.ps1 -VaultRoot "D:\Vaults\MyCampaign"
+#
 #   # Opt in to runner --once pre-flight verification (~60s):
 #   pwsh -ExecutionPolicy Bypass -File setup-service.ps1 -RunPreFlight
 #
@@ -33,6 +36,7 @@
 
 param(
     [string] $ProjectRoot    = "C:\opt\GitHub\NexusCampaigns",
+    [string] $VaultRoot      = "",        # knowledge base dir; may live outside ProjectRoot
     [string] $Python         = "python",
     [string] $Method         = "auto",    # "auto" | "nssm" | "schtasks"
     [int]    $DashboardPort  = 48080,
@@ -54,7 +58,11 @@ USAGE
   pwsh -ExecutionPolicy Bypass -File setup-service.ps1 [parameters]
 
 PARAMETERS
-  -ProjectRoot   <path>   Vault project root. Default: C:\opt\GitHub\NexusCampaigns
+  -ProjectRoot   <path>   App repo root (where this script lives). Default: C:\opt\GitHub\NexusCampaigns
+  -VaultRoot     <path>   Knowledge base dir. May be on another drive/repo entirely.
+                            Default: read from global.json (vault_root), else <ProjectRoot>\knowledge-base
+                            Linked into the app repo via a directory junction so every
+                            hardcoded "knowledge-base" path in the agents/tests keeps working.
   -Python        <cmd>    Python executable to use. Default: python
   -Method        <str>    Install method: auto | nssm | schtasks. Default: auto
                             auto     — picks nssm when admin + NSSM installed, else schtasks
@@ -81,6 +89,9 @@ EXAMPLES
 
   # Custom port, skip dashboard:
   pwsh -ExecutionPolicy Bypass -File setup-service.ps1 -DashboardPort 9000 -NoDashboard
+
+  # App repo here, knowledge base on another drive/repo:
+  pwsh -ExecutionPolicy Bypass -File setup-service.ps1 -VaultRoot "D:\Vaults\MyCampaign"
 
   # Check service health:
   pwsh -ExecutionPolicy Bypass -File setup-service.ps1 -Status
@@ -129,14 +140,21 @@ if (Test-Path $GlobalConfig) {
             $DashboardPort = [int]$gc.ports.dashboard
         }
         if ($gc.ports.host)  { $DashboardHost = [string]$gc.ports.host }
-        if ($gc.vault_root)  { $VaultRootRel  = [string]$gc.vault_root }
+        if (-not $PSBoundParameters.ContainsKey('VaultRoot') -and $gc.vault_root) {
+            $VaultRootRel = [string]$gc.vault_root
+        }
     } catch {
         Write-Host "WARN: could not parse $GlobalConfig — using built-in defaults. $_"
     }
 }
+# -VaultRoot on the command line always wins over global.json.
+if ($PSBoundParameters.ContainsKey('VaultRoot') -and $VaultRoot) {
+    $VaultRootRel = $VaultRoot
+}
 # Resolve vault root to an absolute path anchored at the project root.
 $VaultRootAbs = if ([System.IO.Path]::IsPathRooted($VaultRootRel)) { $VaultRootRel }
                 else { Join-Path $ProjectRoot $VaultRootRel }
+$VaultLinkPath = Join-Path $ProjectRoot "knowledge-base"
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -157,6 +175,43 @@ function Is-Admin {
     ([Security.Principal.WindowsPrincipal]::new(
         [Security.Principal.WindowsIdentity]::GetCurrent()
     )).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+# Every agent/test hardcodes "<ProjectRoot>\knowledge-base" as the vault path (see
+# .agents\shared\config.py project-root anchor and .agents\runtime\tools\runner.py
+# _VAULT_ROOT). Rather than rewire 79 files, link that path to wherever the vault
+# actually lives via a directory junction (no admin rights needed, unlike symlinks).
+function Ensure-VaultLink([string]$LinkPath, [string]$TargetPath) {
+    if (-not (Test-Path $TargetPath)) {
+        Log "Vault dir '$TargetPath' does not exist — creating it."
+        New-Item -ItemType Directory -Force -Path $TargetPath | Out-Null
+    }
+    $targetFull = (Resolve-Path -LiteralPath $TargetPath).Path.TrimEnd('\')
+
+    if (Test-Path $LinkPath) {
+        $item = Get-Item -LiteralPath $LinkPath -Force
+        if ($item.LinkType -eq "Junction") {
+            $currentTarget = [string](@($item.Target)[0]).TrimEnd('\')
+            if ($currentTarget -ieq $targetFull) {
+                Log "Vault link OK: $LinkPath -> $targetFull"
+                return
+            }
+            Log "Repointing vault link: $LinkPath -> $targetFull (was $currentTarget)"
+            Remove-Item -LiteralPath $LinkPath -Force
+        } elseif ($item.PSIsContainer) {
+            $hasContent = @(Get-ChildItem -LiteralPath $LinkPath -Force -ErrorAction SilentlyContinue).Count -gt 0
+            if ($hasContent) {
+                throw "'$LinkPath' is a real, non-empty directory — refusing to replace it with a link to '$targetFull'. Move its contents into the new -VaultRoot (or vice versa), then re-run."
+            }
+            Log "Removing empty placeholder directory: $LinkPath"
+            Remove-Item -LiteralPath $LinkPath -Force -Recurse
+        } else {
+            throw "'$LinkPath' exists and is not a directory — cannot link vault there."
+        }
+    }
+
+    New-Item -ItemType Junction -Path $LinkPath -Target $targetFull | Out-Null
+    Log "Vault linked: $LinkPath -> $targetFull"
 }
 
 function Find-NSSM {
@@ -559,10 +614,8 @@ if ($CleanInstall) {
     }
 
     # 6. Vault pipeline dirs (generated content only — NOT source/approved content)
-    $VaultRootForClean = if ([System.IO.Path]::IsPathRooted($VaultRootRel)) { $VaultRootRel }
-                         else { Join-Path $ProjectRoot $VaultRootRel }
     foreach ($vaultDir in @("01-Processing", "04-Relationships")) {
-        $target = Join-Path $VaultRootForClean $vaultDir
+        $target = Join-Path $VaultRootAbs $vaultDir
         if (Test-Path $target) {
             Log "Clearing vault dir: $target ..."
             Get-ChildItem $target -File -Recurse -ErrorAction SilentlyContinue |
@@ -669,6 +722,17 @@ Log "Python      : $Python"
 if (-not (Test-Path $ProjectRoot)) {
     Log "ProjectRoot '$ProjectRoot' not found." "ERROR"
     exit 1
+}
+
+# Link the vault into the app repo — skip entirely when it already lives at
+# <ProjectRoot>\knowledge-base (the common case; nothing to redirect).
+if ($VaultRootAbs.TrimEnd('\') -ine $VaultLinkPath.TrimEnd('\')) {
+    try {
+        Ensure-VaultLink -LinkPath $VaultLinkPath -TargetPath $VaultRootAbs
+    } catch {
+        Log "$_" "ERROR"
+        exit 1
+    }
 }
 
 # Verify runner script exists
