@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Upload, CheckCircle, XCircle, Loader2 } from 'lucide-react'
-import { uploadImage, isImageFile } from '@/lib/upload-image'
+import { uploadImage, enqueueImage, isImageFile } from '@/lib/upload-image'
 
 type Phase = 'idle' | 'dragging' | 'uploading' | 'done'
 interface DropState {
@@ -53,7 +53,11 @@ export default function GlobalDropZone() {
       if (files.length === 0) { reset(); return }
 
       setState({ phase: 'uploading', count: files.length })
-      const results = await Promise.all(files.map(f => uploadImage({ file: f })))
+      const results = await Promise.all(files.map(async f => {
+        const result = await uploadImage({ file: f })
+        if (result.ok && result.path) await enqueueImage(result.path)
+        return result
+      }))
       const uploaded = results.filter(r => r.ok).length
       const failed = results.length - uploaded
 
