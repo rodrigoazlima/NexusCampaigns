@@ -16,9 +16,12 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import socket
 import subprocess
 import sys
 import time
+import urllib.error
+import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -46,8 +49,11 @@ _LOGS_DIR     = _AGENT_STATE / "logs"
 _REPORTS_DIR  = _AGENTS_DIR / "review" / "state" / "reports"
 _QUEUE_FILE   = _PROJECT_ROOT / "system" / "state" / "inbox-queue.json"
 _PROC_IMAGES  = _AGENTS_DIR / "vision" / "state" / "processed-images.json"
+_ENV_FILE     = _PROJECT_ROOT / "system" / ".env.local"
 
-_LOCK_STALE_S = 1800  # 30 minutes
+_LOCK_STALE_S     = 1800  # 30 minutes
+_DASHBOARD_PORT   = 48080  # fallback if PORT missing from .env.local
+_DASHBOARD_TIMEOUT_S = 3
 
 # Fixable pattern regexes (case-insensitive) → fix label
 _ERROR_PATTERNS: list[tuple[re.Pattern[str], str]] = [
@@ -304,6 +310,53 @@ def _detect_overdue_agents(log: Logger) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# CheckDashboardHealth
+# ---------------------------------------------------------------------------
+
+def _read_dashboard_port(log: Logger) -> int:
+    """Read PORT from system/.env.local (written by setup-service.ps1)."""
+    if not _ENV_FILE.exists():
+        return _DASHBOARD_PORT
+    try:
+        for line in _ENV_FILE.read_text(encoding="utf-8").splitlines():
+            if line.strip().startswith("PORT="):
+                return int(line.split("=", 1)[1].strip())
+    except Exception as exc:
+        log.warning(f"Cannot read PORT from {_ENV_FILE.name}: {exc}")
+    return _DASHBOARD_PORT
+
+
+def _check_dashboard_health(log: Logger) -> dict:
+    """Check dashboard TCP port + HTTP response. No LLM, no side effects."""
+    port = _read_dashboard_port(log)
+    result: dict[str, Any] = {"port": port, "portListening": False, "httpStatus": None, "healthy": False}
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(_DASHBOARD_TIMEOUT_S)
+        try:
+            sock.connect(("127.0.0.1", port))
+            result["portListening"] = True
+        except OSError as exc:
+            log.warning(f"Dashboard port {port} not listening: {exc}")
+            return result
+
+    try:
+        req = urllib.request.Request(f"http://127.0.0.1:{port}", method="GET")
+        with urllib.request.urlopen(req, timeout=_DASHBOARD_TIMEOUT_S) as resp:
+            result["httpStatus"] = resp.status
+            result["healthy"] = 200 <= resp.status < 400
+    except urllib.error.HTTPError as exc:
+        result["httpStatus"] = exc.code
+        log.warning(f"Dashboard HTTP error: {exc.code}")
+    except Exception as exc:
+        log.warning(f"Dashboard HTTP probe failed: {exc}")
+
+    if result["healthy"]:
+        log.info(f"Dashboard healthy on port {port} (HTTP {result['httpStatus']})")
+    return result
+
+
+# ---------------------------------------------------------------------------
 # WriteRepairReport
 # ---------------------------------------------------------------------------
 
@@ -314,6 +367,7 @@ def _write_repair_report(
     invalid_refs: list[str],
     log: Logger,
     git_update: dict | None = None,
+    dashboard_health: dict | None = None,
 ) -> None:
     _REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     today = datetime.now().strftime("%Y-%m-%d")
@@ -327,6 +381,7 @@ def _write_repair_report(
         "repairsApplied":    repairs_applied,
         "overdueAgents":     overdue_agents,
         "invalidImageRefs":  invalid_refs,
+        "dashboardHealth":   dashboard_health,
     }
 
     tmp = report_path.with_suffix(".tmp")
@@ -351,7 +406,8 @@ def main() -> None:
     img_repairs, invalid_refs = _validate_image_refs(log)
     repairs       += img_repairs
     overdue        = _detect_overdue_agents(log)
-    _write_repair_report(fix_labels, repairs, overdue, invalid_refs, log, git_update=git_result)
+    dashboard      = _check_dashboard_health(log)
+    _write_repair_report(fix_labels, repairs, overdue, invalid_refs, log, git_update=git_result, dashboard_health=dashboard)
 
     log.done(t0, key="repairs", count=repairs, failed=0)
     sys.exit(0)
@@ -412,6 +468,15 @@ TOOLS = SELF_MANAGEMENT_TOOLS + [
         "input_schema": {"type": "object", "properties": {}},
     },
     {
+        "name": "check_dashboard_health",
+        "description": (
+            "Check whether the Next.js dashboard is up: reads its port from "
+            "system/.env.local, probes the TCP port, then does an HTTP GET. "
+            "Returns {port, portListening, httpStatus, healthy}. No side effects."
+        ),
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
         "name": "write_repair_report",
         "description": (
             "Write a structured repair-YYYY-MM-DD.json report to "
@@ -425,6 +490,7 @@ TOOLS = SELF_MANAGEMENT_TOOLS + [
                 "repairs_applied": {"type": "integer", "description": "Total number of repairs performed"},
                 "overdue_agents": {"type": "array",   "items": {"type": "string"}, "description": "Task IDs flagged as overdue"},
                 "invalid_refs":   {"type": "array",   "items": {"type": "string"}, "description": "Image paths with invalid or missing refs"},
+                "dashboard_health": {"type": "object", "description": "Result of check_dashboard_health, if run"},
             },
             "required": ["fix_labels", "repairs_applied", "overdue_agents", "invalid_refs"],
         },
@@ -464,6 +530,9 @@ def call_tool(name: str, args: dict, context: dict) -> str:
         overdue = _detect_overdue_agents(log)
         return json.dumps({"overdueAgents": overdue})
 
+    if name == "check_dashboard_health":
+        return json.dumps(_check_dashboard_health(log))
+
     if name == "write_repair_report":
         _write_repair_report(
             fix_labels=args.get("fix_labels", []),
@@ -471,6 +540,7 @@ def call_tool(name: str, args: dict, context: dict) -> str:
             overdue_agents=args.get("overdue_agents", []),
             invalid_refs=args.get("invalid_refs", []),
             log=log,
+            dashboard_health=args.get("dashboard_health"),
         )
         return "Repair report written"
 

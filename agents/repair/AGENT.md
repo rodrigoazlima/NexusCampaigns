@@ -13,6 +13,7 @@ inputs:
   - agents/*/agent.json
   - agents/vision/state/processed-images.json
   - system/state/inbox-queue.json
+  - system/.env.local (PORT, for dashboard health check)
 outputs:
   - agents/runtime/state/ (stale lock removed)
   - agents/*/state/ (missing dirs created)
@@ -30,6 +31,7 @@ responsibilities:
   - CreateMissingDirs: ensure all directories in shared.defaults.REQUIRED_DIRS exist
   - ValidateImageRefs: verify processed-images.json entries by SHA256 identity; prune missing files, flag hash mismatches
   - DetectOverdueAgents: flag any agent not run within 2 × intervalSeconds
+  - CheckDashboardHealth: probe dashboard TCP port + HTTP GET; no fix applied, report-only
   - WriteRepairReport: emit repair-YYYY-MM-DD.json to agents/review/state/reports/
 restrictions:
   - Must not call any LLM
