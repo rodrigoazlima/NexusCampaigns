@@ -166,6 +166,96 @@ def _remove_stale_lock(log: Logger) -> int:
 
 
 # ---------------------------------------------------------------------------
+# GenerateMissingAgentConfigs — agent.json is gitignored (machine-local
+# dispatch config) and nothing else regenerates it. A fresh checkout has
+# zero agent.json files, so runner.py's agents/*/agent.json glob discovers
+# zero tasks and no agent ever dispatches. Scaffold them from this table
+# (sourced from docs/specs/agents/agent-*.spec.md) so the pipeline
+# self-heals instead of silently sitting idle forever.
+# ---------------------------------------------------------------------------
+
+_AGENT_JSON_SPECS: dict[str, list[dict]] = {
+    "ingestion": [
+        {"task_id": "ingestion-agent", "model": "claude-haiku-4-5-20251001",
+         "tools_module": "ingestion.tools.ingestion_agent", "interval": 3600,
+         "description": "Vault ingestion — emoji-strip filenames, convert DOCX, register inbox queue."},
+    ],
+    "vision": [
+        {"task_id": "vision-agent", "model": "claude-sonnet-4-6",
+         "tools_module": "vision.tools.classify_images", "interval": 3600,
+         "description": "Image classification via local vision LLM."},
+    ],
+    "lore": [
+        {"task_id": "lore-agent", "model": "claude-sonnet-4-6",
+         "tools_module": "lore.tools.generate_npcs", "interval": 3600,
+         "description": "Generate NPC drafts from classified images."},
+    ],
+    "token": [
+        {"task_id": "token-agent", "model": "claude-haiku-4-5-20251001",
+         "tools_module": "token.tools.generate_tokens", "interval": 3600,
+         "description": "Generate VTT tokens from classified portrait images."},
+    ],
+    "classification": [
+        {"task_id": "classification-agent", "model": "claude-haiku-4-5-20251001",
+         "tools_module": "classification.tools.enrich_tags", "interval": 3600,
+         "description": "Enrich draft tags and infer entity type."},
+    ],
+    "wiki": [
+        {"task_id": "wiki-agent", "model": "claude-sonnet-4-6",
+         "tools_module": "wiki.tools.compile_wiki", "interval": 3600,
+         "description": "Compile enriched drafts into wiki entity pages."},
+    ],
+    "review": [
+        {"task_id": "review-agent", "model": "claude-haiku-4-5-20251001",
+         "tools_module": "review.tools.daily_report", "interval": 900,
+         "description": "Daily pipeline health + pending-review report."},
+        {"task_id": "review-agent-short-files", "model": "claude-haiku-4-5-20251001",
+         "tools_module": "review.tools.flag_short_files", "interval": 3600,
+         "description": "Flag drafts under 10 body lines for reprocessing.",
+         "prompt_file": "prompts/system-short-files.md"},
+    ],
+    "wikilink": [
+        {"task_id": "wikilink-agent", "model": "claude-haiku-4-5-20251001",
+         "tools_module": "wikilink.tools.wikilink_library", "interval": 3600,
+         "description": "Link Library entities via wikilinks."},
+    ],
+    "cleanup": [
+        {"task_id": "cleanup-agent", "model": "claude-haiku-4-5-20251001",
+         "tools_module": "cleanup.tools.cleanup_agent", "interval": 86400,
+         "description": "Prune old logs and stale state."},
+    ],
+}
+
+
+def _generate_missing_agent_configs(log: Logger) -> int:
+    """Scaffold agents/<name>/agent.json from _AGENT_JSON_SPECS when absent."""
+    created = 0
+    for agent_name, tasks in _AGENT_JSON_SPECS.items():
+        agent_json = _AGENTS_DIR / agent_name / "agent.json"
+        if agent_json.exists():
+            continue
+        payload: dict[str, Any] = {"tasks": {}}
+        for t in tasks:
+            payload["tasks"][t["task_id"]] = {
+                "intervalSeconds": t["interval"],
+                "description": t["description"],
+                "dispatch": {
+                    "type": "claude-api",
+                    "claude_api": {
+                        "model": t["model"],
+                        "tools_module": t["tools_module"],
+                        "prompt_file": t.get("prompt_file", "prompts/system.md"),
+                    },
+                },
+            }
+        agent_json.parent.mkdir(parents=True, exist_ok=True)
+        agent_json.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        log.info(f"Generated missing agent.json: agents/{agent_name}/agent.json")
+        created += 1
+    return created
+
+
+# ---------------------------------------------------------------------------
 # CreateMissingDirs
 # ---------------------------------------------------------------------------
 
@@ -394,19 +484,37 @@ def _write_repair_report(
 # Standalone entry point (direct execution / testing)
 # ---------------------------------------------------------------------------
 
+def _run_step(log: Logger, name: str, fn, default):
+    """Run one repair step in isolation — a failure here must never block the
+    other steps (in particular CreateMissingDirs, downstream of several
+    steps that touch the filesystem/network/git and can raise)."""
+    try:
+        return fn()
+    except Exception as exc:
+        log.error(f"Repair step {name!r} failed — continuing with other steps: {exc}")
+        return default
+
+
 def main() -> None:
     log = _make_logger()
     t0  = log.start()
 
-    git_result     = _git_update(log)
-    fix_labels     = _parse_error_patterns(log)
-    repairs        = 0
-    repairs       += _remove_stale_lock(log)
-    repairs       += _create_missing_dirs(log)
-    img_repairs, invalid_refs = _validate_image_refs(log)
-    repairs       += img_repairs
-    overdue        = _detect_overdue_agents(log)
-    dashboard      = _check_dashboard_health(log)
+    git_result = _run_step(log, "git_update", lambda: _git_update(log),
+                            {"skipped": True, "reason": "step raised"})
+    fix_labels = _run_step(log, "parse_error_patterns", lambda: _parse_error_patterns(log), [])
+
+    repairs  = 0
+    repairs += _run_step(log, "remove_stale_lock", lambda: _remove_stale_lock(log), 0)
+    repairs += _run_step(log, "generate_missing_agent_configs", lambda: _generate_missing_agent_configs(log), 0)
+    repairs += _run_step(log, "create_missing_dirs", lambda: _create_missing_dirs(log), 0)
+
+    img_repairs, invalid_refs = _run_step(log, "validate_image_refs", lambda: _validate_image_refs(log), (0, []))
+    repairs += img_repairs
+
+    overdue   = _run_step(log, "detect_overdue_agents", lambda: _detect_overdue_agents(log), [])
+    dashboard = _run_step(log, "check_dashboard_health", lambda: _check_dashboard_health(log),
+                           {"port": None, "portListening": False, "httpStatus": None, "healthy": False})
+
     _write_repair_report(fix_labels, repairs, overdue, invalid_refs, log, git_update=git_result, dashboard_health=dashboard)
 
     log.done(t0, key="repairs", count=repairs, failed=0)
@@ -449,6 +557,15 @@ TOOLS = SELF_MANAGEMENT_TOOLS + [
     {
         "name": "create_missing_dirs",
         "description": "Create any required agents/ and system/ subdirectories that do not yet exist.",
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "generate_missing_agent_configs",
+        "description": (
+            "Scaffold agents/<name>/agent.json for any active agent missing one "
+            "(gitignored, machine-local dispatch config). Without this, runner.py "
+            "discovers zero tasks and no agent ever dispatches."
+        ),
         "input_schema": {"type": "object", "properties": {}},
     },
     {
@@ -521,6 +638,10 @@ def call_tool(name: str, args: dict, context: dict) -> str:
     if name == "create_missing_dirs":
         n = _create_missing_dirs(log)
         return f"Created {n} missing director(ies)"
+
+    if name == "generate_missing_agent_configs":
+        n = _generate_missing_agent_configs(log)
+        return f"Generated {n} missing agent.json file(s)"
 
     if name == "validate_image_refs":
         n, invalid = _validate_image_refs(log)

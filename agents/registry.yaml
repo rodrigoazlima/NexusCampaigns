@@ -3,6 +3,14 @@ vault_root: "knowledge-base"
 agents_dir: "agents"
 shared_dir: "system"
 
+# ingestion-agent behavior toggles (agent-ingestion.spec.md)
+ingestion_options:
+  # When true, top-level vault entries outside the canonical folder structure
+  # (00-Inbox, 01-Processing, 02-Library, 03-Campaigns, 04-Relationships,
+  # 05-Assets, 99-Archive) are moved into 00-Inbox/ automatically so the
+  # pipeline picks them up. When false, they're only logged as warnings.
+  auto_absorb_stray: true
+
 llm_endpoints:
   vision_llm:
     url: "http://localhost:1234/v1/chat/completions"

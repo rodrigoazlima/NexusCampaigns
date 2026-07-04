@@ -686,8 +686,32 @@ def _inbox_has_slot(slot: str) -> bool:
     return False
 
 
+_CANON_VAULT_DIRS = frozenset({
+    "00-Inbox", "01-Processing", "02-Library", "03-Campaigns",
+    "04-Relationships", "05-Assets", "99-Archive",
+})
+
+
+def _vault_has_stray_entries() -> bool:
+    """Return True if the vault root has top-level content outside the canonical folders.
+
+    Ingestion's auto_absorb_stray step (agent-ingestion.spec.md) needs to run
+    even when 00-Inbox itself is fully registered, so stray content still
+    triggers dispatch instead of being skipped by the precondition check.
+    """
+    if not _VAULT_ROOT.exists():
+        return False
+    for entry in _VAULT_ROOT.iterdir():
+        if entry.name in _CANON_VAULT_DIRS or entry.name.startswith("."):
+            continue
+        return True
+    return False
+
+
 def _inbox_has_new_files() -> bool:
-    """Return True if 00-Inbox has any file not yet registered in inbox-queue.json."""
+    """Return True if 00-Inbox has any file not yet registered, or stray vault content exists."""
+    if _vault_has_stray_entries():
+        return True
     inbox = _VAULT_ROOT / "00-Inbox"
     if not inbox.exists():
         return False

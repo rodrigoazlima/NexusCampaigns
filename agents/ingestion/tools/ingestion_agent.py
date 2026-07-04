@@ -19,6 +19,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+import yaml
+
 # agents/ must be on sys.path so `import shared` resolves
 _TOOLS_DIR    = Path(__file__).resolve().parent
 _AGENTS_DIR   = _TOOLS_DIR.parents[1]
@@ -57,6 +59,17 @@ _QUEUE_FILE   = _SHARED_STATE / "inbox-queue.json"
 _AGENT_STATE    = _AGENTS_DIR / "ingestion" / "state"
 _LOGS_DIR       = _AGENT_STATE / "logs"
 _PROCESSED_DOCX = _AGENT_STATE / "processed-docx.txt"
+
+_REGISTRY_FILE = _AGENTS_DIR / "registry.yaml"
+
+# Canonical vault-root folders per CLAUDE.md — anything else at vault root
+# is "stray" content that landed outside the pipeline (e.g. a reorganized
+# vault, a folder dropped in by hand).
+_CANON_VAULT_DIRS = frozenset({
+    "00-Inbox", "01-Processing", "02-Library", "03-Campaigns",
+    "04-Relationships", "05-Assets", "99-Archive",
+})
+_STRAY_IGNORE_NAMES = frozenset({"LICENSE", "README.md", ".gitignore"})
 
 # Unicode ranges covering common emoji blocks
 _EMOJI_RE = re.compile(
@@ -311,6 +324,95 @@ def process_docx_files(log: Logger) -> tuple[int, int]:
 
 
 # ---------------------------------------------------------------------------
+# Stray vault entries — content outside 00-Inbox that should be treated as
+# inbox material (agent-ingestion.spec.md: auto_absorb_stray)
+# ---------------------------------------------------------------------------
+
+def find_stray_entries(vault_root: Path) -> list[Path]:
+    """Top-level vault entries outside the canonical folder structure."""
+    if not vault_root.exists():
+        return []
+    return [
+        entry for entry in sorted(vault_root.iterdir())
+        if entry.name not in _CANON_VAULT_DIRS
+        and entry.name not in _STRAY_IGNORE_NAMES
+        and not entry.name.startswith(".")
+    ]
+
+
+def _auto_absorb_enabled() -> bool:
+    try:
+        raw = yaml.safe_load(_REGISTRY_FILE.read_text(encoding="utf-8")) or {}
+        return bool((raw.get("ingestion_options") or {}).get("auto_absorb_stray", False))
+    except Exception:
+        return False
+
+
+def _rewrite_prefix_keys(data: dict, old_prefix: str, new_prefix: str) -> int:
+    """Rewrite path-shaped keys/fields starting with old_prefix in place. Returns count changed."""
+    changed = 0
+    for key in list(data.keys()):
+        if isinstance(key, str) and (key == old_prefix or key.startswith(old_prefix + "/")):
+            data[new_prefix + key[len(old_prefix):]] = data.pop(key)
+            changed += 1
+    images = data.get("images")
+    if isinstance(images, dict):
+        for entry in images.values():
+            p = entry.get("path") if isinstance(entry, dict) else None
+            if isinstance(p, str) and (p == old_prefix or p.startswith(old_prefix + "/")):
+                entry["path"] = new_prefix + p[len(old_prefix):]
+                changed += 1
+    return changed
+
+
+def _reindex_moved_prefix(old_prefix: str, new_prefix: str, log: Logger) -> None:
+    """Update any existing index (inbox-queue.json, processed-images.json) after a move."""
+    for path in (_QUEUE_FILE, _AGENTS_DIR / "vision" / "state" / "processed-images.json"):
+        if not path.exists():
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        changed = _rewrite_prefix_keys(data, old_prefix, new_prefix)
+        if changed:
+            tmp = path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
+            tmp.replace(path)
+            log.info(f"Reindexed {changed} path(s) in {path.name}: {old_prefix} -> {new_prefix}")
+
+
+def absorb_stray_entries(log: Logger) -> int:
+    """Move stray top-level vault entries into 00-Inbox/ when auto_absorb_stray is enabled.
+
+    Returns count of entries moved. Always logs strays found even when the
+    toggle is off, so they're visible instead of silently ignored.
+    """
+    strays = find_stray_entries(_VAULT_ROOT)
+    if not strays:
+        return 0
+
+    if not _auto_absorb_enabled():
+        for s in strays:
+            log.warning(f"Stray vault entry outside 00-Inbox (auto_absorb_stray disabled): {s.name}")
+        return 0
+
+    moved = 0
+    for src in strays:
+        dest = _INBOX / src.name
+        if dest.exists():
+            log.warning(f"Skip absorbing {src.name} — {dest} already exists")
+            continue
+        old_prefix = src.relative_to(_PROJECT_ROOT).as_posix()
+        new_prefix = dest.relative_to(_PROJECT_ROOT).as_posix()
+        shutil.move(str(src), str(dest))
+        log.info(f"Absorbed stray vault entry: {old_prefix} -> {new_prefix}")
+        _reindex_moved_prefix(old_prefix, new_prefix, log)
+        moved += 1
+    return moved
+
+
+# ---------------------------------------------------------------------------
 # Queue registration
 # ---------------------------------------------------------------------------
 
@@ -447,6 +549,9 @@ class IngestionAgent(BaseAgent):
         log = self._logger
         total_count, total_failed = 0, 0
 
+        absorbed = absorb_stray_entries(log)
+        total_count += absorbed
+
         renamed = strip_emoji_filenames(_INBOX, log)
         total_count += renamed
 
@@ -499,6 +604,15 @@ TOOLS = SELF_MANAGEMENT_TOOLS + [
         "description": "Scan 00-Inbox/ for files not yet in inbox-queue.json and register them with appropriate agent slots.",
         "input_schema": {"type": "object", "properties": {}},
     },
+    {
+        "name": "absorb_stray_folders",
+        "description": (
+            "Move top-level vault folders/files outside 00-Inbox into 00-Inbox/, "
+            "when ingestion_options.auto_absorb_stray is enabled in registry.yaml. "
+            "Reindexes inbox-queue.json/processed-images.json entries referencing the old path."
+        ),
+        "input_schema": {"type": "object", "properties": {}},
+    },
 ]
 
 
@@ -520,5 +634,8 @@ def call_tool(name: str, args: dict, context: dict) -> str:
         ok, failed = register_new_files(log)
         _reconcile_slots(log)
         return f"Registered {ok} file(s); {failed} failed"
+    if name == "absorb_stray_folders":
+        n = absorb_stray_entries(log)
+        return f"Absorbed {n} stray folder/file(s)"
 
     raise ValueError(f"Unknown tool: {name!r}")
