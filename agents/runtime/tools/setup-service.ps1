@@ -354,6 +354,24 @@ function Setup-Dashboard {
         Log "system\.env.local not found — run Write-DefaultConfig first." "WARN"
     }
 
+    # Sanity-check the checkout before spending time on install/build: a repo
+    # cloned with a broken .gitignore negation (or a sparse/shallow checkout)
+    # silently drops src/lib/*.ts, which then fails as 70+ confusing Turbopack
+    # "module not found" errors instead of one clear message. Try to self-heal
+    # by restoring the path from git's index before giving up.
+    $srcLibDir = "$DashboardDir\src\lib"
+    if (-not (Test-Path $srcLibDir) -or -not (Get-ChildItem $srcLibDir -Filter "*.ts" -ErrorAction SilentlyContinue)) {
+        Log "Dashboard source incomplete: $srcLibDir has no .ts files — attempting auto-repair via git checkout." "WARN"
+        if (Test-Path "$ProjectRoot\.git") {
+            & git -C $ProjectRoot checkout -- "system/dashboard/src/lib" 2>&1 | ForEach-Object { Log "  $_" }
+        }
+        if (-not (Test-Path $srcLibDir) -or -not (Get-ChildItem $srcLibDir -Filter "*.ts" -ErrorAction SilentlyContinue)) {
+            Log "Auto-repair failed: $srcLibDir still empty/missing (files not in git index — check .gitignore, or re-clone). Skipping dashboard build." "ERROR"
+            return
+        }
+        Log "Auto-repair succeeded: $srcLibDir restored from git index."
+    }
+
     # Install deps + production build
     Push-Location $DashboardDir
     try {
