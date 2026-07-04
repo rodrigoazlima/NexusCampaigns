@@ -263,6 +263,31 @@ function Ensure-VaultLink([string]$LinkPath, [string]$TargetPath) {
     Log "Vault linked: $LinkPath -> $targetFull"
 }
 
+# Vault folder structure per CLAUDE.md. Creates only missing dirs — never
+# touches existing content (00-Inbox, 02-Library, etc. may already hold data).
+function Ensure-VaultStructure([string]$VaultPath) {
+    $dirs = @(
+        "00-Inbox",
+        "00-Inbox\images",
+        "00-Inbox\docs",
+        "00-Inbox\songs",
+        "00-Inbox\tokens",
+        "01-Processing",
+        "02-Library",
+        "03-Campaigns",
+        "04-Relationships",
+        "05-Assets",
+        "99-Archive"
+    )
+    foreach ($d in $dirs) {
+        $full = Join-Path $VaultPath $d
+        if (-not (Test-Path $full)) {
+            New-Item -ItemType Directory -Force -Path $full | Out-Null
+            Log "Vault structure: created $d"
+        }
+    }
+}
+
 # Make the vault its own git repo so it can be pushed/pulled independently of the
 # app repo. Only acts when the target has no .git yet — never touches an existing
 # repo's history. Opt-in via -VaultGitInit; safe to call unconditionally otherwise.
@@ -836,6 +861,9 @@ if ($VaultRootAbs.TrimEnd('\') -ine $VaultLinkPath.TrimEnd('\')) {
 if ($VaultGitInit) {
     Ensure-VaultGitRepo -VaultPath $VaultRootAbs
 }
+
+Log "Ensuring vault folder structure at $VaultRootAbs ..."
+Ensure-VaultStructure -VaultPath $VaultRootAbs
 
 # Verify runner script exists
 if (-not (Test-Path $RunnerScript)) {
