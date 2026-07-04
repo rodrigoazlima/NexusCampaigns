@@ -272,12 +272,35 @@ def _create_missing_dirs(log: Logger) -> int:
     return created
 
 
+def _ensure_agent_scaffold(log: Logger) -> int:
+    """Every agent (except shared/tests) gets a real prompts/, state/, tools/
+    dir. Creates only what's missing — never touches an existing one."""
+    created = 0
+    for agent_root in _AGENTS_DIR.iterdir():
+        if not agent_root.is_dir() or agent_root.name in {"tests", "shared"}:
+            continue
+        for sub in ("prompts", "state", "tools"):
+            p = agent_root / sub
+            if not p.exists():
+                p.mkdir(parents=True, exist_ok=True)
+                log.info(f"Agent scaffold: created {agent_root.name}/{sub}")
+                created += 1
+    return created
+
+
 # ---------------------------------------------------------------------------
 # EnsureAgentRelationLinks — mirrors setup-service.ps1's Ensure-AgentRelationLinks
 # (see docs/specs/agents/agent-relationships.md). Only creates a junction where
 # the path is completely absent (a destroyed link) — never touches a path that
 # already exists, whether that's an intact junction, a user-created directory,
 # or a stray file. Includes "repair" itself so this agent self-heals too.
+#
+# Agent-to-agent links are cyclic on disk (agents/repair links to agents/cleanup,
+# which links back to agents/repair, etc.). To keep reparse-point-unaware tools
+# (git status, backup, indexers) from recursing into that cycle forever, those
+# mounts live under a dot-prefixed ".agents/" folder instead of "agents/" —
+# see the ".agents/" rule in .gitignore, which prunes descent into every one.
+# Keep the mount name in sync with setup-service.ps1's Ensure-AgentRelationLinks.
 # ---------------------------------------------------------------------------
 
 _AGENT_RELATIONS: dict[str, list[str]] = {
@@ -315,15 +338,21 @@ def _ensure_agent_relation_links(log: Logger) -> int:
         if not agent_root.exists():
             continue
 
-        for rel in rels:
+        # Every agent also gets agents/shared and system/state regardless of
+        # its table entry ("system" already covers state/ — skip the overlap).
+        extra = ["agents/shared"] + (["system/state"] if "system" not in rels else [])
+        for rel in extra + rels:
             targets = (
                 [f"agents/{a}" for a in all_agents if a != agent_name]
                 if rel == "agents/*" else [rel]
             )
             for t in targets:
-                rel_fs      = Path(t.replace("/", os.sep))
-                link_path   = agent_root / rel_fs
-                target_path = _PROJECT_ROOT / rel_fs
+                target_path = _PROJECT_ROOT / Path(t.replace("/", os.sep))
+                if t.startswith("agents/"):
+                    link_rel = Path(".agents") / t[len("agents/"):]
+                else:
+                    link_rel = Path(t.replace("/", os.sep))
+                link_path = agent_root / link_rel
 
                 if link_path.exists():
                     continue  # intact link, real dir, or file — never touch it
@@ -336,11 +365,11 @@ def _ensure_agent_relation_links(log: Logger) -> int:
                     capture_output=True, text=True,
                 )
                 if result.returncode == 0:
-                    log.info(f"Recreated missing link: agents/{agent_name}/{t}")
+                    log.info(f"Recreated missing link: {agent_name}/{link_rel.as_posix()}")
                     created += 1
                 else:
                     log.warning(
-                        f"Could not recreate link agents/{agent_name}/{t}: "
+                        f"Could not recreate link {agent_name}/{link_rel.as_posix()}: "
                         f"{result.stderr.strip() or result.stdout.strip()}"
                     )
     return created
@@ -583,6 +612,7 @@ def main() -> None:
     repairs += _run_step(log, "remove_stale_lock", lambda: _remove_stale_lock(log), 0)
     repairs += _run_step(log, "generate_missing_agent_configs", lambda: _generate_missing_agent_configs(log), 0)
     repairs += _run_step(log, "create_missing_dirs", lambda: _create_missing_dirs(log), 0)
+    repairs += _run_step(log, "ensure_agent_scaffold", lambda: _ensure_agent_scaffold(log), 0)
     repairs += _run_step(log, "ensure_agent_relation_links", lambda: _ensure_agent_relation_links(log), 0)
 
     img_repairs, invalid_refs = _run_step(log, "validate_image_refs", lambda: _validate_image_refs(log), (0, []))
@@ -634,6 +664,14 @@ TOOLS = SELF_MANAGEMENT_TOOLS + [
     {
         "name": "create_missing_dirs",
         "description": "Create any required agents/ and system/ subdirectories that do not yet exist.",
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "ensure_agent_scaffold",
+        "description": (
+            "Create any missing prompts/, state/, tools/ dir under each agent "
+            "(except shared/tests). Only fills in what's absent."
+        ),
         "input_schema": {"type": "object", "properties": {}},
     },
     {
@@ -725,6 +763,10 @@ def call_tool(name: str, args: dict, context: dict) -> str:
     if name == "create_missing_dirs":
         n = _create_missing_dirs(log)
         return f"Created {n} missing director(ies)"
+
+    if name == "ensure_agent_scaffold":
+        n = _ensure_agent_scaffold(log)
+        return f"Created {n} missing scaffold director(ies)"
 
     if name == "ensure_agent_relation_links":
         n = _ensure_agent_relation_links(log)

@@ -264,6 +264,18 @@ system/tests/.last-run.json
 .ajson
 knowledge-base/
 
+# Agent-to-agent relation-link mounts (agents/<name>/.agents/<other>) — real
+# directory junctions that cross-link agents into each other (a genuine cycle
+# on disk: agents/repair -> agents/cleanup -> agents/repair -> ...). Ignoring
+# the dot-prefixed mount dir makes git prune descent instead of recursing
+# forever. See Ensure-AgentRelationLinks in agents/runtime/tools/setup-service.ps1
+# and _ensure_agent_relation_links in agents/repair/tools/repair_agent.py.
+.agents/
+
+# Per-agent system/ mirror junctions (agents/repair/system, agents/runtime/system)
+# — duplicate view of the real system/ dir, not new content.
+agents/*/system/
+
 # OS artifacts
 .DS_Store
 Thumbs.db

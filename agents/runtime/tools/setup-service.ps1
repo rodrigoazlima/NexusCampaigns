@@ -262,8 +262,29 @@ function Ensure-Junction([string]$LinkPath, [string]$TargetPath) {
     Log "Junction created: $LinkPath -> $targetFull"
 }
 
+# Every agent (except shared/tests) gets a real prompts\, state\, tools\ dir —
+# creates only what's missing, never touches an existing one.
+function Ensure-AgentScaffold([string]$ProjectRoot) {
+    $agentDirs = Get-ChildItem "$ProjectRoot\agents" -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -notin @("tests", "shared") }
+    foreach ($a in $agentDirs) {
+        foreach ($sub in @("prompts", "state", "tools")) {
+            $p = Join-Path $a.FullName $sub
+            if (-not (Test-Path $p)) {
+                New-Item -ItemType Directory -Force -Path $p | Out-Null
+                Log "Agent scaffold: created $($a.Name)\$sub"
+            }
+        }
+    }
+}
+
 # Per-agent path relationships (see docs/specs/agents/agent-relationships.md).
 # "agents/*" expands to every sibling agent dir (excluding itself and tests/shared).
+# NOTE: these junctions cross-link agents into each other (agents/*/agents/<other>),
+# which is a real directory cycle on disk. Any tool that walks directories without
+# reparse-point awareness (git status, backup, indexers) can recurse forever through
+# it. The cycle is contained via .gitignore ("agents/*/agents/" etc. — git prunes
+# descent into ignored dirs) — see .gitignore. Don't remove that ignore rule.
 $script:AgentRelations = @{
     "adventure-builder" = @("knowledge-base/02-Library", "knowledge-base/03-Campaigns", "agents/lore", "agents/canon", "agents/relationship")
     "canon"             = @("knowledge-base/02-Library")
@@ -289,6 +310,17 @@ $script:AgentRelations = @{
 # For each agent, creates agents\<agent-name>\<related-path> -> the real target,
 # so an agent can reach everything it touches by a fixed relative path without
 # hardcoding "..\..\..". "agents/*" entries fan out to every other agent dir.
+# Every agent also gets agents\shared (shared runtime library) and system\state
+# regardless of its entry in $script:AgentRelations.
+#
+# Agent-to-agent links are cyclic on disk (agents/repair links to agents/cleanup,
+# which links back to agents/repair, etc.) — real directory cycles that
+# reparse-point-unaware tools (git status, backup, indexers) can recurse into
+# forever. To keep that fully contained, agent-to-agent mounts are placed under
+# a dot-prefixed ".agents\" folder (agents\<name>\.agents\<other>) instead of
+# "agents\<name>\agents\<other>" — see the ".agents/" rule in .gitignore, which
+# makes git prune descent into every one of them. Don't rename this without
+# updating .gitignore (and agents/repair/tools/repair_agent.py's mirror) too.
 function Ensure-AgentRelationLinks([string]$ProjectRoot) {
     $allAgents = Get-ChildItem "$ProjectRoot\agents" -Directory -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -notin @("tests", "shared") } |
@@ -298,16 +330,20 @@ function Ensure-AgentRelationLinks([string]$ProjectRoot) {
         $agentRoot = "$ProjectRoot\agents\$agentName"
         if (-not (Test-Path $agentRoot)) { continue }
 
-        foreach ($rel in $script:AgentRelations[$agentName]) {
+        $rels  = $script:AgentRelations[$agentName]
+        $extra = @("agents/shared")
+        if ($rels -notcontains "system") { $extra += "system/state" }  # "system" already covers state/
+
+        foreach ($rel in ($extra + $rels)) {
             $targets = if ($rel -eq "agents/*") {
                 $allAgents | Where-Object { $_ -ne $agentName } | ForEach-Object { "agents/$_" }
             } else {
                 , $rel
             }
             foreach ($t in $targets) {
-                $relFs    = $t -replace '/', '\'
-                $linkPath = Join-Path $agentRoot $relFs
-                $target   = Join-Path $ProjectRoot $relFs
+                $target = Join-Path $ProjectRoot ($t -replace '/', '\')
+                $linkRel = if ($t -match '^agents/(.+)$') { ".agents\$($Matches[1])" } else { $t -replace '/', '\' }
+                $linkPath = Join-Path $agentRoot $linkRel
                 New-Item -ItemType Directory -Force -Path (Split-Path $linkPath) | Out-Null
                 Ensure-Junction -LinkPath $linkPath -TargetPath $target
             }
@@ -916,6 +952,9 @@ if ($VaultGitInit) {
 
 Log "Ensuring vault folder structure at $VaultRootAbs ..."
 Ensure-VaultStructure -VaultPath $VaultRootAbs
+
+Log "Ensuring per-agent prompts\, state\, tools\ scaffold ..."
+Ensure-AgentScaffold -ProjectRoot $ProjectRoot
 
 Log "Linking each agent to its related paths (agents\<name>\<related-path>) ..."
 try {
