@@ -36,10 +36,10 @@ import pytest
 # ---------------------------------------------------------------------------
 
 _SCRIPT = (
-    Path(__file__).parent.parent / ".agents" / "review" / "tools" / "flag_short_files.py"
+    Path(__file__).parent.parent / "agents" / "review" / "tools" / "flag_short_files.py"
 )
 
-_AGENTS_DIR = Path(__file__).resolve().parents[1] / ".agents"
+_AGENTS_DIR = Path(__file__).resolve().parents[1] / "agents"
 if str(_AGENTS_DIR) not in sys.path:
     sys.path.insert(0, str(_AGENTS_DIR))
 
@@ -62,7 +62,7 @@ try:
 except Exception as _exc:
     pytest.skip(
         f"Failed to load {_SCRIPT.name}: {_exc}. "
-        "See .agents/tests/ for current coverage.",
+        "See agents/tests/ for current coverage.",
         allow_module_level=True,
     )
 
@@ -76,7 +76,7 @@ if _MISSING_API:
     pytest.skip(
         f"flag_short_files.py API changed — functions not found: {_MISSING_API}. "
         "Refactored module uses _flag_short_file/main/call_tool. "
-        "Next step: rewrite these tests against .agents/review/tools/flag_short_files.py API.",
+        "Next step: rewrite these tests against agents/review/tools/flag_short_files.py API.",
         allow_module_level=True,
     )
 

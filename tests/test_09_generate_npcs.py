@@ -36,10 +36,10 @@ from PIL import Image
 # ---------------------------------------------------------------------------
 
 SCRIPT_PATH = (
-    Path(__file__).parent.parent / ".agents" / "lore" / "tools" / "generate_npcs.py"
+    Path(__file__).parent.parent / "agents" / "lore" / "tools" / "generate_npcs.py"
 )
 
-_AGENTS_DIR = Path(__file__).resolve().parents[1] / ".agents"
+_AGENTS_DIR = Path(__file__).resolve().parents[1] / "agents"
 if str(_AGENTS_DIR) not in sys.path:
     sys.path.insert(0, str(_AGENTS_DIR))
 
@@ -66,7 +66,7 @@ try:
 except Exception as _exc:
     pytest.skip(
         f"Failed to load {SCRIPT_PATH.name}: {_exc}. "
-        "See .agents/tests/ for current coverage.",
+        "See agents/tests/ for current coverage.",
         allow_module_level=True,
     )
 
@@ -80,8 +80,8 @@ if _MISSING_API:
     pytest.skip(
         f"generate_npcs.py API changed — functions not found: {_MISSING_API}. "
         "Refactored module uses _output_to_frontmatter/_output_to_body/etc. "
-        "Next step: rewrite these tests against .agents/lore/tools/generate_npcs.py API "
-        "or extend .agents/tests/test_classification.py.",
+        "Next step: rewrite these tests against agents/lore/tools/generate_npcs.py API "
+        "or extend agents/tests/test_classification.py.",
         allow_module_level=True,
     )
 

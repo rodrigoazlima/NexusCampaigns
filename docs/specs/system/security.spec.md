@@ -45,7 +45,7 @@ LLM endpoint URLs and model identifiers are configured in `registry.yaml` `llm_e
 
 ## VaultGuard
 
-`IVaultGuard` (`.agents/shared/vault_guard.py`) enforces write protection at runtime:
+`IVaultGuard` (`agents/shared/vault_guard.py`) enforces write protection at runtime:
 
 - Raises `VaultWriteError` on any attempted write to `02-Library/` or `00-Inbox/` by agent code.
 - All agent tools must call `guard.assert_writable(target)` before writing.

@@ -1,6 +1,6 @@
 # Spec — Agent Registry
 
-`registry.yaml` is the single source of truth for all agents, LLM endpoints, execution order, and shared state ownership. Location: `.agents/registry.yaml`.
+`registry.yaml` is the single source of truth for all agents, LLM endpoints, execution order, and shared state ownership. Location: `agents/registry.yaml`.
 
 ---
 
@@ -9,8 +9,8 @@
 ```yaml
 version: 1
 vault_root:  "<absolute path to knowledge-base/>"
-agents_dir:  ".agents"
-shared_dir:  ".system"
+agents_dir:  "agents"
+shared_dir:  "system"
 
 llm_endpoints:
   <alias>:
@@ -101,9 +101,9 @@ To swap a model or endpoint: edit `registry.yaml` `llm_endpoints` only. No tool 
 
 ## Adding a New Agent
 
-1. Create `.agents/{name}/` with subdirs: `prompts/`, `tools/`, `generated-tools/`, `state/`, `state/logs/`
-2. Write `AGENT.md` following the schema in `.agents/README.md`
+1. Create `agents/{name}/` with subdirs: `prompts/`, `tools/`, `generated-tools/`, `state/`, `state/logs/`
+2. Write `AGENT.md` following the schema in `agents/README.md`
 3. Add entry under `agents:` in `registry.yaml` with `status: active`
 4. Add entry under `tasks:` in the agent's `agent.json` with dispatch config
-5. Add entry to `.agents/runtime/state/tasks-state.json`: `{ "task-id": { "lastRun": "1970-01-01T00:00:00Z" } }`
+5. Add entry to `agents/runtime/state/tasks-state.json`: `{ "task-id": { "lastRun": "1970-01-01T00:00:00Z" } }`
 6. Add `task-id` to `execution_order` in registry.yaml at the appropriate position

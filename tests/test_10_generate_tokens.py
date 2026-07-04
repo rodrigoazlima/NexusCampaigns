@@ -31,10 +31,10 @@ from PIL import Image, ImageDraw
 # ---------------------------------------------------------------------------
 
 SCRIPT_PATH = (
-    Path(__file__).parent.parent / ".agents" / "token" / "tools" / "generate_tokens.py"
+    Path(__file__).parent.parent / "agents" / "token" / "tools" / "generate_tokens.py"
 )
 
-_AGENTS_DIR = Path(__file__).resolve().parents[1] / ".agents"
+_AGENTS_DIR = Path(__file__).resolve().parents[1] / "agents"
 if str(_AGENTS_DIR) not in sys.path:
     sys.path.insert(0, str(_AGENTS_DIR))
 
@@ -61,7 +61,7 @@ try:
 except Exception as _exc:
     pytest.skip(
         f"Failed to load {SCRIPT_PATH.name}: {_exc}. "
-        "See .agents/tests/test_token_agent.py for current coverage.",
+        "See agents/tests/test_token_agent.py for current coverage.",
         allow_module_level=True,
     )
 
@@ -74,8 +74,8 @@ if _MISSING_API:
     pytest.skip(
         f"generate_tokens.py API changed — functions not found: {_MISSING_API}. "
         "Refactored module uses _load_config/_make_token/etc. (internal names). "
-        "Next step: rewrite these tests against .agents/token/tools/generate_tokens.py API "
-        "or extend .agents/tests/test_token_agent.py.",
+        "Next step: rewrite these tests against agents/token/tools/generate_tokens.py API "
+        "or extend agents/tests/test_token_agent.py.",
         allow_module_level=True,
     )
 

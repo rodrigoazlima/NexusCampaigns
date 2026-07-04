@@ -1,8 +1,8 @@
 # Agent Spec — Review
 
 **Trigger:** every 15 minutes  
-**Input:** `01-Processing/*.md`, `02-Library/*.md`, `.system/state/inbox-queue.json`, `.agents/runtime/state/logs/automation.log` (last 24h)  
-**Output:** `.agents/review/state/reports/report-YYYY-MM-DD.json`  
+**Input:** `01-Processing/*.md`, `02-Library/*.md`, `system/state/inbox-queue.json`, `agents/runtime/state/logs/automation.log` (last 24h)  
+**Output:** `agents/review/state/reports/report-YYYY-MM-DD.json`  
 **Dispatch:** `claude-api` · `claude-haiku-4-5-20251001` · `tools_module: review.tools.daily_report`
 
 ---

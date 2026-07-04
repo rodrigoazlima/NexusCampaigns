@@ -121,14 +121,14 @@ reviewed: false
 ## Scope
 
 Files to create:
-- `.agents/adventure-builder/agent.json`
-- `.agents/adventure-builder/tools/__init__.py`
-- `.agents/adventure-builder/tools/adventure_builder_agent.py`
-- `.agents/adventure-builder/prompts/system.md`
-- `.agents/tests/test_adventure_builder.py`
+- `agents/adventure-builder/agent.json`
+- `agents/adventure-builder/tools/__init__.py`
+- `agents/adventure-builder/tools/adventure_builder_agent.py`
+- `agents/adventure-builder/prompts/system.md`
+- `agents/tests/test_adventure_builder.py`
 
 Files to modify:
-- `.agents/adventure-builder/AGENT.md` — fill in empty stub
+- `agents/adventure-builder/AGENT.md` — fill in empty stub
 
 ---
 
@@ -217,7 +217,7 @@ Standard log format.
 
 ---
 
-## System Prompt (`.agents/adventure-builder/prompts/system.md`)
+## System Prompt (`agents/adventure-builder/prompts/system.md`)
 
 ```markdown
 # Adventure Builder Agent
@@ -261,7 +261,7 @@ The Curator agent does NOT process `03-Campaigns/` — Curator only handles `01-
 
 ## Tests
 
-`.agents/tests/test_adventure_builder.py`:
+`agents/tests/test_adventure_builder.py`:
 
 ```python
 def test_skips_arc_without_seed(tmp_path):

@@ -40,20 +40,20 @@ Signals are:
 ## Scope
 
 Files to create:
-- `.agents/runtime/state/signals/` — signal drop directory (created at runtime startup)
-- `.agents/shared/signal_bus.py` — `SignalEmitter` and `SignalConsumer` classes
-- `.agents/tests/test_signal_bus.py`
+- `agents/runtime/state/signals/` — signal drop directory (created at runtime startup)
+- `agents/shared/signal_bus.py` — `SignalEmitter` and `SignalConsumer` classes
+- `agents/tests/test_signal_bus.py`
 
 Files to modify:
-- `.agents/runtime/tools/runner.py` — call `_check_signals()` at start of each cycle
-- `.agents/shared/interfaces.py` — `ISignalEmitter` protocol
+- `agents/runtime/tools/runner.py` — call `_check_signals()` at start of each cycle
+- `agents/shared/interfaces.py` — `ISignalEmitter` protocol
 - `agent.json` schema — add optional `signal_triggers` array to task config
 
 ---
 
 ## Signal File Format
 
-`.agents/runtime/state/signals/{uuid}.signal.json`:
+`agents/runtime/state/signals/{uuid}.signal.json`:
 
 ```json
 {
@@ -326,7 +326,7 @@ def purge_stale_signals(signals_dir: Path, max_age_days: int = 7) -> int:
 
 ## Tests
 
-`.agents/tests/test_signal_bus.py`:
+`agents/tests/test_signal_bus.py`:
 
 ```python
 def test_emit_creates_signal_file(tmp_path):

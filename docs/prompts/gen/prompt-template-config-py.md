@@ -6,10 +6,10 @@ Analyze the provided Python script and extract all relevant configuration settin
 **Requirements:**
 
 1. **Two-level configuration architecture:**
-   - **Level 1: Global Shared Config** (`.system/config/global.json`)
+   - **Level 1: Global Shared Config** (`system/config/global.json`)
      - Contains variables and settings that are shared across multiple scripts/agents.
      - Always loaded first.
-   - **Level 2: Local Script Config** (`.system/config/<script_name>.json`)
+   - **Level 2: Local Script Config** (`system/config/<script_name>.json`)
      - Contains script-specific settings and overrides.
      - Always loaded after global config (can override global values).
      - Can be empty (`{}`) but must always exist.
@@ -55,10 +55,10 @@ Now analyze the script and generate both configurations.
 
 ```
 NexusCampaigns/
-├── .system/config/
+├── system/config/
 │   ├── global.json
 │   └── classify_images.json
-├── .agents/
+├── agents/
 │   ├── vision/
     │   └── classify_images.py
     └── shared/

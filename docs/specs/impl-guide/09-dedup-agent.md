@@ -42,16 +42,16 @@ Threshold 0.75 chosen empirically. Exposed as `similarity_threshold` in `agent.j
 ## Scope
 
 Files to create:
-- `.agents/deduplication/agent.json`
-- `.agents/deduplication/AGENT.md`
-- `.agents/deduplication/tools/__init__.py`
-- `.agents/deduplication/tools/dedup_agent.py`
-- `.agents/deduplication/prompts/system.md`
-- `.agents/tests/test_dedup_agent.py`
+- `agents/deduplication/agent.json`
+- `agents/deduplication/AGENT.md`
+- `agents/deduplication/tools/__init__.py`
+- `agents/deduplication/tools/dedup_agent.py`
+- `agents/deduplication/prompts/system.md`
+- `agents/tests/test_dedup_agent.py`
 
 Files to modify:
-- `.agents/deduplication/AGENT.md` — fill stub
-- `.agents/shared/interfaces.py` — verify `IDedupAnalyzer` and `DedupCandidate` models complete
+- `agents/deduplication/AGENT.md` — fill stub
+- `agents/shared/interfaces.py` — verify `IDedupAnalyzer` and `DedupCandidate` models complete
 
 ---
 
@@ -189,7 +189,7 @@ Reason string auto-generated:
 
 Writes two outputs:
 
-1. **JSON:** `.agents/review/state/reports/dedup-{date}.json` — machine-readable
+1. **JSON:** `agents/review/state/reports/dedup-{date}.json` — machine-readable
 2. **Markdown:** `01-Processing/dedup-review.md` — human-readable review queue
 
 `dedup-review.md` format:
@@ -225,7 +225,7 @@ Standard log format.
 
 ---
 
-## System Prompt (`.agents/deduplication/prompts/system.md`)
+## System Prompt (`agents/deduplication/prompts/system.md`)
 
 ```markdown
 # Deduplication Agent
@@ -255,7 +255,7 @@ Your role: detect near-duplicate entities and flag them for human review. Never 
 
 ## Tests
 
-`.agents/tests/test_dedup_agent.py`:
+`agents/tests/test_dedup_agent.py`:
 
 ```python
 def test_identical_texts_score_near_one():

@@ -2,7 +2,7 @@
 
 **Version:** 2.1  
 **Date:** 2026-06-13  
-**Supersedes:** `.system/dashboard-legacy/SPEC.md` (stale paths)  
+**Supersedes:** `system/dashboard-legacy/SPEC.md` (stale paths)  
 **Augments:** `docs/specs/dashboard/dashboard.spec.md` (product spec, still valid for pages/components/design)
 
 ---
@@ -11,8 +11,8 @@
 
 Next.js dashboard for the Nexus Campaigns. Reads live vault and agent state from the filesystem. No database — vault is the single source of truth.
 
-**Location:** `.system/dashboard/` (project root)  
-**Run:** `cd .system/dashboard && npm run dev` → http://localhost:3131
+**Location:** `system/dashboard/` (project root)  
+**Run:** `cd system/dashboard && npm run dev` → http://localhost:3131
 
 ---
 
@@ -40,16 +40,16 @@ All paths relative to `PROJECT_ROOT` (repo root).
 
 | Data | Actual Path |
 |------|-------------|
-| Agent registry | `.agents/registry.yaml` |
-| Agent last-run times | `.agents/runtime/state/tasks-state.json` |
-| Agent run metrics | `.agents/runtime/state/agent-metrics.json` |
-| Inbox queue | `.system/state/inbox-queue.json` |
-| Automation log | `.agents/runtime/state/logs/automation.log` |
-| Daily reports | `.agents/review/state/reports/report-YYYY-MM-DD.json` |
-| Repair reports | `.agents/review/state/reports/repair-YYYY-MM-DD.json` |
-| Processed images | `.agents/vision/state/processed-images.json` |
-| Processed NPCs | `.agents/lore/state/processed-npcs.json` |
-| Generated tokens | `.agents/token/state/generated-tokens.json` |
+| Agent registry | `agents/registry.yaml` |
+| Agent last-run times | `agents/runtime/state/tasks-state.json` |
+| Agent run metrics | `agents/runtime/state/agent-metrics.json` |
+| Inbox queue | `system/state/inbox-queue.json` |
+| Automation log | `agents/runtime/state/logs/automation.log` |
+| Daily reports | `agents/review/state/reports/report-YYYY-MM-DD.json` |
+| Repair reports | `agents/review/state/reports/repair-YYYY-MM-DD.json` |
+| Processed images | `agents/vision/state/processed-images.json` |
+| Processed NPCs | `agents/lore/state/processed-npcs.json` |
+| Generated tokens | `agents/token/state/generated-tokens.json` |
 | Vault markdown | `knowledge-base/{00-Inbox,01-Processing,02-Library,...}/**/*.md` |
 
 `VAULT_ROOT` = `knowledge-base/` (absolute: `<PROJECT_ROOT>\knowledge-base`)
@@ -58,7 +58,7 @@ All paths relative to `PROJECT_ROOT` (repo root).
 
 ## Environment Variables
 
-`.system/dashboard/.env.local`:
+`system/dashboard/.env.local`:
 ```
 VAULT_ROOT=<repo-root>\knowledge-base
 PROJECT_ROOT=<repo-root>
@@ -72,13 +72,13 @@ ANTHROPIC_API_KEY=           # required for /gm/chat agent chat feature
 ```typescript
 export const VAULT_ROOT  = process.env.VAULT_ROOT  ?? 'C:\\opt\\GitHub\\NexusCampaigns\\knowledge-base'
 const PROJECT_ROOT       = process.env.PROJECT_ROOT ?? path.resolve(process.cwd(), '..')
-const STATE_DIR          = path.join(PROJECT_ROOT, '.agents', 'runtime', 'state')
-const SHARED_DIR         = path.join(PROJECT_ROOT, '.system', 'state')
-const REPORTS_DIR        = path.join(PROJECT_ROOT, '.agents', 'review', 'state', 'reports')
-const LOGS_DIR           = path.join(PROJECT_ROOT, '.agents', 'runtime', 'state', 'logs')
-const VISION_STATE_DIR   = path.join(PROJECT_ROOT, '.agents', 'vision', 'state')
-const LORE_STATE_DIR     = path.join(PROJECT_ROOT, '.agents', 'lore', 'state')
-const TOKEN_STATE_DIR    = path.join(PROJECT_ROOT, '.agents', 'token', 'state')
+const STATE_DIR          = path.join(PROJECT_ROOT, 'agents', 'runtime', 'state')
+const SHARED_DIR         = path.join(PROJECT_ROOT, 'system', 'state')
+const REPORTS_DIR        = path.join(PROJECT_ROOT, 'agents', 'review', 'state', 'reports')
+const LOGS_DIR           = path.join(PROJECT_ROOT, 'agents', 'runtime', 'state', 'logs')
+const VISION_STATE_DIR   = path.join(PROJECT_ROOT, 'agents', 'vision', 'state')
+const LORE_STATE_DIR     = path.join(PROJECT_ROOT, 'agents', 'lore', 'state')
+const TOKEN_STATE_DIR    = path.join(PROJECT_ROOT, 'agents', 'token', 'state')
 ```
 
 `readJson()` takes absolute paths (not AUTO_DIR-relative strings).
@@ -87,7 +87,7 @@ const TOKEN_STATE_DIR    = path.join(PROJECT_ROOT, '.agents', 'token', 'state')
 
 ## Agent Config Source: registry.yaml
 
-`readTasks()` reads `.agents/registry.yaml` (YAML, not `tasks.json`).
+`readTasks()` reads `agents/registry.yaml` (YAML, not `tasks.json`).
 
 Registry schema (relevant fields):
 ```yaml
@@ -128,7 +128,7 @@ Planned agents (7): relationship, deduplication, canon, curator, search, adventu
 | `/gm/review` | GM Review | 01-Processing/*.md frontmatter (read+write) |
 | `/gm/inbox` | GM Inbox | 00-Inbox/images/, inbox-queue.json |
 | `/gm/tokens` | GM Tokens | 05-Assets/tokens/, 00-Inbox/images/, 00-Inbox/tokens/ |
-| `/gm/chat` | Agent Chat | .agents/{name}/prompts/system.md, Anthropic API |
+| `/gm/chat` | Agent Chat | agents/{name}/prompts/system.md, Anthropic API |
 
 ---
 

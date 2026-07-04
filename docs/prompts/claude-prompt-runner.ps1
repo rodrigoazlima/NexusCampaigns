@@ -5,7 +5,7 @@
 param(
     [string]$PromptDirectory = "docs/prompts",
     [string]$Filter = "*.md",
-    [string]$StateFile = ".system/claude-queue-state.json",
+    [string]$StateFile = "system/claude-queue-state.json",
     [int]$RetryDelayMinutes = 40,
     [int]$MaxRetries = 200,
     [int]$TimeoutMinutes = 30

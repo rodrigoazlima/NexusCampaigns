@@ -35,16 +35,16 @@ The agent is read-only. It never modifies `02-Library/`. It writes reports only.
 ## Scope
 
 Files to create:
-- `.agents/canon/agent.json`
-- `.agents/canon/AGENT.md`
-- `.agents/canon/tools/__init__.py`
-- `.agents/canon/tools/canon_agent.py`
-- `.agents/canon/prompts/system.md`
-- `.agents/tests/test_canon_validator.py`
+- `agents/canon/agent.json`
+- `agents/canon/AGENT.md`
+- `agents/canon/tools/__init__.py`
+- `agents/canon/tools/canon_agent.py`
+- `agents/canon/prompts/system.md`
+- `agents/tests/test_canon_validator.py`
 
 Files to modify:
-- `.agents/shared/interfaces.py` — `ICanonValidator` already defined; verify `CanonReport` model is complete
-- `.agents/review/tools/daily_report.py` — include canon report in daily summary
+- `agents/shared/interfaces.py` — `ICanonValidator` already defined; verify `CanonReport` model is complete
+- `agents/review/tools/daily_report.py` — include canon report in daily summary
 
 ---
 
@@ -83,11 +83,11 @@ name: canon
 purpose: >
   Daily read-only consistency check of 02-Library/. Detects broken wikilinks,
   duplicate IDs, orphan entities, missing metadata, and status violations.
-  Writes CanonReport to .agents/review/state/reports/.
+  Writes CanonReport to agents/review/state/reports/.
 inputs:
   - knowledge-base/02-Library/
 outputs:
-  - .agents/review/state/reports/canon-{date}.json
+  - agents/review/state/reports/canon-{date}.json
 dependencies: []
 dispatch_config: agent.json
 owned_tools:
@@ -113,7 +113,7 @@ restrictions:
   - Never write to 01-Processing/
 state_files: []
 commit_scope:
-  - .agents/review/state/reports
+  - agents/review/state/reports
 ```
 
 ---
@@ -204,11 +204,11 @@ Checks:
 
 ### `write_report(report: CanonReport) → None`
 
-Writes `CanonReport` as JSON to `.agents/review/state/reports/canon-{date}.json`. Atomic write.
+Writes `CanonReport` as JSON to `agents/review/state/reports/canon-{date}.json`. Atomic write.
 
 ---
 
-## System Prompt (`.agents/canon/prompts/system.md`)
+## System Prompt (`agents/canon/prompts/system.md`)
 
 ```markdown
 # Canon Validator Agent
@@ -256,7 +256,7 @@ The review dashboard already renders JSON reports. Add a "Canon Health" card to 
 
 ## Tests
 
-`.agents/tests/test_canon_validator.py`:
+`agents/tests/test_canon_validator.py`:
 
 ```python
 def test_clean_library_produces_healthy_report(tmp_path):
@@ -297,7 +297,7 @@ def test_report_written_atomically(tmp_path):
 
 ## Success Criteria
 
-- Canon report generated daily to `.agents/review/state/reports/canon-{date}.json`.
+- Canon report generated daily to `agents/review/state/reports/canon-{date}.json`.
 - Broken wikilinks detected and reported with file + link details.
 - Duplicate IDs detected across all `02-Library/` entities.
 - Status violations (draft in library, approved-but-not-reviewed) flagged as errors.

@@ -258,21 +258,21 @@ removes from Processing when ready (canon rule: never auto-delete).
 
 ```
 GM types message → POST /api/gm/chat
-  → Read .agents/{agent}/prompts/system.md as system prompt
+  → Read agents/{agent}/prompts/system.md as system prompt
   → Append user message
   → POST to Anthropic API (claude-haiku-4-5-20251001)
   → Return assistant response
   → If save=true: write to 01-Processing/{slug}-custom-{timestamp}.md
 ```
 
-Env var: `ANTHROPIC_API_KEY` in `.system/dashboard/.env.local`.
+Env var: `ANTHROPIC_API_KEY` in `system/dashboard/.env.local`.
 Fallback: if key missing, return `{ error: 'ANTHROPIC_API_KEY not set' }`.
 
 Agent system prompts already exist at:
-- `.agents/lore/prompts/system.md`
-- `.agents/wiki/prompts/system.md`
-- `.agents/vision/prompts/classify-image.txt`
-- `.agents/classification/prompts/system.md`
+- `agents/lore/prompts/system.md`
+- `agents/wiki/prompts/system.md`
+- `agents/vision/prompts/classify-image.txt`
+- `agents/classification/prompts/system.md`
 
 ---
 

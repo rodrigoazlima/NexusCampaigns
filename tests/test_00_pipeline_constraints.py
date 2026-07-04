@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-_AGENTS_DIR = Path(__file__).resolve().parents[1] / ".agents"
+_AGENTS_DIR = Path(__file__).resolve().parents[1] / "agents"
 if str(_AGENTS_DIR) not in sys.path:
     sys.path.insert(0, str(_AGENTS_DIR))
 

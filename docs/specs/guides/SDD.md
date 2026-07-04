@@ -47,10 +47,10 @@ Audience: contributors, automation developers, Claude Code agents.
          ↓
 ┌─────────────────────────────────────────────────────────────────────┐
 │                      Health & Observability                         │
-│  [Review Agent]  → .agents/review/state/reports/report-YYYY-MM-DD.json │
-│  [Repair Agent]  → .agents/review/state/reports/repair-YYYY-MM-DD.json │
+│  [Review Agent]  → agents/review/state/reports/report-YYYY-MM-DD.json │
+│  [Repair Agent]  → agents/review/state/reports/repair-YYYY-MM-DD.json │
 │  [Cleanup Agent] → purge logs/reports older than cleanupDays        │
-│  .agents/runtime/state/agent-metrics.json → per-agent run history   │
+│  agents/runtime/state/agent-metrics.json → per-agent run history   │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -75,7 +75,7 @@ Agents are defined by their **actions** — discrete, named operations each agen
 
 ### Vision
 
-**Trigger:** hourly | **Reads:** `00-Inbox/images/`, `processed-images.json` | **Writes:** `01-Processing/*.md`, `.agents/vision/state/processed-images.json`
+**Trigger:** hourly | **Reads:** `00-Inbox/images/`, `processed-images.json` | **Writes:** `01-Processing/*.md`, `agents/vision/state/processed-images.json`
 
 | Action | Description |
 |--------|-------------|
@@ -84,7 +84,7 @@ Agents are defined by their **actions** — discrete, named operations each agen
 | `ClassifyImage` | Call vision LLM to produce type / race / class / element / environment classification. |
 | `RenameToSlug` | Rename image file to canonical slug format. Bump filename on collision. |
 | `WriteDraft` | Write AGENTS.md-compliant image metadata draft to `01-Processing/`. |
-| `UpdateJsonIndex` | Update entry in `.agents/vision/state/processed-images.json`. |
+| `UpdateJsonIndex` | Update entry in `agents/vision/state/processed-images.json`. |
 | `MarkQueueDone` | Set `agents.vision = done` in `inbox-queue.json`. |
 
 ---
@@ -174,7 +174,7 @@ Agents are defined by their **actions** — discrete, named operations each agen
 |--------|-------------|
 | `ParseErrorPatterns` | Scan `automation.log` for stale-lock, missing-directory, and missing-image-ref patterns. |
 | `RemoveStaleLock` | Delete `runner.lock` if older than 30 minutes. |
-| `CreateMissingDirs` | Create any missing `.system/` subdirectories. |
+| `CreateMissingDirs` | Create any missing `system/` subdirectories. |
 | `ValidateImageRefs` | Verify image references in `processed-images.json` using SHA256 identity. |
 | `DetectOverdueAgents` | Flag any agent not run within `2 × intervalSeconds`. |
 
@@ -182,7 +182,7 @@ Agents are defined by their **actions** — discrete, named operations each agen
 
 ### Cleanup
 
-**Trigger:** daily | **Reads:** `.system/logs/`, `.system/reports/`, `agent-metrics.json` | **Writes:** purges old files, trims metrics
+**Trigger:** daily | **Reads:** `system/logs/`, `system/reports/`, `agent-metrics.json` | **Writes:** purges old files, trims metrics
 
 | Action | Description |
 |--------|-------------|
@@ -203,7 +203,7 @@ Agents are defined by their **actions** — discrete, named operations each agen
 | Agent registry (registry.yaml schema, active/planned agents, LLM endpoints) | [agent-registry.spec.md](specs/agent-registry.spec.md) |
 | Data contracts (frontmatter, naming, logging, encoding) | [data-contracts.spec.md](specs/data-contracts.spec.md) |
 | State files (all JSON/text state file schemas and locations) | [state-files.spec.md](specs/state-files.spec.md) |
-| Shared Python library (.agents/shared/ modules and interfaces) | [shared-library.spec.md](specs/shared-library.spec.md) |
+| Shared Python library (agents/shared/ modules and interfaces) | [shared-library.spec.md](specs/shared-library.spec.md) |
 | LLM integration (providers, model assignments, call parameters) | [llm-integration.spec.md](specs/llm-integration.spec.md) |
 | Linking rules (required links, wikilink syntax) | [linking-rules.spec.md](specs/linking-rules.spec.md) |
 | Security constraints (quality gate, human-only fields, API keys) | [security.spec.md](specs/security.spec.md) |
@@ -219,5 +219,5 @@ Agents are defined by their **actions** — discrete, named operations each agen
 | 2 | Classification/Wiki Agent use LocalRouter port 8080 — these are configured in `registry.yaml` `llm_endpoints`; `agent.json` dispatch still references legacy path | Partially Resolved |
 | 3 | Face matching — no formal spec for distance threshold or match method | Open |
 | 4 | Dashboard API (`/review/<sha256>` routes) — not documented | Open |
-| 5 | `scenarios.json` schema — now documented in [state-files.spec.md](specs/state-files.spec.md); default scenario in `.agents/lore/state/scenarios.json` | Resolved |
+| 5 | `scenarios.json` schema — now documented in [state-files.spec.md](specs/state-files.spec.md); default scenario in `agents/lore/state/scenarios.json` | Resolved |
 | 7 | Planned agents (canon, relationship, deduplication, curator, search, adventure-builder, session-builder, encounter-builder) — all `status: planned` in registry.yaml | Tracking |

@@ -66,8 +66,8 @@ Supported failure-count keywords: `failed`, `failures`.
 
 | File | Content |
 |------|---------|
-| `.agents/runtime/state/logs/automation.log` | Consolidated all-agent log |
-| `.agents/{name}/state/logs/{script-basename}_YYYY-MM-DD.log` | Per-agent daily rotation |
+| `agents/runtime/state/logs/automation.log` | Consolidated all-agent log |
+| `agents/{name}/state/logs/{script-basename}_YYYY-MM-DD.log` | Per-agent daily rotation |
 
 ---
 

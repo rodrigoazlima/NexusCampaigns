@@ -27,13 +27,13 @@ This also blocks implementation of the semantic quality judge (P5), which requir
 ## Scope
 
 Files to modify:
-- `.agents/shared/runners/claude.py` — capture `usage` fields from API response
-- `.agents/runtime/tools/runner.py` — record cost after each dispatch
-- `.agents/review/tools/daily_report.py` — add cost summary to report
+- `agents/shared/runners/claude.py` — capture `usage` fields from API response
+- `agents/runtime/tools/runner.py` — record cost after each dispatch
+- `agents/review/tools/daily_report.py` — add cost summary to report
 
 Files to create:
-- `.agents/runtime/state/costs/` — directory, one JSON per day
-- `.agents/tests/test_cost_tracking.py`
+- `agents/runtime/state/costs/` — directory, one JSON per day
+- `agents/tests/test_cost_tracking.py`
 
 ---
 
@@ -195,7 +195,7 @@ if cfg.max_tokens_per_run and (total_input + total_output) > cfg.max_tokens_per_
 
 ## Cost File Format
 
-`.agents/runtime/state/costs/costs-2026-06-10.json`:
+`agents/runtime/state/costs/costs-2026-06-10.json`:
 
 ```json
 {
@@ -253,7 +253,7 @@ Report displays per-task token totals for the day. Dollar amounts computed clien
 
 ## Tests
 
-`.agents/tests/test_cost_tracking.py`:
+`agents/tests/test_cost_tracking.py`:
 
 ```python
 def test_run_result_captures_tokens():

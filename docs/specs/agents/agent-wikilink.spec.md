@@ -1,7 +1,7 @@
 # Agent Spec — Wikilink
 
 **Trigger:** hourly  
-**Input:** `02-Library/**/*.md`, `.agents/wikilink/state/wikilink-state.json`  
+**Input:** `02-Library/**/*.md`, `agents/wikilink/state/wikilink-state.json`  
 **Output:** `[[wikilink]]` insertions in `## Related` section of each note  
 **Dispatch:** `claude-api` · `claude-haiku-4-5-20251001` · `tools_module: wikilink.tools.wikilink_library`
 

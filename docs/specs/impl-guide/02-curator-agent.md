@@ -39,16 +39,16 @@ The Curator never sets `reviewed: true`. It never sets `status: approved`. Vault
 ## Scope
 
 Files to create:
-- `.agents/curator/agent.json`
-- `.agents/curator/AGENT.md`
-- `.agents/curator/tools/__init__.py`
-- `.agents/curator/tools/curator_agent.py`
-- `.agents/curator/prompts/system.md`
-- `.agents/curator/state/curator-state.json` (tracks already-assessed files)
-- `.agents/tests/test_curator.py`
+- `agents/curator/agent.json`
+- `agents/curator/AGENT.md`
+- `agents/curator/tools/__init__.py`
+- `agents/curator/tools/curator_agent.py`
+- `agents/curator/prompts/system.md`
+- `agents/curator/state/curator-state.json` (tracks already-assessed files)
+- `agents/tests/test_curator.py`
 
 Files to modify:
-- `.agents/shared/interfaces.py` — `ICurator` already defined; `CuratorSuggestion` model may need `curator_notes` field
+- `agents/shared/interfaces.py` — `ICurator` already defined; `CuratorSuggestion` model may need `curator_notes` field
 
 ---
 
@@ -115,10 +115,10 @@ restrictions:
   - Never overwrite an existing 02-Library/ file
   - If 02-Library/{slug}.md already exists, skip — do not overwrite canon
 state_files:
-  - .agents/curator/state/curator-state.json
+  - agents/curator/state/curator-state.json
 commit_scope:
   - knowledge-base/02-Library
-  - .agents/curator/state
+  - agents/curator/state
 ```
 
 ---
@@ -194,7 +194,7 @@ Writes standard `--- DONE ---` log line via shared logger.
 
 ---
 
-## System Prompt (`.agents/curator/prompts/system.md`)
+## System Prompt (`agents/curator/prompts/system.md`)
 
 ```markdown
 # Curator Agent
@@ -264,7 +264,7 @@ Do NOT modify VaultGuard logic — it protects other agents. The Curator skips t
 
 ## Tests
 
-`.agents/tests/test_curator.py`:
+`agents/tests/test_curator.py`:
 
 ```python
 def test_promotes_qualifying_draft(tmp_path):

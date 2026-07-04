@@ -1,7 +1,7 @@
 # Agent Spec — Cleanup
 
 **Trigger:** daily  
-**Input:** `.agents/runtime/state/logs/`, `.agents/review/state/reports/`, `.agents/runtime/state/agent-metrics.json`  
+**Input:** `agents/runtime/state/logs/`, `agents/review/state/reports/`, `agents/runtime/state/agent-metrics.json`  
 **Config:** `cleanupDays` from orchestrator `agent.json` (default: 90)  
 **Dispatch:** `claude-api` · `claude-haiku-4-5-20251001` · `tools_module: cleanup.tools.cleanup_agent`
 

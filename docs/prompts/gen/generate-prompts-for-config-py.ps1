@@ -4,7 +4,7 @@
 
 param(
     [string]$TemplateFile = "prompt-template-config-py.md",
-    [string]$AgentsRoot   = (Join-Path $PSScriptRoot "..\..\.agents"),
+    [string]$AgentsRoot   = (Join-Path $PSScriptRoot "..\..\agents"),
     [string]$OutputDir    = ".",
     [string]$OutputPrefix = "prompt-config-py",
     [switch]$SkipEmpty

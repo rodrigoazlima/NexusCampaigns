@@ -116,7 +116,7 @@ Preferred relationships:
 
 ---
 
-## Automation Scripts (`.system/`)
+## Automation Scripts (`system/`)
 
 ### Path conventions
 | Variable | Path |
@@ -132,18 +132,18 @@ All file I/O **must** use `-Encoding UTF8` explicitly. Never rely on PS default 
 
 | Destination | Path | Purpose |
 |-------------|------|---------|
-| Shared log | `.system/logs/automation.log` | Full consolidated history |
-| Per-task log | `.system/logs/<script-name>_YYYY-MM-DD.log` | Per-script daily rotation |
+| Shared log | `system/logs/automation.log` | Full consolidated history |
+| Per-task log | `system/logs/<script-name>_YYYY-MM-DD.log` | Per-script daily rotation |
 
 Log line format: `[YYYY-MM-DD HH:mm:ss] [<task-id>] <message>`
 
 Every script must emit `--- START ---` and `--- DONE ---` markers via `Write-Log`.
 
 ### Adding a New Automation
-1. Create `.agents/<name>/tools/<name>_agent.py` with `TOOLS` list and `call_tool()` function
-2. Create `.agents/<name>/agent.json` with `tasks.<task-id>.intervalSeconds`, `.description`, and `dispatch.claude_api` config
-3. Create `.agents/<name>/prompts/system.md` with agent role, tools, and success criteria
-4. Add entry to `.agents/runtime/state/tasks-state.json` with `lastRun: "1970-01-01T00:00:00Z"`
+1. Create `agents/<name>/tools/<name>_agent.py` with `TOOLS` list and `call_tool()` function
+2. Create `agents/<name>/agent.json` with `tasks.<task-id>.intervalSeconds`, `.description`, and `dispatch.claude_api` config
+3. Create `agents/<name>/prompts/system.md` with agent role, tools, and success criteria
+4. Add entry to `agents/runtime/state/tasks-state.json` with `lastRun: "1970-01-01T00:00:00Z"`
 
 ### Task Intervals
 - `3600` — hourly (cleanup, compile, classify, generate)

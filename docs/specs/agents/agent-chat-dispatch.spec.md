@@ -16,7 +16,7 @@ Allows the GM dashboard chat UI to send messages directly to vault agents using 
 ```
 Dashboard (browser)
   └─ POST /api/gm/chat
-       └─ writes to .system/state/chat-queue.json  (status: pending)
+       └─ writes to system/state/chat-queue.json  (status: pending)
        └─ spawns: python runner.py --chat-id <uuid>
             └─ reads agent.json → dispatch.type + dispatch config
             └─ loads prompts/system.md
@@ -29,7 +29,7 @@ Dashboard (browser)
 
 ## Chat Queue
 
-**Path:** `.system/state/chat-queue.json`
+**Path:** `system/state/chat-queue.json`
 
 **Format:** JSON array of items:
 
@@ -78,8 +78,8 @@ python runner.py --chat-id <uuid>
 
 Loaded from (first match wins):
 
-1. `.agents/<agentName>/prompts/system.md`
-2. `.agents/<agentName>/prompts/system.txt`
+1. `agents/<agentName>/prompts/system.md`
+2. `agents/<agentName>/prompts/system.txt`
 3. Built-in DM assistant fallback
 
 ### LLM Dispatch
@@ -125,7 +125,7 @@ Timeout: 120 seconds (matches runner default).
 | Wiki | `wiki-agent` | per `agent.json` dispatch |
 | Classification | `classification-agent` | per `agent.json` dispatch |
 
-To add a new agent to the chat UI, add it to `AGENTS` in `.system/dashboard/src/app/gm/chat/page.tsx` and add the `agentName → task_id` entry to `_AGENT_NAME_TO_TASK` in `runner.py`.
+To add a new agent to the chat UI, add it to `AGENTS` in `system/dashboard/src/app/gm/chat/page.tsx` and add the `agentName → task_id` entry to `_AGENT_NAME_TO_TASK` in `runner.py`.
 
 ---
 
@@ -133,6 +133,6 @@ To add a new agent to the chat UI, add it to `AGENTS` in `.system/dashboard/src/
 
 | File | Role |
 |------|------|
-| `.agents/runtime/tools/runner.py` | `_dispatch_chat()`, `--chat-id` CLI arg |
-| `.system/dashboard/src/app/api/gm/chat/route.ts` | Queue write + runner subprocess |
-| `.system/state/chat-queue.json` | Runtime queue (auto-created) |
+| `agents/runtime/tools/runner.py` | `_dispatch_chat()`, `--chat-id` CLI arg |
+| `system/dashboard/src/app/api/gm/chat/route.ts` | Queue write + runner subprocess |
+| `system/state/chat-queue.json` | Runtime queue (auto-created) |

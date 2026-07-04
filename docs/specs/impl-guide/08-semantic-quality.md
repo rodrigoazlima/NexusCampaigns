@@ -36,13 +36,13 @@ Cost gate: `max_tokens_per_run` must be set in `agent.json` before enabling.
 ## Scope
 
 Files to create:
-- `.agents/shared/semantic_judge.py` — `SemanticQualityJudge` class
-- `.agents/shared/interfaces.py` — `ISemanticJudge` protocol (add)
-- `.agents/tests/test_semantic_judge.py`
+- `agents/shared/semantic_judge.py` — `SemanticQualityJudge` class
+- `agents/shared/interfaces.py` — `ISemanticJudge` protocol (add)
+- `agents/tests/test_semantic_judge.py`
 
 Files to modify:
-- `.agents/curator/tools/curator_agent.py` — optionally call judge in `score_draft()`
-- `.agents/curator/agent.json` — add `enable_semantic_scoring` flag
+- `agents/curator/tools/curator_agent.py` — optionally call judge in `score_draft()`
+- `agents/curator/agent.json` — add `enable_semantic_scoring` flag
 
 ---
 
@@ -237,7 +237,7 @@ If LLM returns non-JSON or malformed response: log warning, skip semantic score,
 
 ## Tests
 
-`.agents/tests/test_semantic_judge.py`:
+`agents/tests/test_semantic_judge.py`:
 
 ```python
 def test_returns_semantic_score_on_valid_response():

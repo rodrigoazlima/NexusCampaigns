@@ -1,0 +1,217 @@
+version: 1
+vault_root: "knowledge-base"
+agents_dir: "agents"
+shared_dir: "system"
+
+llm_endpoints:
+  vision_llm:
+    url: "http://localhost:1234/v1/chat/completions"
+    model: "qwen3-vl-4b-instruct"
+    type: vision
+    provider: lm-studio
+  local_router:
+    url: "http://localhost:8080/v1/chat/completions"
+    model: "auto"
+    type: text
+    provider: local-router
+
+execution_order:
+  - runtime
+  - repair
+  - ingestion
+  - vision
+  - lore
+  - token
+  - wiki
+  - classification
+  - review
+  - wikilink
+  - cleanup
+
+shared_state_files:
+  inbox-queue.json:
+    path: system/state/inbox-queue.json
+    owner: ingestion
+    updaters:
+      - vision
+      - lore
+      - wiki
+
+agents:
+  runtime:
+    status: active
+    description: "Python scheduler and dispatch runtime — the only static code. Not an AI agent."
+    interval_seconds: 60
+    llm: none
+    tools:
+      - tools/runner.py
+
+  repair:
+    status: active
+    task_id: repair-agent
+    interval_seconds: 900
+    llm: none
+    tools:
+      - tools/repair_agent.py
+
+  ingestion:
+    status: active
+    task_id: ingestion-agent
+    interval_seconds: 3600
+    llm: none
+    tools:
+      - tools/ingestion_agent.py
+    shared_state:
+      writes:
+        - system/state/inbox-queue.json
+
+  vision:
+    status: active
+    task_id: vision-agent
+    interval_seconds: 3600
+    llm: vision_llm
+    tools:
+      - tools/classify_images.py
+    prompts:
+      - prompts/classify-image.txt
+    shared_state:
+      reads:
+        - system/state/inbox-queue.json
+      updates:
+        - system/state/inbox-queue.json
+
+  lore:
+    status: active
+    task_id: lore-agent
+    interval_seconds: 3600
+    llm: vision_llm
+    tools:
+      - tools/generate_npcs.py
+    prompts:
+      - prompts/generate-npc.txt
+    shared_state:
+      reads:
+        - system/state/inbox-queue.json
+        - agents/vision/state/processed-images.json
+      updates:
+        - system/state/inbox-queue.json
+
+  token:
+    status: active
+    task_id: token-agent
+    interval_seconds: 3600
+    llm: none
+    tools:
+      - tools/generate_tokens.py
+    shared_state:
+      reads:
+        - agents/vision/state/processed-images.json
+
+  classification:
+    status: active
+    task_id: classification-agent
+    interval_seconds: 3600
+    llm: local_router
+    tools:
+      - tools/enrich_tags.py
+    prompts:
+      - prompts/enrich-tags.txt
+      - prompts/infer-type.txt
+    shared_state:
+      reads:
+        - system/state/inbox-queue.json
+
+  wiki:
+    status: active
+    task_id: wiki-agent
+    interval_seconds: 3600
+    llm: local_router
+    tools:
+      - tools/compile_wiki.py
+    prompts:
+      - prompts/compile-entity.txt
+    shared_state:
+      reads:
+        - system/state/inbox-queue.json
+      updates:
+        - system/state/inbox-queue.json
+
+  review:
+    status: active
+    task_id: review-agent
+    interval_seconds: 900
+    llm: none
+    tools:
+      - tools/daily_report.py
+      - tools/flag_short_files.py
+
+  wikilink:
+    status: active
+    task_id: wikilink-agent
+    interval_seconds: 3600
+    llm: none
+    tools:
+      - tools/wikilink_library.py
+    shared_state:
+      reads:
+        - agents/wikilink/state/wikilink-state.json
+
+  cleanup:
+    status: active
+    task_id: cleanup-agent
+    interval_seconds: 86400
+    llm: none
+    tools:
+      - tools/cleanup_agent.py
+
+  relationship:
+    status: planned
+    dependencies:
+      - canon
+    llm: TBD
+
+  deduplication:
+    status: planned
+    dependencies:
+      - classification
+    llm: TBD
+
+  canon:
+    status: planned
+    dependencies: []
+    llm: TBD
+
+  curator:
+    status: planned
+    dependencies:
+      - review
+      - classification
+    llm: TBD
+
+  search:
+    status: planned
+    dependencies:
+      - canon
+    llm: TBD
+
+  adventure-builder:
+    status: planned
+    dependencies:
+      - lore
+      - canon
+      - relationship
+    llm: TBD
+
+  session-builder:
+    status: planned
+    dependencies:
+      - adventure-builder
+    llm: TBD
+
+  encounter-builder:
+    status: planned
+    dependencies:
+      - lore
+      - vision
+      - canon
+    llm: TBD

@@ -170,25 +170,25 @@ Do not generate lore that contradicts existing approved entities in `02-Library/
 ### Ingestion Agent
 - Detects new files in `00-Inbox/images/`
 - Generates slug name, metadata, companion `.md` in same folder
-- Updates `.agents/vision/state/processed-images.json`
+- Updates `agents/vision/state/processed-images.json`
 - Cannot modify `02-Library/`
 
 ### NPC Agent
 - Reads image + scenario from `00-Inbox/images/`
 - Generates NPC markdown draft in `01-Processing/`
-- Tracks processed pairs in `.system/processed-npcs.json`
+- Tracks processed pairs in `system/processed-npcs.json`
 - Cannot approve content
 
 ### Token Agent
 - Generates circular portrait tokens from character images
 - Reads from `00-Inbox/images/`, writes `*-token.png` alongside source
-- Tracks in `.system/generated-tokens.json`
+- Tracks in `system/generated-tokens.json`
 - Cannot modify `02-Library/`
 
 ### Compile Agent
 - Reads `00-Inbox/` markdown notes
 - Generates synthesized pages in `01-Processing/`
-- Tracks in `.system/processed.txt`
+- Tracks in `system/processed.txt`
 - Cannot approve content
 
 ### Enrich Agent

@@ -8,7 +8,7 @@ All runtime state is stored in JSON files. State files are gitignored runtime ar
 
 | File | Path | Owner | Readers/Updaters |
 |------|------|-------|-----------------|
-| `inbox-queue.json` | `.system/state/inbox-queue.json` | ingestion (creates) | vision, lore, wiki (update agent slots) |
+| `inbox-queue.json` | `system/state/inbox-queue.json` | ingestion (creates) | vision, lore, wiki (update agent slots) |
 
 ### inbox-queue.json schema
 
@@ -41,9 +41,9 @@ All runtime state is stored in JSON files. State files are gitignored runtime ar
 
 | File | Path | Purpose |
 |------|------|---------|
-| `tasks-state.json` | `.agents/runtime/state/tasks-state.json` | Last-run timestamps per task |
-| `runner.lock` | `.agents/runtime/state/runner.lock` | Prevents concurrent runner instances |
-| `agent-metrics.json` | `.agents/runtime/state/agent-metrics.json` | Per-task run history (last 100 runs) |
+| `tasks-state.json` | `agents/runtime/state/tasks-state.json` | Last-run timestamps per task |
+| `runner.lock` | `agents/runtime/state/runner.lock` | Prevents concurrent runner instances |
+| `agent-metrics.json` | `agents/runtime/state/agent-metrics.json` | Per-task run history (last 100 runs) |
 
 ### tasks-state.json schema
 
@@ -83,7 +83,7 @@ All runtime state is stored in JSON files. State files are gitignored runtime ar
 
 | File | Path |
 |------|------|
-| `processed-images.json` | `.agents/vision/state/processed-images.json` |
+| `processed-images.json` | `agents/vision/state/processed-images.json` |
 
 #### processed-images.json v2 schema
 
@@ -122,8 +122,8 @@ Connection-error images are NOT stored — retried next run.
 
 | File | Path |
 |------|------|
-| `processed-npcs.json` | `.agents/lore/state/processed-npcs.json` |
-| `scenarios.json` | `.agents/lore/state/scenarios.json` |
+| `processed-npcs.json` | `agents/lore/state/processed-npcs.json` |
+| `scenarios.json` | `agents/lore/state/scenarios.json` |
 
 #### scenarios.json schema
 
@@ -147,7 +147,7 @@ Active scenarios are used for NPC generation context. Add one entry per campaign
 
 | File | Path |
 |------|------|
-| `generated-tokens.json` | `.agents/token/state/generated-tokens.json` |
+| `generated-tokens.json` | `agents/token/state/generated-tokens.json` |
 
 #### generated-tokens.json schema
 
@@ -167,7 +167,7 @@ Active scenarios are used for NPC generation context. Add one entry per campaign
 
 | File | Path |
 |------|------|
-| `processed-docx.txt` | `.agents/ingestion/state/processed-docx.txt` |
+| `processed-docx.txt` | `agents/ingestion/state/processed-docx.txt` |
 
 Plain text list of converted DOCX paths (one per line). Prevents re-conversion on next run.
 
@@ -177,8 +177,8 @@ Plain text list of converted DOCX paths (one per line). Prevents re-conversion o
 
 | File | Path |
 |------|------|
-| `processed.txt` | `.agents/wiki/state/processed.txt` |
-| `bad-wiki-docs.txt` | `.agents/wiki/state/bad-wiki-docs.txt` |
+| `processed.txt` | `agents/wiki/state/processed.txt` |
+| `bad-wiki-docs.txt` | `agents/wiki/state/bad-wiki-docs.txt` |
 
 ---
 
@@ -186,7 +186,7 @@ Plain text list of converted DOCX paths (one per line). Prevents re-conversion o
 
 | File | Path |
 |------|------|
-| `bad-docs.txt` | `.agents/classification/state/bad-docs.txt` |
+| `bad-docs.txt` | `agents/classification/state/bad-docs.txt` |
 
 ---
 
@@ -194,7 +194,7 @@ Plain text list of converted DOCX paths (one per line). Prevents re-conversion o
 
 | File | Path |
 |------|------|
-| `wikilink-state.json` | `.agents/wikilink/state/wikilink-state.json` |
+| `wikilink-state.json` | `agents/wikilink/state/wikilink-state.json` |
 
 ---
 
@@ -202,7 +202,7 @@ Plain text list of converted DOCX paths (one per line). Prevents re-conversion o
 
 | Directory | Path |
 |-----------|------|
-| `reports/` | `.agents/review/state/reports/` |
+| `reports/` | `agents/review/state/reports/` |
 
 Report files: `report-YYYY-MM-DD.json` (daily health), `repair-YYYY-MM-DD.json` (repair runs).
 
@@ -212,11 +212,11 @@ Report files: `report-YYYY-MM-DD.json` (daily health), `repair-YYYY-MM-DD.json` 
 
 | File | Path | Purpose |
 |------|------|---------|
-| `automation.log` | `.agents/runtime/state/logs/automation.log` | Consolidated all-agent log |
-| Per-agent daily | `.agents/{name}/state/logs/{basename}_YYYY-MM-DD.log` | Agent-scoped daily rotation |
+| `automation.log` | `agents/runtime/state/logs/automation.log` | Consolidated all-agent log |
+| Per-agent daily | `agents/{name}/state/logs/{basename}_YYYY-MM-DD.log` | Agent-scoped daily rotation |
 
 ---
 
 ## Agent Conversation History
 
-Tool-use dispatched agents (all active `claude-api` agents) maintain conversation history files. Location: `.agents/{name}/state/{name}-agent-history.json`. Used to preserve multi-turn context across scheduled runs.
+Tool-use dispatched agents (all active `claude-api` agents) maintain conversation history files. Location: `agents/{name}/state/{name}-agent-history.json`. Used to preserve multi-turn context across scheduled runs.

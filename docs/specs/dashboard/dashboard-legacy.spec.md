@@ -151,14 +151,14 @@ VaultStats { folders, images, npcs, growth }
 
 | Source | Data |
 |--------|------|
-| `.system/inbox-queue.json` | Queue state |
-| `.system/processed-images.json` | Vision agent results |
-| `.system/processed-npcs.json` | Lore agent results |
-| `.system/generated-tokens.json` | Token results |
-| `.system/tasks.json` | Task config |
-| `.system/tasks-state.json` | Last run times |
-| `.system/logs/automation.log` | Combined log |
-| `.system/reports/report-*.json` | Daily reports |
+| `system/inbox-queue.json` | Queue state |
+| `system/processed-images.json` | Vision agent results |
+| `system/processed-npcs.json` | Lore agent results |
+| `system/generated-tokens.json` | Token results |
+| `system/tasks.json` | Task config |
+| `system/tasks-state.json` | Last run times |
+| `system/logs/automation.log` | Combined log |
+| `system/reports/report-*.json` | Daily reports |
 | `01-Processing/*.md` | Draft entities (parse frontmatter) |
 | `02-Library/**/*.md` | Canon entities (parse frontmatter) |
 | Folder file counts | Stage counts |
@@ -168,7 +168,7 @@ create drift. Next.js server components + API routes read files directly at
 request time. No sync daemon needed.
 
 If growth requires caching: add an in-memory TTL cache (30s) in vault.ts.
-For history/trends: write daily snapshots to `.system/snapshots/*.json`
+For history/trends: write daily snapshots to `system/snapshots/*.json`
 from the Review Agent.
 
 ---
@@ -292,7 +292,7 @@ useEffect(() => {
 ```
 
 Future WebSocket: add `wss://` endpoint in Next.js Route Handler using
-`chokidar` to watch `.system/*.json` and push change events to clients.
+`chokidar` to watch `system/*.json` and push change events to clients.
 
 ---
 
@@ -340,7 +340,7 @@ Future WebSocket: add `wss://` endpoint in Next.js Route Handler using
 ## 14. Running
 
 ```bash
-cd .system/dashboard
+cd system/dashboard
 npm install
 npm run dev         # http://localhost:3131
 ```

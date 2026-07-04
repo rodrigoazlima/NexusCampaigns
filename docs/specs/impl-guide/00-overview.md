@@ -103,7 +103,7 @@ Every new agent capability requires an `I*` interface added to `shared/interface
 - Metrics are recorded to `agent-metrics.json` by the runner — no custom metrics code inside agents.
 
 ### Testing
-- Every new tool function requires a unit test in `.agents/tests/`.
+- Every new tool function requires a unit test in `agents/tests/`.
 - Tests must use `conftest.py` fixtures and match existing test conventions.
 - Integration tests may use `tmp_path` (pytest) — never write to live vault directories.
 

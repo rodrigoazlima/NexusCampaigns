@@ -1,7 +1,7 @@
 # Agent Spec — Classification
 
 **Trigger:** hourly  
-**Input:** notes in `00-Inbox/` and `01-Processing/` with ≤5 tags; `.system/state/inbox-queue.json`  
+**Input:** notes in `00-Inbox/` and `01-Processing/` with ≤5 tags; `system/state/inbox-queue.json`  
 **Output:** enriched frontmatter in-place  
 **Dependency:** LocalRouter at `http://localhost:8080`  
 **Dispatch:** `claude-api` · `claude-haiku-4-5-20251001` · `tools_module: classification.tools.enrich_tags`

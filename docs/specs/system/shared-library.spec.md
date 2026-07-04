@@ -1,8 +1,8 @@
 # Spec — Shared Python Library
 
-Location: `.agents/shared/`
+Location: `agents/shared/`
 
-Shared code used by 3+ agents. Agent-specific logic stays in `{agent}/tools/`. Code moves to `.system/` only when reuse threshold is met.
+Shared code used by 3+ agents. Agent-specific logic stays in `{agent}/tools/`. Code moves to `system/` only when reuse threshold is met.
 
 ---
 
@@ -112,8 +112,8 @@ System paths are derived from a single `project_root` via `SystemPaths`:
 
 | Property | Resolved path |
 |----------|--------------|
-| `agents_dir` | `{project_root}/.agents/` |
-| `shared_state` | `{project_root}/.system/state/` |
-| `logs_dir` | `{project_root}/.agents/runtime/state/logs/` |
-| `reports_dir` | `{project_root}/.agents/review/state/reports/` |
-| `agent_state(name)` | `{project_root}/.agents/{name}/state/` |
+| `agents_dir` | `{project_root}/agents/` |
+| `shared_state` | `{project_root}/system/state/` |
+| `logs_dir` | `{project_root}/agents/runtime/state/logs/` |
+| `reports_dir` | `{project_root}/agents/review/state/reports/` |
+| `agent_state(name)` | `{project_root}/agents/{name}/state/` |

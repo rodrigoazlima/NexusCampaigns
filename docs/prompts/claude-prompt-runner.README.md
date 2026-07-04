@@ -21,7 +21,7 @@ are done (or have exhausted their retries).
 1. **Anchors to the repo root.** Before doing anything, the script derives the
    codebase root by stripping the `$PromptDirectory` tail off `$PSScriptRoot`
    (its own absolute folder) and `Set-Location`s there, so the relative defaults
-   (`docs/prompts`, `.system/...`) resolve no matter where you invoke it from.
+   (`docs/prompts`, `system/...`) resolve no matter where you invoke it from.
    The root is computed from the variables, not a hardcoded depth — move the
    script and it still finds the right root as long as it stays under
    `$PromptDirectory`.
@@ -36,7 +36,7 @@ are done (or have exhausted their retries).
    trying again. Failure = non-zero exit code, or output matching a known
    limit message (`usage limit reached`, `insufficient credits`,
    `credit limit reached`).
-6. **Persists state** to `.system/claude-queue-state.json` after every step, so
+6. **Persists state** to `system/claude-queue-state.json` after every step, so
    you can Ctrl-C and re-run to resume exactly where it left off.
 
 ## Parameters
@@ -45,7 +45,7 @@ are done (or have exhausted their retries).
 |-------|---------|---------|
 | `-PromptDirectory` | `docs/prompts` | Folder to scan (relative to repo root). |
 | `-Filter` | `*.md` | Glob for prompt files. README files are always excluded. |
-| `-StateFile` | `.system/claude-queue-state.json` | Resume/queue state. |
+| `-StateFile` | `system/claude-queue-state.json` | Resume/queue state. |
 | `-RetryDelayMinutes` | `40` | Cooldown before retrying a failed prompt. |
 | `-MaxRetries` | `200` | Per-prompt retry cap before giving up. |
 | `-TimeoutMinutes` | `30` | Per-prompt run timeout. |
@@ -62,7 +62,7 @@ pwsh docs/prompts/claude-prompt-runner.ps1 -PromptDirectory docs/other-prompts
 
 ## Resuming
 
-State lives in `.system/claude-queue-state.json`. Re-running picks up the queue:
+State lives in `system/claude-queue-state.json`. Re-running picks up the queue:
 completed prompts stay completed (and are already moved to `prompt-done/`), and
 newly added `*.md` files are appended to the queue automatically. To start
 completely fresh, delete the state file.

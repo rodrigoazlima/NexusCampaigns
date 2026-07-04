@@ -56,7 +56,7 @@ if not SCRIPT_PATH.exists():
     pytest.skip(
         "match-token script has no equivalent in NexusCampaigns "
         "(pathway-specific utility; token matching handled by vision/token agents). "
-        "Skip until a dedicated match-token tool is added under .agents/.",
+        "Skip until a dedicated match-token tool is added under agents/.",
         allow_module_level=True,
     )
 

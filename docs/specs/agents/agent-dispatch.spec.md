@@ -13,28 +13,28 @@ per agent — the runtime never hardcodes invocation details.
 ## Agent Resolution
 
 ```
-task.id → strip "-agent[-*]" suffix → .agents/{name}/ → agent.json
+task.id → strip "-agent[-*]" suffix → agents/{name}/ → agent.json
 ```
 
 | task_id | agent folder |
 |---|---|
-| `repair-agent` | `.agents/repair/` |
-| `review-agent` | `.agents/review/` |
-| `review-agent-short-files` | `.agents/review/` |
-| `ingestion-agent` | `.agents/ingestion/` |
-| `vision-agent` | `.agents/vision/` |
+| `repair-agent` | `agents/repair/` |
+| `review-agent` | `agents/review/` |
+| `review-agent-short-files` | `agents/review/` |
+| `ingestion-agent` | `agents/ingestion/` |
+| `vision-agent` | `agents/vision/` |
 
-If `.agents/{name}/agent.json` does not exist the runtime logs an error and skips the task.
+If `agents/{name}/agent.json` does not exist the runtime logs an error and skips the task.
 `lastRun` is **not** updated on a skip.
 
 ---
 
 ## `agent.json` Schema
 
-Location: `.agents/{name}/agent.json`
+Location: `agents/{name}/agent.json`
 
 One agent folder may serve multiple task IDs (e.g. `review-agent` and `review-agent-short-files`
-both map to `.agents/review/`). The `tasks` dict is keyed by task ID.
+both map to `agents/review/`). The `tasks` dict is keyed by task ID.
 
 ```json
 {
@@ -66,7 +66,7 @@ any shell-accessible binary.
     "type": "cli",
     "cli": {
       "command": "python",
-      "args": [".agents/repair/tools/repair_agent.py"],
+      "args": ["agents/repair/tools/repair_agent.py"],
       "cwd": "project_root",
       "timeout_seconds": 300,
       "env": {}
@@ -88,10 +88,10 @@ Exit code 0 = success. Non-zero = failure. stdout/stderr stream to the shared lo
 **CLI agent examples:**
 
 ```json
-{ "command": "python",   "args": [".agents/lore/tools/generate_npcs.py"] }
-{ "command": "claude",   "args": ["--print", "--prompt-file", ".agents/wiki/prompts/main.md"] }
-{ "command": "codex",    "args": ["run", ".agents/classification/prompts/main.md"] }
-{ "command": "opencode", "args": ["--task", ".agents/vision/prompts/classify.md"] }
+{ "command": "python",   "args": ["agents/lore/tools/generate_npcs.py"] }
+{ "command": "claude",   "args": ["--print", "--prompt-file", "agents/wiki/prompts/main.md"] }
+{ "command": "codex",    "args": ["run", "agents/classification/prompts/main.md"] }
+{ "command": "opencode", "args": ["--task", "agents/vision/prompts/classify.md"] }
 ```
 
 ---
@@ -107,8 +107,8 @@ OpenAI REST API **or** any OpenAI-compatible endpoint (LM Studio, Ollama, LocalR
     "openai_api": {
       "base_url": "https://api.openai.com/v1",
       "model": "gpt-4o",
-      "prompt_file": ".agents/wiki/prompts/main.md",
-      "system_file": ".agents/wiki/prompts/system.md",
+      "prompt_file": "agents/wiki/prompts/main.md",
+      "system_file": "agents/wiki/prompts/system.md",
       "max_tokens": 4096,
       "temperature": 0,
       "timeout_seconds": 120
@@ -201,8 +201,8 @@ Google Gemini API.
     "type": "gemini-api",
     "gemini_api": {
       "model": "gemini-2.5-flash",
-      "prompt_file": ".agents/classification/prompts/main.md",
-      "system_file": ".agents/classification/prompts/system.md",
+      "prompt_file": "agents/classification/prompts/main.md",
+      "system_file": "agents/classification/prompts/system.md",
       "max_tokens": 2048,
       "temperature": 0,
       "timeout_seconds": 120
@@ -234,8 +234,8 @@ OpenRouter unified gateway — any model available via OpenRouter.
     "type": "openrouter-api",
     "openrouter_api": {
       "model": "anthropic/claude-sonnet-4-6",
-      "prompt_file": ".agents/adventure-builder/prompts/main.md",
-      "system_file": ".agents/adventure-builder/prompts/system.md",
+      "prompt_file": "agents/adventure-builder/prompts/main.md",
+      "system_file": "agents/adventure-builder/prompts/system.md",
       "max_tokens": 8192,
       "temperature": 0,
       "timeout_seconds": 180
@@ -259,7 +259,7 @@ Auth: `OPENROUTER_API_KEY` env var.
 
 ## Shared Runners
 
-Location: `.agents/shared/runners/`
+Location: `agents/shared/runners/`
 
 ```
 shared/
@@ -318,7 +318,7 @@ Local endpoints require `OPENAI_API_KEY` set to any non-empty value (e.g. `"lm-s
 
 ## Prompt Files
 
-`prompt_file` and `system_file` paths in API dispatch configs are relative to the **agent directory** (e.g. `prompts/system.md` resolves to `.agents/{name}/prompts/system.md`).
+`prompt_file` and `system_file` paths in API dispatch configs are relative to the **agent directory** (e.g. `prompts/system.md` resolves to `agents/{name}/prompts/system.md`).
 
 - Files are plain Markdown (`.md`). Read fresh at dispatch time — not cached.
 - `prompt_file` absent → runner sends empty user message.

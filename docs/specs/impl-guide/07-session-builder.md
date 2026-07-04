@@ -126,14 +126,14 @@ reviewed: false
 ## Scope
 
 Files to create:
-- `.agents/session-builder/agent.json`
-- `.agents/session-builder/tools/__init__.py`
-- `.agents/session-builder/tools/session_builder_agent.py`
-- `.agents/session-builder/prompts/system.md`
-- `.agents/tests/test_session_builder.py`
+- `agents/session-builder/agent.json`
+- `agents/session-builder/tools/__init__.py`
+- `agents/session-builder/tools/session_builder_agent.py`
+- `agents/session-builder/prompts/system.md`
+- `agents/tests/test_session_builder.py`
 
 Files to modify:
-- `.agents/session-builder/AGENT.md` — fill stub
+- `agents/session-builder/AGENT.md` — fill stub
 
 ---
 
@@ -217,7 +217,7 @@ Standard log format.
 
 ---
 
-## System Prompt (`.agents/session-builder/prompts/system.md`)
+## System Prompt (`agents/session-builder/prompts/system.md`)
 
 ```markdown
 # Session Builder Agent
@@ -268,7 +268,7 @@ Session Builder receives via `signal_triggers: ["adventure-module-ready"]`. This
 
 ## Tests
 
-`.agents/tests/test_session_builder.py`:
+`agents/tests/test_session_builder.py`:
 
 ```python
 def test_skips_arc_without_adventure_module(tmp_path):

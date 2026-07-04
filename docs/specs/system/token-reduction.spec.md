@@ -29,7 +29,7 @@ If the precondition returns `False`, the agent is skipped entirely — no dispat
 
 ## Implementation
 
-**File:** `.agents/runtime/tools/runner.py`
+**File:** `agents/runtime/tools/runner.py`
 
 **Hook in `run_cycle()`:**
 ```
@@ -48,14 +48,14 @@ Unknown task IDs default to `True` (always run) to avoid breaking new agents.
 | Agent | Task ID | Precondition | Data Source |
 |-------|---------|--------------|-------------|
 | Ingestion | `ingestion-agent` | `00-Inbox/images/` or `00-Inbox/docs/` contains at least one processable file | Filesystem scan |
-| Vision | `vision-agent` | `inbox-queue.json` has ≥1 entry with `agents.vision == "pending"` | `.system/state/inbox-queue.json` |
-| Lore | `lore-agent` | `inbox-queue.json` has ≥1 entry with `agents.lore == "pending"` | `.system/state/inbox-queue.json` |
-| Classification | `classification-agent` | `inbox-queue.json` has ≥1 entry with `agents.classification == "pending"` | `.system/state/inbox-queue.json` |
-| Wiki | `wiki-agent` | `inbox-queue.json` has ≥1 entry with `agents.wiki == "pending"` | `.system/state/inbox-queue.json` |
-| Token | `token-agent` | `processed-images.json` has ≥1 image with `status==ok`, `isToken==false`, not in `generated-tokens.json` | `.agents/vision/state/processed-images.json`, `.agents/token/state/generated-tokens.json` |
-| Wikilink | `wikilink-agent` | `02-Library/*.md` has ≥1 file absent from `wikilink-state.json` OR modified after its `processedAt` timestamp | `02-Library/`, `.agents/wikilink/state/wikilink-state.json` |
+| Vision | `vision-agent` | `inbox-queue.json` has ≥1 entry with `agents.vision == "pending"` | `system/state/inbox-queue.json` |
+| Lore | `lore-agent` | `inbox-queue.json` has ≥1 entry with `agents.lore == "pending"` | `system/state/inbox-queue.json` |
+| Classification | `classification-agent` | `inbox-queue.json` has ≥1 entry with `agents.classification == "pending"` | `system/state/inbox-queue.json` |
+| Wiki | `wiki-agent` | `inbox-queue.json` has ≥1 entry with `agents.wiki == "pending"` | `system/state/inbox-queue.json` |
+| Token | `token-agent` | `processed-images.json` has ≥1 image with `status==ok`, `isToken==false`, not in `generated-tokens.json` | `agents/vision/state/processed-images.json`, `agents/token/state/generated-tokens.json` |
+| Wikilink | `wikilink-agent` | `02-Library/*.md` has ≥1 file absent from `wikilink-state.json` OR modified after its `processedAt` timestamp | `02-Library/`, `agents/wikilink/state/wikilink-state.json` |
 | Review (short files) | `review-agent-short-files` | `01-Processing/` contains ≥1 `.md` file | Filesystem scan |
-| Cleanup | `cleanup-agent` | Any log file in `.agents/runtime/state/logs/` older than 7 days | Filesystem `mtime` scan |
+| Cleanup | `cleanup-agent` | Any log file in `agents/runtime/state/logs/` older than 7 days | Filesystem `mtime` scan |
 | Review | `review-agent` | **Always runs** (health monitor — skipping defeats its purpose) | — |
 | Repair | `repair-agent` | **Always runs** (health monitor — skipping defeats its purpose) | — |
 

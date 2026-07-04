@@ -14,7 +14,7 @@ Provides operational visibility, content quality control, human review workflows
 and knowledge-base analytics over an Obsidian vault.
 
 **Audience:** DM (human operator) running the local pipeline.
-**Location:** `.system/dashboard/` · **URL:** http://localhost:3131
+**Location:** `system/dashboard/` · **URL:** http://localhost:3131
 
 ---
 
@@ -220,7 +220,7 @@ Sidebar shows "Live · 30s refresh" indicator.
 
 **Current:** meta-refresh or client `useEffect` + `router.refresh()` every 30s.
 
-**Future:** WebSocket via Next.js Route Handler + `chokidar` watching `.agents/runtime/state/*.json`, pushing change events to clients.
+**Future:** WebSocket via Next.js Route Handler + `chokidar` watching `agents/runtime/state/*.json`, pushing change events to clients.
 
 ---
 
@@ -268,9 +268,9 @@ Sidebar shows "Live · 30s refresh" indicator.
 ## 9. Running
 
 ```bash
-cd .system/dashboard
+cd system/dashboard
 npm install
 npm run dev   # http://localhost:3131
 ```
 
-Requires Node.js 18+. Override vault path: set `VAULT_ROOT` in `.system/dashboard/.env.local`.
+Requires Node.js 18+. Override vault path: set `VAULT_ROOT` in `system/dashboard/.env.local`.

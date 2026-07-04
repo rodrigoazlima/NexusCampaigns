@@ -22,13 +22,13 @@ After generation, the Lore Agent scores its own output using `QualityGate`. If s
 ## Scope
 
 Files to modify:
-- `.agents/lore/tools/generate_npcs.py` — add reflexion loop in `run_batch()`
-- `.agents/lore/prompts/system.md` — add revision instruction section
-- `.agents/shared/interfaces.py` — add `IReflexionContext` protocol (optional, if warranted)
+- `agents/lore/tools/generate_npcs.py` — add reflexion loop in `run_batch()`
+- `agents/lore/prompts/system.md` — add revision instruction section
+- `agents/shared/interfaces.py` — add `IReflexionContext` protocol (optional, if warranted)
 
 Files to create:
-- `.agents/lore/prompts/revise-npc.md` — revision prompt template
-- `.agents/tests/test_reflexion.py` — unit tests for loop logic
+- `agents/lore/prompts/revise-npc.md` — revision prompt template
+- `agents/tests/test_reflexion.py` — unit tests for loop logic
 
 ---
 
@@ -145,7 +145,7 @@ And sets frontmatter: `needs_human_review: true`.
 
 ---
 
-## Revision Prompt Template (`.agents/lore/prompts/revise-npc.md`)
+## Revision Prompt Template (`agents/lore/prompts/revise-npc.md`)
 
 ```
 You previously generated an NPC sheet that did not meet quality standards.
@@ -183,7 +183,7 @@ No new state files. The reflexion loop is in-memory within a single `run_batch()
 
 ## Tests
 
-`.agents/tests/test_reflexion.py`:
+`agents/tests/test_reflexion.py`:
 
 ```python
 def test_passes_on_first_try_if_score_7():

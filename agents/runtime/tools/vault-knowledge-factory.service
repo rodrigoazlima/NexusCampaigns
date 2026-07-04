@@ -1,0 +1,26 @@
+[Unit]
+Description=Vault Nexus Campaigns
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=<service_user>
+WorkingDirectory=<project_root>
+ExecStart=/usr/bin/python3 <project_root>/agents/runtime/tools/runner.py
+Restart=always
+RestartSec=30
+
+Environment=GIT_AUTHOR_NAME=Vault Bot
+Environment=GIT_AUTHOR_EMAIL=bot@localhost
+Environment=ANTHROPIC_API_KEY=<your-key>
+# Uncomment as needed:
+# Environment=OPENAI_API_KEY=lm-studio
+# Environment=GEMINI_API_KEY=<your-key>
+# Environment=OPENROUTER_API_KEY=<your-key>
+
+StandardOutput=append:<project_root>/agents/runtime/state/logs/service-stdout.log
+StandardError=append:<project_root>/agents/runtime/state/logs/service-stderr.log
+
+[Install]
+WantedBy=multi-user.target
