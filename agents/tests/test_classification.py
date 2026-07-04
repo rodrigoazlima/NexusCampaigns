@@ -235,8 +235,8 @@ class TestRunInferType:
         assert failed == 0
 
     def test_skips_files_with_existing_type(self, patch_roots, vault):
-        proc = vault / "01-Processing" / "npc-hero.md"
-        _write_md(proc, {"id": "npc-hero", "type": "npc", "tags": []})
+        proc = vault / "01-Processing" / "quest-slay-dragon.md"
+        _write_md(proc, {"id": "quest-slay-dragon", "type": "quest", "tags": []})
 
         with patch("classification.tools.enrich_tags.LLMClient") as MockClient:
             client = MockClient.return_value

@@ -32,12 +32,12 @@ export const PROJECT_ROOT =
 export const VAULT_ROOT =
   process.env.VAULT_ROOT ?? path.join(PROJECT_ROOT, 'knowledge-base')
 
-const AGENTS_DIR = path.join(PROJECT_ROOT, '.agents')
-const STATE_DIR = path.join(PROJECT_ROOT, '.agents', 'runtime', 'state')
-const SHARED_DIR = path.join(PROJECT_ROOT, '.system', 'state')
-const REPORTS_DIR = path.join(PROJECT_ROOT, '.agents', 'review', 'state', 'reports')
-const LOGS_DIR = path.join(PROJECT_ROOT, '.agents', 'runtime', 'state', 'logs')
-const REGISTRY_PATH = path.join(PROJECT_ROOT, '.agents', 'registry.yaml')
+const AGENTS_DIR = path.join(PROJECT_ROOT, 'agents')
+const STATE_DIR = path.join(PROJECT_ROOT, 'agents', 'runtime', 'state')
+const SHARED_DIR = path.join(PROJECT_ROOT, 'system', 'state')
+const REPORTS_DIR = path.join(PROJECT_ROOT, 'agents', 'review', 'state', 'reports')
+const LOGS_DIR = path.join(PROJECT_ROOT, 'agents', 'runtime', 'state', 'logs')
+const REGISTRY_PATH = path.join(PROJECT_ROOT, 'agents', 'registry.yaml')
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -137,7 +137,7 @@ export function readVaultStats(): VaultStats {
   }
 
   try {
-    const tokenDir = path.join(PROJECT_ROOT, '.agents', 'token', 'state')
+    const tokenDir = path.join(PROJECT_ROOT, 'agents', 'token', 'state')
     if (fs.existsSync(tokenDir)) {
       totalTokens = countFilesByExt(tokenDir, ['.png', '.jpg', '.webp'])
     }
@@ -1134,22 +1134,22 @@ export function readInboxImages(): InboxImage[] {
 
 const TOKEN_ELIGIBLE_TYPES = new Set(['portrait', 'body'])
 const DEFAULT_MOLDURA = 'knowledge-base/00-Inbox/tokens/Molduras/moldura_default.png'
-const TOKEN_CONFIG_PATH = path.join(PROJECT_ROOT, '.system', 'state', 'token-config.json')
+const TOKEN_CONFIG_PATH = path.join(PROJECT_ROOT, 'system', 'state', 'token-config.json')
 
 export function readVisionState(): Record<string, Record<string, unknown>> {
-  const visionPath = path.join(PROJECT_ROOT, '.agents', 'vision', 'state', 'processed-images.json')
+  const visionPath = path.join(PROJECT_ROOT, 'agents', 'vision', 'state', 'processed-images.json')
   const raw = readJson<{ images: Record<string, Record<string, unknown>>; pathIndex: Record<string, string> }>(visionPath)
   return raw?.images ?? {}
 }
 
 export function readVisionPathIndex(): Record<string, string> {
-  const visionPath = path.join(PROJECT_ROOT, '.agents', 'vision', 'state', 'processed-images.json')
+  const visionPath = path.join(PROJECT_ROOT, 'agents', 'vision', 'state', 'processed-images.json')
   const raw = readJson<{ images: Record<string, unknown>; pathIndex: Record<string, string> }>(visionPath)
   return raw?.pathIndex ?? {}
 }
 
 export function readGeneratedTokens(): Record<string, { sourcePath: string; tokenPath: string; generatedAt: string }> {
-  const genPath = path.join(PROJECT_ROOT, '.agents', 'token', 'state', 'generated-tokens.json')
+  const genPath = path.join(PROJECT_ROOT, 'agents', 'token', 'state', 'generated-tokens.json')
   return readJson<Record<string, { sourcePath: string; tokenPath: string; generatedAt: string }>>(genPath) ?? {}
 }
 
