@@ -3,18 +3,20 @@
 Maintenance agent — no LLM, no vault content changes.
 
 Actions (per agent-repair.spec.md):
-  ParseErrorPatterns  — scan automation.log (last 24h) for fixable error patterns
-  RemoveStaleLock     — delete runner.lock if age > 30 min
-  CreateMissingDirs   — ensure all required dirs exist
-  ValidateImageRefs   — verify processed-images.json refs by SHA256 identity
-  DetectOverdueAgents — flag agents not run within 2 × intervalSeconds
-  WriteRepairReport   — emit repair-YYYY-MM-DD.json to reports dir
+  ParseErrorPatterns      — scan automation.log (last 24h) for fixable error patterns
+  RemoveStaleLock         — delete runner.lock if age > 30 min
+  CreateMissingDirs       — ensure all required dirs exist
+  EnsureAgentRelationLinks — recreate deleted agents/<name>/<related-path> junctions
+  ValidateImageRefs       — verify processed-images.json refs by SHA256 identity
+  DetectOverdueAgents     — flag agents not run within 2 × intervalSeconds
+  WriteRepairReport       — emit repair-YYYY-MM-DD.json to reports dir
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import socket
 import subprocess
@@ -271,6 +273,80 @@ def _create_missing_dirs(log: Logger) -> int:
 
 
 # ---------------------------------------------------------------------------
+# EnsureAgentRelationLinks — mirrors setup-service.ps1's Ensure-AgentRelationLinks
+# (see docs/specs/agents/agent-relationships.md). Only creates a junction where
+# the path is completely absent (a destroyed link) — never touches a path that
+# already exists, whether that's an intact junction, a user-created directory,
+# or a stray file. Includes "repair" itself so this agent self-heals too.
+# ---------------------------------------------------------------------------
+
+_AGENT_RELATIONS: dict[str, list[str]] = {
+    "adventure-builder": ["knowledge-base/02-Library", "knowledge-base/03-Campaigns", "agents/lore", "agents/canon", "agents/relationship"],
+    "canon":             ["knowledge-base/02-Library"],
+    "classification":    ["knowledge-base/00-Inbox", "knowledge-base/01-Processing", "knowledge-base/02-Library"],
+    "cleanup":           ["agents/runtime", "agents/review", "agents/repair", "agents/canon", "agents/deduplication"],
+    "curator":           ["knowledge-base/01-Processing"],
+    "deduplication":     ["knowledge-base/00-Inbox", "knowledge-base/01-Processing", "knowledge-base/02-Library"],
+    "encounter-builder": ["knowledge-base/02-Library", "knowledge-base/03-Campaigns"],
+    "ingestion":         ["knowledge-base/00-Inbox", "system/state"],
+    "lore":              ["knowledge-base/00-Inbox", "knowledge-base/01-Processing", "knowledge-base/02-Library", "agents/vision", "system/state"],
+    "relationship":      ["knowledge-base/02-Library", "knowledge-base/04-Relationships"],
+    "repair":            ["agents/runtime", "agents/review", "agents/vision", "agents/*", "system"],
+    "review":            ["agents/runtime", "knowledge-base/01-Processing", "agents/*"],
+    "runtime":           ["agents/*", "system"],
+    "search":            ["knowledge-base/01-Processing", "knowledge-base/02-Library"],
+    "session-builder":   ["knowledge-base/03-Campaigns", "agents/adventure-builder"],
+    "token":             ["agents/vision", "knowledge-base/00-Inbox", "knowledge-base/05-Assets"],
+    "vision":            ["knowledge-base/00-Inbox", "knowledge-base/01-Processing", "system/state"],
+    "wiki":              ["knowledge-base/01-Processing", "knowledge-base/02-Library", "system/state"],
+    "wikilink":          ["knowledge-base/02-Library"],
+}
+
+
+def _ensure_agent_relation_links(log: Logger) -> int:
+    created = 0
+    all_agents = sorted(
+        p.name for p in _AGENTS_DIR.iterdir()
+        if p.is_dir() and p.name not in {"tests", "shared"}
+    )
+
+    for agent_name, rels in _AGENT_RELATIONS.items():
+        agent_root = _AGENTS_DIR / agent_name
+        if not agent_root.exists():
+            continue
+
+        for rel in rels:
+            targets = (
+                [f"agents/{a}" for a in all_agents if a != agent_name]
+                if rel == "agents/*" else [rel]
+            )
+            for t in targets:
+                rel_fs      = Path(t.replace("/", os.sep))
+                link_path   = agent_root / rel_fs
+                target_path = _PROJECT_ROOT / rel_fs
+
+                if link_path.exists():
+                    continue  # intact link, real dir, or file — never touch it
+                if not target_path.exists():
+                    continue  # nothing to link to (yet)
+
+                link_path.parent.mkdir(parents=True, exist_ok=True)
+                result = subprocess.run(
+                    ["cmd", "/c", "mklink", "/J", str(link_path), str(target_path)],
+                    capture_output=True, text=True,
+                )
+                if result.returncode == 0:
+                    log.info(f"Recreated missing link: agents/{agent_name}/{t}")
+                    created += 1
+                else:
+                    log.warning(
+                        f"Could not recreate link agents/{agent_name}/{t}: "
+                        f"{result.stderr.strip() or result.stdout.strip()}"
+                    )
+    return created
+
+
+# ---------------------------------------------------------------------------
 # ValidateImageRefs — SHA256 identity check
 # ---------------------------------------------------------------------------
 
@@ -507,6 +583,7 @@ def main() -> None:
     repairs += _run_step(log, "remove_stale_lock", lambda: _remove_stale_lock(log), 0)
     repairs += _run_step(log, "generate_missing_agent_configs", lambda: _generate_missing_agent_configs(log), 0)
     repairs += _run_step(log, "create_missing_dirs", lambda: _create_missing_dirs(log), 0)
+    repairs += _run_step(log, "ensure_agent_relation_links", lambda: _ensure_agent_relation_links(log), 0)
 
     img_repairs, invalid_refs = _run_step(log, "validate_image_refs", lambda: _validate_image_refs(log), (0, []))
     repairs += img_repairs
@@ -557,6 +634,16 @@ TOOLS = SELF_MANAGEMENT_TOOLS + [
     {
         "name": "create_missing_dirs",
         "description": "Create any required agents/ and system/ subdirectories that do not yet exist.",
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "ensure_agent_relation_links",
+        "description": (
+            "Recreate any deleted agents/<name>/<related-path> junctions (per "
+            "docs/specs/agents/agent-relationships.md), including repair's own. "
+            "Only fills in paths that are completely absent — never touches an "
+            "existing link, directory, or file."
+        ),
         "input_schema": {"type": "object", "properties": {}},
     },
     {
@@ -638,6 +725,10 @@ def call_tool(name: str, args: dict, context: dict) -> str:
     if name == "create_missing_dirs":
         n = _create_missing_dirs(log)
         return f"Created {n} missing director(ies)"
+
+    if name == "ensure_agent_relation_links":
+        n = _ensure_agent_relation_links(log)
+        return f"Recreated {n} missing agent relation link(s)"
 
     if name == "generate_missing_agent_configs":
         n = _generate_missing_agent_configs(log)

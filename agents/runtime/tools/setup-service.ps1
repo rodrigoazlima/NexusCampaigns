@@ -226,13 +226,12 @@ function Test-GitRepoHealth([string]$RepoPath) {
     return $ok
 }
 
-# Every agent/test hardcodes "<ProjectRoot>\knowledge-base" as the vault path (see
-# agents\shared\config.py project-root anchor and agents\runtime\tools\runner.py
-# _VAULT_ROOT). Rather than rewire 79 files, link that path to wherever the vault
-# actually lives via a directory junction (no admin rights needed, unlike symlinks).
-function Ensure-VaultLink([string]$LinkPath, [string]$TargetPath) {
+# Generic directory-junction helper (no admin rights needed, unlike symlinks).
+# Creates $LinkPath -> $TargetPath, repoints it if it points elsewhere, and
+# refuses to clobber a real non-empty directory sitting at $LinkPath.
+function Ensure-Junction([string]$LinkPath, [string]$TargetPath) {
     if (-not (Test-Path $TargetPath)) {
-        Log "Vault dir '$TargetPath' does not exist — creating it."
+        Log "Junction target '$TargetPath' does not exist — creating it."
         New-Item -ItemType Directory -Force -Path $TargetPath | Out-Null
     }
     $targetFull = (Resolve-Path -LiteralPath $TargetPath).Path.TrimEnd('\')
@@ -242,25 +241,78 @@ function Ensure-VaultLink([string]$LinkPath, [string]$TargetPath) {
         if ($item.LinkType -eq "Junction") {
             $currentTarget = [string](@($item.Target)[0]).TrimEnd('\')
             if ($currentTarget -ieq $targetFull) {
-                Log "Vault link OK: $LinkPath -> $targetFull"
+                Log "Junction OK: $LinkPath -> $targetFull"
                 return
             }
-            Log "Repointing vault link: $LinkPath -> $targetFull (was $currentTarget)"
+            Log "Repointing junction: $LinkPath -> $targetFull (was $currentTarget)"
             Remove-Item -LiteralPath $LinkPath -Force
         } elseif ($item.PSIsContainer) {
             $hasContent = @(Get-ChildItem -LiteralPath $LinkPath -Force -ErrorAction SilentlyContinue).Count -gt 0
             if ($hasContent) {
-                throw "'$LinkPath' is a real, non-empty directory — refusing to replace it with a link to '$targetFull'. Move its contents into the new -VaultRoot (or vice versa), then re-run."
+                throw "'$LinkPath' is a real, non-empty directory — refusing to replace it with a link to '$targetFull'. Move its contents aside, then re-run."
             }
             Log "Removing empty placeholder directory: $LinkPath"
             Remove-Item -LiteralPath $LinkPath -Force -Recurse
         } else {
-            throw "'$LinkPath' exists and is not a directory — cannot link vault there."
+            throw "'$LinkPath' exists and is not a directory — cannot link there."
         }
     }
 
     New-Item -ItemType Junction -Path $LinkPath -Target $targetFull | Out-Null
-    Log "Vault linked: $LinkPath -> $targetFull"
+    Log "Junction created: $LinkPath -> $targetFull"
+}
+
+# Per-agent path relationships (see docs/specs/agents/agent-relationships.md).
+# "agents/*" expands to every sibling agent dir (excluding itself and tests/shared).
+$script:AgentRelations = @{
+    "adventure-builder" = @("knowledge-base/02-Library", "knowledge-base/03-Campaigns", "agents/lore", "agents/canon", "agents/relationship")
+    "canon"             = @("knowledge-base/02-Library")
+    "classification"    = @("knowledge-base/00-Inbox", "knowledge-base/01-Processing", "knowledge-base/02-Library")
+    "cleanup"           = @("agents/runtime", "agents/review", "agents/repair", "agents/canon", "agents/deduplication")
+    "curator"           = @("knowledge-base/01-Processing")
+    "deduplication"     = @("knowledge-base/00-Inbox", "knowledge-base/01-Processing", "knowledge-base/02-Library")
+    "encounter-builder" = @("knowledge-base/02-Library", "knowledge-base/03-Campaigns")
+    "ingestion"         = @("knowledge-base/00-Inbox", "system/state")
+    "lore"              = @("knowledge-base/00-Inbox", "knowledge-base/01-Processing", "knowledge-base/02-Library", "agents/vision", "system/state")
+    "relationship"      = @("knowledge-base/02-Library", "knowledge-base/04-Relationships")
+    "repair"            = @("agents/runtime", "agents/review", "agents/vision", "agents/*", "system")
+    "review"            = @("agents/runtime", "knowledge-base/01-Processing", "agents/*")
+    "runtime"           = @("agents/*", "system")
+    "search"            = @("knowledge-base/01-Processing", "knowledge-base/02-Library")
+    "session-builder"   = @("knowledge-base/03-Campaigns", "agents/adventure-builder")
+    "token"             = @("agents/vision", "knowledge-base/00-Inbox", "knowledge-base/05-Assets")
+    "vision"            = @("knowledge-base/00-Inbox", "knowledge-base/01-Processing", "system/state")
+    "wiki"              = @("knowledge-base/01-Processing", "knowledge-base/02-Library", "system/state")
+    "wikilink"          = @("knowledge-base/02-Library")
+}
+
+# For each agent, creates agents\<agent-name>\<related-path> -> the real target,
+# so an agent can reach everything it touches by a fixed relative path without
+# hardcoding "..\..\..". "agents/*" entries fan out to every other agent dir.
+function Ensure-AgentRelationLinks([string]$ProjectRoot) {
+    $allAgents = Get-ChildItem "$ProjectRoot\agents" -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -notin @("tests", "shared") } |
+        Select-Object -ExpandProperty Name
+
+    foreach ($agentName in $script:AgentRelations.Keys) {
+        $agentRoot = "$ProjectRoot\agents\$agentName"
+        if (-not (Test-Path $agentRoot)) { continue }
+
+        foreach ($rel in $script:AgentRelations[$agentName]) {
+            $targets = if ($rel -eq "agents/*") {
+                $allAgents | Where-Object { $_ -ne $agentName } | ForEach-Object { "agents/$_" }
+            } else {
+                , $rel
+            }
+            foreach ($t in $targets) {
+                $relFs    = $t -replace '/', '\'
+                $linkPath = Join-Path $agentRoot $relFs
+                $target   = Join-Path $ProjectRoot $relFs
+                New-Item -ItemType Directory -Force -Path (Split-Path $linkPath) | Out-Null
+                Ensure-Junction -LinkPath $linkPath -TargetPath $target
+            }
+        }
+    }
 }
 
 # Vault folder structure per CLAUDE.md. Creates only missing dirs — never
@@ -851,7 +903,7 @@ if (-not (Test-GitRepoHealth $ProjectRoot)) {
 # <ProjectRoot>\knowledge-base (the common case; nothing to redirect).
 if ($VaultRootAbs.TrimEnd('\') -ine $VaultLinkPath.TrimEnd('\')) {
     try {
-        Ensure-VaultLink -LinkPath $VaultLinkPath -TargetPath $VaultRootAbs
+        Ensure-Junction -LinkPath $VaultLinkPath -TargetPath $VaultRootAbs
     } catch {
         Log "$_" "ERROR"
         exit 1
@@ -864,6 +916,14 @@ if ($VaultGitInit) {
 
 Log "Ensuring vault folder structure at $VaultRootAbs ..."
 Ensure-VaultStructure -VaultPath $VaultRootAbs
+
+Log "Linking each agent to its related paths (agents\<name>\<related-path>) ..."
+try {
+    Ensure-AgentRelationLinks -ProjectRoot $ProjectRoot
+} catch {
+    Log "Agent relation link setup failed: $_" "ERROR"
+    exit 1
+}
 
 # Verify runner script exists
 if (-not (Test-Path $RunnerScript)) {

@@ -1,4 +1,56 @@
-# Claude Code — Nexus Campaigns
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Commands
+
+```powershell
+# Install Python deps
+python -m pip install -r requirements.txt
+
+# Run the full test suite (pytest.ini sets testpaths = agents/tests)
+pytest
+pytest agents/tests/test_11_ingestion_agent.py        # single file
+pytest agents/tests/test_11_ingestion_agent.py::test_x -k x  # single test
+pytest -m e2e                                          # end-to-end tests (need network + Pillow)
+
+# Run the scheduler once (dry loop) vs a single task, bypassing due/precondition checks
+python agents/runtime/tools/runner.py --once
+python agents/runtime/tools/runner.py --task ingestion-agent --force
+
+# Start the always-on daemon (what the Windows service wraps)
+powershell -NonInteractive -File agents\runtime\tools\daemon.ps1
+
+# One-command install / status / uninstall / clean reinstall
+pwsh -ExecutionPolicy Bypass -File agents\runtime\tools\setup-service.ps1
+pwsh -File agents\runtime\tools\setup-service.ps1 -Status
+pwsh -File agents\runtime\tools\setup-service.ps1 -Uninstall
+pwsh -File agents\runtime\tools\setup-service.ps1 -CleanInstall
+
+# Dashboard dev server
+cd system\dashboard; npm run dev
+
+# Live log tail
+Get-Content 'agents\runtime\state\logs\automation.log' -Tail 50 -Wait
+```
+
+## Architecture
+
+**Two repos, one working tree.** `knowledge-base/` is an NTFS junction/symlink to a separate vault repo (content, gitignored from this repo's perspective). `agents/` is the Python pipeline; `system/dashboard/` is the Next.js UI. Only `agents/runtime/tools/runner.py` is "static" orchestration code — every other `agents/<name>/` folder is a spec-driven agent, most of which call out to an LLM.
+
+**Runtime dispatch loop** (`agents/runtime/tools/runner.py`):
+1. `_discover_tasks()` globs `agents/*/agent.json`, orders tasks by `execution_order` in `agents/registry.yaml` (fallback: alphabetical).
+2. Each cycle checks `is_due()` (elapsed ≥ `intervalSeconds` since `state/tasks-state.json`) OR a pending signal in `state/signals/` (`SignalConsumer`/`agents/shared/signal_bus.py`), then a cheap precondition function in `_PRECONDITIONS` (e.g. `_inbox_has_new_files`) that skips dispatch — and burns no LLM tokens — when an agent has no pending work.
+3. `_load_agent_dispatch()` reads the task's `agent.json`; if missing/incomplete it falls back to `registry.yaml`'s `default_dispatch` (see `docs/specs/agents/agent-dispatch-settings.md`).
+4. Dispatch type (`cli` / `claude-api` / `claude-code` / `openai-api` / `gemini-api` / `openrouter-api` / `lm-studio` / `codex-cli`) selects a runner from `agents/shared/runners/` via `get_runner()`. A per-task `fallback_dispatch` retries on non-zero exit.
+5. On success, `commit_changes()` stages only the paths in the agent's `AGENT.md` `commit_scope:` block and commits — agents never commit their own changes.
+6. Metrics (`state/agent-metrics.json`), token costs (`state/costs/`), and per-task/master logs (`state/logs/`) are recorded every cycle regardless of outcome.
+
+**Agent contract** (`agents/shared/interfaces.py`, `agents/shared/models.py`): every agent subclasses `BaseAgent` (`bootstrap()` → `run_batch()` → default `execute()` lifecycle logging START/DONE), and each pipeline concern (LLM client, state store, frontmatter I/O, vault guard, quality gate, wikilink resolver, etc.) is an `I*` Protocol/ABC in `interfaces.py` with a concrete implementation under the owning agent's `tools/`. Read the relevant `docs/specs/agents/agent-*.spec.md` before touching an agent — it is the source of truth for that agent's contract, not the code.
+
+**Each agent folder** (`agents/<name>/`) has: `agent.json` (task ids, `intervalSeconds`, dispatch config), `AGENT.md` (purpose, inputs/outputs, `commit_scope:`, restrictions — read before modifying), `prompts/system.md`, `tools/<name>_agent.py`, `state/` (gitignored runtime state, JSON files with atomic tmp-rename writes). Adding a new automation means creating all of these plus a `state/tasks-state.json` entry — see "Adding a New Automation" below.
+
+**Security boundary** (`agents/shared/vault_guard.py`, `IVaultGuard`): agents must call `assert_writable()` / `assert_not_self_approved()` before any frontmatter write. `status: approved` and `reviewed: true` are human-only fields — no agent may set them. `02-Library/` is never written by agents directly; only humans promote drafts there from `01-Processing/`.
 
 ## Vault Purpose
 
