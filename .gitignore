@@ -246,7 +246,7 @@ system/logs/
 system/reports/report-*.json
 
 # Dashboard (Next.js) — un-ignore src/lib/ caught by Python lib/ rule above
-!*/src/lib/
+!**/src/lib/
 **/node_modules/
 **/.next/
 **/.env.local
