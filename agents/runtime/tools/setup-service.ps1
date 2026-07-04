@@ -184,6 +184,48 @@ function Is-Admin {
     )).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
+# Catches the state that bit us before: a leftover .git\index.lock (stale or
+# from a hung daemon fetch/pull) silently blocks every git operation the
+# service and its tooling rely on. Also runs `git fsck` to catch a corrupted
+# repo. Reports but does not exit — caller decides whether to abort.
+function Test-GitRepoHealth([string]$RepoPath) {
+    $gitDir = Join-Path $RepoPath ".git"
+    if (-not (Test-Path $gitDir)) {
+        Log "No .git directory at '$RepoPath' — skipping git health check." "WARN"
+        return $true
+    }
+
+    $ok = $true
+
+    $lockFile = Join-Path $gitDir "index.lock"
+    if (Test-Path $lockFile) {
+        $gitProcs = Get-Process git -ErrorAction SilentlyContinue
+        if ($gitProcs) {
+            Log "Git repo locked: '$lockFile' exists and git process(es) running (PID: $($gitProcs.Id -join ', ')) — a git operation is in progress. Re-run once it finishes." "ERROR"
+            $ok = $false
+        } else {
+            Log "Stale git lock found: '$lockFile' exists but no git process is running — removing." "WARN"
+            Remove-Item $lockFile -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    Push-Location $RepoPath
+    try {
+        $fsck = & git fsck --no-progress 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            Log "Git repo appears broken at '$RepoPath' (git fsck exited $LASTEXITCODE): $fsck" "ERROR"
+            $ok = $false
+        }
+    } catch {
+        Log "Could not run 'git fsck' on '$RepoPath': $_" "ERROR"
+        $ok = $false
+    } finally {
+        Pop-Location
+    }
+
+    return $ok
+}
+
 # Every agent/test hardcodes "<ProjectRoot>\knowledge-base" as the vault path (see
 # agents\shared\config.py project-root anchor and agents\runtime\tools\runner.py
 # _VAULT_ROOT). Rather than rewire 79 files, link that path to wherever the vault
@@ -352,24 +394,6 @@ function Setup-Dashboard {
         Log "Copied system\.env.local -> system\dashboard\.env.local"
     } else {
         Log "system\.env.local not found — run Write-DefaultConfig first." "WARN"
-    }
-
-    # Sanity-check the checkout before spending time on install/build: a repo
-    # cloned with a broken .gitignore negation (or a sparse/shallow checkout)
-    # silently drops src/lib/*.ts, which then fails as 70+ confusing Turbopack
-    # "module not found" errors instead of one clear message. Try to self-heal
-    # by restoring the path from git's index before giving up.
-    $srcLibDir = "$DashboardDir\src\lib"
-    if (-not (Test-Path $srcLibDir) -or -not (Get-ChildItem $srcLibDir -Filter "*.ts" -ErrorAction SilentlyContinue)) {
-        Log "Dashboard source incomplete: $srcLibDir has no .ts files — attempting auto-repair via git checkout." "WARN"
-        if (Test-Path "$ProjectRoot\.git") {
-            & git -C $ProjectRoot checkout -- "system/dashboard/src/lib" 2>&1 | ForEach-Object { Log "  $_" }
-        }
-        if (-not (Test-Path $srcLibDir) -or -not (Get-ChildItem $srcLibDir -Filter "*.ts" -ErrorAction SilentlyContinue)) {
-            Log "Auto-repair failed: $srcLibDir still empty/missing (files not in git index — check .gitignore, or re-clone). Skipping dashboard build." "ERROR"
-            return
-        }
-        Log "Auto-repair succeeded: $srcLibDir restored from git index."
     }
 
     # Install deps + production build
@@ -793,6 +817,11 @@ if (-not (Test-Path $ProjectRoot)) {
     exit 1
 }
 
+if (-not (Test-GitRepoHealth $ProjectRoot)) {
+    Log "Git repo health check failed for '$ProjectRoot' — fix the issue above and re-run." "ERROR"
+    exit 1
+}
+
 # Link the vault into the app repo — skip entirely when it already lives at
 # <ProjectRoot>\knowledge-base (the common case; nothing to redirect).
 if ($VaultRootAbs.TrimEnd('\') -ine $VaultLinkPath.TrimEnd('\')) {
@@ -903,7 +932,7 @@ if ($Method -eq "nssm") {
     & $nssmPath set         $ServiceName AppDirectory   $ProjectRoot                         2>&1 | Out-File $nssmLog -Append -Encoding UTF8
     & $nssmPath set         $ServiceName DisplayName    $DisplayName                         2>&1 | Out-File $nssmLog -Append -Encoding UTF8
     & $nssmPath set         $ServiceName Description    $Description                         2>&1 | Out-File $nssmLog -Append -Encoding UTF8
-    & $nssmPath set         $ServiceName Start          SERVICE_AUTO_START                   2>&1 | Out-File $nssmLog -Append -Encoding UTF8
+    & $nssmPath set         $ServiceName Start          SERVICE_DELAYED_START                2>&1 | Out-File $nssmLog -Append -Encoding UTF8
     & $nssmPath set         $ServiceName AppRestartDelay 30000                               2>&1 | Out-File $nssmLog -Append -Encoding UTF8
     & $nssmPath set         $ServiceName AppStdout      "$LogDir\service-stdout.log"         2>&1 | Out-File $nssmLog -Append -Encoding UTF8
     & $nssmPath set         $ServiceName AppStderr      "$LogDir\service-stderr.log"         2>&1 | Out-File $nssmLog -Append -Encoding UTF8
