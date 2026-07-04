@@ -37,9 +37,9 @@ def test_api_agents_lists_every_registry_agent():
     agents = resp.json()
     assert isinstance(agents, list) and agents, "expected non-empty agent list"
 
-    got_ids = {a["id"] for a in agents}
-    expected_ids = set(_registry_agents().keys())
-    missing = expected_ids - got_ids
+    got_names = {a["name"] for a in agents}
+    expected_names = set(_registry_agents().keys())
+    missing = expected_names - got_names
     assert not missing, f"agents missing from /api/agents: {sorted(missing)}"
 
 
@@ -47,7 +47,7 @@ def test_active_agents_report_a_status():
     """Every registry agent with status:active surfaces a real (non-planned) status."""
     resp = requests.get(f"{_DASHBOARD_BASE}/api/agents", timeout=10)
     assert resp.status_code == 200
-    agents = {a["id"]: a for a in resp.json()}
+    agents = {a["name"]: a for a in resp.json()}
 
     for key, reg_agent in _registry_agents().items():
         if reg_agent.get("status") != "active":

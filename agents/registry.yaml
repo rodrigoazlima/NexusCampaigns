@@ -23,6 +23,16 @@ llm_endpoints:
     type: text
     provider: local-router
 
+# Fallback dispatch used by runner.py when an agent has no agent.json (or no
+# entry for the requested task_id). Lets an agent run off its registry.yaml
+# `tools:` entry alone. See docs/specs/agents/agent-dispatch-settings.md.
+default_dispatch:
+  type: lm-studio
+  base_url: "http://localhost:1234/v1"
+  model: "qwen/qwen3.5-9b"
+  timeout_seconds: 1800
+  system_file: "prompts/system.md"
+
 execution_order:
   - runtime
   - repair

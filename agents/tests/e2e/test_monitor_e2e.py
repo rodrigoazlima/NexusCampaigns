@@ -249,10 +249,16 @@ def test_stage3_vision():
     assert "status: draft" in content, "Draft missing 'status: draft'"
     assert "reviewed: false" in content, "Draft missing 'reviewed: false'"
 
-    # Queue updated
-    queue = _read_json(_QUEUE_FILE)
-    assert queue[key]["agents"].get("vision") == "done", (
-        f"vision slot not marked done: {queue[key]['agents']}"
+    # Queue updated — vision renames the file to its canonical slug and
+    # rekeys the queue entry to match (see classify_images.py step 10), so
+    # re-resolve the marker-matched key rather than reusing the pre-rename one.
+    queue     = _read_json(_QUEUE_FILE)
+    final_key = _queue_key()
+    assert final_key is not None and final_key in queue, (
+        f"no queue entry for {MARKER} found after vision rename (was {key!r})"
+    )
+    assert queue[final_key]["agents"].get("vision") == "done", (
+        f"vision slot not marked done: {queue[final_key]['agents']}"
     )
 
 

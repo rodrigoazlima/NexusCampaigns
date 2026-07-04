@@ -1,12 +1,16 @@
 """
 E2E test: upload an image through the dashboard's upload-image API and confirm
-it lands in 00-Inbox/ and the ingestion pipeline (running daemon/runner)
-picks it up into inbox-queue.json within a timeout.
+the ingestion agent picks it up into inbox-queue.json.
+
+ingestion-agent's registry interval is 3600s, so a passively-polling daemon
+won't re-run it inside any reasonable test window. Force-dispatch it via
+runner.py (same convention as test_pipeline_e2e.py / test_monitor_e2e.py)
+rather than waiting on the background schedule.
 
 Requires:
-  - Dashboard dev server running (system/dashboard, `npm run dev`, port 48080)
-  - A runner/daemon polling ingestion-agent on its normal interval (this test
-    does not dispatch the agent itself — it waits for whatever is running)
+  - Dashboard server running (system/dashboard, port 48080)
+  - ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN set (runner dispatches agents
+    via claude-api tool-use even for LLM-less agents like ingestion)
 
 Run:
   pytest agents/tests/e2e/test_dashboard_upload_e2e.py -v -m e2e
@@ -17,8 +21,10 @@ Keep the uploaded file after test:
 from __future__ import annotations
 
 import io
+import json
 import os
-import time
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -28,13 +34,13 @@ pytestmark = pytest.mark.e2e
 
 _AGENTS_DIR   = Path(__file__).resolve().parents[2]
 _PROJECT_ROOT = _AGENTS_DIR.parent
+_RUNNER_PY    = _AGENTS_DIR / "runtime" / "tools" / "runner.py"
 _VAULT_ROOT   = _PROJECT_ROOT / "knowledge-base"
 _INBOX_DIR    = _VAULT_ROOT / "00-Inbox" / "images" / "e2e-upload"
+_QUEUE_FILE   = _PROJECT_ROOT / "system" / "state" / "inbox-queue.json"
 
 _DASHBOARD_BASE = "http://localhost:48080"
 IMAGE_NAME      = "e2e-upload-test.png"
-POLL_TIMEOUT_S  = 120
-POLL_INTERVAL_S = 3
 
 # 1x1 PNG — smallest valid image, no network download needed.
 _PNG_BYTES = bytes.fromhex(
@@ -57,7 +63,7 @@ def _cleanup():
         pass
 
 
-def test_upload_image_and_wait_for_inbox_queue():
+def test_upload_image_and_ingest_into_queue():
     target_path = f"knowledge-base/00-Inbox/images/e2e-upload/{IMAGE_NAME}"
 
     resp = requests.post(
@@ -74,17 +80,23 @@ def test_upload_image_and_wait_for_inbox_queue():
     img_path = _PROJECT_ROOT / target_path
     assert img_path.exists(), "uploaded file not written to disk"
 
-    deadline = time.monotonic() + POLL_TIMEOUT_S
-    found = False
-    while time.monotonic() < deadline:
-        q = requests.get(f"{_DASHBOARD_BASE}/api/queue", timeout=10).json()
-        items = {item["path"]: item for item in q.get("items", [])}
-        if target_path in items:
-            found = True
-            break
-        time.sleep(POLL_INTERVAL_S)
-
-    assert found, (
-        f"{target_path!r} did not appear in inbox-queue.json within {POLL_TIMEOUT_S}s "
-        "— is the ingestion agent's daemon/runner running?"
+    result = subprocess.run(
+        [sys.executable, str(_RUNNER_PY), "--task", "ingestion-agent", "--once", "--force"],
+        cwd=str(_PROJECT_ROOT),
+        capture_output=True, text=True, timeout=60,
+        encoding="utf-8", errors="replace",
     )
+    assert result.returncode == 0, (
+        f"ingestion-agent dispatch failed (exit {result.returncode})\n{result.stdout[-2000:]}"
+    )
+
+    assert _QUEUE_FILE.exists(), "inbox-queue.json not created"
+    queue = json.loads(_QUEUE_FILE.read_text(encoding="utf-8"))
+    assert target_path in queue, (
+        f"{target_path!r} not registered in inbox-queue.json after ingestion-agent ran"
+    )
+    assert queue[target_path]["agents"]["vision"] == "pending"
+
+    q = requests.get(f"{_DASHBOARD_BASE}/api/queue", timeout=10).json()
+    items = {item["path"]: item for item in q.get("items", [])}
+    assert target_path in items, f"{target_path!r} not visible via /api/queue"

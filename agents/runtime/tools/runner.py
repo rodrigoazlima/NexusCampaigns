@@ -40,7 +40,8 @@ from shared import (  # noqa: E402
     get_runner,
     TASKS_STATE_DEFAULT,
 )
-from shared.models import RunResult  # noqa: E402
+from shared.loaders import load_registry  # noqa: E402
+from shared.models import LmStudioConfig, RunResult  # noqa: E402
 from shared.signal_bus import SignalConsumer  # noqa: E402
 
 # ---------------------------------------------------------------------------
@@ -391,27 +392,75 @@ def _agent_name_from_task_id(task_id: str) -> str:
 
 
 def _load_agent_dispatch(task_id: str, log: _Logger) -> Optional[AgentDispatchConfig]:
-    """Load and return the AgentDispatchConfig for task_id from agent.json."""
+    """Load and return the AgentDispatchConfig for task_id from agent.json.
+
+    Falls back to registry.yaml's `default_dispatch` (paired with the
+    agent's registered `tools:` entry) when agent.json is missing or has no
+    entry for this task_id — lets an agent run off its registry.yaml
+    declaration alone. See docs/specs/agents/agent-dispatch-settings.md.
+    """
     agent_name = _agent_name_from_task_id(task_id)
     agent_json = _AGENTS_DIR / agent_name / "agent.json"
 
-    if not agent_json.exists():
-        log.error(f"agent.json not found: {agent_json} — skipping {task_id}")
-        return None
+    if agent_json.exists():
+        try:
+            raw = json.loads(agent_json.read_text(encoding="utf-8"))
+            folder_cfg = AgentFolderConfig.model_validate(raw)
+        except Exception as exc:
+            log.error(f"Failed to parse {agent_json}: {exc} — skipping {task_id}")
+            return None
 
+        entry: Optional[TaskDispatchEntry] = folder_cfg.tasks.get(task_id)
+        if entry is not None:
+            return entry.dispatch
+        log.warning(f"Task ID {task_id!r} not found in {agent_json} — trying registry default_dispatch")
+    else:
+        log.warning(f"agent.json not found: {agent_json} — trying registry default_dispatch")
+
+    return _build_default_dispatch(agent_name, task_id, log)
+
+
+def _build_default_dispatch(agent_name: str, task_id: str, log: _Logger) -> Optional[AgentDispatchConfig]:
+    """Build a fallback AgentDispatchConfig from registry.yaml's default_dispatch
+    + the agent's `tools:` entry. Returns None if either is unavailable."""
     try:
-        raw = json.loads(agent_json.read_text(encoding="utf-8"))
-        folder_cfg = AgentFolderConfig.model_validate(raw)
+        registry = load_registry(_PROJECT_ROOT)
     except Exception as exc:
-        log.error(f"Failed to parse {agent_json}: {exc} — skipping {task_id}")
+        log.error(f"Could not load registry.yaml for default_dispatch fallback: {exc} — skipping {task_id}")
         return None
 
-    entry: Optional[TaskDispatchEntry] = folder_cfg.tasks.get(task_id)
-    if entry is None:
-        log.error(f"Task ID {task_id!r} not found in {agent_json} — skipping")
+    default_cfg = registry.default_dispatch
+    reg_agent   = registry.agents.get(agent_name)
+    if default_cfg is None or reg_agent is None or not reg_agent.tools:
+        log.error(
+            f"No agent.json and no usable registry default for {task_id!r} "
+            f"(agent={agent_name!r}) — skipping"
+        )
         return None
 
-    return entry.dispatch
+    tool_path    = reg_agent.tools[0]                       # e.g. "tools/ingestion_agent.py"
+    tool_stem    = Path(tool_path).stem                     # "ingestion_agent"
+    tools_module = f"{agent_name}.tools.{tool_stem}"
+
+    log.warning(
+        f"Using registry default_dispatch for {task_id!r}: "
+        f"type={default_cfg.type} model={default_cfg.model} tools_module={tools_module}"
+    )
+
+    if default_cfg.type != "lm-studio":
+        log.error(f"default_dispatch type {default_cfg.type!r} not supported by fallback builder — skipping {task_id}")
+        return None
+
+    return AgentDispatchConfig(
+        type=default_cfg.type,
+        lm_studio=LmStudioConfig(
+            base_url=default_cfg.base_url,
+            model=default_cfg.model,
+            timeout_seconds=default_cfg.timeout_seconds,
+            system_file=default_cfg.system_file,
+            tools_module=tools_module,
+        ),
+    )
 
 
 def _read_agent_commit_scope(task_id: str) -> list[str]:

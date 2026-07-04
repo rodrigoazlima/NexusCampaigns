@@ -27,6 +27,7 @@ Tools module must expose:
 
 Retry policy (spec: agent-dispatch.spec.md):
   - API 5xx: retry up to 3× with 3s backoff
+  - API 429 (rate limit): retry up to 3×, honoring Retry-After header if present
   - API 401/403: no retry, exit_code=1
   - Timeout: no retry, exit_code=1
 """
@@ -165,6 +166,11 @@ class ClaudeRunner:
                     duration_ms=_ms(t0),
                     model=model_id,
                 )
+            except anthropic.RateLimitError as exc:
+                last_error = f"Claude API rate limit (attempt {attempt + 1}): {exc}"
+                if attempt < _MAX_RETRIES - 1:
+                    time.sleep(_retry_after(exc))
+                continue
             except anthropic.InternalServerError as exc:
                 last_error = f"Claude API 5xx error (attempt {attempt + 1}): {exc}"
             except Exception as exc:
@@ -290,7 +296,7 @@ class ClaudeRunner:
                 resp = _create_with_retry(client, create_kwargs)
                 if resp is None:
                     exit_code  = 1
-                    last_error = "Claude API 5xx — max retries exhausted mid-loop"
+                    last_error = "Claude API 5xx or rate-limit — max retries exhausted mid-loop"
                     break
 
                 if hasattr(resp, "usage") and resp.usage:
@@ -371,6 +377,10 @@ def _create_with_retry(client: Any, kwargs: dict) -> Any:
         except (anthropic.AuthenticationError, anthropic.PermissionDeniedError,
                 anthropic.APITimeoutError):
             raise  # propagate non-retryable errors immediately
+        except anthropic.RateLimitError as exc:
+            if attempt < _MAX_RETRIES - 1:
+                time.sleep(_retry_after(exc))
+            continue
         except anthropic.InternalServerError:
             pass  # 5xx — retry
         except Exception:
@@ -380,6 +390,18 @@ def _create_with_retry(client: Any, kwargs: dict) -> Any:
             time.sleep(_RETRY_DELAY_S)
 
     return None
+
+
+def _retry_after(exc: Any, default: float = _RETRY_DELAY_S) -> float:
+    """Seconds to wait before retrying a RateLimitError — honors Retry-After header."""
+    response = getattr(exc, "response", None)
+    header = response.headers.get("retry-after") if response is not None else None
+    if header:
+        try:
+            return max(float(header), default)
+        except ValueError:
+            pass
+    return default
 
 
 def _load_file(agent_dir: Path, filename: str | None, context: dict) -> str:

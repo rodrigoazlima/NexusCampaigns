@@ -425,6 +425,9 @@ class LmStudioConfig(BaseModel):
     timeout_seconds: int                  = 1800
     system_file:     Optional[str]        = None
     prompt_file:     Optional[str]        = None
+    tools_module:    Optional[str]        = None   # dotted import path — enables agentic tool-call loop
+    history_file:    Optional[str]        = None   # relative to agent state/ dir
+    max_tool_rounds: int                  = 20
 
 
 class CodexCliConfig(BaseModel):
@@ -745,6 +748,16 @@ class SharedStateFileSpec(BaseModel):
     updaters: list[str] = Field(default_factory=list)
 
 
+class DefaultDispatchConfig(BaseModel):
+    """registry.yaml `default_dispatch` — fallback used when an agent has no
+    agent.json (or no entry for the requested task_id)."""
+    type:            str            = "lm-studio"
+    base_url:        str            = "http://localhost:1234/v1"
+    model:           str            = ""
+    timeout_seconds: int            = 1800
+    system_file:     Optional[str]  = "prompts/system.md"
+
+
 class RegistryConfig(BaseModel):
     """Full parsed representation of agents/registry.yaml."""
     version:            int                              = 1
@@ -755,6 +768,7 @@ class RegistryConfig(BaseModel):
     execution_order:    list[str]                        = Field(default_factory=list)
     shared_state_files: dict[str, SharedStateFileSpec]   = Field(default_factory=dict)
     agents:             dict[str, AgentRegistryEntry]    = Field(default_factory=dict)
+    default_dispatch:   Optional[DefaultDispatchConfig]  = None
 
     def active_agents(self) -> dict[str, AgentRegistryEntry]:
         """Return only agents with status='active'."""
