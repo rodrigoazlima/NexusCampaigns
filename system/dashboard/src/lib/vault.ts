@@ -332,6 +332,40 @@ export function readAgents(): AgentInfo[] {
     })
   }
 
+  // Folders under agents/ that registry.yaml hasn't caught up with yet still
+  // show up here (as planned, zero-metrics) so a new agent dir is never
+  // silently missing from the dashboard.
+  const knownKeys = new Set(Object.keys(agentEntries))
+  let dirEntries: string[] = []
+  try {
+    dirEntries = fs.readdirSync(AGENTS_DIR, { withFileTypes: true })
+      .filter((d) => d.isDirectory() && !['tests', 'shared'].includes(d.name))
+      .map((d) => d.name)
+  } catch {
+    // ignore
+  }
+
+  for (const key of dirEntries) {
+    if (knownKeys.has(key)) continue
+    agents.push({
+      id: `${key}-agent`,
+      name: key,
+      status: 'planned',
+      description: '',
+      intervalSeconds: 3600,
+      llm: 'none',
+      intelligence: 'none',
+      fallbackIntelligence: null,
+      lastRun: null,
+      nextRun: null,
+      totalRuns: 0,
+      totalProcessed: 0,
+      totalFailed: 0,
+      avgDurationMs: 0,
+      recentRuns: [],
+    })
+  }
+
   return agents
 }
 
