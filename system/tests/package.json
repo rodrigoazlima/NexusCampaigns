@@ -4,7 +4,9 @@
   "private": true,
   "description": "Playwright governance tests for the agent runtime (repo invariants, not browser E2E).",
   "scripts": {
-    "test": "playwright test"
+    "test": "playwright test",
+    "test:unit": "playwright test unit",
+    "test:e2e": "playwright test e2e"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0"

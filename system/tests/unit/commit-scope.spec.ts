@@ -15,7 +15,7 @@ import { join } from 'path';
  * the commit entirely.
  */
 
-const AGENTS_DIR = join(__dirname, '..', '..', 'agents');
+const AGENTS_DIR = join(__dirname, '..', '..', '..', 'agents');
 const ALLOWED_PREFIX = 'knowledge-base/';
 
 // Ported verbatim from runner.py — keep in sync if the runner regex changes.
