@@ -4,6 +4,7 @@ import { readQueue, readAgents } from '@/lib/vault'
 import PageHeader from '@/components/widgets/PageHeader'
 import AutoRefresh from '@/components/AutoRefresh'
 import QueuePipeline from '@/components/queue/QueuePipeline'
+import QueueThumb from '@/components/queue/QueueThumb'
 import { Inbox } from 'lucide-react'
 import { formatRelative } from '@/lib/utils'
 import type { QueueItem, QueueAgentStat } from '@/lib/types'
@@ -93,6 +94,7 @@ export default async function QueuePage() {
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-surface-3 text-zinc-500">
+                  <th className="px-4 py-2 text-left"></th>
                   <th className="px-4 py-2 text-left">File</th>
                   <th className="px-4 py-2 text-left">Type</th>
                   <th className="px-4 py-2 text-left">Ingested</th>
@@ -102,6 +104,7 @@ export default async function QueuePage() {
               <tbody>
                 {stuckItems.map((item) => (
                   <tr key={item.path} className="border-b border-surface-3/50 hover:bg-surface-2">
+                    <td className="px-4 py-2"><QueueThumb path={item.path} /></td>
                     <td className="px-4 py-2 font-mono text-danger">{filename(item.path)}</td>
                     <td className="px-4 py-2 text-zinc-400">{item.type}</td>
                     <td className="px-4 py-2 text-zinc-400">{formatRelative(item.ingestedAt)}</td>
@@ -126,6 +129,7 @@ export default async function QueuePage() {
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-surface-3 text-zinc-500">
+                  <th className="px-4 py-2 text-left"></th>
                   <th className="px-4 py-2 text-left">File</th>
                   <th className="px-4 py-2 text-left">Type</th>
                   <th className="px-4 py-2 text-left">Ingested</th>
@@ -135,6 +139,7 @@ export default async function QueuePage() {
               <tbody>
                 {pendingItems.slice(0, 50).map((item) => (
                   <tr key={item.path} className="border-b border-surface-3/50 hover:bg-surface-2">
+                    <td className="px-4 py-2"><QueueThumb path={item.path} /></td>
                     <td className="px-4 py-2 font-mono text-zinc-300">{filename(item.path)}</td>
                     <td className="px-4 py-2 text-zinc-400">{item.type}</td>
                     <td className="px-4 py-2 text-zinc-400">{formatRelative(item.ingestedAt)}</td>
@@ -161,6 +166,7 @@ export default async function QueuePage() {
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-surface-3 text-zinc-500">
+                  <th className="px-4 py-2 text-left"></th>
                   <th className="px-4 py-2 text-left">File</th>
                   <th className="px-4 py-2 text-left">Type</th>
                   <th className="px-4 py-2 text-left">Ingested</th>
@@ -170,6 +176,7 @@ export default async function QueuePage() {
               <tbody>
                 {doneItems.slice(0, 30).map((item) => (
                   <tr key={item.path} className="border-b border-surface-3/50 hover:bg-surface-2">
+                    <td className="px-4 py-2"><QueueThumb path={item.path} /></td>
                     <td className="px-4 py-2 font-mono text-zinc-400">{filename(item.path)}</td>
                     <td className="px-4 py-2 text-zinc-500">{item.type}</td>
                     <td className="px-4 py-2 text-zinc-500">{formatRelative(item.ingestedAt)}</td>

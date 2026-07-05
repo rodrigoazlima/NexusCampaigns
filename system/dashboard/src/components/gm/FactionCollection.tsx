@@ -205,8 +205,10 @@ export default function FactionCollection({ items }: { items: FactionItem[] }) {
       return (b.updated ?? '').localeCompare(a.updated ?? '') // updated (default)
     })
 
-  const tokenSrc = (i: FactionItem) =>
-    i.tokenPath ? `/api/image?path=${encodeURIComponent(i.tokenPath)}` : null
+  const tokenSrc = (i: FactionItem) => {
+    const path = i.tokenPath || i.source[0]
+    return path ? `/api/image?path=${encodeURIComponent(path)}` : null
+  }
 
   const cardHref = (i: FactionItem) => `/gm/view/${i.uuid || encodeURIComponent(i.id)}`
 

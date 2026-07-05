@@ -338,7 +338,7 @@ def main() -> None:
         out_path = _unique_output(slug)
         try:
             guard.assert_writable(out_path)
-            _enforce_and_write(result, md_path.name, out_path, fio)
+            _enforce_and_write(result, rel_key, out_path, fio)
             log.info(f"Compiled: {md_path.name} → {out_path.name}")
             _mark_wiki_done(rel_key)
             count += 1

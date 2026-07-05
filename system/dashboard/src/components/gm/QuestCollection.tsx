@@ -195,8 +195,10 @@ export default function QuestCollection({ items }: { items: QuestItem[] }) {
       return (b.updated ?? '').localeCompare(a.updated ?? '') // updated (default)
     })
 
-  const tokenSrc = (i: QuestItem) =>
-    i.tokenPath ? `/api/image?path=${encodeURIComponent(i.tokenPath)}` : null
+  const tokenSrc = (i: QuestItem) => {
+    const path = i.tokenPath || i.source[0]
+    return path ? `/api/image?path=${encodeURIComponent(path)}` : null
+  }
 
   const cardHref = (i: QuestItem) => `/gm/view/${i.uuid || encodeURIComponent(i.id)}`
 

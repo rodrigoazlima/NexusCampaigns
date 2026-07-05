@@ -46,21 +46,22 @@ export async function POST(req: NextRequest) {
     let newImagePath: string | null = null
 
     if (sourceFiles.length > 0) {
+      // source[0] is already project-relative (e.g. ".knowledge-base/00-Inbox/RAW/clipart/x.webp"),
+      // not a bare filename under 00-Inbox — renaming must preserve its subfolder.
       const sourceFile = sourceFiles[0]
-      const inboxDir = path.join(VAULT_ROOT, '00-Inbox')
-      const oldImageAbs = path.join(inboxDir, sourceFile)
+      const oldImageAbs = path.join(PROJECT_ROOT, sourceFile)
 
       if (fs.existsSync(oldImageAbs)) {
         const ext = path.extname(sourceFile)
         const newImageFilename = `${cleanSlug}${ext}`
-        const newImageAbs = path.join(inboxDir, newImageFilename)
+        const newImageAbs = path.join(path.dirname(oldImageAbs), newImageFilename)
 
-        if (sourceFile !== newImageFilename) {
+        if (oldImageAbs !== newImageAbs) {
           fs.renameSync(oldImageAbs, newImageAbs)
         }
 
-        const oldRelPath = `.knowledge-base/00-Inbox/${sourceFile}`
-        const newRelPath = `.knowledge-base/00-Inbox/${newImageFilename}`
+        const oldRelPath = sourceFile.replace(/\\/g, '/')
+        const newRelPath = path.relative(PROJECT_ROOT, newImageAbs).replace(/\\/g, '/')
         newImagePath = newRelPath
 
         // Update inbox-queue.json key
@@ -93,7 +94,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Update source field in the renamed .md
-        writeFrontmatter(destPath, { source: [newImageFilename], updated: today })
+        writeFrontmatter(destPath, { source: [newRelPath], updated: today })
       }
     }
 
