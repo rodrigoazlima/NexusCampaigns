@@ -172,8 +172,7 @@ export default function BestiaryCollection({ items }: { items: BestiaryItem[] })
   const tokenSrc = (i: BestiaryItem) =>
     i.tokenPath ? `/api/image?path=${encodeURIComponent(i.tokenPath)}` : null
 
-  const cardHref = (i: BestiaryItem) =>
-    i.origin === 'draft' ? `/gm/view/${i.uuid || encodeURIComponent(i.id)}` : '/library'
+  const cardHref = (i: BestiaryItem) => `/gm/view/${i.uuid || encodeURIComponent(i.id)}`
 
   return (
     <div className="p-4 md:p-6">

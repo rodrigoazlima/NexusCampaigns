@@ -208,8 +208,7 @@ export default function FactionCollection({ items }: { items: FactionItem[] }) {
   const tokenSrc = (i: FactionItem) =>
     i.tokenPath ? `/api/image?path=${encodeURIComponent(i.tokenPath)}` : null
 
-  const cardHref = (i: FactionItem) =>
-    i.origin === 'draft' ? `/gm/view/${i.uuid || encodeURIComponent(i.id)}` : '/library'
+  const cardHref = (i: FactionItem) => `/gm/view/${i.uuid || encodeURIComponent(i.id)}`
 
   return (
     <div className="p-4 md:p-6">

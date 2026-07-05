@@ -13,7 +13,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'filename required' }, { status: 400 })
   }
 
-  const filepath = path.join(VAULT_ROOT, '01-Processing', filename)
+  const draftPath = path.join(VAULT_ROOT, '01-Processing', filename)
+  const libraryPath = path.join(VAULT_ROOT, '02-Library', filename)
+  const filepath = fs.existsSync(draftPath) ? draftPath : libraryPath
 
   if (!fs.existsSync(filepath)) {
     return NextResponse.json({ error: 'File not found' }, { status: 404 })

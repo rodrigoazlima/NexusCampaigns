@@ -1210,14 +1210,18 @@ export function readReviewItemById(id: string): ReviewItem | null {
   // UUID takes priority so stable URLs survive slug/filename renames.
   const drafts = readRawDrafts()
   const match = drafts.find((d) => d.uuid === id) ?? drafts.find((d) => d.id === id)
-  if (!match) return null
+  if (match) {
+    // History = the other drafts that share this draft's source image.
+    const src = match.source[0] ? match.source[0].replace(/\\/g, '/') : null
+    const siblings = src
+      ? drafts.filter((d) => d !== match && d.source[0] && d.source[0].replace(/\\/g, '/') === src)
+      : []
+    return stripRaw(match, siblings.map(toDraftRef))
+  }
 
-  // History = the other drafts that share this draft's source image.
-  const src = match.source[0] ? match.source[0].replace(/\\/g, '/') : null
-  const siblings = src
-    ? drafts.filter((d) => d !== match && d.source[0] && d.source[0].replace(/\\/g, '/') === src)
-    : []
-  return stripRaw(match, siblings.map(toDraftRef))
+  // Not a draft — fall back to canon (02-Library) so gm/view also opens approved entities.
+  const library = readLibraryItems()
+  return library.find((d) => d.uuid === id) ?? library.find((d) => d.id === id) ?? null
 }
 
 export function readItemDetail(id: string): ItemDetail | null {

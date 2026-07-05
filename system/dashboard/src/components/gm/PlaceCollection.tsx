@@ -172,8 +172,7 @@ export default function PlaceCollection({ items }: { items: PlaceItem[] }) {
     return p ? `/api/image?path=${encodeURIComponent(p)}` : null
   }
 
-  const cardHref = (i: PlaceItem) =>
-    i.origin === 'draft' ? `/gm/view/${i.uuid || encodeURIComponent(i.id)}` : '/library'
+  const cardHref = (i: PlaceItem) => `/gm/view/${i.uuid || encodeURIComponent(i.id)}`
 
   return (
     <div className="p-4 md:p-6">
