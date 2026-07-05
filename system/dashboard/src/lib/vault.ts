@@ -1233,6 +1233,7 @@ export function readItemDetail(id: string): ItemDetail | null {
   let imageClassification: ImageClassification | null = null
   let tokenPath: string | null = null
   let tokenEligible = false
+  let tokenUpdatedAt: string | null = null
 
   const sourceFile = item.source[0] ?? null
   if (sourceFile) {
@@ -1260,6 +1261,7 @@ export function readItemDetail(id: string): ItemDetail | null {
     const tokenEntry = Object.values(genTokens).find((t) => t.sourcePath === inboxRelPath)
     if (tokenEntry) {
       tokenPath = tokenEntry.tokenPath
+      tokenUpdatedAt = tokenEntry.generatedAt
     } else {
       // Also check for *-token.png alongside the source
       const srcBase = sourceFile.replace(/\.[^.]+$/, '')
@@ -1268,9 +1270,17 @@ export function readItemDetail(id: string): ItemDetail | null {
         tokenPath = candidateToken
       }
     }
+
+    if (tokenPath && !tokenUpdatedAt) {
+      try {
+        tokenUpdatedAt = String(fs.statSync(path.join(PROJECT_ROOT, tokenPath)).mtimeMs)
+      } catch {
+        // file may not exist yet — leave unset
+      }
+    }
   }
 
-  return { ...item, imageClassification, tokenPath, tokenEligible, activeAgents: agents }
+  return { ...item, imageClassification, tokenPath, tokenUpdatedAt, tokenEligible, activeAgents: agents }
 }
 
 function scanDirForTokens(dir: string, projectRoot: string, results: TokenFile[]): void {

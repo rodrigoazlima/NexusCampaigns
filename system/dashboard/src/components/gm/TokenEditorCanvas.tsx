@@ -317,7 +317,12 @@ export default function TokenEditorCanvas({ item, imageSrc, tokenSrc }: Props) {
       const r = await fetch('/api/gm/token/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageData, filename: item.filename, sourcePath: item.source[0] ?? '' }),
+        body: JSON.stringify({
+          imageData,
+          filename: item.filename,
+          sourcePath: item.source[0] ?? '',
+          existingTokenPath: item.tokenPath,
+        }),
       })
       if (!r.ok) throw new Error(await r.text())
       const data = await r.json() as { ok: boolean; tokenUrl: string }
@@ -330,7 +335,7 @@ export default function TokenEditorCanvas({ item, imageSrc, tokenSrc }: Props) {
     } finally {
       setSaving(false)
     }
-  }, [item.filename, showMsg])
+  }, [item.filename, item.tokenPath, showMsg])
 
   const saveAndReturn = useCallback(async () => {
     const ok = await saveToken()

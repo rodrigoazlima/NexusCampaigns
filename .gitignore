@@ -308,7 +308,6 @@ ehthumbs.db
 # Re-include committed config JSON
 !agents/runtime/state/tasks.json
 !package.json
-!package-lock.json
 !tsconfig.json
 !tsconfig.*.json
 

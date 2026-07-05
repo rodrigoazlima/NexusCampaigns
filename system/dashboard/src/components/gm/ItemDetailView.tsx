@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect, type ReactNode } from 'react'
+import { useState, useCallback, useEffect, useRef, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
@@ -10,7 +10,6 @@ import {
   Pencil, Check, X, Sparkles, ChevronDown, Save
 } from 'lucide-react'
 import type { ItemDetail } from '@/lib/types'
-import QualityBar from '@/components/widgets/QualityBar'
 import QualityPicker from './QualityPicker'
 import ImageModal from './ImageModal'
 import TagEditor from './TagEditor'
@@ -22,6 +21,7 @@ import '@uiw/react-md-editor/markdown-editor.css'
 import '@uiw/react-markdown-preview/markdown.css'
 
 const MDEditor = dynamic(() => import('@uiw/react-md-editor'), { ssr: false })
+const MarkdownPreview = dynamic(() => import('@uiw/react-markdown-preview'), { ssr: false })
 
 // Split a vault md file into its YAML frontmatter block and the body below it.
 // Tolerant of CRLF — vault files are written on Windows.
@@ -136,6 +136,9 @@ export default function ItemDetailView({ item: initial }: Props) {
   const [body, setBody] = useState('')
   const [bodyDirty, setBodyDirty] = useState(false)
   const [savingContent, setSavingContent] = useState(false)
+  const [contentEditMode, setContentEditMode] = useState(false)
+  const [showEditHint, setShowEditHint] = useState(false)
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     fetch(`/api/gm/content?filename=${encodeURIComponent(item.filename)}`)
@@ -155,7 +158,7 @@ export default function ItemDetailView({ item: initial }: Props) {
     : null
 
   const tokenSrc = item.tokenPath
-    ? `/api/image?path=${encodeURIComponent(item.tokenPath)}`
+    ? `/api/image?path=${encodeURIComponent(item.tokenPath)}${item.tokenUpdatedAt ? `&v=${encodeURIComponent(item.tokenUpdatedAt)}` : ''}`
     : null
 
   const showToast = useCallback((message: string, type: 'success' | 'error') => {
@@ -189,12 +192,6 @@ export default function ItemDetailView({ item: initial }: Props) {
   const handleStatusChange = async (newStatus: string) => {
     setItem((i) => ({ ...i, status: newStatus }))
     await saveField({ status: newStatus })
-  }
-
-  const handleQualityChange = async (q: number) => {
-    setItem((i) => ({ ...i, quality: q }))
-    await saveField({ quality: q })
-    showToast(`Quality set to ${q}`, 'success')
   }
 
   const handleTagsChange = async (tags: string[]) => {
@@ -379,6 +376,7 @@ export default function ItemDetailView({ item: initial }: Props) {
       if (!data.ok) throw new Error(data.error ?? 'Save failed')
       setMdContent(newRaw)
       setBodyDirty(false)
+      setContentEditMode(false)
       showToast('Content saved', 'success')
     } catch (err) {
       showToast(String(err), 'error')
@@ -469,15 +467,6 @@ export default function ItemDetailView({ item: initial }: Props) {
 
         <div className="flex-1" />
 
-        {/* quality chip */}
-        {item.quality > 0 && (
-          <Tip label={`Quality ${item.quality}/10`} side="bottom">
-            <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-surface-3 text-zinc-300">
-              Q{item.quality}
-            </span>
-          </Tip>
-        )}
-
         {/* action buttons */}
         <div className="flex items-center gap-1.5 shrink-0">
           <button
@@ -515,13 +504,13 @@ export default function ItemDetailView({ item: initial }: Props) {
       )}
 
       {/* ── Body ── */}
-      <div className="flex-1 p-4 md:p-6 grid grid-cols-1 lg:grid-cols-5 gap-6">
+      <div className="flex-1 p-4 md:p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {/* LEFT: integrated media */}
-        <div className="lg:col-span-3 space-y-4">
+        <div className="space-y-4">
 
           {/* Hero — source image with token integrated */}
-          <div className="relative group rounded-2xl overflow-hidden bg-surface-2 border border-surface-3 flex items-center justify-center" style={{ minHeight: 380 }}>
+          <div className="relative group rounded-2xl overflow-hidden bg-surface-2 border border-surface-3 flex items-center justify-center" style={{ minHeight: 720 }}>
             {imageSrc ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -666,66 +655,91 @@ export default function ItemDetailView({ item: initial }: Props) {
           </div>
         </div>
 
-        {/* RIGHT: metadata rail */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="panel p-4 space-y-4">
-            <div>
-              <label className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 block mb-2">Quality</label>
-              <div className="mb-2"><QualityBar score={item.quality} /></div>
-              <QualityPicker value={item.quality || null} onChange={handleQualityChange} />
+        {/* RIGHT: content editor — narrative body (history, lore, location, gods, …) */}
+        {mdContent !== null && (
+          <div className="space-y-4">
+            <div className="panel p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <FileText size={13} className="text-zinc-500" />
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Content</span>
+                {bodyDirty && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-warning/10 text-warning font-medium">unsaved</span>
+                )}
+                <div className="flex-1" />
+                {contentEditMode && (
+                  <button
+                    onClick={handleSaveContent}
+                    disabled={savingContent || !bodyDirty}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-success/10 text-success border border-success/40 hover:bg-success/20 transition-colors disabled:opacity-40"
+                  >
+                    {savingContent ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                    {savingContent ? 'Saving…' : 'Save Content'}
+                  </button>
+                )}
+              </div>
+              <div
+                className="relative"
+                onMouseEnter={() => {
+                  if (contentEditMode) return
+                  hoverTimerRef.current = setTimeout(() => setShowEditHint(true), 3000)
+                }}
+                onMouseLeave={() => {
+                  if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
+                  setShowEditHint(false)
+                }}
+              >
+                <div data-color-mode="dark">
+                  {contentEditMode ? (
+                    <MDEditor
+                      value={body}
+                      onChange={(v) => { setBody(v ?? ''); setBodyDirty(true) }}
+                      height={720}
+                      visibleDragbar={false}
+                      textareaProps={{ placeholder: 'Add history, name, location, lore, gods, abilities…' }}
+                    />
+                  ) : (
+                    <div
+                      onDoubleClick={() => setContentEditMode(true)}
+                      className="min-h-[720px] px-1 cursor-text"
+                    >
+                      <MarkdownPreview source={body || '*No content yet — double click to edit*'} />
+                    </div>
+                  )}
+                </div>
+                {!contentEditMode && showEditHint && (
+                  <button
+                    onClick={() => setContentEditMode(true)}
+                    className="absolute bottom-3 right-3 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-primary/10 text-primary border border-primary/40 hover:bg-primary/20 shadow-lg transition-colors"
+                  >
+                    <Pencil size={13} /> Edit
+                  </button>
+                )}
+              </div>
             </div>
+          </div>
+        )}
+      </div>
 
-            <div>
-              <label className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 block mb-2">Tags</label>
-              <TagEditor tags={item.tags} onChange={handleTagsChange} />
-            </div>
+      {/* metadata rail — full width */}
+      <div className="px-4 md:px-6 pb-4">
+        <div className="panel p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 block mb-2">Tags</label>
+            <TagEditor tags={item.tags} onChange={handleTagsChange} />
+          </div>
 
-            <div>
-              <label className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 block mb-2">Relationships</label>
-              <RelationshipEditor relationships={item.relationships} onChange={handleRelsChange} />
-            </div>
+          <div>
+            <label className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 block mb-2">Relationships</label>
+            <RelationshipEditor relationships={item.relationships} onChange={handleRelsChange} />
+          </div>
 
-            <div className="text-[10px] text-zinc-600 space-y-0.5 pt-3 border-t border-surface-3">
-              <div>Created: {item.created}</div>
-              <div>Updated: {item.updated}</div>
-              <div className="font-mono truncate" title={item.filename}>{item.filename}</div>
-            </div>
+          <div className="text-[10px] text-zinc-600 space-y-0.5 md:pt-5">
+            <div>Created: {item.created}</div>
+            <div>Updated: {item.updated}</div>
+            <div className="font-mono truncate" title={item.filename}>{item.filename}</div>
           </div>
         </div>
       </div>
-
-      {/* Content editor — narrative body (history, lore, location, gods, …) */}
-      {mdContent !== null && (
-        <div className="px-4 md:px-6 pb-4">
-          <div className="panel p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <FileText size={13} className="text-zinc-500" />
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Content</span>
-              {bodyDirty && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-warning/10 text-warning font-medium">unsaved</span>
-              )}
-              <div className="flex-1" />
-              <button
-                onClick={handleSaveContent}
-                disabled={savingContent || !bodyDirty}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-success/10 text-success border border-success/40 hover:bg-success/20 transition-colors disabled:opacity-40"
-              >
-                {savingContent ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-                {savingContent ? 'Saving…' : 'Save Content'}
-              </button>
-            </div>
-            <div data-color-mode="dark">
-              <MDEditor
-                value={body}
-                onChange={(v) => { setBody(v ?? ''); setBodyDirty(true) }}
-                height={420}
-                visibleDragbar={false}
-                textareaProps={{ placeholder: 'Add history, name, location, lore, gods, abilities…' }}
-              />
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Linked drafts */}
       {item.history.length > 0 && (
@@ -750,7 +764,6 @@ export default function ItemDetailView({ item: initial }: Props) {
                   {h.reviewed && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-semibold uppercase">reviewed</span>
                   )}
-                  {h.quality > 0 && <span className="text-[10px] text-zinc-500 font-mono">q{h.quality}</span>}
                   <ChevronRight size={14} className="text-zinc-600 group-hover:text-primary transition-colors" />
                 </Link>
               ))}

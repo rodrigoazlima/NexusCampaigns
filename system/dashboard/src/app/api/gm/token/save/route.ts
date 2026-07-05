@@ -7,8 +7,8 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json() as { imageData: string; filename: string; sourcePath?: string }
-    const { imageData, filename, sourcePath } = body
+    const body = await req.json() as { imageData: string; filename: string; sourcePath?: string; existingTokenPath?: string | null }
+    const { imageData, filename, sourcePath, existingTokenPath } = body
 
     if (!imageData?.startsWith('data:image/png;base64,')) {
       return NextResponse.json({ error: 'Invalid image data' }, { status: 400 })
@@ -23,13 +23,22 @@ export async function POST(req: NextRequest) {
     }
 
     const genTokens = readGeneratedTokens()
+    const slug = filename.replace(/\.md$/, '')
+
+    // Find this item's existing entry. Prefer matching by the tokenPath the
+    // client already has (vault filename/source-basename slugs don't follow a
+    // consistent convention, e.g. "body-x.md" vs source "x.body.jpg" — string
+    // guessing there is unreliable) and fall back to a slug guess otherwise.
+    const matchedKey = Object.keys(genTokens).find((k) => {
+      const t = genTokens[k]
+      if (existingTokenPath && t.tokenPath === existingTokenPath) return true
+      const srcBase = path.basename(t.sourcePath ?? '').replace(/\.[^.]+$/, '')
+      return srcBase === slug || srcBase.startsWith(`${slug}.`) || t.sourcePath?.endsWith(filename)
+    })
+    const entry = matchedKey ? genTokens[matchedKey] : undefined
 
     // Find existing token path for this item via sourcePath lookup
     let tokenAbsPath: string | null = null
-    const entry = Object.values(genTokens).find(
-      (t) => path.basename(t.sourcePath ?? '').replace(/\.[^.]+$/, '') === filename.replace(/\.[^.]+$/, '') ||
-             t.sourcePath?.endsWith(filename)
-    )
     if (entry?.tokenPath) {
       const candidate = path.isAbsolute(entry.tokenPath)
         ? entry.tokenPath
@@ -39,8 +48,6 @@ export async function POST(req: NextRequest) {
 
     // Fallback: place alongside the source file with -token.png suffix
     if (!tokenAbsPath) {
-      // Try to find the source image next to where the md file implies
-      const slug = filename.replace(/\.md$/, '')
       const outDir = path.join(VAULT_ROOT, '05-Assets', 'tokens')
       fs.mkdirSync(outDir, { recursive: true })
       tokenAbsPath = path.join(outDir, `${slug}.token.png`)
@@ -52,21 +59,13 @@ export async function POST(req: NextRequest) {
 
     const tokenPath = path.relative(PROJECT_ROOT, tokenAbsPath).replace(/\\/g, '/')
 
-    // Update generated-tokens.json entry
+    // Update generated-tokens.json entry — reuse the same matched key so the
+    // index and the file on disk never point at two different tokens.
     const genPath = path.join(PROJECT_ROOT, 'agents', 'token', 'state', 'generated-tokens.json')
     try {
-      const slug = filename.replace(/\.md$/, '')
-      // Find and update existing entry or create one keyed by slug
-      let updated = false
-      for (const [k, v] of Object.entries(genTokens)) {
-        const srcSlug = path.basename(v.sourcePath ?? '').replace(/\.[^.]+$/, '')
-        if (srcSlug === slug || k === `path:${v.sourcePath}`) {
-          genTokens[k] = { ...v, tokenPath, generatedAt: new Date().toISOString() }
-          updated = true
-          break
-        }
-      }
-      if (!updated) {
+      if (matchedKey) {
+        genTokens[matchedKey] = { ...genTokens[matchedKey], tokenPath, generatedAt: new Date().toISOString() }
+      } else {
         genTokens[`manual:${slug}`] = {
           sourcePath: sourcePath ?? '',
           tokenPath,
