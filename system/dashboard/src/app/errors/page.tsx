@@ -4,6 +4,7 @@ import { readLogs, readAllReports, readLatestReport } from '@/lib/vault'
 import PageHeader from '@/components/widgets/PageHeader'
 import AutoRefresh from '@/components/AutoRefresh'
 import ActivityFeed from '@/components/widgets/ActivityFeed'
+import RepairAgentButton from '@/components/widgets/RepairAgentButton'
 import { Zap } from 'lucide-react'
 import type { LogLine } from '@/lib/types'
 
@@ -87,9 +88,12 @@ export default async function ErrorsPage() {
                 <div key={task} className="px-4 py-3">
                   <div className="flex items-center justify-between mb-2">
                     <span className="font-mono text-sm text-danger">[{task}]</span>
-                    <span className="text-xs px-2 py-0.5 rounded bg-danger/10 text-danger font-mono">
-                      {logs.length} error{logs.length !== 1 ? 's' : ''}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs px-2 py-0.5 rounded bg-danger/10 text-danger font-mono">
+                        {logs.length} error{logs.length !== 1 ? 's' : ''}
+                      </span>
+                      <RepairAgentButton agent={task} error={logs[0]?.message ?? ''} />
+                    </div>
                   </div>
                   <div className="space-y-1">
                     {logs.slice(0, 3).map((log, i) => (

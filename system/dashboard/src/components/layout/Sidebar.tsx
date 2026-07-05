@@ -37,6 +37,7 @@ interface NavItem {
   href: string
   label: string
   icon: LucideIcon
+  children?: NavItem[]
 }
 
 interface NavSection {
@@ -81,12 +82,26 @@ const nav: NavSection[] = [
       { href: '/gm/chat', label: 'Agent Chat', icon: MessageSquare },
       { href: '/', label: 'Executive', icon: LayoutDashboard },
       { href: '/pipeline', label: 'Pipeline', icon: GitBranch },
-      { href: '/agents', label: 'Agents', icon: Bot },
-      { href: '/prompt', label: 'Prompts', icon: FileText },
-      { href: '/queue', label: 'Queue', icon: Inbox },
-      { href: '/errors', label: 'Errors', icon: Zap },
       { href: '/review', label: 'Review', icon: Eye },
       { href: '/library', label: 'Library', icon: BookOpen },
+    ],
+  },
+  {
+    group: 'CONFIGURATION',
+    collapsible: true,
+    defaultOpen: false,
+    items: [
+      { href: '/agents', label: 'Agents', icon: Bot },
+      { href: '/queue', label: 'Queue', icon: Inbox },
+      {
+        href: '#monitoring',
+        label: 'Monitoring',
+        icon: Eye,
+        children: [
+          { href: '/errors', label: 'Errors', icon: Zap },
+          { href: '/prompt', label: 'Prompts', icon: FileText },
+        ],
+      },
     ],
   },
 ]
@@ -120,9 +135,49 @@ function NavLink({ item, onNavigate, collapsed }: { item: NavItem; onNavigate?: 
   )
 }
 
+function NavSubGroup({ item, onNavigate }: { item: NavItem; onNavigate?: () => void }) {
+  const pathname = usePathname()
+  const children = item.children ?? []
+  const containsActive = children.some((c) => isActive(c.href, pathname))
+  const [open, setOpen] = useState(containsActive)
+  const Icon = item.icon
+
+  return (
+    <div className="mb-0.5">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center gap-2.5 px-2 py-2.5 md:py-2 rounded-md text-sm text-zinc-400 hover:text-zinc-100 hover:bg-surface-3 transition-colors"
+      >
+        <Icon size={15} className="text-zinc-500" />
+        <span className="flex-1 text-left">{item.label}</span>
+        {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+      </button>
+      {open && (
+        <div className="ml-4 pl-2 border-l border-surface-3/60">
+          {children.map((child) => (
+            <NavLink key={child.href} item={child} onNavigate={onNavigate} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function renderItem(item: NavItem, onNavigate: (() => void) | undefined, collapsed: boolean) {
+  if (item.children && item.children.length > 0) {
+    if (collapsed) {
+      return item.children.map((child) => (
+        <NavLink key={child.href} item={child} onNavigate={onNavigate} collapsed />
+      ))
+    }
+    return <NavSubGroup key={item.href} item={item} onNavigate={onNavigate} />
+  }
+  return <NavLink key={item.href} item={item} onNavigate={onNavigate} collapsed={collapsed} />
+}
+
 function NavGroup({ section, onNavigate, collapsed, first }: { section: NavSection; onNavigate?: () => void; collapsed?: boolean; first?: boolean }) {
   const pathname = usePathname()
-  const containsActive = section.items.some((i) => isActive(i.href, pathname))
+  const containsActive = section.items.some((i) => isActive(i.href, pathname) || (i.children ?? []).some((c) => isActive(c.href, pathname)))
   // Open by default, or whenever the group owns the active route (deep link).
   const [open, setOpen] = useState((section.defaultOpen ?? true) || containsActive)
 
@@ -132,9 +187,7 @@ function NavGroup({ section, onNavigate, collapsed, first }: { section: NavSecti
     return (
       <div className="mb-2">
         {!first && <div className="mx-2 my-2 border-t border-surface-3/60" />}
-        {open && section.items.map((item) => (
-          <NavLink key={item.href} item={item} onNavigate={onNavigate} collapsed />
-        ))}
+        {open && section.items.map((item) => renderItem(item, onNavigate, true))}
       </div>
     )
   }
@@ -147,9 +200,7 @@ function NavGroup({ section, onNavigate, collapsed, first }: { section: NavSecti
             {section.group}
           </div>
         )}
-        {section.items.map((item) => (
-          <NavLink key={item.href} item={item} onNavigate={onNavigate} />
-        ))}
+        {section.items.map((item) => renderItem(item, onNavigate, false))}
       </div>
     )
   }
@@ -164,9 +215,7 @@ function NavGroup({ section, onNavigate, collapsed, first }: { section: NavSecti
         {section.group}
       </button>
       {open &&
-        section.items.map((item) => (
-          <NavLink key={item.href} item={item} onNavigate={onNavigate} />
-        ))}
+        section.items.map((item) => renderItem(item, onNavigate, false))}
     </div>
   )
 }
