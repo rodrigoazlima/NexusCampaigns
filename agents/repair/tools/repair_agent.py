@@ -179,32 +179,32 @@ def _remove_stale_lock(log: Logger) -> int:
 _AGENT_JSON_SPECS: dict[str, list[dict]] = {
     "ingestion": [
         {"task_id": "ingestion-agent", "model": "claude-haiku-4-5-20251001",
-         "tools_module": "ingestion.tools.ingestion_agent", "interval": 3600,
+         "tools_module": "ingestion.tools.ingestion_agent", "interval": 900,
          "description": "Vault ingestion — emoji-strip filenames, convert DOCX, register inbox queue."},
     ],
     "vision": [
         {"task_id": "vision-agent", "model": "claude-sonnet-4-6",
-         "tools_module": "vision.tools.classify_images", "interval": 3600,
+         "tools_module": "vision.tools.classify_images", "interval": 900,
          "description": "Image classification via local vision LLM."},
     ],
     "lore": [
         {"task_id": "lore-agent", "model": "claude-sonnet-4-6",
-         "tools_module": "lore.tools.generate_npcs", "interval": 3600,
+         "tools_module": "lore.tools.generate_npcs", "interval": 900,
          "description": "Generate NPC drafts from classified images."},
     ],
     "token": [
         {"task_id": "token-agent", "model": "claude-haiku-4-5-20251001",
-         "tools_module": "token.tools.generate_tokens", "interval": 3600,
+         "tools_module": "token.tools.generate_tokens", "interval": 900,
          "description": "Generate VTT tokens from classified portrait images."},
     ],
     "classification": [
         {"task_id": "classification-agent", "model": "claude-haiku-4-5-20251001",
-         "tools_module": "classification.tools.enrich_tags", "interval": 3600,
+         "tools_module": "classification.tools.enrich_tags", "interval": 900,
          "description": "Enrich draft tags and infer entity type."},
     ],
     "wiki": [
         {"task_id": "wiki-agent", "model": "claude-sonnet-4-6",
-         "tools_module": "wiki.tools.compile_wiki", "interval": 3600,
+         "tools_module": "wiki.tools.compile_wiki", "interval": 900,
          "description": "Compile enriched drafts into wiki entity pages."},
     ],
     "review": [

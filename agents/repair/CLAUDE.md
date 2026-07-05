@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this agent is
 
-Repair agent — pipeline maintenance, no LLM calls, no vault content changes. Runs every 15 min via the shared `agents/runtime` scheduler, dispatched from `agents/repair/agent.json` (gitignored, machine-local) against the spec in `AGENT.md`.
+Repair agent — pipeline maintenance, no LLM calls, no vault content changes. Runs every 24h via the shared `agents/runtime` scheduler, dispatched from `agents/repair/agent.json` (gitignored, machine-local) against the spec in `AGENT.md`.
 
 Full behavioral contract lives in `AGENT.md` (frontmatter: inputs/outputs/responsibilities/restrictions) and `prompts/system.md` (ordered workflow steps 0–7). Read both before changing `tools/repair_agent.py` — they are the source of truth the LLM dispatcher follows; code must match them.
 
