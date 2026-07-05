@@ -102,7 +102,10 @@ export default function ItemChatPanel({ item, agents }: ItemChatPanelProps) {
       {!collapsed && (
         <>
           {/* Messages */}
-          <div className="p-4 space-y-2 max-h-64 overflow-y-auto">
+          <div
+            className="p-4 space-y-2 overflow-y-auto"
+            style={{ maxHeight: 'calc(100vh - var(--gm-header-height, 48px) - 160px)' }}
+          >
             {messages.length === 0 && (
               <div className="text-xs text-zinc-600 italic">
                 Ask {agentDisplayName(selectedAgent)} about &ldquo;{item.id}&rdquo;…

@@ -1285,7 +1285,16 @@ export function readItemDetail(id: string): ItemDetail | null {
     }
   }
 
-  return { ...item, imageClassification, tokenPath, tokenUpdatedAt, tokenEligible, activeAgents: agents }
+  return {
+    ...item,
+    imageClassification,
+    tokenPath,
+    tokenUpdatedAt,
+    tokenEligible,
+    activeAgents: agents,
+    sourceAbsolute: item.source.map((s) => path.join(PROJECT_ROOT, s)),
+    tokenAbsolute: tokenPath ? path.join(PROJECT_ROOT, tokenPath) : null,
+  }
 }
 
 function scanDirForTokens(dir: string, projectRoot: string, results: TokenFile[]): void {

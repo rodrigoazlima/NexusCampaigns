@@ -7,7 +7,7 @@ import dynamic from 'next/dynamic'
 import {
   ArrowLeft, CheckCircle, Archive, XCircle, Flag,
   Loader2, Maximize2, Upload, RefreshCw, ImagePlus, FileText, ChevronRight,
-  Pencil, Check, X, Sparkles, ChevronDown, Save
+  Pencil, Check, X, Sparkles, ChevronDown, Save, Copy, CalendarDays
 } from 'lucide-react'
 import type { ItemDetail } from '@/lib/types'
 import QualityPicker from './QualityPicker'
@@ -114,6 +114,62 @@ function BadgeSelect({
   )
 }
 
+// Labeled absolute-path row with click-to-copy, and an optional replace-file affordance
+function PathRow({
+  label, path, onReplace, replacing, accept,
+}: {
+  label: string
+  path: string
+  onReplace?: (file: File) => void
+  replacing?: boolean
+  accept?: string
+}) {
+  const [copied, setCopied] = useState(false)
+  const copy = () => {
+    navigator.clipboard.writeText(path).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    })
+  }
+  return (
+    <div className="flex items-center gap-1 w-full px-2 py-1.5 rounded-lg hover:bg-surface-3 transition-colors group">
+      <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-surface-3 text-zinc-500 group-hover:text-zinc-400">
+        {label}
+      </span>
+      <button
+        onClick={copy}
+        title={`${path} — click to copy`}
+        className="font-mono text-[11px] text-zinc-500 truncate flex-1 text-left"
+      >
+        {path}
+      </button>
+      {copied ? (
+        <Check size={12} className="shrink-0 text-success" />
+      ) : (
+        <Copy
+          size={12}
+          onClick={copy}
+          className="shrink-0 text-zinc-700 group-hover:text-zinc-500 cursor-pointer"
+        />
+      )}
+      {onReplace && (
+        <label className="shrink-0" title="Replace this file">
+          <input
+            type="file"
+            accept={accept}
+            className="hidden"
+            disabled={replacing}
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) onReplace(f); e.target.value = '' }}
+          />
+          <span className="inline-flex items-center justify-center w-5 h-5 rounded text-zinc-700 hover:text-primary hover:bg-surface-2 cursor-pointer transition-colors">
+            {replacing ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+          </span>
+        </label>
+      )}
+    </div>
+  )
+}
+
 interface Toast { message: string; type: 'success' | 'error' }
 
 interface Props { item: ItemDetail }
@@ -139,6 +195,20 @@ export default function ItemDetailView({ item: initial }: Props) {
   const [contentEditMode, setContentEditMode] = useState(false)
   const [showEditHint, setShowEditHint] = useState(false)
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const headerRef = useRef<HTMLElement>(null)
+
+  // Header height varies with viewport width (badges/actions wrap onto a second
+  // row on narrow screens) — publish it as a CSS var so the chat panel below can
+  // size its scroll area against the space actually left, not a fixed guess.
+  useEffect(() => {
+    const el = headerRef.current
+    if (!el) return
+    const update = () => document.documentElement.style.setProperty('--gm-header-height', `${el.offsetHeight}px`)
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   useEffect(() => {
     fetch(`/api/gm/content?filename=${encodeURIComponent(item.filename)}`)
@@ -338,6 +408,28 @@ export default function ItemDetailView({ item: initial }: Props) {
     }
   }
 
+  const handleReplaceToken = async (file: File) => {
+    if (!item.tokenPath) return
+    setUploadingImage(true)
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      form.append('targetPath', item.tokenPath)
+      const res = await fetch('/api/gm/upload-image', { method: 'POST', body: form })
+      const data = await res.json()
+      if (data.ok) {
+        showToast('Token file replaced', 'success')
+        setItem((i) => ({ ...i, tokenUpdatedAt: String(Date.now()) }))
+      } else {
+        showToast(data.error ?? 'Upload failed', 'error')
+      }
+    } catch (err) {
+      showToast(String(err), 'error')
+    } finally {
+      setUploadingImage(false)
+    }
+  }
+
   const handleUploadTokenBase = async (file: File) => {
     if (!item.source[0]) return
     setUploadingBase(true)
@@ -391,7 +483,7 @@ export default function ItemDetailView({ item: initial }: Props) {
     <div className="min-h-screen flex flex-col">
       {/* Toast */}
       {toast && (
-        <div className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 rounded-full border shadow-2xl backdrop-blur-sm text-sm font-medium ${
+        <div data-component="ItemDetailView.Toast" className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 rounded-full border shadow-2xl backdrop-blur-sm text-sm font-medium ${
           toast.type === 'success'
             ? 'bg-success/10 border-success/40 text-success'
             : 'bg-danger/10 border-danger/40 text-danger'
@@ -402,7 +494,7 @@ export default function ItemDetailView({ item: initial }: Props) {
       )}
 
       {/* ── Sticky header ── */}
-      <header className="sticky top-0 z-30 bg-surface-1/95 backdrop-blur border-b border-surface-3 px-4 md:px-6 py-2.5 flex items-center gap-2 flex-wrap">
+      <header ref={headerRef} data-component="ItemDetailView.Header" className="sticky top-0 z-30 bg-surface-1/95 backdrop-blur border-b border-surface-3 px-4 md:px-6 py-2.5 flex items-center gap-2 flex-wrap">
         <Link
           href="/gm/review"
           className="flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-300 transition-colors shrink-0"
@@ -468,7 +560,7 @@ export default function ItemDetailView({ item: initial }: Props) {
         <div className="flex-1" />
 
         {/* action buttons */}
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div data-component="ItemDetailView.HeaderActions" className="flex items-center gap-1.5 shrink-0">
           <button
             onClick={handlePromote}
             disabled={loading || (showApproveQuality && approveQuality === null)}
@@ -497,20 +589,20 @@ export default function ItemDetailView({ item: initial }: Props) {
 
       {/* promote quality picker drops below header */}
       {showApproveQuality && (
-        <div className="bg-surface-1 border-b border-surface-3 px-4 md:px-6 py-3 flex items-center gap-3">
+        <div data-component="ItemDetailView.PromoteQualityPicker" className="bg-surface-1 border-b border-surface-3 px-4 md:px-6 py-3 flex items-center gap-3">
           <span className="text-[11px] text-zinc-500 uppercase tracking-wide shrink-0">Quality to promote</span>
           <QualityPicker value={approveQuality} onChange={setApproveQuality} />
         </div>
       )}
 
       {/* ── Body ── */}
-      <div className="flex-1 p-4 md:p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div data-component="ItemDetailView.Body" className="flex-1 p-4 md:p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {/* LEFT: integrated media */}
-        <div className="space-y-4">
+        <div data-component="ItemDetailView.MediaColumn" className="space-y-4">
 
           {/* Hero — source image with token integrated */}
-          <div className="relative group rounded-2xl overflow-hidden bg-surface-2 border border-surface-3 flex items-center justify-center" style={{ minHeight: 720 }}>
+          <div data-component="ItemDetailView.HeroImage" className="relative group rounded-2xl overflow-hidden bg-surface-2 border border-surface-3 flex items-center justify-center" style={{ minHeight: 720 }}>
             {imageSrc ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -604,7 +696,7 @@ export default function ItemDetailView({ item: initial }: Props) {
           </div>
 
           {/* Token toolbar */}
-          <div className="panel p-3 flex items-center gap-2 flex-wrap">
+          <div data-component="ItemDetailView.TokenToolbar" className="panel p-3 flex items-center gap-2 flex-wrap">
             <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 mr-1">Token</span>
             {canToken && (
               <button
@@ -617,12 +709,33 @@ export default function ItemDetailView({ item: initial }: Props) {
               </button>
             )}
             {item.source[0] && (
-              <Link
-                href={`/gm/view/${item.uuid || item.id}/token`}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-surface-3 text-zinc-300 border border-surface-3 hover:border-zinc-600 hover:text-white transition-colors"
-              >
-                <Pencil size={13} /> Edit
-              </Link>
+              <div className="relative group/edit">
+                <Link
+                  href={`/gm/view/${item.uuid || item.id}/token`}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-surface-3 text-zinc-300 border border-surface-3 hover:border-zinc-600 hover:text-white transition-colors"
+                >
+                  <Pencil size={13} /> Edit
+                </Link>
+
+                {/* hover dropdown — soft fade + rise, no layout shift */}
+                <div
+                  className="absolute left-0 top-full mt-2 z-40 w-48 origin-top-left rounded-lg border border-surface-3 bg-surface-2 shadow-2xl p-2
+                             opacity-0 scale-95 translate-y-1 pointer-events-none
+                             group-hover/edit:opacity-100 group-hover/edit:scale-100 group-hover/edit:translate-y-0 group-hover/edit:pointer-events-auto
+                             transition-all duration-200 ease-out"
+                >
+                  {tokenSrc && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={tokenSrc} alt="token preview" className="w-full h-20 object-contain rounded mb-2 bg-surface" />
+                  )}
+                  <Link
+                    href={`/gm/view/${item.uuid || item.id}/token`}
+                    className="flex items-center gap-1.5 px-2 py-1.5 text-xs font-medium rounded-md text-zinc-300 hover:bg-surface-3 hover:text-white transition-colors"
+                  >
+                    <Pencil size={12} /> Open token editor
+                  </Link>
+                </div>
+              </div>
             )}
             {item.source[0] && (
               <label className="inline-flex">
@@ -657,7 +770,7 @@ export default function ItemDetailView({ item: initial }: Props) {
 
         {/* RIGHT: content editor — narrative body (history, lore, location, gods, …) */}
         {mdContent !== null && (
-          <div className="space-y-4">
+          <div data-component="ItemDetailView.ContentColumn" className="space-y-4">
             <div className="panel p-4">
               <div className="flex items-center gap-2 mb-3">
                 <FileText size={13} className="text-zinc-500" />
@@ -678,6 +791,7 @@ export default function ItemDetailView({ item: initial }: Props) {
                 )}
               </div>
               <div
+                data-component="ItemDetailView.ContentEditor"
                 className="relative"
                 onMouseEnter={() => {
                   if (contentEditMode) return
@@ -720,30 +834,9 @@ export default function ItemDetailView({ item: initial }: Props) {
         )}
       </div>
 
-      {/* metadata rail — full width */}
-      <div className="px-4 md:px-6 pb-4">
-        <div className="panel p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 block mb-2">Tags</label>
-            <TagEditor tags={item.tags} onChange={handleTagsChange} />
-          </div>
-
-          <div>
-            <label className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 block mb-2">Relationships</label>
-            <RelationshipEditor relationships={item.relationships} onChange={handleRelsChange} />
-          </div>
-
-          <div className="text-[10px] text-zinc-600 space-y-0.5 md:pt-5">
-            <div>Created: {item.created}</div>
-            <div>Updated: {item.updated}</div>
-            <div className="font-mono truncate" title={item.filename}>{item.filename}</div>
-          </div>
-        </div>
-      </div>
-
       {/* Linked drafts */}
       {item.history.length > 0 && (
-        <div className="px-4 md:px-6 pb-4">
+        <div data-component="ItemDetailView.LinkedDrafts" className="px-4 md:px-6 pb-4">
           <div className="panel p-4">
             <div className="flex items-center gap-2 mb-3">
               <FileText size={13} className="text-zinc-500" />
@@ -773,8 +866,52 @@ export default function ItemDetailView({ item: initial }: Props) {
       )}
 
       {/* Chat panel */}
-      <div className="px-4 md:px-6 pb-6">
+      <div data-component="ItemDetailView.ChatPanel" className="px-4 md:px-6 pb-6">
         <ItemChatPanel item={item} agents={item.activeAgents} />
+      </div>
+
+      {/* metadata rail — full width */}
+      <div data-component="ItemDetailView.MetadataRail" className="px-4 md:px-6 pb-6">
+        <div className="panel p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 block mb-2">Tags</label>
+            <TagEditor tags={item.tags} onChange={handleTagsChange} />
+          </div>
+
+          <div>
+            <label className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 block mb-2">Relationships</label>
+            <RelationshipEditor relationships={item.relationships} onChange={handleRelsChange} />
+          </div>
+        </div>
+
+        <div className="panel p-4 mt-4 grid grid-cols-1 md:grid-cols-[auto_1fr] gap-x-6 gap-y-3">
+          <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
+            <CalendarDays size={13} className="text-zinc-600" />
+            <span>Created <span className="text-zinc-400">{item.created}</span></span>
+            <span className="text-surface-4 mx-1">·</span>
+            <span>Updated <span className="text-zinc-400">{item.updated}</span></span>
+          </div>
+
+          <div className="space-y-0.5">
+            <PathRow label="md" path={item.filepath} />
+            {item.sourceAbsolute.map((p) => (
+              <PathRow
+                key={p} label="src" path={p}
+                accept="image/*,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tiff,.tif,.avif,.heic,.heif,.jfif"
+                onReplace={handleReplaceImage}
+                replacing={uploadingImage}
+              />
+            ))}
+            {item.tokenAbsolute && (
+              <PathRow
+                label="token" path={item.tokenAbsolute}
+                accept="image/*,.png"
+                onReplace={handleReplaceToken}
+                replacing={uploadingImage}
+              />
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Image modal */}
