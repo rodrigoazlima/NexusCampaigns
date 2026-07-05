@@ -714,7 +714,7 @@ def _classify_one(
         img_path,
         prompt or "Classify this RPG image. Return JSON only.",
         system="You are a Pathfinder 2e image classifier. Return ONLY valid JSON.",
-        max_tokens=350,
+        max_tokens=2048,
     )
     clf = VisionClassification.model_validate(raw)
     if is_tk:
@@ -788,8 +788,17 @@ def main() -> None:
             try:
                 clf = _classify_one(img_path, client, prompt, is_tk)
             except LLMOfflineError:
-                log.warning(f"LLM offline while processing {img_path.name} — aborting batch")
-                break
+                # LM Studio can only hold one model loaded at a time; a
+                # concurrent request for another model briefly evicts this
+                # one. One retry after a short wait rides out that swap
+                # instead of aborting the whole batch.
+                log.warning(f"LLM offline while processing {img_path.name} — retrying once")
+                time.sleep(10)
+                try:
+                    clf = _classify_one(img_path, client, prompt, is_tk)
+                except LLMOfflineError:
+                    log.warning(f"LLM still offline for {img_path.name} — aborting batch")
+                    break
             except (LLMResponseError, Exception) as exc:
                 log.error(f"Classification failed for {img_path.name}: {exc}")
                 sha_fail = _sha256(img_path)

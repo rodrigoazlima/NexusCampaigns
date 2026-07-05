@@ -9,6 +9,7 @@
     "test:e2e": "playwright test e2e"
   },
   "devDependencies": {
-    "@playwright/test": "^1.49.0"
+    "@playwright/test": "^1.49.0",
+    "@types/node": "^26.1.0"
   }
 }
