@@ -2,9 +2,9 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import type { ReviewItem } from '@/lib/types'
 import GMActionBar from './GMActionBar'
-import ImageModal from './ImageModal'
 import { ExternalLink } from 'lucide-react'
 
 const TYPE_COLORS: Record<string, string> = {
@@ -26,7 +26,7 @@ interface ReviewCardProps {
 }
 
 export default function ReviewCard({ item, onApprove, onReject, onReprocess }: ReviewCardProps) {
-  const [modalOpen, setModalOpen] = useState(false)
+  const router = useRouter()
   const [chatOpen, setChatOpen] = useState(false)
   const [chatMessages, setChatMessages] = useState<{ role: string; content: string }[]>([])
   const [chatInput, setChatInput] = useState('')
@@ -133,9 +133,9 @@ export default function ReviewCard({ item, onApprove, onReject, onReprocess }: R
         {/* Left: image column — original behind, token in front */}
         <div className="md:w-52 flex-shrink-0 p-3 flex flex-col gap-2 border-b md:border-b-0 md:border-r border-surface-3">
           <button
-            className="relative w-full aspect-square overflow-hidden rounded-xl bg-surface-3 border border-surface-3 hover:border-primary/40 transition-all cursor-zoom-in group"
-            onClick={() => setModalOpen(true)}
-            title="Click to enlarge"
+            className="relative w-full aspect-square overflow-hidden rounded-xl bg-surface-3 border border-surface-3 hover:border-primary/40 transition-all cursor-pointer group"
+            onClick={() => router.push(`/gm/view/${item.uuid || encodeURIComponent(item.id)}`)}
+            title="Click to open item"
           >
             {/* Original image — blurred background */}
             {imageSrc ? (
@@ -372,15 +372,6 @@ export default function ReviewCard({ item, onApprove, onReject, onReprocess }: R
         </div>
       )}
 
-      {/* Image modal — prefer token, fallback to source */}
-      {(tokenSrc || imageSrc) && (
-        <ImageModal
-          src={tokenSrc ?? imageSrc!}
-          alt={item.id}
-          open={modalOpen}
-          onClose={() => setModalOpen(false)}
-        />
-      )}
     </div>
   )
 }
