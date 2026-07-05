@@ -30,6 +30,8 @@ import {
   ChevronRight,
   PanelLeftClose,
   PanelLeftOpen,
+  Archive,
+  Settings,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -43,6 +45,7 @@ interface NavItem {
 interface NavSection {
   group: string
   items: NavItem[]
+  icon?: LucideIcon
   collapsible?: boolean
   defaultOpen?: boolean
 }
@@ -57,10 +60,12 @@ const nav: NavSection[] = [
   },
   {
     group: 'GAME MASTER',
+    icon: Dices,
     collapsible: true,
     defaultOpen: true,
     items: [
       { href: '/gm/campaign', label: 'Campaign', icon: Dices },
+      { href: '/gm/review', label: 'Review', icon: CheckSquare },
       { href: '/gm/npcs', label: 'NPCs', icon: Users },
       { href: '/gm/quests', label: 'Quests', icon: ScrollText },
       { href: '/gm/places', label: 'Places', icon: Map },
@@ -73,11 +78,11 @@ const nav: NavSection[] = [
   },
   {
     group: 'LEGACY',
+    icon: Archive,
     collapsible: true,
     defaultOpen: false,
     items: [
       { href: '/gm', label: 'GM Hub', icon: Dices },
-      { href: '/gm/review', label: 'Review', icon: CheckSquare },
       { href: '/gm/tokens', label: 'Tokens', icon: CircleDot },
       { href: '/gm/chat', label: 'Agent Chat', icon: MessageSquare },
       { href: '/', label: 'Executive', icon: LayoutDashboard },
@@ -88,6 +93,7 @@ const nav: NavSection[] = [
   },
   {
     group: 'CONFIGURATION',
+    icon: Settings,
     collapsible: true,
     defaultOpen: false,
     items: [
@@ -205,14 +211,17 @@ function NavGroup({ section, onNavigate, collapsed, first }: { section: NavSecti
     )
   }
 
+  const Icon = section.icon
+
   return (
     <div className="mb-3">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center gap-1 px-2 mb-1 py-1 text-[10px] font-semibold tracking-widest text-zinc-500 hover:text-zinc-300 uppercase transition-colors"
+        className="w-full flex items-center gap-2.5 px-2 py-2.5 md:py-2 rounded-md text-sm text-zinc-400 hover:text-zinc-100 hover:bg-surface-3 transition-colors mb-0.5"
       >
+        {Icon && <Icon size={15} className="text-zinc-500" />}
+        <span className="flex-1 text-left">{section.group}</span>
         {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-        {section.group}
       </button>
       {open &&
         section.items.map((item) => renderItem(item, onNavigate, false))}
@@ -222,7 +231,7 @@ function NavGroup({ section, onNavigate, collapsed, first }: { section: NavSecti
 
 function NavLinks({ onNavigate, collapsed }: { onNavigate?: () => void; collapsed?: boolean }) {
   return (
-    <nav className="flex-1 px-2 py-4 overflow-y-auto">
+    <nav className="flex-1 px-2 py-4 overflow-y-auto overscroll-contain">
       {nav.map((section, idx) => (
         <NavGroup key={section.group} section={section} onNavigate={onNavigate} collapsed={collapsed} first={idx === 0} />
       ))}
@@ -296,8 +305,8 @@ export default function Sidebar() {
         <BottomBar collapsed={collapsed} onToggle={toggleCollapsed} />
       </aside>
 
-      {/* Mobile top bar — visible below md */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-30 h-14 bg-surface-1 border-b border-surface-3 flex items-center px-3 gap-3">
+      {/* Mobile top bar — visible below md. box-content: h-14 row + notch padding on top */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-30 h-14 box-content pt-[env(safe-area-inset-top)] bg-surface-1 border-b border-surface-3 flex items-center px-3 gap-3">
         <button
           onClick={() => setOpen(true)}
           className="p-2.5 rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-surface-3 transition-colors"
@@ -319,25 +328,28 @@ export default function Sidebar() {
       {/* Mobile drawer */}
       {open && (
         <div className="md:hidden fixed inset-0 z-40" role="dialog" aria-modal="true" aria-label="Navigation">
-          {/* Backdrop */}
+          {/* Backdrop — touch-none: iOS ignores body overflow lock, block scroll gestures here */}
           <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm touch-none overscroll-none animate-fade-in"
             onClick={() => setOpen(false)}
           />
           {/* Drawer */}
-          <aside className="absolute top-0 left-0 bottom-0 w-64 bg-surface-1 border-r border-surface-3 flex flex-col z-50">
+          <aside className="absolute top-0 left-0 bottom-0 w-64 max-w-[85vw] bg-surface-1 border-r border-surface-3 flex flex-col z-50 pt-[env(safe-area-inset-top)] animate-drawer-in">
             <div className="h-14 px-4 border-b border-surface-3 flex items-center justify-between">
               <Logo />
               <button
                 onClick={() => setOpen(false)}
-                className="p-2 rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-surface-3 transition-colors"
+                className="p-2.5 -mr-1 rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-surface-3 transition-colors"
                 aria-label="Close navigation"
               >
-                <X size={18} />
+                <X size={20} />
               </button>
             </div>
             <NavLinks onNavigate={() => setOpen(false)} />
-            <BottomBar collapsed={false} onToggle={() => setOpen(false)} />
+            <div className="flex items-center px-3 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] border-t border-surface-3">
+              <span className="inline-block w-2 h-2 rounded-full bg-success animate-pulse" title="Live · 30s refresh" />
+              <span className="ml-2 text-xs text-zinc-500">Live · 30s refresh</span>
+            </div>
           </aside>
         </div>
       )}

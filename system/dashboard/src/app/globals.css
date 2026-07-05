@@ -18,6 +18,26 @@ body {
   color: var(--foreground);
   font-family: 'IBM Plex Sans', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Mobile drawer motion */
+@keyframes drawer-in {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-drawer-in { animation: drawer-in 0.2s ease-out; }
+.animate-fade-in { animation: fade-in 0.2s ease-out; }
+
+/* iOS Safari auto-zooms into inputs with font-size < 16px */
+@media (max-width: 767px) {
+  input, select, textarea {
+    font-size: 16px;
+  }
 }
 
 /* Scrollbar */
