@@ -1,7 +1,8 @@
 # setup-service.ps1 — Install and start Nexus Campaigns services
 #
-# Installs pip deps, registers and starts the agent pipeline service, and builds,
-# registers, and starts the Next.js dashboard on port 48080. Run once from elevated shell.
+# Installs pip deps, registers and starts the agent pipeline service, and registers
+# and starts the Next.js dashboard (via `next dev` — hot deploy — by default) on
+# port 48080. Run once from elevated shell.
 #
 # Supported methods (auto-detected):
 #   nssm      — NSSM service manager (requires Admin; recommended for production)
@@ -45,6 +46,7 @@ param(
     [string] $Method         = "auto",    # "auto" | "nssm" | "schtasks"
     [int]    $DashboardPort  = 48080,
     [switch] $NoDashboard,
+    [switch] $Release,                # hot deploy (next dev, live reload) is ON by default; pass this for a production `next build`+`next start`
     [switch] $Force,
     [switch] $Uninstall,
     [switch] $Status,
@@ -77,6 +79,8 @@ PARAMETERS
                             schtasks — HKCU Run key; no admin needed, starts at logon
   -DashboardPort <int>    Next.js dashboard port. Default: read from global.json, else 48080
   -NoDashboard            Skip dashboard build and start entirely
+  -Release                Use a production `next build`+`next start` instead of `next dev`.
+                            Hot deploy (`next dev`, live reload on save) is ON by default.
   -Force                  Overwrite existing .env.local config (default: keep existing)
   -RunPreFlight           Run runner --once before installing (~60s pre-flight check)
   -Status                 Check if agent service and dashboard are running, then exit
@@ -518,7 +522,7 @@ function Setup-Dashboard {
         Log "system\.env.local not found — run Write-DefaultConfig first." "WARN"
     }
 
-    # Install deps + production build
+    # Install deps (+ production build only when hot deploy is off)
     Push-Location $DashboardDir
     try {
         $npmLog = "$LogDir\npm-install.log"
@@ -526,16 +530,22 @@ function Setup-Dashboard {
         Log "Installing dashboard dependencies (npm install → $npmLog)..."
         & $npm install 2>&1 | Out-File $npmLog -Encoding UTF8
         if ($LASTEXITCODE -ne 0) { Log "npm install failed — check $npmLog" "ERROR"; return }
-        $buildLog = "$LogDir\npm-build.log"
-        Step-Progress "Building dashboard (npm run build)..." 75
-        Log "Building dashboard (npm run build → $buildLog)..."
-        & $npm run build 2>&1 | Out-File $buildLog -Encoding UTF8
-        if ($LASTEXITCODE -ne 0) { Log "npm run build failed — check $buildLog" "ERROR"; return }
+        if ($Release) {
+            $buildLog = "$LogDir\npm-build.log"
+            Step-Progress "Building dashboard (npm run build)..." 75
+            Log "Building dashboard (npm run build → $buildLog)..."
+            & $npm run build 2>&1 | Out-File $buildLog -Encoding UTF8
+            if ($LASTEXITCODE -ne 0) { Log "npm run build failed — check $buildLog" "ERROR"; return }
+        } else {
+            Log "Hot deploy on — skipping production build, dashboard will run via 'next dev'."
+        }
     } finally {
         Pop-Location
     }
 
-    $nextBin = "$DashboardDir\node_modules\next\dist\bin\next"
+    $nextBin  = "$DashboardDir\node_modules\next\dist\bin\next"
+    $nextArgs = if ($Release) { "start" } else { "dev" }
+    $envExtra = if ($Release) { "NODE_ENV=production PORT=$DashboardPort HOSTNAME=$DashboardHost" } else { "PORT=$DashboardPort HOSTNAME=$DashboardHost" }
 
     if ($Method -eq "nssm") {
         $nssmPath = Find-NSSM
@@ -546,8 +556,8 @@ function Setup-Dashboard {
             & $nssmPath remove $DashboardSvc confirm
         }
         Log "Installing NSSM service '$DashboardSvc' (details: $nssmLog)..."
-        & $nssmPath install $DashboardSvc $nodePath                                                                          2>&1 | Out-File $nssmLog -Append -Encoding UTF8
-        & $nssmPath set     $DashboardSvc AppParameters  "`"$nextBin`" start --port $DashboardPort --hostname $DashboardHost" 2>&1 | Out-File $nssmLog -Append -Encoding UTF8
+        & $nssmPath install $DashboardSvc $nodePath                                                                                2>&1 | Out-File $nssmLog -Append -Encoding UTF8
+        & $nssmPath set     $DashboardSvc AppParameters  "`"$nextBin`" $nextArgs --port $DashboardPort --hostname $DashboardHost" 2>&1 | Out-File $nssmLog -Append -Encoding UTF8
         & $nssmPath set     $DashboardSvc AppDirectory   $DashboardDir                                                       2>&1 | Out-File $nssmLog -Append -Encoding UTF8
         & $nssmPath set     $DashboardSvc DisplayName    "Vault Nexus Dashboard"                                             2>&1 | Out-File $nssmLog -Append -Encoding UTF8
         & $nssmPath set     $DashboardSvc Description    "Nexus Campaigns admin dashboard (Next.js) on port $DashboardPort"  2>&1 | Out-File $nssmLog -Append -Encoding UTF8
@@ -557,7 +567,7 @@ function Setup-Dashboard {
         & $nssmPath set     $DashboardSvc AppStderr      "$LogDir\dashboard-stderr.log"                                      2>&1 | Out-File $nssmLog -Append -Encoding UTF8
         & $nssmPath set     $DashboardSvc AppStdoutCreationDisposition 4                                                     2>&1 | Out-File $nssmLog -Append -Encoding UTF8
         & $nssmPath set     $DashboardSvc AppStderrCreationDisposition 4                                                     2>&1 | Out-File $nssmLog -Append -Encoding UTF8
-        & $nssmPath set     $DashboardSvc AppEnvironmentExtra "NODE_ENV=production PORT=$DashboardPort HOSTNAME=$DashboardHost" 2>&1 | Out-File $nssmLog -Append -Encoding UTF8
+        & $nssmPath set     $DashboardSvc AppEnvironmentExtra $envExtra                                                      2>&1 | Out-File $nssmLog -Append -Encoding UTF8
         Step-Progress "Starting dashboard service..." 90
         Log "Starting dashboard service '$DashboardSvc'..."
         & $nssmPath start $DashboardSvc 2>&1 | Out-File $nssmLog -Append -Encoding UTF8
@@ -565,13 +575,13 @@ function Setup-Dashboard {
     } else {
         # No admin: auto-start at logon via HKCU Run key + start now (detached, hidden).
         $RegPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
-        $cmd     = "`"$nodePath`" `"$nextBin`" start --port $DashboardPort --hostname $DashboardHost"
+        $cmd     = "`"$nodePath`" `"$nextBin`" $nextArgs --port $DashboardPort --hostname $DashboardHost"
         $existing = Get-ItemProperty $RegPath -Name $DashboardRun -ErrorAction SilentlyContinue
         if ($existing) { Remove-ItemProperty $RegPath -Name $DashboardRun -Force }
         Set-ItemProperty $RegPath -Name $DashboardRun -Value $cmd
         Log "Dashboard auto-start registered: HKCU\...\Run\$DashboardRun"
         $proc = Start-Process -FilePath $nodePath `
-            -ArgumentList @($nextBin, "start", "--port", "$DashboardPort", "--hostname", "$DashboardHost") `
+            -ArgumentList @($nextBin, $nextArgs, "--port", "$DashboardPort", "--hostname", "$DashboardHost") `
             -WorkingDirectory $DashboardDir -WindowStyle Hidden -PassThru
         if ($proc) { Log "Dashboard started (PID=$($proc.Id)) -> http://localhost:$DashboardPort" }
         else       { Log "Dashboard Start-Process returned no handle — may have launched detached." "WARN" }
