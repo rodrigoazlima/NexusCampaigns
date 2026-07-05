@@ -36,6 +36,7 @@ from shared import (  # noqa: E402
     to_slug,
 )
 from shared.config import LLMEndpointConfig  # noqa: E402
+from shared.loaders import load_vault_config  # noqa: E402
 from shared.models import Element, Environment, ImageType  # noqa: E402
 
 TASK_ID         = "vision-agent"
@@ -64,12 +65,23 @@ _EXCLUDE_TYPES = frozenset({"token", "battlemap", "scene"})
 
 _FACE_SIMILARITY_THRESHOLD = 0.85  # cosine similarity for face-region match
 
-_LLM_CFG = LLMEndpointConfig(
+# Model selectable via agents/registry.yaml -> llm_endpoints.vision_llm.model
+_FALLBACK_LLM_CFG = LLMEndpointConfig(
     url      = "http://localhost:1234/v1/chat/completions",
     model    = "qwen3-vl-4b-instruct",
     type     = "vision",
     provider = "lmstudio",
 )
+
+
+def _load_llm_cfg() -> LLMEndpointConfig:
+    try:
+        return load_vault_config(_PROJECT_ROOT).llm_endpoints["vision_llm"]
+    except Exception:
+        return _FALLBACK_LLM_CFG
+
+
+_LLM_CFG = _load_llm_cfg()
 
 
 # ---------------------------------------------------------------------------

@@ -38,7 +38,7 @@ python agents\vision\tools\extract_text.py
 pytest agents/tests -k vision
 ```
 
-LM Studio must be running at `http://localhost:1234/v1` with `qwen3-vl-4b-instruct` loaded (note: `agent.json`'s dispatch config lists a different model name — `classify_images.py`'s `_LLM_CFG` is what's actually used when run standalone; the runner's `agent.json` config only applies to `claude-code`/`lm-studio` dispatch of the *agent itself*, not this script's internal LLM calls). If the LLM is offline, the batch aborts silently — no image is marked failed.
+LM Studio must be running at `http://localhost:1234/v1`. Vision model is selected via `agents/registry.yaml` → `llm_endpoints.vision_llm.model` (`classify_images.py` reads it through `shared.loaders.load_vault_config()` at import time, falling back to `qwen3-vl-4b-instruct` if registry.yaml is missing/malformed). `agent.json`'s dispatch config is unrelated — it only governs `claude-code`/`lm-studio` dispatch of the agent process itself, not this script's internal vision LLM calls. If the LLM is offline, the batch aborts silently — no image is marked failed.
 
 ## Architecture within this folder
 
