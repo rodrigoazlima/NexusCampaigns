@@ -33,6 +33,7 @@ from shared import (  # noqa: E402
     AgentDispatchConfig,
     AgentFolderConfig,
     DispatchError,
+    FileLock,
     IOrchestrator,
     TasksState,
     TaskStateEntry,
@@ -56,6 +57,7 @@ _LOGS_DIR      = _RUNTIME_STATE / "logs"
 _MASTER_LOG    = _LOGS_DIR / "automation.log"
 _SIGNALS_DIR   = _RUNTIME_STATE / "signals"
 _COSTS_DIR     = _RUNTIME_STATE / "costs"
+_GIT_COMMIT_LOCK_TARGET = _RUNTIME_STATE / "git-commit"
 
 _LOCK_STALE_SECONDS = 1800   # 30 min
 _DEFAULT_INTERVAL   = 60     # orchestrator poll cadence
@@ -320,6 +322,12 @@ def _load_registry() -> dict:
 def _load_execution_order() -> list[str]:
     """Load execution_order list from registry.yaml. Returns [] on any error."""
     return list(_load_registry().get("execution_order", []))
+
+
+def _load_pipeline_mode() -> str:
+    """Load pipeline_mode ('sync' or 'async') from registry.yaml. Defaults to 'sync'."""
+    mode = _load_registry().get("pipeline_mode", "sync")
+    return mode if mode == "async" else "sync"
 
 
 # task_id used for every tool beyond the first in a multi-tool agent, keyed by
@@ -660,36 +668,40 @@ class Runtime(IOrchestrator):
             )
             return
 
-        # Clear the index first so any stray pre-staged file (leftover from a
-        # prior partial run, manual `git add`, etc.) cannot leak into the auto
-        # commit. After this, the index holds ONLY the scope paths staged below.
-        subprocess.run(
-            ["git", "reset", "-q"],
-            cwd=str(_PROJECT_ROOT),
-            capture_output=True,
-        )
-
-        for path in scope:
+        # `git reset` clobbers the whole index, so in async mode two agents
+        # committing at once could wipe each other's staged scope — serialize
+        # the reset→add→commit critical section regardless of pipeline_mode.
+        with FileLock(_GIT_COMMIT_LOCK_TARGET, timeout=30.0):
+            # Clear the index first so any stray pre-staged file (leftover from a
+            # prior partial run, manual `git add`, etc.) cannot leak into the auto
+            # commit. After this, the index holds ONLY the scope paths staged below.
             subprocess.run(
-                ["git", "add", "--", path],
+                ["git", "reset", "-q"],
                 cwd=str(_PROJECT_ROOT),
                 capture_output=True,
             )
 
-        staged = subprocess.run(
-            ["git", "diff", "--cached", "--quiet"],
-            cwd=str(_PROJECT_ROOT),
-        )
-        if staged.returncode == 0:
-            return
+            for path in scope:
+                subprocess.run(
+                    ["git", "add", "--", path],
+                    cwd=str(_PROJECT_ROOT),
+                    capture_output=True,
+                )
 
-        ts  = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        msg = f"chore(auto): {task_id} run at {ts}"
-        subprocess.run(
-            ["git", "commit", "-m", msg, "--", *scope],
-            cwd=str(_PROJECT_ROOT),
-            check=True,
-        )
+            staged = subprocess.run(
+                ["git", "diff", "--cached", "--quiet"],
+                cwd=str(_PROJECT_ROOT),
+            )
+            if staged.returncode == 0:
+                return
+
+            ts  = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            msg = f"chore(auto): {task_id} run at {ts}"
+            subprocess.run(
+                ["git", "commit", "-m", msg, "--", *scope],
+                cwd=str(_PROJECT_ROOT),
+                check=True,
+            )
         self._log.info(f"Committed scoped changes for {task_id} (paths: {scope})")
 
     # Internals -------------------------------------------------------------
@@ -706,19 +718,67 @@ class Runtime(IOrchestrator):
         self._state = _load_state()
         self._log.info(f"Discovered {len(self._tasks)} tasks from agent.json files")
 
+    def _run_one(self, task_id: str, entry: TaskDispatchEntry, reason: str) -> None:
+        """Dispatch a single task and record its state/metrics/cost/commit.
+
+        Safe to call from multiple threads concurrently (pipeline_mode: async):
+        state-file writes and git commits are each serialized via FileLock.
+        """
+        self._log.info(f"Dispatching {task_id} ({entry.description}) [{reason}]")
+        started_at  = datetime.now(timezone.utc)
+        exit_code, result = self.dispatch(task_id)
+        finished_at = datetime.now(timezone.utc)
+
+        assert self._state is not None
+        self._state[task_id] = TaskStateEntry(lastRun=finished_at)
+        with FileLock(_STATE_JSON, timeout=30.0):
+            _save_state(self._state)
+
+        try:
+            processed, failed = _parse_agent_items(task_id, started_at)
+            _record_metrics(task_id, started_at, finished_at, processed, failed)
+        except Exception as exc:
+            self._log.warning(f"Metrics update failed for {task_id}: {exc}")
+
+        try:
+            _record_cost(
+                task_id,
+                result.model,
+                result.input_tokens,
+                result.output_tokens,
+                started_at,
+            )
+        except Exception as exc:
+            self._log.warning(f"Cost recording failed for {task_id}: {exc}")
+
+        if exit_code == 0:
+            try:
+                self.commit_changes(task_id)
+            except Exception as exc:
+                self._log.warning(f"Git commit failed for {task_id}: {exc}")
+        else:
+            self._log.warning(f"Task {task_id} exited with code {exit_code} — skipping git commit")
+
     def run_cycle(self, task_filter: Optional[str] = None, force: bool = False) -> None:
-        """One scheduling cycle: check all tasks, dispatch due and signal-triggered ones."""
+        """One scheduling cycle: check all tasks, dispatch due and signal-triggered ones.
+
+        pipeline_mode (registry.yaml) controls dispatch order:
+          sync  — one agent at a time, in execution_order (default)
+          async — all due/signalled agents for this cycle run concurrently
+        """
         self.reload()
         _SIGNALS_DIR.mkdir(parents=True, exist_ok=True)
 
         signal_triggered = _check_signals(self._tasks, self._log)
 
+        to_run: list[tuple[str, TaskDispatchEntry, str]] = []
         for task_id, entry in self._tasks:
             if task_filter and task_id != task_filter:
                 continue
 
             if force:
                 self._log.info(f"Force dispatch {task_id} (bypassing due/precondition checks)")
+                reason = "force"
             else:
                 due       = self.is_due(task_id)
                 signalled = task_id in signal_triggered
@@ -731,45 +791,26 @@ class Runtime(IOrchestrator):
                 if not _check_preconditions(task_id, self._log):
                     continue
 
+                reason = "signalled" if signalled and not due else "due"
+
             # Pre-check: if agent.json is missing, skip without updating lastRun
             # (spec: agent.json missing → log error, skip, lastRun not updated)
             if _load_agent_dispatch(task_id, self._log) is None:
                 continue
 
-            reason = "force" if force else ("signalled" if signalled and not due else "due")
-            self._log.info(f"Dispatching {task_id} ({entry.description}) [{reason}]")
-            started_at  = datetime.now(timezone.utc)
-            exit_code, result = self.dispatch(task_id)
-            finished_at = datetime.now(timezone.utc)
+            to_run.append((task_id, entry, reason))
 
-            assert self._state is not None
-            self._state[task_id] = TaskStateEntry(lastRun=finished_at)
-            _save_state(self._state)
-
-            try:
-                processed, failed = _parse_agent_items(task_id, started_at)
-                _record_metrics(task_id, started_at, finished_at, processed, failed)
-            except Exception as exc:
-                self._log.warning(f"Metrics update failed for {task_id}: {exc}")
-
-            try:
-                _record_cost(
-                    task_id,
-                    result.model,
-                    result.input_tokens,
-                    result.output_tokens,
-                    started_at,
-                )
-            except Exception as exc:
-                self._log.warning(f"Cost recording failed for {task_id}: {exc}")
-
-            if exit_code == 0:
-                try:
-                    self.commit_changes(task_id)
-                except Exception as exc:
-                    self._log.warning(f"Git commit failed for {task_id}: {exc}")
-            else:
-                self._log.warning(f"Task {task_id} exited with code {exit_code} — skipping git commit")
+        pipeline_mode = _load_pipeline_mode()
+        if pipeline_mode == "async" and len(to_run) > 1:
+            self._log.info(f"pipeline_mode=async — dispatching {len(to_run)} task(s) concurrently")
+            from concurrent.futures import ThreadPoolExecutor  # noqa: PLC0415
+            with ThreadPoolExecutor(max_workers=len(to_run)) as pool:
+                futures = [pool.submit(self._run_one, tid, e, r) for tid, e, r in to_run]
+                for fut in futures:
+                    fut.result()
+        else:
+            for task_id, entry, reason in to_run:
+                self._run_one(task_id, entry, reason)
 
         # Consume processed signals AFTER all dispatches in this cycle
         consumer = SignalConsumer(_SIGNALS_DIR)

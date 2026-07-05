@@ -13,7 +13,7 @@ import sys
 import time
 from difflib import SequenceMatcher
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 _TOOLS_DIR    = Path(__file__).resolve().parent
 _AGENTS_DIR   = _TOOLS_DIR.parents[1]
@@ -30,6 +30,7 @@ from shared import (  # noqa: E402
     Logger,
     TagEnrichmentOutput,
     VaultWriteError,
+    locked_update_queue_entry,
 )
 from shared.config import LLMEndpointConfig  # noqa: E402
 
@@ -212,22 +213,23 @@ def _is_queue_done(queue: dict[str, Any], rel: str) -> bool:
     return agents.get("classification") in ("done", "skip")
 
 
+def _mark_classification_done(entry: dict) -> Optional[str]:
+    agents = entry.get("agents")
+    if isinstance(agents, dict) and agents.get("classification") == "pending":
+        agents["classification"] = "done"
+    return None
+
+
 def _mark_queue_done(queue: dict[str, Any], rel: str) -> None:
-    """Mark classification slot done for rel in queue.
+    """Mark classification slot done for rel — locked, fresh, one entry at a time.
 
     rel may be an .md path (01-Processing/) or a direct inbox image path.
     For .md files, also marks the source image's queue entry done via
-    the frontmatter 'source' field.
+    the frontmatter 'source' field. `queue` is only consulted (not mutated)
+    to decide which keys exist — the actual write reloads fresh under lock.
     """
-    changed = False
-
-    # Direct queue entry (inbox image path)
-    entry = queue.get(rel)
-    if entry is not None:
-        agents = entry.get("agents")
-        if isinstance(agents, dict) and agents.get("classification") == "pending":
-            agents["classification"] = "done"
-            changed = True
+    if rel in queue:
+        locked_update_queue_entry(_QUEUE_FILE, rel, _mark_classification_done)
 
     # Indirect: rel is a .md file; trace back to source image via frontmatter
     md_path = _PROJECT_ROOT / rel
@@ -235,20 +237,10 @@ def _mark_queue_done(queue: dict[str, Any], rel: str) -> None:
         try:
             fm, _ = FrontmatterIO().read(md_path)
             for src in fm.get("source") or []:
-                src_entry = queue.get(src)
-                if src_entry is None:
-                    continue
-                src_agents = src_entry.get("agents")
-                if isinstance(src_agents, dict) and src_agents.get("classification") == "pending":
-                    src_agents["classification"] = "done"
-                    changed = True
+                if src in queue:
+                    locked_update_queue_entry(_QUEUE_FILE, src, _mark_classification_done)
         except Exception:
             pass
-
-    if changed:
-        tmp = _QUEUE_FILE.with_suffix(".tmp")
-        tmp.write_text(_json.dumps(queue, indent=2, default=str), encoding="utf-8")
-        tmp.replace(_QUEUE_FILE)
 
 
 # ---------------------------------------------------------------------------

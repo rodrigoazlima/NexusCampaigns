@@ -214,6 +214,7 @@ interface RegistryAgent {
 
 interface Registry {
   agents: Record<string, RegistryAgent>
+  pipeline_mode?: 'sync' | 'async'
 }
 
 const RUNTIME_SERVICE_NAME = 'vault-knowledge-factory'

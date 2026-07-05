@@ -17,7 +17,7 @@ import time
 import uuid as _uuid
 from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 _TOOLS_DIR    = Path(__file__).resolve().parent
 _AGENTS_DIR   = _TOOLS_DIR.parents[1]
@@ -33,6 +33,7 @@ from shared import (  # noqa: E402
     LLMResponseError,
     NPCLLMOutput,
     QualityGate,
+    locked_update_queue_entry,
 )
 from shared.config import LLMEndpointConfig  # noqa: E402
 
@@ -330,13 +331,6 @@ def _load_queue() -> dict[str, Any]:
     return json.loads(_QUEUE_FILE.read_text(encoding="utf-8"))
 
 
-def _save_queue(queue: dict) -> None:
-    _SHARED_STATE.mkdir(parents=True, exist_ok=True)
-    tmp = _QUEUE_FILE.with_suffix(".tmp")
-    tmp.write_text(json.dumps(queue, indent=2, default=str), encoding="utf-8")
-    tmp.replace(_QUEUE_FILE)
-
-
 def _canon_context() -> str:
     lines: list[str] = []
     if not _LIBRARY.is_dir():
@@ -558,8 +552,11 @@ def _run_batch_impl(log: "_Logger") -> tuple[int, int]:
         _save_proc_npcs(proc_npcs)
 
         if img_rel in queue and isinstance(queue[img_rel].get("agents"), dict):
-            queue[img_rel]["agents"]["lore"] = "done"
-            _save_queue(queue)
+            def _mark_lore_done(entry: dict) -> Optional[str]:
+                entry.setdefault("agents", {})["lore"] = "done"
+                return None
+
+            locked_update_queue_entry(_QUEUE_FILE, img_rel, _mark_lore_done)
 
         log.info(f"Generated NPC: {out_path.name} ({scenario['name']})")
         count += 1

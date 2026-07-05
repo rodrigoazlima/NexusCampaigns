@@ -32,6 +32,7 @@ from shared import (  # noqa: E402
     LLMResponseError,
     SignalEmitter,
     VisionClassification,
+    locked_update_queue_entry,
     to_slug,
 )
 from shared.config import LLMEndpointConfig  # noqa: E402
@@ -140,13 +141,6 @@ def _load_queue() -> dict[str, Any]:
     if not _QUEUE_FILE.exists():
         return {}
     return json.loads(_QUEUE_FILE.read_text(encoding="utf-8"))
-
-
-def _save_queue(queue: dict) -> None:
-    _SHARED_STATE.mkdir(parents=True, exist_ok=True)
-    tmp = _QUEUE_FILE.with_suffix(".tmp")
-    tmp.write_text(json.dumps(queue, indent=2, default=str), encoding="utf-8")
-    tmp.replace(_QUEUE_FILE)
 
 
 # ---------------------------------------------------------------------------
@@ -856,14 +850,16 @@ def main() -> None:
             }
             _save_token_links(token_links)
 
-        # --- Update inbox-queue.json (step 10) ---
+        # --- Update inbox-queue.json (step 10) — locked, one item at a time ---
         if orig_rel in queue and isinstance(queue[orig_rel].get("agents"), dict):
-            queue[orig_rel]["agents"]["vision"] = "done"
-            # Rename queue key to match new image path so classification/lore
-            # can trace source frontmatter back to the correct queue entry.
-            if new_rel != orig_rel:
-                queue[new_rel] = queue.pop(orig_rel)
-            _save_queue(queue)
+            def _mark_vision_done(entry: dict) -> Optional[str]:
+                entry.setdefault("agents", {})["vision"] = "done"
+                # Rename queue key to match new image path so classification/lore
+                # can trace source frontmatter back to the correct queue entry.
+                return new_rel if new_rel != orig_rel else None
+
+            locked_update_queue_entry(_QUEUE_FILE, orig_rel, _mark_vision_done)
+            queue = _load_queue()
 
         # --- Emit signal for Lore agent (fire-and-forget per G5) ---
         emitter.emit(

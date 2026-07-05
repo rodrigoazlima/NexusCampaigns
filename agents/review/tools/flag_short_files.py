@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from typing import Optional
 
 _TOOLS_DIR    = Path(__file__).resolve().parent
 _AGENTS_DIR   = _TOOLS_DIR.parents[1]
@@ -19,7 +20,7 @@ _PROJECT_ROOT = _AGENTS_DIR.parent
 if str(_AGENTS_DIR) not in sys.path:
     sys.path.insert(0, str(_AGENTS_DIR))
 
-from shared import FrontmatterIO, Logger  # noqa: E402
+from shared import FrontmatterIO, Logger, locked_update_queue_entry  # noqa: E402
 
 TASK_ID         = "review-agent-short-files"
 SCRIPT_BASENAME = "flag_short_files.py"
@@ -71,7 +72,8 @@ def _draft_source(fm: dict) -> str | None:
 
 def _mark_reviewed(sources: set[str], log: Logger) -> int:
     """Set agents.review = done in inbox-queue.json for each source the review
-    pass scanned. Idempotent. Returns the number of queue entries updated."""
+    pass scanned. Idempotent, locked, one entry at a time. Returns the number
+    of queue entries updated."""
     if not sources or not _QUEUE_FILE.exists():
         return 0
     try:
@@ -82,18 +84,24 @@ def _mark_reviewed(sources: set[str], log: Logger) -> int:
 
     updated = 0
     for rel in sources:
-        entry = queue.get(rel)
-        if not entry:
+        if rel not in queue:
             continue
-        agents = entry.setdefault("agents", {})
-        if agents.get("review") != "done":
-            agents["review"] = "done"
+
+        changed = False
+
+        def _mark(entry: dict) -> Optional[str]:
+            nonlocal changed
+            agents = entry.setdefault("agents", {})
+            if agents.get("review") != "done":
+                agents["review"] = "done"
+                changed = True
+            return None
+
+        locked_update_queue_entry(_QUEUE_FILE, rel, _mark)
+        if changed:
             updated += 1
 
     if updated:
-        tmp = _QUEUE_FILE.with_suffix(".tmp")
-        tmp.write_text(json.dumps(queue, indent=2, default=str), encoding="utf-8")
-        tmp.replace(_QUEUE_FILE)
         log.info(f"Marked agents.review=done for {updated} queue entry/entries")
     return updated
 

@@ -33,8 +33,10 @@ from shared import (  # noqa: E402
     AgentSlots,
     AgentSlotStatus,
     BaseAgent,
+    FileLock,
     InboxQueue,
     InboxQueueEntry,
+    locked_update_queue_entry,
 )
 from shared.logger import Logger  # noqa: E402
 from shared.loaders import load_vault_config  # noqa: E402
@@ -370,15 +372,17 @@ def _reindex_moved_prefix(old_prefix: str, new_prefix: str, log: Logger) -> None
     for path in (_QUEUE_FILE, _AGENTS_DIR / "vision" / "state" / "processed-images.json"):
         if not path.exists():
             continue
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
-            continue
-        changed = _rewrite_prefix_keys(data, old_prefix, new_prefix)
+        with FileLock(path):
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            changed = _rewrite_prefix_keys(data, old_prefix, new_prefix)
+            if changed:
+                tmp = path.with_suffix(".tmp")
+                tmp.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
+                tmp.replace(path)
         if changed:
-            tmp = path.with_suffix(".tmp")
-            tmp.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
-            tmp.replace(path)
             log.info(f"Reindexed {changed} path(s) in {path.name}: {old_prefix} -> {new_prefix}")
 
 
@@ -452,20 +456,22 @@ def _reconcile_slots(log: Logger) -> int:
     """
     if not _QUEUE_FILE.exists():
         return 0
-    raw: dict = json.loads(_QUEUE_FILE.read_text(encoding="utf-8"))
     changed = 0
-    for entry in raw.values():
-        old_agents = entry.get("agents", {})
-        new_agents = AgentSlots.model_validate(old_agents).model_dump(mode="json")
-        new_agents["ingestion"] = AgentSlotStatus.done.value   # entry exists => ingested
-        if new_agents != old_agents:
-            entry["agents"] = new_agents
-            changed += 1
+    with FileLock(_QUEUE_FILE):
+        raw: dict = json.loads(_QUEUE_FILE.read_text(encoding="utf-8"))
+        for entry in raw.values():
+            old_agents = entry.get("agents", {})
+            new_agents = AgentSlots.model_validate(old_agents).model_dump(mode="json")
+            new_agents["ingestion"] = AgentSlotStatus.done.value   # entry exists => ingested
+            if new_agents != old_agents:
+                entry["agents"] = new_agents
+                changed += 1
+        if changed:
+            _SHARED_STATE.mkdir(parents=True, exist_ok=True)
+            tmp = _QUEUE_FILE.with_suffix(".tmp")
+            tmp.write_text(json.dumps(raw, indent=2, default=str), encoding="utf-8")
+            tmp.replace(_QUEUE_FILE)
     if changed:
-        _SHARED_STATE.mkdir(parents=True, exist_ok=True)
-        tmp = _QUEUE_FILE.with_suffix(".tmp")
-        tmp.write_text(json.dumps(raw, indent=2, default=str), encoding="utf-8")
-        tmp.replace(_QUEUE_FILE)
         log.info(f"Reconciled agent slots in {changed} queue entry/entries")
     return changed
 
@@ -495,12 +501,21 @@ def register_new_files(log: Logger) -> tuple[int, int]:
         if _is_token_file(path):
             continue
 
-        ft            = _file_type(path)
-        queue[rel]    = InboxQueueEntry(
+        ft = _file_type(path)
+        new_entry = InboxQueueEntry(
             ingestedAt=datetime.now(timezone.utc),
             type=ft,
             agents=_make_slots(ft),
         )
+
+        # Locked, one item at a time — avoids clobbering concurrent agent
+        # slot updates on other keys made while this scan is still running.
+        def _register(entry: dict, _dump=new_entry.model_dump(mode="json")) -> Optional[str]:
+            entry.update(_dump)
+            return None
+
+        locked_update_queue_entry(_QUEUE_FILE, rel, _register)
+        queue[rel] = new_entry
         log.info(f"Queued [{ft}]: {rel}")
         added += 1
 
@@ -512,10 +527,6 @@ def register_new_files(log: Logger) -> tuple[int, int]:
     if phantom:
         for p in phantom:
             log.info(f"  Phantom entry: {p}")
-
-    if added:
-        _save_queue(queue)
-        log.info(f"Queue saved — {added} new entry/entries (total: {len(queue)})")
 
     return added, 0
 

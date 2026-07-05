@@ -33,6 +33,14 @@ default_dispatch:
   timeout_seconds: 1800
   system_file: "prompts/system.md"
 
+# How runner.py dispatches due/signalled tasks within one scheduling cycle:
+#   sync  — one agent at a time, in execution_order (default; safest, matches
+#           the pipeline's stage dependencies)
+#   async — all due agents for the cycle are dispatched concurrently
+#           (threads); queue/state writes are still serialized via
+#           agents/shared/file_lock.py so this is safe, just faster wall-clock
+pipeline_mode: sync
+
 execution_order:
   - runtime
   - repair

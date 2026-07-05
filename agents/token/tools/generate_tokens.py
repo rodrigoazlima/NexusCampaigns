@@ -26,7 +26,7 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 _TOOLS_DIR    = Path(__file__).resolve().parent
 _AGENTS_DIR   = _TOOLS_DIR.parents[1]
@@ -37,6 +37,7 @@ if str(_AGENTS_DIR) not in sys.path:
 
 from shared.logger import Logger, _ensure_utf8_stdout  # noqa: E402
 from shared.agent_tools import SELF_MANAGEMENT_TOOLS, call_self_management_tool  # noqa: E402
+from shared import locked_update_queue_entry  # noqa: E402
 
 TASK_ID         = "token-agent"
 SCRIPT_BASENAME = "generate_tokens.py"
@@ -163,26 +164,25 @@ def _load_queue() -> dict[str, Any]:
     return json.loads(_QUEUE_FILE.read_text(encoding="utf-8"))
 
 
-def _save_queue(queue: dict[str, Any]) -> None:
-    tmp = _QUEUE_FILE.with_suffix(".tmp")
-    tmp.write_text(json.dumps(queue, indent=2, default=str), encoding="utf-8")
-    tmp.replace(_QUEUE_FILE)
-
-
 def _set_queue_token_slot(source_rel: str, status: str, log: Logger) -> bool:
     queue = _load_queue()
     if source_rel not in queue:
         return False
-    entry = queue[source_rel]
-    agents = entry.get("agents", {})
-    if agents.get("token") == status:
-        return False
-    agents["token"] = status
-    entry["agents"] = agents
-    queue[source_rel] = entry
-    _save_queue(queue)
-    log.info(f"Queue token slot [{status}]: {source_rel.split('/')[-1]}")
-    return True
+
+    changed = False
+
+    def _mark(entry: dict) -> Optional[str]:
+        nonlocal changed
+        agents = entry.setdefault("agents", {})
+        if agents.get("token") != status:
+            agents["token"] = status
+            changed = True
+        return None
+
+    locked_update_queue_entry(_QUEUE_FILE, source_rel, _mark)
+    if changed:
+        log.info(f"Queue token slot [{status}]: {source_rel.split('/')[-1]}")
+    return changed
 
 
 def _pick_moldura(entry: dict[str, Any], cfg: dict[str, Any]) -> Path:

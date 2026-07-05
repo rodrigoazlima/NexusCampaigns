@@ -178,8 +178,7 @@ export default function TreasuresCollection({ items }: { items: TreasureItem[] }
       return (b.updated ?? '').localeCompare(a.updated ?? '')
     })
 
-  const cardHref = (i: TreasureItem) =>
-    i.origin === 'draft' ? `/gm/view/${i.uuid || encodeURIComponent(i.id)}` : '/library'
+  const cardHref = (i: TreasureItem) => `/gm/view/${i.uuid || encodeURIComponent(i.id)}`
 
   return (
     <div className="p-4 md:p-6">
