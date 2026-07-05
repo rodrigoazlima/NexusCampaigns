@@ -276,6 +276,9 @@ system/tests/.last-run.json
 # agents/repair/tools/repair_agent.py. Keep every new junction dot-prefixed
 # and listed here — don't invent a differently-named mount.
 .knowledge-base/
+**/.knowledge-base/
+knowledge-base/
+**/knowledge-base/
 .agents/
 agents/*/.system/
 
