@@ -10,6 +10,7 @@ import {
   Pencil, Check, X, Sparkles, ChevronDown, Save, Copy, CalendarDays
 } from 'lucide-react'
 import type { ItemDetail } from '@/lib/types'
+import { PILLARS, pillarOf } from '@/lib/pillars'
 import QualityPicker from './QualityPicker'
 import ImageModal from './ImageModal'
 import TagEditor from './TagEditor'
@@ -619,9 +620,18 @@ export default function ItemDetailView({ item: initial }: Props) {
                 className="max-h-[50vh] max-w-[60%] object-contain cursor-zoom-in"
                 onClick={() => { setModalSrc(tokenSrc); setModalOpen(true) }}
               />
-            ) : (
-              <div className="text-zinc-600 text-sm py-20">No image</div>
-            )}
+            ) : (() => {
+              const pillar = PILLARS.find((p) => p.key === pillarOf(item.type))
+              const Icon = pillar?.icon
+              return Icon ? (
+                <div className={`flex flex-col items-center gap-2 py-20 ${pillar.accent}`}>
+                  <Icon size={40} />
+                  <span className="text-xs uppercase tracking-wide text-zinc-600">{item.type}</span>
+                </div>
+              ) : (
+                <div className="text-zinc-600 text-sm py-20">No image</div>
+              )
+            })()}
 
             {/* hover toolbar */}
             <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">

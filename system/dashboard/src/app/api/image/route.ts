@@ -23,9 +23,16 @@ export async function GET(req: NextRequest) {
     return new NextResponse('Missing path', { status: 400 })
   }
 
-  const absolutePath = path.isAbsolute(imagePath)
+  let absolutePath = path.isAbsolute(imagePath)
     ? imagePath
     : path.join(PROJECT_ROOT, imagePath)
+
+  // ponytail: some drafts have a `source:` path missing its leading dot
+  // (`knowledge-base/...` instead of `.knowledge-base/...`) from a prior
+  // agent bug — retry with the dot before 404ing.
+  if (!fs.existsSync(absolutePath) && !path.isAbsolute(imagePath) && imagePath.startsWith('knowledge-base/')) {
+    absolutePath = path.join(PROJECT_ROOT, `.${imagePath}`)
+  }
 
   const normalized = path.normalize(absolutePath)
   const projectNormalized = path.normalize(PROJECT_ROOT)

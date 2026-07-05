@@ -169,8 +169,10 @@ export default function BestiaryCollection({ items }: { items: BestiaryItem[] })
       return (b.updated ?? '').localeCompare(a.updated ?? '') // updated (default)
     })
 
-  const tokenSrc = (i: BestiaryItem) =>
-    i.tokenPath ? `/api/image?path=${encodeURIComponent(i.tokenPath)}` : null
+  const tokenSrc = (i: BestiaryItem) => {
+    const path = i.tokenPath || i.source[0]
+    return path ? `/api/image?path=${encodeURIComponent(path)}` : null
+  }
 
   const cardHref = (i: BestiaryItem) => `/gm/view/${i.uuid || encodeURIComponent(i.id)}`
 
