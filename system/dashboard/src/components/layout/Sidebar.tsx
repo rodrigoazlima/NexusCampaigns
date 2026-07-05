@@ -67,6 +67,7 @@ const nav: NavSection[] = [
       { href: '/gm/bestiary', label: 'Bestiary', icon: Skull },
       { href: '/gm/treasures', label: 'Treasures', icon: Gem },
       { href: '/gm/wiki', label: 'Wiki', icon: BookOpen },
+      { href: '/gm/inbox', label: 'Inbox', icon: Image },
     ],
   },
   {
@@ -76,7 +77,6 @@ const nav: NavSection[] = [
     items: [
       { href: '/gm', label: 'GM Hub', icon: Dices },
       { href: '/gm/review', label: 'Review', icon: CheckSquare },
-      { href: '/gm/inbox', label: 'Inbox', icon: Image },
       { href: '/gm/tokens', label: 'Tokens', icon: CircleDot },
       { href: '/gm/chat', label: 'Agent Chat', icon: MessageSquare },
       { href: '/', label: 'Executive', icon: LayoutDashboard },

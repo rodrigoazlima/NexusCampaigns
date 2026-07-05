@@ -141,6 +141,7 @@ export interface InboxImage {
   hasToken: boolean
   tokenPath: string | null
   isStuck: boolean
+  entityId: string | null
 }
 
 export interface TokenFile {

@@ -1086,6 +1086,7 @@ export function readInboxImages(): InboxImage[] {
   const imageExts = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif'])
   const cutoff24h = Date.now() - 24 * 60 * 60 * 1000
   const results: InboxImage[] = []
+  const drafts = readRawDrafts()
 
   for (const [queuePath, entry] of Object.entries(raw)) {
     const filename = path.basename(queuePath)
@@ -1107,8 +1108,12 @@ export function readInboxImages(): InboxImage[] {
     const ingestedTime = new Date(entry.ingestedAt).getTime()
     const isStuck = anyPending && !isNaN(ingestedTime) && ingestedTime < cutoff24h
 
+    const normQueuePath = queuePath.replace(/\\/g, '/')
+    const draft = drafts.find((d) => d.source[0]?.replace(/\\/g, '/') === normQueuePath)
+    const entityId = draft ? (draft.uuid || draft.id) : null
+
     results.push({
-      path: queuePath.replace(/\\/g, '/'),
+      path: normQueuePath,
       filename,
       type: 'image',
       ingestedAt: entry.ingestedAt,
@@ -1116,6 +1121,7 @@ export function readInboxImages(): InboxImage[] {
       hasToken,
       tokenPath,
       isStuck,
+      entityId,
     })
   }
 

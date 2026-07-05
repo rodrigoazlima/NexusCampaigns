@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import type { InboxImage } from '@/lib/types'
 import { formatRelative } from '@/lib/utils'
 import { AlertTriangle } from 'lucide-react'
@@ -20,14 +21,23 @@ interface InboxImageCardProps {
 
 export default function InboxImageCard({ item }: InboxImageCardProps) {
   const [modalOpen, setModalOpen] = useState(false)
+  const router = useRouter()
   const src = `/api/image?path=${encodeURIComponent(item.path)}`
 
   return (
-    <div className={`panel overflow-hidden ${item.isStuck ? 'border-danger/40' : ''}`}>
+    <div
+      className={`panel overflow-hidden ${item.isStuck ? 'border-danger/40' : ''} ${item.entityId ? 'cursor-pointer hover:border-primary/40' : ''}`}
+      onClick={() => {
+        if (item.entityId) router.push(`/gm/view/${encodeURIComponent(item.entityId)}`)
+      }}
+    >
       {/* Image thumbnail */}
       <button
         className="aspect-square overflow-hidden bg-surface-3 relative w-full cursor-zoom-in block"
-        onClick={() => setModalOpen(true)}
+        onClick={(e) => {
+          e.stopPropagation()
+          setModalOpen(true)
+        }}
         title="Click to enlarge"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
