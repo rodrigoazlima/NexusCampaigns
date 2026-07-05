@@ -219,6 +219,9 @@ __marimo__/
 *.lock
 *.lock.lock
 
+# Lockfiles (npm) — not committed, generated
+**/package-lock.json
+
 # Runtime state
 agents/runtime/state/tasks-state.json
 agents/runtime/state/logs/
