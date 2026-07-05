@@ -41,4 +41,13 @@ state_files:
   - state/logs/08-daily-report_YYYY-MM-DD.log
 commit_scope:
   - .knowledge-base/01-Processing
+vault_context:
+  quality_scale:
+    1-3: reject
+    4-6: needs review
+    7-8: good
+    9-10: library candidate — only quality >= 7 may enter 02-Library/
+  human_only_fields: [status: approved, reviewed: true]
+  orphan_rule: every 02-Library/ entity must have >=1 [[wikilink]]; flag zero-link entities
+  canon_rule: status: approved is canon — never overwrite or modify without reviewed re-set by human
 ---

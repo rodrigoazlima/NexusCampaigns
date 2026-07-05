@@ -36,6 +36,9 @@ restrictions:
   - Must not modify 02-Library/
   - Must not overwrite existing tokens unless --force is passed
   - Token output stays in 00-Inbox/images/ (promotion to 05-Assets/ is a human curation step)
+  - Must never modify or delete original source images in 00-Inbox/ (read-only input)
+  - Must never set status: approved / reviewed: true (human-only fields)
+  - Cannot self-approve promotion to 05-Assets/tokens/ — vault-wide rule, only humans promote
 state_files:
   - state/generated-tokens.json
   - state/10-generate-tokens.json
