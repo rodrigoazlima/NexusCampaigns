@@ -1007,6 +1007,18 @@ if ($LASTEXITCODE -ne 0) {
 }
 Log "Dependencies OK."
 
+# agent.json is gitignored (matches the repo's blanket *.json rule), so a fresh
+# clone has none — the scheduler would discover 0 tasks and the pipeline would
+# never run. runner.py --ensure-config synthesizes any missing agent.json from
+# registry.yaml defaults; safe/idempotent to run on every install.
+Log "Ensuring agents/*/agent.json exist (synthesizing missing ones from registry.yaml)..."
+& $Python $RunnerScript --ensure-config
+if ($LASTEXITCODE -ne 0) {
+    Log "runner.py --ensure-config exited $LASTEXITCODE — check logs; agent.json may be incomplete." "WARN"
+} else {
+    Log "agent.json config OK."
+}
+
 # Auth token
 $auth = Get-AuthToken
 if ($auth) {
