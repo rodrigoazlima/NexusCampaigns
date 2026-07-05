@@ -40,7 +40,7 @@ TASK_ID         = "lore-agent"
 SCRIPT_BASENAME = "generate_npcs.py"
 BATCH_SIZE      = 10
 
-_VAULT_ROOT   = _PROJECT_ROOT / "knowledge-base"
+_VAULT_ROOT   = _PROJECT_ROOT / ".knowledge-base"
 _PROCESSING   = _VAULT_ROOT / "01-Processing"
 _LIBRARY      = _VAULT_ROOT / "02-Library"
 _AGENT_STATE  = _AGENTS_DIR / "lore" / "state"

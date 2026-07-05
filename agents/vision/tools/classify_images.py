@@ -41,7 +41,7 @@ TASK_ID         = "vision-agent"
 SCRIPT_BASENAME = "classify_images.py"
 BATCH_SIZE      = 10
 
-_VAULT_ROOT   = _PROJECT_ROOT / "knowledge-base"
+_VAULT_ROOT   = _PROJECT_ROOT / ".knowledge-base"
 _INBOX        = _VAULT_ROOT / "00-Inbox"
 _INBOX_IMAGES = _INBOX  # scan entire inbox, not just images/ subdir
 _PROCESSING   = _VAULT_ROOT / "01-Processing"

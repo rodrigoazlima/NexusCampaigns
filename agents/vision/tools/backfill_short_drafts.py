@@ -36,7 +36,7 @@ from vision.tools.classify_images import (  # noqa: E402
     _token_body,
 )
 
-_VAULT_ROOT  = _PROJECT_ROOT / "knowledge-base"
+_VAULT_ROOT  = _PROJECT_ROOT / ".knowledge-base"
 _PROCESSING  = _VAULT_ROOT / "01-Processing"
 _AGENT_STATE = _AGENTS_DIR / "vision" / "state"
 _PROC_IMAGES = _AGENT_STATE / "processed-images.json"

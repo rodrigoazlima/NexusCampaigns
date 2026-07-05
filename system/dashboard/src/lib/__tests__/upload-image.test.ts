@@ -24,7 +24,7 @@ describe('uploadImage', () => {
   it('posts to /api/gm/upload-image with file and default targetPath', async () => {
     const spy = vi.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
-      json: async () => ({ ok: true, path: 'knowledge-base/00-Inbox/images/art.png' }),
+      json: async () => ({ ok: true, path: '.knowledge-base/00-Inbox/images/art.png' }),
     } as Response)
 
     const file = makeFile('art.png')
@@ -37,9 +37,9 @@ describe('uploadImage', () => {
 
     const body = init.body as FormData
     expect(body.get('file')).toBe(file)
-    expect(body.get('targetPath')).toBe('knowledge-base/00-Inbox/images/art.png')
+    expect(body.get('targetPath')).toBe('.knowledge-base/00-Inbox/images/art.png')
 
-    expect(result).toEqual({ ok: true, path: 'knowledge-base/00-Inbox/images/art.png' })
+    expect(result).toEqual({ ok: true, path: '.knowledge-base/00-Inbox/images/art.png' })
   })
 
   it('uses provided targetPath', async () => {
@@ -100,13 +100,13 @@ describe('enqueueImage', () => {
       json: async () => ({ ok: true }),
     } as Response)
 
-    const result = await enqueueImage('knowledge-base/00-Inbox/images/art.png')
+    const result = await enqueueImage('.knowledge-base/00-Inbox/images/art.png')
 
     expect(spy).toHaveBeenCalledOnce()
     const [url, init] = spy.mock.calls[0] as [string, RequestInit]
     expect(url).toBe('/api/gm/queue/add')
     expect(init.method).toBe('POST')
-    expect(JSON.parse(init.body as string)).toEqual({ path: 'knowledge-base/00-Inbox/images/art.png' })
+    expect(JSON.parse(init.body as string)).toEqual({ path: '.knowledge-base/00-Inbox/images/art.png' })
     expect(result).toEqual({ ok: true, skipped: undefined })
   })
 
@@ -116,7 +116,7 @@ describe('enqueueImage', () => {
       json: async () => ({ ok: true, skipped: true }),
     } as Response)
 
-    const result = await enqueueImage('knowledge-base/00-Inbox/images/art.png')
+    const result = await enqueueImage('.knowledge-base/00-Inbox/images/art.png')
     expect(result).toEqual({ ok: true, skipped: true })
   })
 
@@ -124,17 +124,17 @@ describe('enqueueImage', () => {
     vi.spyOn(global, 'fetch').mockResolvedValue({
       ok: false,
       status: 400,
-      json: async () => ({ error: 'path must be under knowledge-base/00-Inbox/' }),
+      json: async () => ({ error: 'path must be under .knowledge-base/00-Inbox/' }),
     } as Response)
 
     const result = await enqueueImage('evil/path.png')
-    expect(result).toEqual({ ok: false, error: 'path must be under knowledge-base/00-Inbox/' })
+    expect(result).toEqual({ ok: false, error: 'path must be under .knowledge-base/00-Inbox/' })
   })
 
   it('returns error on network failure', async () => {
     vi.spyOn(global, 'fetch').mockRejectedValue(new Error('Network error'))
 
-    const result = await enqueueImage('knowledge-base/00-Inbox/images/art.png')
+    const result = await enqueueImage('.knowledge-base/00-Inbox/images/art.png')
     expect(result).toEqual({ ok: false, error: 'Error: Network error' })
   })
 })

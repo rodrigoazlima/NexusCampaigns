@@ -64,9 +64,9 @@ USAGE
 PARAMETERS
   -ProjectRoot   <path>   App repo root (where this script lives). Default: parent of agents\runtime\tools
   -VaultRoot     <path>   Knowledge base dir. May be on another drive/repo entirely.
-                            Default: read from global.json (vault_root), else <ProjectRoot>\knowledge-base
+                            Default: read from global.json (vault_root), else <ProjectRoot>\.knowledge-base
                             Linked into the app repo via a directory junction so every
-                            hardcoded "knowledge-base" path in the agents/tests keeps working.
+                            hardcoded ".knowledge-base" path in the agents/tests keeps working.
   -VaultGitInit           If -VaultRoot isn't already a git repo, run git init there (plus a
                             vault-appropriate .gitignore and an initial commit). Never touches
                             a vault dir that's already a git repo.
@@ -139,7 +139,7 @@ $GlobalConfig = "$ProjectRoot\system\.shared\config\global.json"
 # An explicit -DashboardPort still wins over the config value.
 # ---------------------------------------------------------------------------
 $DashboardHost = "0.0.0.0"
-$VaultRootRel  = "knowledge-base"
+$VaultRootRel  = ".knowledge-base"
 if (Test-Path $GlobalConfig) {
     try {
         $gc = Get-Content $GlobalConfig -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -161,7 +161,7 @@ if ($PSBoundParameters.ContainsKey('VaultRoot') -and $VaultRoot) {
 # Resolve vault root to an absolute path anchored at the project root.
 $VaultRootAbs = if ([System.IO.Path]::IsPathRooted($VaultRootRel)) { $VaultRootRel }
                 else { Join-Path $ProjectRoot $VaultRootRel }
-$VaultLinkPath = Join-Path $ProjectRoot "knowledge-base"
+$VaultLinkPath = Join-Path $ProjectRoot ".knowledge-base"
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -286,41 +286,41 @@ function Ensure-AgentScaffold([string]$ProjectRoot) {
 # it. The cycle is contained via .gitignore ("agents/*/agents/" etc. — git prunes
 # descent into ignored dirs) — see .gitignore. Don't remove that ignore rule.
 $script:AgentRelations = @{
-    "adventure-builder" = @("knowledge-base/02-Library", "knowledge-base/03-Campaigns", "agents/lore", "agents/canon", "agents/relationship")
-    "canon"             = @("knowledge-base/02-Library")
-    "classification"    = @("knowledge-base/00-Inbox", "knowledge-base/01-Processing", "knowledge-base/02-Library")
+    "adventure-builder" = @(".knowledge-base/02-Library", ".knowledge-base/03-Campaigns", "agents/lore", "agents/canon", "agents/relationship")
+    "canon"             = @(".knowledge-base/02-Library")
+    "classification"    = @(".knowledge-base/00-Inbox", ".knowledge-base/01-Processing", ".knowledge-base/02-Library")
     "cleanup"           = @("agents/runtime", "agents/review", "agents/repair", "agents/canon", "agents/deduplication")
-    "curator"           = @("knowledge-base/01-Processing")
-    "deduplication"     = @("knowledge-base/00-Inbox", "knowledge-base/01-Processing", "knowledge-base/02-Library")
-    "encounter-builder" = @("knowledge-base/02-Library", "knowledge-base/03-Campaigns")
-    "ingestion"         = @("knowledge-base/00-Inbox", "system/state")
-    "lore"              = @("knowledge-base/00-Inbox", "knowledge-base/01-Processing", "knowledge-base/02-Library", "agents/vision", "system/state")
-    "relationship"      = @("knowledge-base/02-Library", "knowledge-base/04-Relationships")
+    "curator"           = @(".knowledge-base/01-Processing")
+    "deduplication"     = @(".knowledge-base/00-Inbox", ".knowledge-base/01-Processing", ".knowledge-base/02-Library")
+    "encounter-builder" = @(".knowledge-base/02-Library", ".knowledge-base/03-Campaigns")
+    "ingestion"         = @(".knowledge-base/00-Inbox", "system/state")
+    "lore"              = @(".knowledge-base/00-Inbox", ".knowledge-base/01-Processing", ".knowledge-base/02-Library", "agents/vision", "system/state")
+    "relationship"      = @(".knowledge-base/02-Library", ".knowledge-base/04-Relationships")
     "repair"            = @("agents/runtime", "agents/review", "agents/vision", "agents/*", "system")
-    "review"            = @("agents/runtime", "knowledge-base/01-Processing", "agents/*")
+    "review"            = @("agents/runtime", ".knowledge-base/01-Processing", "agents/*")
     "runtime"           = @("agents/*", "system")
-    "search"            = @("knowledge-base/01-Processing", "knowledge-base/02-Library")
-    "session-builder"   = @("knowledge-base/03-Campaigns", "agents/adventure-builder")
-    "token"             = @("agents/vision", "knowledge-base/00-Inbox", "knowledge-base/05-Assets")
-    "vision"            = @("knowledge-base/00-Inbox", "knowledge-base/01-Processing", "system/state")
-    "wiki"              = @("knowledge-base/01-Processing", "knowledge-base/02-Library", "system/state")
-    "wikilink"          = @("knowledge-base/02-Library")
+    "search"            = @(".knowledge-base/01-Processing", ".knowledge-base/02-Library")
+    "session-builder"   = @(".knowledge-base/03-Campaigns", "agents/adventure-builder")
+    "token"             = @("agents/vision", ".knowledge-base/00-Inbox", ".knowledge-base/05-Assets")
+    "vision"            = @(".knowledge-base/00-Inbox", ".knowledge-base/01-Processing", "system/state")
+    "wiki"              = @(".knowledge-base/01-Processing", ".knowledge-base/02-Library", "system/state")
+    "wikilink"          = @(".knowledge-base/02-Library")
 }
 
-# For each agent, creates agents\<agent-name>\<related-path> -> the real target,
+# For each agent, creates agents\<agent-name>\.<related-path> -> the real target,
 # so an agent can reach everything it touches by a fixed relative path without
 # hardcoding "..\..\..". "agents/*" entries fan out to every other agent dir.
 # Every agent also gets agents\shared (shared runtime library) and system\state
 # regardless of its entry in $script:AgentRelations.
 #
-# Agent-to-agent links are cyclic on disk (agents/repair links to agents/cleanup,
-# which links back to agents/repair, etc.) — real directory cycles that
-# reparse-point-unaware tools (git status, backup, indexers) can recurse into
-# forever. To keep that fully contained, agent-to-agent mounts are placed under
-# a dot-prefixed ".agents\" folder (agents\<name>\.agents\<other>) instead of
-# "agents\<name>\agents\<other>" — see the ".agents/" rule in .gitignore, which
-# makes git prune descent into every one of them. Don't rename this without
-# updating .gitignore (and agents/repair/tools/repair_agent.py's mirror) too.
+# Every generated mount's top path segment is dot-prefixed by convention
+# (.knowledge-base, .agents, .system, ...) — agents\<name>\agents\<other> in
+# particular is a real cycle on disk (agents/repair links to agents/cleanup,
+# which links back to agents/repair, etc.), and a reparse-point-unaware directory
+# walk (git status, backup, indexers) can recurse into that forever. Dot-prefixing
+# every mount lets a single .gitignore block ("### Generated junction mounts")
+# prune descent into all of them uniformly. Don't rename without updating
+# .gitignore (and agents/repair/tools/repair_agent.py's mirror) too.
 function Ensure-AgentRelationLinks([string]$ProjectRoot) {
     $allAgents = Get-ChildItem "$ProjectRoot\agents" -Directory -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -notin @("tests", "shared") } |
@@ -341,9 +341,18 @@ function Ensure-AgentRelationLinks([string]$ProjectRoot) {
                 , $rel
             }
             foreach ($t in $targets) {
-                $target = Join-Path $ProjectRoot ($t -replace '/', '\')
-                $linkRel = if ($t -match '^agents/(.+)$') { ".agents\$($Matches[1])" } else { $t -replace '/', '\' }
-                $linkPath = Join-Path $agentRoot $linkRel
+                # $t's first segment may already be dot-prefixed in the table
+                # (".knowledge-base/...") or plain ("agents/...", "system/...").
+                # The real vault root lives on disk as ".knowledge-base"; "agents"
+                # and "system" are real, unprefixed top-level folders. The
+                # per-agent MOUNT name is always dot-prefixed either way.
+                $parts    = $t -split '/', 2
+                $logical  = $parts[0].TrimStart('.')
+                $targetFirst = if ($logical -eq "knowledge-base") { ".knowledge-base" } else { $logical }
+                $targetRel   = if ($parts.Count -eq 2) { "$targetFirst\$($parts[1] -replace '/','\')" } else { $targetFirst }
+                $target      = Join-Path $ProjectRoot $targetRel
+                $linkRel     = if ($parts.Count -eq 2) { ".$logical\$($parts[1] -replace '/','\')" } else { ".$logical" }
+                $linkPath    = Join-Path $agentRoot $linkRel
                 New-Item -ItemType Directory -Force -Path (Split-Path $linkPath) | Out-Null
                 Ensure-Junction -LinkPath $linkPath -TargetPath $target
             }
@@ -936,7 +945,7 @@ if (-not (Test-GitRepoHealth $ProjectRoot)) {
 }
 
 # Link the vault into the app repo — skip entirely when it already lives at
-# <ProjectRoot>\knowledge-base (the common case; nothing to redirect).
+# <ProjectRoot>\.knowledge-base (the common case; nothing to redirect).
 if ($VaultRootAbs.TrimEnd('\') -ine $VaultLinkPath.TrimEnd('\')) {
     try {
         Ensure-Junction -LinkPath $VaultLinkPath -TargetPath $VaultRootAbs

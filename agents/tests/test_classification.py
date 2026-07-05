@@ -25,7 +25,7 @@ from shared.interfaces import VaultWriteError
 @pytest.fixture
 def vault(tmp_path):
     """Minimal vault layout under tmp_path."""
-    kb = tmp_path / "knowledge-base"
+    kb = tmp_path / ".knowledge-base"
     (kb / "00-Inbox").mkdir(parents=True)
     (kb / "01-Processing").mkdir(parents=True)
     (kb / "02-Library").mkdir(parents=True)
@@ -348,12 +348,12 @@ class TestQueueHelpers:
         assert _mod._load_queue() == {}
 
     def test_load_queue_valid(self, tmp_path, monkeypatch):
-        data = {"knowledge-base/00-Inbox/a.md": {"type": "document", "agents": {"classification": "pending"}}}
+        data = {".knowledge-base/00-Inbox/a.md": {"type": "document", "agents": {"classification": "pending"}}}
         q = tmp_path / "inbox-queue.json"
         q.write_text(_json.dumps(data), encoding="utf-8")
         monkeypatch.setattr(_mod, "_QUEUE_FILE", q)
         result = _mod._load_queue()
-        assert "knowledge-base/00-Inbox/a.md" in result
+        assert ".knowledge-base/00-Inbox/a.md" in result
 
     def test_is_queue_done_absent(self):
         assert _mod._is_queue_done({}, "some/file.md") is False
@@ -371,15 +371,15 @@ class TestQueueHelpers:
         assert _mod._is_queue_done(q, "f.md") is True
 
     def test_mark_queue_done_writes_file(self, tmp_path, monkeypatch):
-        data = {"knowledge-base/00-Inbox/a.md": {"agents": {"classification": "pending"}}}
+        data = {".knowledge-base/00-Inbox/a.md": {"agents": {"classification": "pending"}}}
         q = tmp_path / "inbox-queue.json"
         q.write_text(_json.dumps(data), encoding="utf-8")
         monkeypatch.setattr(_mod, "_QUEUE_FILE", q)
 
-        _mod._mark_queue_done(data, "knowledge-base/00-Inbox/a.md")
+        _mod._mark_queue_done(data, ".knowledge-base/00-Inbox/a.md")
 
         saved = _json.loads(q.read_text(encoding="utf-8"))
-        assert saved["knowledge-base/00-Inbox/a.md"]["agents"]["classification"] == "done"
+        assert saved[".knowledge-base/00-Inbox/a.md"]["agents"]["classification"] == "done"
 
     def test_mark_queue_done_no_op_when_not_pending(self, tmp_path, monkeypatch):
         data = {"f.md": {"agents": {"classification": "done"}}}

@@ -20,7 +20,7 @@ from shared import FrontmatterIO
 
 @pytest.fixture
 def vault(tmp_path):
-    kb = tmp_path / "knowledge-base"
+    kb = tmp_path / ".knowledge-base"
     (kb / "02-Library").mkdir(parents=True)
     return kb
 
@@ -267,9 +267,9 @@ class TestStateHelpers:
         store = StateStore(state_file, WIKILINK_STATE_DEFAULT)
         store.init_defaults()
 
-        _mod._mark_processed(store, "knowledge-base/02-Library/npc-witch.md", 3)
+        _mod._mark_processed(store, ".knowledge-base/02-Library/npc-witch.md", 3)
         processed = _mod._load_processed(store)
-        assert "knowledge-base/02-Library/npc-witch.md" in processed
+        assert ".knowledge-base/02-Library/npc-witch.md" in processed
 
     def test_init_defaults_idempotent(self, vault, patch_roots, tmp_path):
         state_file = tmp_path / "agents" / "wikilink" / "state" / "wikilink-state.json"
@@ -286,7 +286,7 @@ class TestStateHelpers:
 
 class TestMainNoLibrary:
     def test_exits_zero_when_library_missing(self, vault, patch_roots, monkeypatch, tmp_path):
-        missing = tmp_path / "knowledge-base" / "02-Library-missing"
+        missing = tmp_path / ".knowledge-base" / "02-Library-missing"
         monkeypatch.setattr(_mod, "_LIBRARY", missing)
         with pytest.raises(SystemExit) as exc:
             _mod.main()

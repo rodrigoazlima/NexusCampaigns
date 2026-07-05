@@ -24,14 +24,14 @@ class TestLLMEndpointConfig:
 
 class TestVaultPaths:
     def test_derived_paths(self, tmp_path):
-        vp = VaultPaths(vault_root=tmp_path / "knowledge-base")
-        assert vp.inbox   == tmp_path / "knowledge-base" / "00-Inbox"
-        assert vp.library == tmp_path / "knowledge-base" / "02-Library"
-        assert vp.processing == tmp_path / "knowledge-base" / "01-Processing"
-        assert vp.campaigns  == tmp_path / "knowledge-base" / "03-Campaigns"
-        assert vp.relationships == tmp_path / "knowledge-base" / "04-Relationships"
-        assert vp.assets   == tmp_path / "knowledge-base" / "05-Assets"
-        assert vp.archive  == tmp_path / "knowledge-base" / "99-Archive"
+        vp = VaultPaths(vault_root=tmp_path / ".knowledge-base")
+        assert vp.inbox   == tmp_path / ".knowledge-base" / "00-Inbox"
+        assert vp.library == tmp_path / ".knowledge-base" / "02-Library"
+        assert vp.processing == tmp_path / ".knowledge-base" / "01-Processing"
+        assert vp.campaigns  == tmp_path / ".knowledge-base" / "03-Campaigns"
+        assert vp.relationships == tmp_path / ".knowledge-base" / "04-Relationships"
+        assert vp.assets   == tmp_path / ".knowledge-base" / "05-Assets"
+        assert vp.archive  == tmp_path / ".knowledge-base" / "99-Archive"
 
     def test_frozen(self, tmp_path):
         vp = VaultPaths(vault_root=tmp_path)
@@ -59,7 +59,7 @@ class TestSystemPaths:
 
 class TestVaultConfig:
     def test_compose(self, tmp_path):
-        vp  = VaultPaths(vault_root=tmp_path / "knowledge-base")
+        vp  = VaultPaths(vault_root=tmp_path / ".knowledge-base")
         sp  = SystemPaths(project_root=tmp_path)
         cfg = VaultConfig(vault_paths=vp, system_paths=sp)
         assert cfg.llm_endpoints == {}

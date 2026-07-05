@@ -45,7 +45,7 @@ def _clf(
 
 @pytest.fixture
 def vault(tmp_path):
-    kb = tmp_path / "knowledge-base"
+    kb = tmp_path / ".knowledge-base"
     (kb / "00-Inbox" / "images").mkdir(parents=True)
     (kb / "01-Processing").mkdir(parents=True)
     (kb / "02-Library").mkdir(parents=True)
@@ -345,8 +345,8 @@ class TestTokenLinks:
     def test_save_and_reload_token_links(self, patch_roots):
         links = {
             "abc123": {
-                "tokenPath":    "knowledge-base/00-Inbox/images/A1/human-fighter.token.png",
-                "sourcePath":   "knowledge-base/00-Inbox/images/A1/human-fighter.portrait.jpg",
+                "tokenPath":    ".knowledge-base/00-Inbox/images/A1/human-fighter.token.png",
+                "sourcePath":   ".knowledge-base/00-Inbox/images/A1/human-fighter.portrait.jpg",
                 "sourceSha256": "def456",
                 "linkedAt":     "2026-01-01T00:00:00+00:00",
             }

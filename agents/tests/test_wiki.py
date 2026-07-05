@@ -22,7 +22,7 @@ from shared.interfaces import VaultWriteError
 
 @pytest.fixture
 def vault(tmp_path):
-    kb = tmp_path / "knowledge-base"
+    kb = tmp_path / ".knowledge-base"
     (kb / "00-Inbox").mkdir(parents=True)
     (kb / "01-Processing").mkdir(parents=True)
     (kb / "02-Library").mkdir(parents=True)

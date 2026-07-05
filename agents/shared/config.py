@@ -105,7 +105,7 @@ class VaultConfig:
 
 # Embedded defaults — application works even with no JSON files on disk.
 _GLOBAL_DEFAULTS: dict[str, Any] = {
-    "vault_root": "knowledge-base",
+    "vault_root": ".knowledge-base",
     "llm": {
         "url":              "http://localhost:1234/v1/chat/completions",
         "model":            "qwen3-vl-4b-instruct",
@@ -194,12 +194,12 @@ class AppConfig(BaseModel):
 # ---------------------------------------------------------------------------
 
 def _find_project_root(start: Path) -> Path:
-    """Walk up from *start* until finding a directory that contains knowledge-base/."""
+    """Walk up from *start* until finding a directory that contains .knowledge-base/."""
     for candidate in [start.resolve(), *start.resolve().parents]:
-        if (candidate / "knowledge-base").is_dir():
+        if (candidate / ".knowledge-base").is_dir():
             return candidate
     raise FileNotFoundError(
-        f"No project root found (no knowledge-base/ directory) searching up from {start}.\n"
+        f"No project root found (no .knowledge-base/ directory) searching up from {start}.\n"
         "Hint: make sure you are running from inside the NexusCampaigns tree."
     )
 

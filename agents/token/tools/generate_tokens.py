@@ -42,7 +42,7 @@ TASK_ID         = "token-agent"
 SCRIPT_BASENAME = "generate_tokens.py"
 BATCH_SIZE      = 10
 
-_VAULT_ROOT   = _PROJECT_ROOT / "knowledge-base"
+_VAULT_ROOT   = _PROJECT_ROOT / ".knowledge-base"
 _INBOX_IMAGES = _VAULT_ROOT / "00-Inbox" / "images"
 _AGENT_STATE  = _AGENTS_DIR / "token" / "state"
 _LOGS_DIR     = _AGENT_STATE / "logs"
@@ -59,7 +59,7 @@ _DEFAULT_CFG: dict[str, Any] = {
     "forehead_ratio": 0.35,       # extra head room above face bbox top
     "body_ratio":     0.30,       # extra body room below face bbox bottom
     "focus_head":     [0, 0, 0, 0],  # [top, right, bottom, left] % of crop_size
-    "moldura_path":   "knowledge-base/05-Assets/tokens/frames/frame.png",
+    "moldura_path":   ".knowledge-base/05-Assets/tokens/frames/frame.png",
     "moldura_by_type": {},        # e.g. {"creature": "path/to/creature_frame.png"}
 }
 

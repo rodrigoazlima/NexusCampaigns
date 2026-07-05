@@ -59,8 +59,8 @@ export async function POST(req: NextRequest) {
           fs.renameSync(oldImageAbs, newImageAbs)
         }
 
-        const oldRelPath = `knowledge-base/00-Inbox/${sourceFile}`
-        const newRelPath = `knowledge-base/00-Inbox/${newImageFilename}`
+        const oldRelPath = `.knowledge-base/00-Inbox/${sourceFile}`
+        const newRelPath = `.knowledge-base/00-Inbox/${newImageFilename}`
         newImagePath = newRelPath
 
         // Update inbox-queue.json key

@@ -11,7 +11,7 @@ if str(_AGENTS_DIR) not in sys.path:
     sys.path.insert(0, str(_AGENTS_DIR))
 
 # Stable constants shared with test module
-E2E_INBOX_SUBDIR = "knowledge-base/00-Inbox/images/e2e-test"
+E2E_INBOX_SUBDIR = ".knowledge-base/00-Inbox/images/e2e-test"
 E2E_IMAGE_NAME   = "e2e-mileena-mk.jpg"
 
 
@@ -65,7 +65,7 @@ def _do_cleanup(root: Path) -> None:
             pass
 
     # Remove 01-Processing/ entities that reference e2e-test images
-    processing = root / "knowledge-base" / "01-Processing"
+    processing = root / ".knowledge-base" / "01-Processing"
     if processing.exists():
         for md in processing.glob("*.md"):
             try:

@@ -38,5 +38,5 @@ state_files:
   - state/relationship-graph.json
   - state/logs/relationship_YYYY-MM-DD.log
 commit_scope:
-  - knowledge-base/04-Relationships
+  - .knowledge-base/04-Relationships
 ---

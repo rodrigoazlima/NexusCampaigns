@@ -34,7 +34,7 @@ from shared import (  # noqa: E402
 TASK_ID         = "review-agent"
 SCRIPT_BASENAME = "daily_report.py"
 
-_VAULT_ROOT   = _PROJECT_ROOT / "knowledge-base"
+_VAULT_ROOT   = _PROJECT_ROOT / ".knowledge-base"
 _PROCESSING   = _VAULT_ROOT / "01-Processing"
 _LIBRARY      = _VAULT_ROOT / "02-Library"
 _ORCH_STATE   = _AGENTS_DIR / "runtime" / "state"

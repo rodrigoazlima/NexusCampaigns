@@ -37,7 +37,7 @@ TASK_ID         = "classification-agent"
 SCRIPT_BASENAME = "enrich_tags.py"
 BATCH_SIZE      = 20
 
-_VAULT_ROOT   = _PROJECT_ROOT / "knowledge-base"
+_VAULT_ROOT   = _PROJECT_ROOT / ".knowledge-base"
 _INBOX        = _VAULT_ROOT / "00-Inbox"
 _PROCESSING   = _VAULT_ROOT / "01-Processing"
 _LIBRARY      = _VAULT_ROOT / "02-Library"

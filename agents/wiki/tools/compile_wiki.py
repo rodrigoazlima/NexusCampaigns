@@ -45,7 +45,7 @@ TASK_ID         = "wiki-agent"
 SCRIPT_BASENAME = "compile_wiki.py"
 BATCH_SIZE      = 5
 
-_VAULT_ROOT  = _PROJECT_ROOT / "knowledge-base"
+_VAULT_ROOT  = _PROJECT_ROOT / ".knowledge-base"
 _VAULT_PATHS = VaultPaths(vault_root=_VAULT_ROOT)
 _INBOX       = _VAULT_ROOT / "00-Inbox"
 _PROCESSING  = _VAULT_ROOT / "01-Processing"

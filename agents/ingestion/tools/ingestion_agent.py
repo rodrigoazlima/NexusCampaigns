@@ -51,7 +51,7 @@ DONE_KEY        = "processed"
 IMAGE_EXTS    = frozenset({".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tiff", ".tif"})
 DOCUMENT_EXTS = frozenset({".docx", ".doc", ".pdf", ".md", ".txt", ".odt"})
 
-_VAULT_ROOT   = _PROJECT_ROOT / "knowledge-base"
+_VAULT_ROOT   = _PROJECT_ROOT / ".knowledge-base"
 _INBOX        = _VAULT_ROOT / "00-Inbox"
 _SHARED_STATE = _PROJECT_ROOT / "system" / "state"
 _QUEUE_FILE   = _SHARED_STATE / "inbox-queue.json"
@@ -504,7 +504,7 @@ def register_new_files(log: Logger) -> tuple[int, int]:
         log.info(f"Queued [{ft}]: {rel}")
         added += 1
 
-    phantom = [k for k in queue if k.startswith("knowledge-base/00-Inbox/") and k not in inbox_paths]
+    phantom = [k for k in queue if k.startswith(".knowledge-base/00-Inbox/") and k not in inbox_paths]
     log.info(
         f"Queue scan: {scanned} inbox files, {scanned - added} already queued, "
         f"{added} new, {len(phantom)} phantom (queued but missing from disk)"

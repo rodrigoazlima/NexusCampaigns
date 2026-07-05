@@ -35,7 +35,7 @@ def runner(tmp_path):
 
 def _fake_registry(tools=("tools/someagent_agent.py",)):
     return RegistryConfig(
-        vault_root="knowledge-base",
+        vault_root=".knowledge-base",
         agents={
             "someagent": AgentRegistryEntry(
                 status="active",

@@ -48,5 +48,5 @@ state_files:
   - state/processed-npcs.json
   - state/scenarios.json
 commit_scope:
-  - knowledge-base/01-Processing
+  - .knowledge-base/01-Processing
 ---

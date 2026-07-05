@@ -63,7 +63,7 @@ _DEFAULT_INTERVAL   = 60     # orchestrator poll cadence
 _SYSTEM_STATE  = _PROJECT_ROOT / "system" / "state"
 _CHAT_QUEUE    = _SYSTEM_STATE / "chat-queue.json"
 _INBOX_QUEUE   = _SYSTEM_STATE / "inbox-queue.json"
-_VAULT_ROOT    = _PROJECT_ROOT / "knowledge-base"
+_VAULT_ROOT    = _PROJECT_ROOT / ".knowledge-base"
 
 _IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tiff"}
 

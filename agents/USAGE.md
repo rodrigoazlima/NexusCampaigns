@@ -279,13 +279,13 @@ Edit `state/10-generate-tokens.json`:
 ### Single-image mode
 
 ```powershell
-python agents/token/tools/10-generate-tokens.py --source "00-Inbox\images\A1\human-warrior-fire.jpg" --vault-root "knowledge-base"
+python agents/token/tools/10-generate-tokens.py --source "00-Inbox\images\A1\human-warrior-fire.jpg" --vault-root ".knowledge-base"
 ```
 
 ### Force regenerate
 
 ```powershell
-python agents/token/tools/10-generate-tokens.py --force --vault-root "knowledge-base"
+python agents/token/tools/10-generate-tokens.py --force --vault-root ".knowledge-base"
 ```
 
 ### Troubleshooting
@@ -440,7 +440,7 @@ $report.vaultHealth.pendingReview | Select-Object file, suggestedQuality
 
 ```powershell
 $name = "my-agent"
-$vault = "knowledge-base"
+$vault = ".knowledge-base"
 $base = "$vault\agents\$name"
 @("skills","prompts","tools","generated-tools","state","state\logs") | ForEach-Object {
   New-Item -ItemType Directory -Force "$base\$_"

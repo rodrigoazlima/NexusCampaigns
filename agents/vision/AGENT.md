@@ -48,8 +48,8 @@ state_files:
   - state/processed-images.json
   - state/token-links.json
 commit_scope:
-  - knowledge-base/00-Inbox/images
-  - knowledge-base/01-Processing
+  - .knowledge-base/00-Inbox/images
+  - .knowledge-base/01-Processing
 ---
 
 ## Valid Classification Values

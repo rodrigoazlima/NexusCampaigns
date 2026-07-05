@@ -921,7 +921,7 @@ function TokenConfigPanel({ cfg, onChange }: {
         <TextInput
           value={cfg.moldura_path}
           onChange={(v) => onChange('moldura_path', v)}
-          placeholder="knowledge-base/05-Assets/tokens/frames/frame.png"
+          placeholder=".knowledge-base/05-Assets/tokens/frames/frame.png"
           mono
         />
         <p className="text-[10px] text-zinc-600 mt-1">Relative to project root. Applied to all types unless overridden below.</p>

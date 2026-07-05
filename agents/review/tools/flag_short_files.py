@@ -25,7 +25,7 @@ TASK_ID         = "review-agent-short-files"
 SCRIPT_BASENAME = "flag_short_files.py"
 MIN_BODY_LINES  = 10
 
-_VAULT_ROOT  = _PROJECT_ROOT / "knowledge-base"
+_VAULT_ROOT  = _PROJECT_ROOT / ".knowledge-base"
 _PROCESSING  = _VAULT_ROOT / "01-Processing"
 _AGENT_STATE = _AGENTS_DIR / "review" / "state"
 _LOGS_DIR    = _AGENT_STATE / "logs"

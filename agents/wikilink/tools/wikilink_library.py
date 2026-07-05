@@ -42,7 +42,7 @@ BATCH_SIZE      = 20
 MIN_SCORE       = 1   # minimum pair score to insert a link
 MAX_LINKS       = 10  # max new links inserted per file per run
 
-_VAULT_ROOT  = _PROJECT_ROOT / "knowledge-base"
+_VAULT_ROOT  = _PROJECT_ROOT / ".knowledge-base"
 _LIBRARY     = _VAULT_ROOT / "02-Library"
 _AGENT_STATE = _AGENTS_DIR / "wikilink" / "state"
 _LOGS_DIR    = _AGENT_STATE / "logs"

@@ -51,5 +51,5 @@ state_files:
   - system/state/inbox-queue.json
   - agents/wiki/state/bad-wiki-docs.txt
 commit_scope:
-  - knowledge-base/01-Processing
+  - .knowledge-base/01-Processing
 ---

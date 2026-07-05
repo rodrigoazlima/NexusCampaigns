@@ -46,8 +46,8 @@ restrictions:
 state_files:
   - state/bad-docs.txt
 commit_scope:
-  - knowledge-base/00-Inbox
-  - knowledge-base/01-Processing
+  - .knowledge-base/00-Inbox
+  - .knowledge-base/01-Processing
 ---
 
 ## Valid Tags (28)

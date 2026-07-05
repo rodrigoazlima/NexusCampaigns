@@ -23,7 +23,7 @@ from shared.models import (
 
 _MINIMAL_REGISTRY = textwrap.dedent("""\
     version: 1
-    vault_root: "/tmp/vault/knowledge-base"
+    vault_root: "/tmp/vault/.knowledge-base"
     agents_dir: "agents"
     shared_dir: "system"
 
@@ -95,7 +95,7 @@ _MINIMAL_REGISTRY = textwrap.dedent("""\
 
 @pytest.fixture
 def project_root(tmp_path: Path) -> Path:
-    (tmp_path / "knowledge-base").mkdir()
+    (tmp_path / ".knowledge-base").mkdir()
     agents_dir = tmp_path / "agents"
     agents_dir.mkdir()
     (agents_dir / "registry.yaml").write_text(_MINIMAL_REGISTRY, encoding="utf-8")
@@ -125,7 +125,7 @@ class TestLoadRegistry:
         assert registry.shared_dir == "system"
 
     def test_raises_when_no_registry(self, tmp_path: Path) -> None:
-        (tmp_path / "knowledge-base").mkdir()
+        (tmp_path / ".knowledge-base").mkdir()
         with pytest.raises(FileNotFoundError, match="registry.yaml"):
             load_registry(tmp_path)
 
@@ -316,7 +316,7 @@ class TestLoadVaultConfigWithRegistry:
         assert "1234" in cfg.llm_endpoints["vision_llm"].url
 
     def test_falls_back_to_defaults_without_registry(self, tmp_path: Path) -> None:
-        (tmp_path / "knowledge-base").mkdir()
+        (tmp_path / ".knowledge-base").mkdir()
         cfg = load_vault_config(tmp_path)
         # Fallback uses legacy aliases
         assert "vision" in cfg.llm_endpoints

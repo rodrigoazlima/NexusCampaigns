@@ -24,8 +24,8 @@ export async function POST(req: NextRequest) {
     if (!vaultPath) return NextResponse.json({ error: 'path required' }, { status: 400 })
 
     const normalized = vaultPath.replace(/\\/g, '/')
-    if (!normalized.startsWith('knowledge-base/00-Inbox/')) {
-      return NextResponse.json({ error: 'path must be under knowledge-base/00-Inbox/' }, { status: 400 })
+    if (!normalized.startsWith('.knowledge-base/00-Inbox/')) {
+      return NextResponse.json({ error: 'path must be under .knowledge-base/00-Inbox/' }, { status: 400 })
     }
 
     let queue: Record<string, unknown> = {}

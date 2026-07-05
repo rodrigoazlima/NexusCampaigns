@@ -262,19 +262,22 @@ system/tests/.last-run.json
 **/.smart-env/
 .smart-env/
 .ajson
-knowledge-base/
 
-# Agent-to-agent relation-link mounts (agents/<name>/.agents/<other>) — real
-# directory junctions that cross-link agents into each other (a genuine cycle
-# on disk: agents/repair -> agents/cleanup -> agents/repair -> ...). Ignoring
-# the dot-prefixed mount dir makes git prune descent instead of recursing
-# forever. See Ensure-AgentRelationLinks in agents/runtime/tools/setup-service.ps1
-# and _ensure_agent_relation_links in agents/repair/tools/repair_agent.py.
+# --- Generated junction mounts (naming convention: dot-prefix every one) ---
+# All directory junctions this repo creates (vault link, agent-to-agent links,
+# per-agent system/ mirror) are named with a leading "." specifically so this
+# one block can ignore all of them by pattern. Agent-to-agent mounts in
+# particular form a real cycle on disk (agents/repair/.agents/cleanup <->
+# agents/cleanup/.agents/repair <-> ...); a reparse-point-unaware directory
+# walk (git status, backup, indexers) recurses into that forever unless the
+# mount dir itself is pruned before descent — which is what a gitignore'd
+# directory name achieves. See Ensure-Junction / Ensure-AgentRelationLinks in
+# agents/runtime/tools/setup-service.ps1 and its mirror in
+# agents/repair/tools/repair_agent.py. Keep every new junction dot-prefixed
+# and listed here — don't invent a differently-named mount.
+.knowledge-base/
 .agents/
-
-# Per-agent system/ mirror junctions (agents/repair/system, agents/runtime/system)
-# — duplicate view of the real system/ dir, not new content.
-agents/*/system/
+agents/*/.system/
 
 # OS artifacts
 .DS_Store

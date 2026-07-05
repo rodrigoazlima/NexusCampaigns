@@ -95,7 +95,7 @@ Nexus Campaigns is an AI-powered vault that transforms raw campaign inspiration 
 
 A pipeline of scheduled agents ingests source material, classifies it with vision and language models, generates NPC sheets and circular tokens, enriches metadata, and weaves `[[wikilinks]]` between entities. A human reviews every draft and is the only one who can promote content to canon.
 
-* **Vault root:** `knowledge-base/`
+* **Vault root:** `.knowledge-base/`
 * **Version:** 1.0 · **Date:** 2026-06-09
 
 > Every agent reads `AGENTS.md` before making changes. It is the operating system of this vault.
@@ -211,7 +211,7 @@ Prefer to run the pieces by hand instead of the one-command installer?
    |---------|-------|---------|
    | `ports.dashboard` | `system\.shared\config\global.json` | `48080` |
    | `ports.host` | `system\.shared\config\global.json` | `0.0.0.0` |
-   | `VAULT_ROOT` | `system\.env.local` (or `NEXUS_VAULT_ROOT`) | `<repo>\knowledge-base` |
+   | `VAULT_ROOT` | `system\.env.local` (or `NEXUS_VAULT_ROOT`) | `<repo>\.knowledge-base` |
 4. Start the agent daemon and dashboard — see [Usage](#usage).
 
 ### Installing at a Custom Location
@@ -223,14 +223,14 @@ vault in a separate repo/drive from the app repo? Pass `-ProjectRoot` and
 ```powershell
 pwsh -ExecutionPolicy Bypass -File agents\runtime\tools\setup-service.ps1 `
     -ProjectRoot "C:\path\to\NexusCampaigns" `
-    -VaultRoot   "C:\path\to\vault-repo\knowledge-base"
+    -VaultRoot   "C:\path\to\vault-repo\.knowledge-base"
 ```
 
 * `-ProjectRoot` defaults to the app repo root (parent of `agents\runtime\tools`)
   — only needed if the script is invoked from somewhere else, or wrapped by another script.
-* `-VaultRoot` defaults to `<ProjectRoot>\knowledge-base` — set it to point at a
+* `-VaultRoot` defaults to `<ProjectRoot>\.knowledge-base` — set it to point at a
   separately-cloned vault repo. The script creates the directory if missing and
-  links `<ProjectRoot>\knowledge-base` to it via an NTFS junction.
+  links `<ProjectRoot>\.knowledge-base` to it via an NTFS junction.
 * If `-VaultRoot` already has its own `.git` (e.g. cloned from a separate vault
   repo), do **not** pass `-VaultGitInit` — that flag is only for turning a plain
   folder into a new git repo, and will error/misinit against an existing one.

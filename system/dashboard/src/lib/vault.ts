@@ -30,7 +30,7 @@ import { addSeconds } from './utils'
 export const PROJECT_ROOT =
   process.env.PROJECT_ROOT ?? path.resolve(process.cwd(), '..', '..')
 export const VAULT_ROOT =
-  process.env.VAULT_ROOT ?? path.join(PROJECT_ROOT, 'knowledge-base')
+  process.env.VAULT_ROOT ?? path.join(PROJECT_ROOT, '.knowledge-base')
 
 const AGENTS_DIR = path.join(PROJECT_ROOT, 'agents')
 const STATE_DIR = path.join(PROJECT_ROOT, 'agents', 'runtime', 'state')
@@ -1133,7 +1133,7 @@ export function readInboxImages(): InboxImage[] {
 // ---------------------------------------------------------------------------
 
 const TOKEN_ELIGIBLE_TYPES = new Set(['portrait', 'body'])
-const DEFAULT_MOLDURA = 'knowledge-base/00-Inbox/tokens/Molduras/moldura_default.png'
+const DEFAULT_MOLDURA = '.knowledge-base/00-Inbox/tokens/Molduras/moldura_default.png'
 const TOKEN_CONFIG_PATH = path.join(PROJECT_ROOT, 'system', 'state', 'token-config.json')
 
 export function readVisionState(): Record<string, Record<string, unknown>> {

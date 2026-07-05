@@ -5,7 +5,7 @@ registry.yaml (agent-registry.spec.md) is the single source of truth for
 LLM endpoints, agent definitions, and execution order.
 
 Auto-discovery: walks up from __file__ until finding a directory that
-contains knowledge-base/. Explicit root overrides auto-detect.
+contains .knowledge-base/. Explicit root overrides auto-detect.
 
 Fallback endpoints (no registry.yaml present) match llm-integration.spec.md:
   vision/lore  → localhost:1234  (Qwen3-VL)
@@ -47,12 +47,12 @@ _DEFAULT_ENDPOINTS: dict[str, LLMEndpointConfig] = {
 
 
 def _find_project_root(start: Path) -> Path:
-    """Walk up from start until a directory containing knowledge-base/ is found."""
+    """Walk up from start until a directory containing .knowledge-base/ is found."""
     for candidate in [start.resolve(), *start.resolve().parents]:
-        if (candidate / "knowledge-base").is_dir():
+        if (candidate / ".knowledge-base").is_dir():
             return candidate
     raise FileNotFoundError(
-        f"No project root found (missing knowledge-base/) searching up from {start}"
+        f"No project root found (missing .knowledge-base/) searching up from {start}"
     )
 
 
@@ -108,7 +108,7 @@ def load_vault_config(project_root: Optional[Path] = None) -> VaultConfig:
         endpoints = _DEFAULT_ENDPOINTS
 
     return VaultConfig(
-        vault_paths   = VaultPaths(vault_root=project_root / "knowledge-base"),
+        vault_paths   = VaultPaths(vault_root=project_root / ".knowledge-base"),
         system_paths  = SystemPaths(project_root=project_root),
         llm_endpoints = endpoints,
     )

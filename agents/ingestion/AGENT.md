@@ -40,5 +40,5 @@ state_files:
   - state/processed-docx.txt
   - system/state/inbox-queue.json (shared owner — ingestion writes, others update)
 commit_scope:
-  - knowledge-base/00-Inbox
+  - .knowledge-base/00-Inbox
 ---

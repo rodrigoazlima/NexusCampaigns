@@ -34,5 +34,5 @@ restrictions:
 state_files:
   - state/wikilink-state.json
 commit_scope:
-  - knowledge-base/02-Library
+  - .knowledge-base/02-Library
 ---

@@ -36,7 +36,7 @@ Get-Content 'agents\runtime\state\logs\automation.log' -Tail 50 -Wait
 
 ## Architecture
 
-**Two repos, one working tree.** `knowledge-base/` is an NTFS junction/symlink to a separate vault repo (content, gitignored from this repo's perspective). `agents/` is the Python pipeline; `system/dashboard/` is the Next.js UI. Only `agents/runtime/tools/runner.py` is "static" orchestration code — every other `agents/<name>/` folder is a spec-driven agent, most of which call out to an LLM.
+**Two repos, one working tree.** `.knowledge-base/` is an NTFS junction/symlink to a separate vault repo (content, gitignored from this repo's perspective). `agents/` is the Python pipeline; `system/dashboard/` is the Next.js UI. Only `agents/runtime/tools/runner.py` is "static" orchestration code — every other `agents/<name>/` folder is a spec-driven agent, most of which call out to an LLM.
 
 **Runtime dispatch loop** (`agents/runtime/tools/runner.py`):
 1. `_discover_tasks()` globs `agents/*/agent.json`, orders tasks by `execution_order` in `agents/registry.yaml` (fallback: alphabetical).
@@ -56,7 +56,7 @@ Get-Content 'agents\runtime\state\logs\automation.log' -Tail 50 -Wait
 
 Dungeon Master Nexus Campaigns. Transforms raw inspiration into reusable campaign assets via AI processing + human review.
 
-Root: `knowledge-base`
+Root: `.knowledge-base`
 
 > Every agent reads `AGENTS.md` before making changes. It is the operating system of this vault.
 

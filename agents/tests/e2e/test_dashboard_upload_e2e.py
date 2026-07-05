@@ -35,7 +35,7 @@ pytestmark = pytest.mark.e2e
 _AGENTS_DIR   = Path(__file__).resolve().parents[2]
 _PROJECT_ROOT = _AGENTS_DIR.parent
 _RUNNER_PY    = _AGENTS_DIR / "runtime" / "tools" / "runner.py"
-_VAULT_ROOT   = _PROJECT_ROOT / "knowledge-base"
+_VAULT_ROOT   = _PROJECT_ROOT / ".knowledge-base"
 _INBOX_DIR    = _VAULT_ROOT / "00-Inbox" / "images" / "e2e-upload"
 _QUEUE_FILE   = _PROJECT_ROOT / "system" / "state" / "inbox-queue.json"
 
@@ -64,7 +64,7 @@ def _cleanup():
 
 
 def test_upload_image_and_ingest_into_queue():
-    target_path = f"knowledge-base/00-Inbox/images/e2e-upload/{IMAGE_NAME}"
+    target_path = f".knowledge-base/00-Inbox/images/e2e-upload/{IMAGE_NAME}"
 
     resp = requests.post(
         f"{_DASHBOARD_BASE}/api/gm/upload-image",

@@ -34,7 +34,7 @@ def vision_state_ok(tmp_path: Path) -> dict:
         "version": 2,
         "images": {
             "abc123": {
-                "path": "knowledge-base/00-Inbox/images/A1/hero.png",
+                "path": ".knowledge-base/00-Inbox/images/A1/hero.png",
                 "processedAt": "2026-06-01T00:00:00Z",
                 "originalName": "hero.png",
                 "type": "portrait",
@@ -49,7 +49,7 @@ def vision_state_ok(tmp_path: Path) -> dict:
                 "status": "ok",
             },
             "def456": {
-                "path": "knowledge-base/00-Inbox/images/A1/mage.png",
+                "path": ".knowledge-base/00-Inbox/images/A1/mage.png",
                 "processedAt": "2026-06-01T00:00:00Z",
                 "originalName": "mage.png",
                 "type": "body",
@@ -64,7 +64,7 @@ def vision_state_ok(tmp_path: Path) -> dict:
                 "status": "ok",
             },
             "bmap99": {
-                "path": "knowledge-base/00-Inbox/images/A1/dungeon-map.png",
+                "path": ".knowledge-base/00-Inbox/images/A1/dungeon-map.png",
                 "processedAt": "2026-06-01T00:00:00Z",
                 "originalName": "dungeon-map.png",
                 "type": "battlemap",
@@ -79,7 +79,7 @@ def vision_state_ok(tmp_path: Path) -> dict:
                 "status": "ok",
             },
             "tok111": {
-                "path": "knowledge-base/00-Inbox/images/A1/hero-token.png",
+                "path": ".knowledge-base/00-Inbox/images/A1/hero-token.png",
                 "processedAt": "2026-06-01T00:00:00Z",
                 "originalName": "hero-token.png",
                 "type": "portrait",
@@ -95,10 +95,10 @@ def vision_state_ok(tmp_path: Path) -> dict:
             },
         },
         "pathIndex": {
-            "knowledge-base/00-Inbox/images/A1/hero.png":  "abc123",
-            "knowledge-base/00-Inbox/images/A1/mage.png":  "def456",
-            "knowledge-base/00-Inbox/images/A1/dungeon-map.png": "bmap99",
-            "knowledge-base/00-Inbox/images/A1/hero-token.png":  "tok111",
+            ".knowledge-base/00-Inbox/images/A1/hero.png":  "abc123",
+            ".knowledge-base/00-Inbox/images/A1/mage.png":  "def456",
+            ".knowledge-base/00-Inbox/images/A1/dungeon-map.png": "bmap99",
+            ".knowledge-base/00-Inbox/images/A1/hero-token.png":  "tok111",
         },
     }
 
@@ -108,8 +108,8 @@ def gen_tokens_partial() -> dict:
     """generated-tokens.json with hero already done."""
     return {
         "abc123": {
-            "sourcePath":  "knowledge-base/00-Inbox/images/A1/hero.png",
-            "tokenPath":   "knowledge-base/00-Inbox/images/A1/hero-token.png",
+            "sourcePath":  ".knowledge-base/00-Inbox/images/A1/hero.png",
+            "tokenPath":   ".knowledge-base/00-Inbox/images/A1/hero-token.png",
             "generatedAt": "2026-06-01T00:00:00Z",
         }
     }
@@ -263,14 +263,14 @@ class TestCallToolGenerateToken:
         except ImportError:
             pytest.skip("Pillow not installed")
 
-        img_dir = tmp_path / "knowledge-base" / "00-Inbox" / "images" / "A1"
+        img_dir = tmp_path / ".knowledge-base" / "00-Inbox" / "images" / "A1"
         img_dir.mkdir(parents=True)
         img_path = img_dir / "hero.png"
         Image.new("RGBA", (100, 100), (200, 100, 50, 255)).save(str(img_path))
 
         p = tmp_path / "processed-images.json"
         # update vision_state paths to use tmp_path
-        rel = "knowledge-base/00-Inbox/images/A1/hero.png"
+        rel = ".knowledge-base/00-Inbox/images/A1/hero.png"
         vision_state_ok["pathIndex"][rel] = "abc123"
         p.write_text(json.dumps(vision_state_ok), encoding="utf-8")
 
@@ -303,7 +303,7 @@ class TestCallToolGenerateToken:
         except ImportError:
             pytest.skip("Pillow not installed")
 
-        img_dir = tmp_path / "knowledge-base" / "00-Inbox" / "images" / "A1"
+        img_dir = tmp_path / ".knowledge-base" / "00-Inbox" / "images" / "A1"
         img_dir.mkdir(parents=True)
         img_path = img_dir / "unknown.png"
         Image.new("RGBA", (100, 100), (10, 20, 30, 255)).save(str(img_path))

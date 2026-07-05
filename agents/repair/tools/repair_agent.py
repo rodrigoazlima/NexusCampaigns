@@ -295,34 +295,35 @@ def _ensure_agent_scaffold(log: Logger) -> int:
 # already exists, whether that's an intact junction, a user-created directory,
 # or a stray file. Includes "repair" itself so this agent self-heals too.
 #
-# Agent-to-agent links are cyclic on disk (agents/repair links to agents/cleanup,
-# which links back to agents/repair, etc.). To keep reparse-point-unaware tools
-# (git status, backup, indexers) from recursing into that cycle forever, those
-# mounts live under a dot-prefixed ".agents/" folder instead of "agents/" —
-# see the ".agents/" rule in .gitignore, which prunes descent into every one.
-# Keep the mount name in sync with setup-service.ps1's Ensure-AgentRelationLinks.
+# Every generated mount's top path segment is dot-prefixed by convention
+# (.knowledge-base, .agents, .system, ...) — agents/<name>/agents/<other> in
+# particular is a real cycle on disk (agents/repair links to agents/cleanup,
+# which links back to agents/repair, etc.), and a reparse-point-unaware
+# directory walk (git status, backup, indexers) can recurse into that forever.
+# Dot-prefixing every mount lets a single .gitignore block prune descent into
+# all of them uniformly. Keep in sync with setup-service.ps1's mirror.
 # ---------------------------------------------------------------------------
 
 _AGENT_RELATIONS: dict[str, list[str]] = {
-    "adventure-builder": ["knowledge-base/02-Library", "knowledge-base/03-Campaigns", "agents/lore", "agents/canon", "agents/relationship"],
-    "canon":             ["knowledge-base/02-Library"],
-    "classification":    ["knowledge-base/00-Inbox", "knowledge-base/01-Processing", "knowledge-base/02-Library"],
+    "adventure-builder": [".knowledge-base/02-Library", ".knowledge-base/03-Campaigns", "agents/lore", "agents/canon", "agents/relationship"],
+    "canon":             [".knowledge-base/02-Library"],
+    "classification":    [".knowledge-base/00-Inbox", ".knowledge-base/01-Processing", ".knowledge-base/02-Library"],
     "cleanup":           ["agents/runtime", "agents/review", "agents/repair", "agents/canon", "agents/deduplication"],
-    "curator":           ["knowledge-base/01-Processing"],
-    "deduplication":     ["knowledge-base/00-Inbox", "knowledge-base/01-Processing", "knowledge-base/02-Library"],
-    "encounter-builder": ["knowledge-base/02-Library", "knowledge-base/03-Campaigns"],
-    "ingestion":         ["knowledge-base/00-Inbox", "system/state"],
-    "lore":              ["knowledge-base/00-Inbox", "knowledge-base/01-Processing", "knowledge-base/02-Library", "agents/vision", "system/state"],
-    "relationship":      ["knowledge-base/02-Library", "knowledge-base/04-Relationships"],
+    "curator":           [".knowledge-base/01-Processing"],
+    "deduplication":     [".knowledge-base/00-Inbox", ".knowledge-base/01-Processing", ".knowledge-base/02-Library"],
+    "encounter-builder": [".knowledge-base/02-Library", ".knowledge-base/03-Campaigns"],
+    "ingestion":         [".knowledge-base/00-Inbox", "system/state"],
+    "lore":              [".knowledge-base/00-Inbox", ".knowledge-base/01-Processing", ".knowledge-base/02-Library", "agents/vision", "system/state"],
+    "relationship":      [".knowledge-base/02-Library", ".knowledge-base/04-Relationships"],
     "repair":            ["agents/runtime", "agents/review", "agents/vision", "agents/*", "system"],
-    "review":            ["agents/runtime", "knowledge-base/01-Processing", "agents/*"],
+    "review":            ["agents/runtime", ".knowledge-base/01-Processing", "agents/*"],
     "runtime":           ["agents/*", "system"],
-    "search":            ["knowledge-base/01-Processing", "knowledge-base/02-Library"],
-    "session-builder":   ["knowledge-base/03-Campaigns", "agents/adventure-builder"],
-    "token":             ["agents/vision", "knowledge-base/00-Inbox", "knowledge-base/05-Assets"],
-    "vision":            ["knowledge-base/00-Inbox", "knowledge-base/01-Processing", "system/state"],
-    "wiki":              ["knowledge-base/01-Processing", "knowledge-base/02-Library", "system/state"],
-    "wikilink":          ["knowledge-base/02-Library"],
+    "search":            [".knowledge-base/01-Processing", ".knowledge-base/02-Library"],
+    "session-builder":   [".knowledge-base/03-Campaigns", "agents/adventure-builder"],
+    "token":             ["agents/vision", ".knowledge-base/00-Inbox", ".knowledge-base/05-Assets"],
+    "vision":            [".knowledge-base/00-Inbox", ".knowledge-base/01-Processing", "system/state"],
+    "wiki":              [".knowledge-base/01-Processing", ".knowledge-base/02-Library", "system/state"],
+    "wikilink":          [".knowledge-base/02-Library"],
 }
 
 
@@ -347,11 +348,15 @@ def _ensure_agent_relation_links(log: Logger) -> int:
                 if rel == "agents/*" else [rel]
             )
             for t in targets:
-                target_path = _PROJECT_ROOT / Path(t.replace("/", os.sep))
-                if t.startswith("agents/"):
-                    link_rel = Path(".agents") / t[len("agents/"):]
-                else:
-                    link_rel = Path(t.replace("/", os.sep))
+                # t's first segment may already be dot-prefixed (".knowledge-base/...")
+                # or plain ("agents/...", "system/..."). The real vault root lives on
+                # disk as ".knowledge-base"; "agents" and "system" are real, unprefixed
+                # top-level folders. The per-agent MOUNT name is always dot-prefixed.
+                head, _, tail = t.partition("/")
+                logical = head.lstrip(".")
+                target_first = ".knowledge-base" if logical == "knowledge-base" else logical
+                target_path = _PROJECT_ROOT / Path(target_first) / Path(tail.replace("/", os.sep)) if tail else _PROJECT_ROOT / target_first
+                link_rel = (Path(f".{logical}") / tail.replace("/", os.sep)) if tail else Path(f".{logical}")
                 link_path = agent_root / link_rel
 
                 if link_path.exists():

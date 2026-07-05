@@ -129,7 +129,7 @@ class TestBaseAgent:
 
 @pytest.fixture
 def vault_cfg(tmp_path):
-    kb = tmp_path / "knowledge-base"
+    kb = tmp_path / ".knowledge-base"
     kb.mkdir()
     return VaultConfig(
         vault_paths  = VaultPaths(vault_root=kb),

@@ -50,8 +50,8 @@ from shared.models import (
 
 @pytest.fixture
 def vault(tmp_path):
-    """Minimal vault directory structure mirroring knowledge-base/."""
-    kb = tmp_path / "knowledge-base"
+    """Minimal vault directory structure mirroring .knowledge-base/."""
+    kb = tmp_path / ".knowledge-base"
     for folder in [
         "00-Inbox/images",
         "00-Inbox/docs",
@@ -98,9 +98,9 @@ def logger_setup(vault):
 class TestConfigToPathResolution:
     def test_load_vault_config_derives_all_paths(self, vault):
         cfg = load_vault_config(vault)
-        assert cfg.vault_paths.inbox   == vault / "knowledge-base" / "00-Inbox"
-        assert cfg.vault_paths.library == vault / "knowledge-base" / "02-Library"
-        assert cfg.vault_paths.processing == vault / "knowledge-base" / "01-Processing"
+        assert cfg.vault_paths.inbox   == vault / ".knowledge-base" / "00-Inbox"
+        assert cfg.vault_paths.library == vault / ".knowledge-base" / "02-Library"
+        assert cfg.vault_paths.processing == vault / ".knowledge-base" / "01-Processing"
 
     def test_system_paths_resolve_from_same_root(self, vault):
         cfg = load_vault_config(vault)
@@ -256,7 +256,7 @@ class TestInboxQueueLifecycle:
         now = datetime.now(timezone.utc).isoformat()
         store.update(lambda q: {
             **q,
-            "knowledge-base/00-Inbox/images/portrait.png": {
+            ".knowledge-base/00-Inbox/images/portrait.png": {
                 "ingestedAt": now,
                 "type":       "image",
                 "agents": {
@@ -269,11 +269,11 @@ class TestInboxQueueLifecycle:
         })
 
         q = store.load()
-        assert "knowledge-base/00-Inbox/images/portrait.png" in q
+        assert ".knowledge-base/00-Inbox/images/portrait.png" in q
 
     def test_mark_vision_done_updates_slot(self, vault):
         store = self._make_queue_store(vault)
-        key   = "knowledge-base/00-Inbox/images/portrait.png"
+        key   = ".knowledge-base/00-Inbox/images/portrait.png"
         store.save({
             key: {
                 "ingestedAt": datetime.now(timezone.utc).isoformat(),

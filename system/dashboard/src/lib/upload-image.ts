@@ -5,7 +5,7 @@ const ALLOWED_EXTS = new Set([
 
 export interface UploadImageOptions {
   file: File
-  /** Relative to PROJECT_ROOT. Defaults to `knowledge-base/00-Inbox/images/{file.name}` */
+  /** Relative to PROJECT_ROOT. Defaults to `.knowledge-base/00-Inbox/images/{file.name}` */
   targetPath?: string
 }
 
@@ -44,7 +44,7 @@ export async function enqueueImage(vaultPath: string): Promise<EnqueueResult> {
 }
 
 export async function uploadImage(options: UploadImageOptions): Promise<UploadImageResult> {
-  const { file, targetPath = `knowledge-base/00-Inbox/images/${file.name}` } = options
+  const { file, targetPath = `.knowledge-base/00-Inbox/images/${file.name}` } = options
 
   const form = new FormData()
   form.append('file', file)
