@@ -36,7 +36,11 @@ export default function InboxImageCard({ item }: InboxImageCardProps) {
         className="aspect-square overflow-hidden bg-surface-3 relative w-full cursor-zoom-in block"
         onClick={(e) => {
           e.stopPropagation()
-          setModalOpen(true)
+          if (item.entityId) {
+            router.push(`/gm/view/${encodeURIComponent(item.entityId)}`)
+          } else {
+            setModalOpen(true)
+          }
         }}
         title="Click to enlarge"
       >
