@@ -752,7 +752,10 @@ if ($Uninstall) {
         Remove-ItemProperty $regPath -Name $DashboardRun -Force
         Log "HKCU Run key '$DashboardRun' removed."
     }
-    # Stop any next.js dashboard process bound to the port
+    # Stop any next.js dashboard process bound to the port, and wait for actual exit —
+    # Stop-Process -Force returns before the process handle is released, so a caller
+    # that immediately does Remove-Item on the dashboard dir can still hit "file in use"
+    # (e.g. dashboard-stderr.log) even though this block already "stopped" it.
     $dProc = Get-NetTCPConnection -State Listen -LocalPort $DashboardPort -ErrorAction SilentlyContinue
     if ($dProc) {
         $dProc.OwningProcess | Sort-Object -Unique | ForEach-Object {
@@ -761,10 +764,34 @@ if ($Uninstall) {
         }
     }
 
+    # Next.js dev spawns worker processes (separate PIDs from the port listener) that
+    # can still hold file handles in the dashboard dir — catch those by command line too.
+    Get-Process node -ErrorAction SilentlyContinue |
+        Where-Object { $_.CommandLine -like "*$DashboardDir*" -or $_.CommandLine -like "*next*dev*" -or $_.CommandLine -like "*next*start*" } |
+        ForEach-Object { Log "Stopping dashboard worker PID=$($_.Id)"; Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }
+
     # Kill any lingering daemon/runner processes
     Get-Process powershell, python -ErrorAction SilentlyContinue |
         Where-Object { $_.CommandLine -like "*daemon.ps1*" -or $_.CommandLine -like "*runner.py*" } |
         ForEach-Object { Log "Stopping process PID=$($_.Id)"; Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }
+
+    # Wait (up to 10s) for every PID we just told to die to actually exit before
+    # returning — callers (custom-install.ps1) chain a Remove-Item right after -Uninstall.
+    $allPids = @()
+    if ($dProc) { $allPids += $dProc.OwningProcess }
+    $allPids += (Get-Process node -ErrorAction SilentlyContinue |
+        Where-Object { $_.CommandLine -like "*$DashboardDir*" -or $_.CommandLine -like "*next*dev*" -or $_.CommandLine -like "*next*start*" }).Id
+    $allPids = $allPids | Sort-Object -Unique
+    if ($allPids) {
+        $waited = 0
+        while (($allPids | Where-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue }) -and $waited -lt 10) {
+            Start-Sleep -Milliseconds 500
+            $waited += 0.5
+        }
+        $stillAlive = $allPids | Where-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue }
+        if ($stillAlive) { Log "PID(s) still alive after ${waited}s: $($stillAlive -join ', ') — file locks may persist." "WARN" }
+        else { Log "All stopped processes confirmed exited." }
+    }
 
     Log "Uninstall complete."
     exit 0
