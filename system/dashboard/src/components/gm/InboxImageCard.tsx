@@ -31,9 +31,11 @@ export default function InboxImageCard({ item }: InboxImageCardProps) {
         if (item.entityId) router.push(`/gm/view/${encodeURIComponent(item.entityId)}`)
       }}
     >
-      {/* Image thumbnail */}
+      {/* Image thumbnail — shrink-wrapped to the image's own box (w-fit) so the
+          Stuck/Token badges below anchor to the image corners, not empty column space.
+          max-w-full + h-auto on the img: never upscaled past its source size. */}
       <button
-        className="aspect-square overflow-hidden bg-surface-3 relative w-full cursor-zoom-in block"
+        className="block w-fit max-w-full min-w-24 min-h-24 mx-auto overflow-hidden bg-surface-3 relative cursor-zoom-in"
         onClick={(e) => {
           e.stopPropagation()
           if (item.entityId) {
@@ -46,9 +48,11 @@ export default function InboxImageCard({ item }: InboxImageCardProps) {
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={src}
+          src={`${src}&thumb=1`}
           alt={item.filename}
-          className="w-full h-full object-cover"
+          loading="lazy"
+          decoding="async"
+          className="block max-w-full h-auto"
           onError={(e) => {
             const target = e.target as HTMLImageElement
             target.style.display = 'none'

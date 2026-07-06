@@ -227,6 +227,8 @@ agents/runtime/state/tasks-state.json
 agents/runtime/state/logs/
 
 # Per-agent mutable state (regenerated each run)
+agents/thumbnails/state/
+system/state/thumbs/
 agents/ingestion/state/processed-docx.txt
 agents/vision/state/processed-images.json
 agents/vision/state/token-links.json

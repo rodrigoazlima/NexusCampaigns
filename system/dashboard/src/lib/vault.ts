@@ -392,7 +392,10 @@ type RawDraft = ReviewItem & { _keyCount: number; _hasName: boolean }
 function readRawDrafts(): RawDraft[] {
   const processingDir = path.join(VAULT_ROOT, '01-Processing')
   const drafts: RawDraft[] = []
-  const genTokens = readGeneratedTokens()
+  const tokenBySource = new Map<string, string>()
+  for (const t of Object.values(readGeneratedTokens())) {
+    tokenBySource.set(t.sourcePath, t.tokenPath)
+  }
 
   let files: string[]
   try {
@@ -419,9 +422,9 @@ function readRawDrafts(): RawDraft[] {
       let tokenPath: string | null = null
       if (srcPath) {
         const normSrc = srcPath.replace(/\\/g, '/')
-        const tokenEntry = Object.values(genTokens).find((t) => t.sourcePath === normSrc)
-        if (tokenEntry) {
-          tokenPath = tokenEntry.tokenPath
+        const indexed = tokenBySource.get(normSrc)
+        if (indexed) {
+          tokenPath = indexed
         } else {
           const srcBase = normSrc.replace(/\.[^.]+$/, '')
           const candidate = `${srcBase}-token.png`
@@ -1109,19 +1112,59 @@ export function parseTreasure(filepath: string, tags: string[]): {
   }
 }
 
+// ponytail: mtime+TTL memo, swap for fs.watch if staleness ever bites
+let inboxCache: { mtimeMs: number; at: number; data: InboxImage[] } | null = null
+const INBOX_CACHE_TTL_MS = 15_000
+
 export function readInboxImages(): InboxImage[] {
+  const queueFile = path.join(SHARED_DIR, 'inbox-queue.json')
+  let mtimeMs = 0
+  try {
+    mtimeMs = fs.statSync(queueFile).mtimeMs
+  } catch {
+    return []
+  }
+  if (
+    inboxCache &&
+    inboxCache.mtimeMs === mtimeMs &&
+    Date.now() - inboxCache.at < INBOX_CACHE_TTL_MS
+  ) {
+    return inboxCache.data
+  }
+
   const raw = readJson<Record<string, {
     ingestedAt: string
     type: string
     agents: Record<string, string>
-  }>>(path.join(SHARED_DIR, 'inbox-queue.json'))
+  }>>(queueFile)
 
   if (!raw) return []
 
   const imageExts = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif'])
   const cutoff24h = Date.now() - 24 * 60 * 60 * 1000
   const results: InboxImage[] = []
-  const drafts = readRawDrafts()
+
+  // First draft per normalized source path (same pick as the old linear .find)
+  const draftBySource = new Map<string, RawDraft>()
+  for (const d of readRawDrafts()) {
+    const src = d.source[0]?.replace(/\\/g, '/')
+    if (src && !draftBySource.has(src)) draftBySource.set(src, d)
+  }
+
+  // One readdir per unique directory instead of one existsSync per image
+  const dirListings = new Map<string, Set<string>>()
+  const listDir = (dir: string): Set<string> => {
+    let names = dirListings.get(dir)
+    if (!names) {
+      try {
+        names = new Set(fs.readdirSync(dir))
+      } catch {
+        names = new Set()
+      }
+      dirListings.set(dir, names)
+    }
+    return names
+  }
 
   for (const [queuePath, entry] of Object.entries(raw)) {
     const filename = path.basename(queuePath)
@@ -1130,12 +1173,14 @@ export function readInboxImages(): InboxImage[] {
 
     const absolutePath = path.join(PROJECT_ROOT, queuePath)
     const dir = path.dirname(absolutePath)
+    const dirNames = listDir(dir)
+    // Stale queue entries (file deleted from disk) would render as blank cards
+    if (!dirNames.has(filename)) continue
     const base = filename.replace(/\.[^.]+$/, '')
     const tokenFilename = `${base}-token.png`
-    const tokenAbsPath = path.join(dir, tokenFilename)
-    const hasToken = fs.existsSync(tokenAbsPath)
+    const hasToken = dirNames.has(tokenFilename)
     const tokenPath = hasToken
-      ? path.relative(PROJECT_ROOT, tokenAbsPath).replace(/\\/g, '/')
+      ? path.relative(PROJECT_ROOT, path.join(dir, tokenFilename)).replace(/\\/g, '/')
       : null
 
     const agentStatuses = Object.values(entry.agents)
@@ -1144,7 +1189,7 @@ export function readInboxImages(): InboxImage[] {
     const isStuck = anyPending && !isNaN(ingestedTime) && ingestedTime < cutoff24h
 
     const normQueuePath = queuePath.replace(/\\/g, '/')
-    const draft = drafts.find((d) => d.source[0]?.replace(/\\/g, '/') === normQueuePath)
+    const draft = draftBySource.get(normQueuePath)
     const entityId = draft ? (draft.uuid || draft.id) : null
 
     results.push({
@@ -1166,6 +1211,7 @@ export function readInboxImages(): InboxImage[] {
     return new Date(b.ingestedAt).getTime() - new Date(a.ingestedAt).getTime()
   })
 
+  inboxCache = { mtimeMs, at: Date.now(), data: results }
   return results
 }
 

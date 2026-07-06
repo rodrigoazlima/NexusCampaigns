@@ -56,6 +56,20 @@ body {
   background: #52525b;
 }
 
+/* Masonry (react-masonry-css) — library ships no CSS of its own */
+.masonry-grid {
+  display: flex;
+  margin-left: -1rem;
+  width: auto;
+}
+.masonry-grid_column {
+  padding-left: 1rem;
+  background-clip: padding-box;
+}
+.masonry-grid_column > * {
+  margin-bottom: 1rem;
+}
+
 /* Glass panel */
 .panel {
   background: #111113;

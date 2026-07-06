@@ -144,6 +144,13 @@ export interface InboxImage {
   entityId: string | null
 }
 
+export interface InboxPage {
+  total: number
+  stuck: number
+  withToken: number
+  items: InboxImage[]
+}
+
 export interface TokenFile {
   path: string
   filename: string

@@ -19,6 +19,7 @@ outputs:
   - agents/*/state/ (missing dirs created)
   - agents/*/<related-path> (missing junctions recreated, per docs/specs/agents/agent-relationships.md)
   - agents/vision/state/processed-images.json (invalid refs pruned/flagged)
+  - system/state/inbox-queue.json (entries pruned whose file no longer exists)
   - agents/review/state/reports/repair-YYYY-MM-DD.json
   - agents/repair/state/logs/repair_agent_YYYY-MM-DD.log
 dependencies: []
@@ -32,6 +33,7 @@ responsibilities:
   - CreateMissingDirs: ensure all directories in shared.defaults.REQUIRED_DIRS exist
   - EnsureAgentRelationLinks: recreate any deleted agents/<name>/<related-path> junction (including repair's own); never touches a path that already exists
   - ValidateImageRefs: verify processed-images.json entries by SHA256 identity; prune missing files, flag hash mismatches
+  - ValidateInboxQueue: prune inbox-queue.json entries whose source file no longer exists on disk
   - DetectOverdueAgents: flag any agent not run within 2 × intervalSeconds
   - CheckDashboardHealth: probe dashboard TCP port + HTTP GET; no fix applied, report-only
   - WriteRepairReport: emit repair-YYYY-MM-DD.json to agents/review/state/reports/

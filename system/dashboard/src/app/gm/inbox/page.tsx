@@ -1,68 +1,102 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import type { InboxImage } from '@/lib/types'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import Masonry from 'react-masonry-css'
+import type { InboxImage, InboxPage } from '@/lib/types'
 import PageHeader from '@/components/widgets/PageHeader'
 import InboxImageCard from '@/components/gm/InboxImageCard'
 import { Image, Loader2, AlertTriangle } from 'lucide-react'
 
+const MASONRY_BREAKPOINTS = { default: 4, 1279: 3, 1023: 2, 639: 1 }
+const PAGE_SIZE = 60
+
 export default function GMInboxPage() {
   const [items, setItems] = useState<InboxImage[]>([])
+  const [summary, setSummary] = useState<Pick<InboxPage, 'total' | 'stuck' | 'withToken'> | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const fetchingRef = useRef(false)
+  const sentinelRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    fetch('/api/gm/inbox')
+  const loadPage = useCallback((offset: number) => {
+    if (fetchingRef.current) return
+    fetchingRef.current = true
+    fetch(`/api/gm/inbox?offset=${offset}&limit=${PAGE_SIZE}`)
       .then((r) => {
         if (!r.ok) throw new Error('Failed to load')
         return r.json()
       })
-      .then((data: InboxImage[]) => {
-        setItems(data)
-        setLoading(false)
+      .then((data: InboxPage) => {
+        setSummary({ total: data.total, stuck: data.stuck, withToken: data.withToken })
+        setItems((prev) => {
+          if (offset === 0) return data.items
+          const seen = new Set(prev.map((i) => i.path))
+          return [...prev, ...data.items.filter((i) => !seen.has(i.path))]
+        })
       })
-      .catch((err) => {
-        setError(String(err))
+      .catch((err) => setError(String(err)))
+      .finally(() => {
+        fetchingRef.current = false
         setLoading(false)
       })
   }, [])
 
-  const stuck = items.filter((i) => i.isStuck)
-  const withToken = items.filter((i) => i.hasToken)
+  useEffect(() => {
+    loadPage(0)
+  }, [loadPage])
+
+  const hasMore = summary !== null && items.length < summary.total
+
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el || !hasMore) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) loadPage(items.length)
+      },
+      { rootMargin: '600px' }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [hasMore, items.length, loadPage])
+
+  const total = summary?.total ?? 0
+  const stuckCount = summary?.stuck ?? 0
+  const withTokenCount = summary?.withToken ?? 0
 
   return (
     <div className="p-4 md:p-6">
       <PageHeader
         icon={Image}
         title="Inbox Gallery"
-        subtitle={`${items.length} images in queue`}
+        subtitle={`${total} images in queue`}
       />
 
       {/* Stats strip */}
-      {!loading && items.length > 0 && (
+      {!loading && total > 0 && (
         <div className="flex flex-wrap gap-3 mb-6">
           <div className="panel px-4 py-3 flex items-center gap-2">
-            <span className="text-2xl font-mono font-bold text-zinc-200">{items.length}</span>
+            <span className="text-2xl font-mono font-bold text-zinc-200">{total}</span>
             <span className="text-xs text-zinc-500">total images</span>
           </div>
           <div className="panel px-4 py-3 flex items-center gap-2">
-            <span className={`text-2xl font-mono font-bold ${stuck.length > 0 ? 'text-danger' : 'text-success'}`}>
-              {stuck.length}
+            <span className={`text-2xl font-mono font-bold ${stuckCount > 0 ? 'text-danger' : 'text-success'}`}>
+              {stuckCount}
             </span>
             <span className="text-xs text-zinc-500">stuck (&gt;24h)</span>
           </div>
           <div className="panel px-4 py-3 flex items-center gap-2">
-            <span className="text-2xl font-mono font-bold text-success">{withToken.length}</span>
+            <span className="text-2xl font-mono font-bold text-success">{withTokenCount}</span>
             <span className="text-xs text-zinc-500">with token</span>
           </div>
         </div>
       )}
 
       {/* Stuck warning */}
-      {!loading && stuck.length > 0 && (
+      {!loading && stuckCount > 0 && (
         <div className="mb-4 p-3 rounded-lg border border-danger/30 bg-danger/5 flex items-center gap-2 text-sm">
           <AlertTriangle size={15} className="text-danger flex-shrink-0" />
-          <span className="text-danger font-medium">{stuck.length} items</span>
+          <span className="text-danger font-medium">{stuckCount} items</span>
           <span className="text-zinc-400">have been in the queue for over 24 hours without completing</span>
         </div>
       )}
@@ -77,7 +111,7 @@ export default function GMInboxPage() {
         <div className="panel p-12 text-center">
           <div className="text-danger text-sm">{error}</div>
         </div>
-      ) : items.length === 0 ? (
+      ) : total === 0 ? (
         <div className="panel p-12 text-center">
           {/* eslint-disable-next-line jsx-a11y/alt-text */}
           <Image size={28} className="mx-auto text-zinc-600 mb-3" />
@@ -87,11 +121,22 @@ export default function GMInboxPage() {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {items.map((item) => (
-            <InboxImageCard key={item.path} item={item} />
-          ))}
-        </div>
+        <>
+          <Masonry
+            breakpointCols={MASONRY_BREAKPOINTS}
+            className="masonry-grid"
+            columnClassName="masonry-grid_column"
+          >
+            {items.map((item) => (
+              <InboxImageCard key={item.path} item={item} />
+            ))}
+          </Masonry>
+          {hasMore && (
+            <div ref={sentinelRef} className="p-6 text-center">
+              <Loader2 size={16} className="mx-auto text-zinc-600 animate-spin" />
+            </div>
+          )}
+        </>
       )}
     </div>
   )

@@ -8,6 +8,7 @@ Actions (per agent-repair.spec.md):
   CreateMissingDirs       — ensure all required dirs exist
   EnsureAgentRelationLinks — recreate deleted agents/<name>/<related-path> junctions
   ValidateImageRefs       — verify processed-images.json refs by SHA256 identity
+  ValidateInboxQueue      — prune inbox-queue.json entries whose file is gone
   DetectOverdueAgents     — flag agents not run within 2 × intervalSeconds
   WriteRepairReport       — emit repair-YYYY-MM-DD.json to reports dir
 """
@@ -226,6 +227,12 @@ _AGENT_JSON_SPECS: dict[str, list[dict]] = {
          "tools_module": "cleanup.tools.cleanup_agent", "interval": 86400,
          "description": "Prune old logs and stale state."},
     ],
+    "thumbnails": [
+        {"task_id": "thumbnails-agent", "interval": 3600,
+         "dispatch": "cli", "cli_args": ["agents/thumbnails/tools/thumbnails_agent.py"],
+         "timeout": 1800,
+         "description": "Pre-generate 320px webp thumbnails for inbox images."},
+    ],
 }
 
 
@@ -238,17 +245,29 @@ def _generate_missing_agent_configs(log: Logger) -> int:
             continue
         payload: dict[str, Any] = {"tasks": {}}
         for t in tasks:
-            payload["tasks"][t["task_id"]] = {
-                "intervalSeconds": t["interval"],
-                "description": t["description"],
-                "dispatch": {
+            if t.get("dispatch") == "cli":
+                dispatch: dict[str, Any] = {
+                    "type": "cli",
+                    "cli": {
+                        "command": "python",
+                        "args": t["cli_args"],
+                        "cwd": "project_root",
+                        "timeout_seconds": t.get("timeout", 300),
+                    },
+                }
+            else:
+                dispatch = {
                     "type": "claude-api",
                     "claude_api": {
                         "model": t["model"],
                         "tools_module": t["tools_module"],
                         "prompt_file": t.get("prompt_file", "prompts/system.md"),
                     },
-                },
+                }
+            payload["tasks"][t["task_id"]] = {
+                "intervalSeconds": t["interval"],
+                "description": t["description"],
+                "dispatch": dispatch,
             }
         agent_json.parent.mkdir(parents=True, exist_ok=True)
         agent_json.write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -460,6 +479,48 @@ def _validate_image_refs(log: Logger) -> tuple[int, list[str]]:
 
 
 # ---------------------------------------------------------------------------
+# ValidateInboxQueue — prune entries whose source file is gone
+# ---------------------------------------------------------------------------
+
+def _validate_inbox_queue(log: Logger) -> tuple[int, list[str]]:
+    """Prune inbox-queue.json entries whose file no longer exists on disk.
+
+    Ingestion registers every file under 00-Inbox/ but by design never removes
+    an entry once its file disappears — it only logs a "phantom" warning (see
+    ingestion/CLAUDE.md). Renamed-outside-the-normal-flow, deleted, or
+    overwritten-by-collision files then sit in the queue as 'pending' forever,
+    since nothing can ever mark them done — inflating the dashboard's queue
+    count long after the files themselves are gone.
+
+    Returns (repairs_applied, pruned_paths).
+    """
+    if not _QUEUE_FILE.exists():
+        return 0, []
+
+    try:
+        queue: dict[str, Any] = json.loads(
+            _QUEUE_FILE.read_text(encoding="utf-8").lstrip("﻿")
+        )
+    except Exception as exc:
+        log.error(f"inbox-queue read error: {exc}")
+        return 0, []
+
+    pruned: list[str] = []
+    for rel_path in list(queue.keys()):
+        if not (_PROJECT_ROOT / rel_path).exists():
+            del queue[rel_path]
+            pruned.append(rel_path)
+            log.info(f"Pruned missing inbox-queue ref: {rel_path}")
+
+    if pruned:
+        tmp = _QUEUE_FILE.with_suffix(".tmp")
+        tmp.write_text(json.dumps(queue, indent=2, default=str), encoding="utf-8")
+        tmp.replace(_QUEUE_FILE)
+
+    return len(pruned), pruned
+
+
+# ---------------------------------------------------------------------------
 # DetectOverdueAgents
 # ---------------------------------------------------------------------------
 
@@ -568,6 +629,7 @@ def _write_repair_report(
     log: Logger,
     git_update: dict | None = None,
     dashboard_health: dict | None = None,
+    pruned_queue_refs: list[str] | None = None,
 ) -> None:
     _REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     today = datetime.now().strftime("%Y-%m-%d")
@@ -581,6 +643,7 @@ def _write_repair_report(
         "repairsApplied":    repairs_applied,
         "overdueAgents":     overdue_agents,
         "invalidImageRefs":  invalid_refs,
+        "prunedInboxQueueRefs": pruned_queue_refs or [],
         "dashboardHealth":   dashboard_health,
     }
 
@@ -623,11 +686,15 @@ def main() -> None:
     img_repairs, invalid_refs = _run_step(log, "validate_image_refs", lambda: _validate_image_refs(log), (0, []))
     repairs += img_repairs
 
+    queue_repairs, pruned_queue_refs = _run_step(log, "validate_inbox_queue", lambda: _validate_inbox_queue(log), (0, []))
+    repairs += queue_repairs
+
     overdue   = _run_step(log, "detect_overdue_agents", lambda: _detect_overdue_agents(log), [])
     dashboard = _run_step(log, "check_dashboard_health", lambda: _check_dashboard_health(log),
                            {"port": None, "portListening": False, "httpStatus": None, "healthy": False})
 
-    _write_repair_report(fix_labels, repairs, overdue, invalid_refs, log, git_update=git_result, dashboard_health=dashboard)
+    _write_repair_report(fix_labels, repairs, overdue, invalid_refs, log, git_update=git_result,
+                          dashboard_health=dashboard, pruned_queue_refs=pruned_queue_refs)
 
     log.done(t0, key="repairs", count=repairs, failed=0)
     sys.exit(0)
@@ -707,6 +774,15 @@ TOOLS = SELF_MANAGEMENT_TOOLS + [
         "input_schema": {"type": "object", "properties": {}},
     },
     {
+        "name": "validate_inbox_queue",
+        "description": (
+            "Prune inbox-queue.json entries whose source file no longer exists on disk. "
+            "Ingestion never removes an entry once its file is gone, so this is the only "
+            "thing that shrinks the dashboard's queue count back to reality."
+        ),
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
         "name": "detect_overdue_agents",
         "description": (
             "Check all registered agents against their intervalSeconds. "
@@ -738,6 +814,7 @@ TOOLS = SELF_MANAGEMENT_TOOLS + [
                 "overdue_agents": {"type": "array",   "items": {"type": "string"}, "description": "Task IDs flagged as overdue"},
                 "invalid_refs":   {"type": "array",   "items": {"type": "string"}, "description": "Image paths with invalid or missing refs"},
                 "dashboard_health": {"type": "object", "description": "Result of check_dashboard_health, if run"},
+                "pruned_queue_refs": {"type": "array", "items": {"type": "string"}, "description": "Inbox-queue paths pruned by validate_inbox_queue, if run"},
             },
             "required": ["fix_labels", "repairs_applied", "overdue_agents", "invalid_refs"],
         },
@@ -785,6 +862,10 @@ def call_tool(name: str, args: dict, context: dict) -> str:
         n, invalid = _validate_image_refs(log)
         return json.dumps({"repairsApplied": n, "invalidImageRefs": invalid})
 
+    if name == "validate_inbox_queue":
+        n, pruned = _validate_inbox_queue(log)
+        return json.dumps({"repairsApplied": n, "prunedInboxQueueRefs": pruned})
+
     if name == "detect_overdue_agents":
         overdue = _detect_overdue_agents(log)
         return json.dumps({"overdueAgents": overdue})
@@ -800,6 +881,7 @@ def call_tool(name: str, args: dict, context: dict) -> str:
             invalid_refs=args.get("invalid_refs", []),
             log=log,
             dashboard_health=args.get("dashboard_health"),
+            pruned_queue_refs=args.get("pruned_queue_refs"),
         )
         return "Repair report written"
 

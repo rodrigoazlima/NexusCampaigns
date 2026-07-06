@@ -841,11 +841,19 @@ def _read_inbox_queue() -> dict:
 
 
 def _inbox_has_slot(slot: str) -> bool:
-    """Return True if inbox-queue has at least one entry with agents.<slot> == 'pending'."""
+    """Return True if inbox-queue has at least one entry with agents.<slot> == 'pending'
+    whose file still exists on disk.
+
+    Queue entries can outlive their file (renamed outside the normal vision-rename
+    flow, deleted, or silently overwritten by a filename collision) and would
+    otherwise stay 'pending' forever, triggering a dispatch every due cycle that
+    can never actually complete the work. Skip those rather than treating them
+    as pending.
+    """
     queue = _read_inbox_queue()
-    for entry in queue.values():
+    for rel_path, entry in queue.items():
         agents = entry.get("agents", {}) if isinstance(entry, dict) else {}
-        if agents.get(slot) == "pending":
+        if agents.get(slot) == "pending" and (_PROJECT_ROOT / rel_path).exists():
             return True
     return False
 

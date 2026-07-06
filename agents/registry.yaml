@@ -53,6 +53,7 @@ execution_order:
   - review
   - wikilink
   - cleanup
+  - thumbnails
 
 shared_state_files:
   inbox-queue.json:
@@ -189,6 +190,18 @@ agents:
     llm: none
     tools:
       - tools/cleanup_agent.py
+
+  thumbnails:
+    status: active
+    task_id: thumbnails-agent
+    interval_seconds: 3600
+    llm: none
+    description: "Pre-generate 320px webp thumbnails for inbox images (dashboard gallery)."
+    tools:
+      - tools/thumbnails_agent.py
+    shared_state:
+      reads:
+        - system/state/inbox-queue.json
 
   relationship:
     status: planned
