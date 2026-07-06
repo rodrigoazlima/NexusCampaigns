@@ -36,6 +36,7 @@ from shared import (  # noqa: E402
     locked_update_queue_entry,
 )
 from shared.config import LLMEndpointConfig  # noqa: E402
+from shared.loaders import load_llm_endpoint  # noqa: E402
 
 TASK_ID         = "lore-agent"
 SCRIPT_BASENAME = "generate_npcs.py"
@@ -55,11 +56,17 @@ _QUEUE_FILE   = _SHARED_STATE / "inbox-queue.json"
 _PROMPT_FILE  = _AGENTS_DIR / "lore" / "prompts" / "generate-npc.txt"
 _REVISE_FILE  = _AGENTS_DIR / "lore" / "prompts" / "revise-npc.md"
 
-_LLM_CFG = LLMEndpointConfig(
-    url      = "http://localhost:1234/v1/chat/completions",
-    model    = "qwen3-vl-4b-instruct",
-    type     = "vision",
-    provider = "lmstudio",
+_LLM_CFG = load_llm_endpoint(
+    "vision_llm",
+    fallback = LLMEndpointConfig(
+        url      = "http://localhost:1234/v1/chat/completions",
+        model    = "qwen3-vl-4b-instruct",
+        type     = "vision",
+        provider = "lmstudio",
+    ),
+    agent_dir    = _AGENTS_DIR / "lore",
+    task_id      = TASK_ID,
+    project_root = _PROJECT_ROOT,
 )
 
 _CHARACTER_TYPES = frozenset({"portrait", "body", "token"})

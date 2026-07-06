@@ -36,7 +36,7 @@ from shared import (  # noqa: E402
     to_slug,
 )
 from shared.config import LLMEndpointConfig  # noqa: E402
-from shared.loaders import load_vault_config  # noqa: E402
+from shared.loaders import load_llm_endpoint  # noqa: E402
 from shared.models import Element, Environment, ImageType  # noqa: E402
 
 TASK_ID         = "vision-agent"
@@ -74,14 +74,13 @@ _FALLBACK_LLM_CFG = LLMEndpointConfig(
 )
 
 
-def _load_llm_cfg() -> LLMEndpointConfig:
-    try:
-        return load_vault_config(_PROJECT_ROOT).llm_endpoints["vision_llm"]
-    except Exception:
-        return _FALLBACK_LLM_CFG
-
-
-_LLM_CFG = _load_llm_cfg()
+_LLM_CFG = load_llm_endpoint(
+    "vision_llm",
+    fallback     = _FALLBACK_LLM_CFG,
+    agent_dir    = _AGENTS_DIR / "vision",
+    task_id      = TASK_ID,
+    project_root = _PROJECT_ROOT,
+)
 
 
 # ---------------------------------------------------------------------------

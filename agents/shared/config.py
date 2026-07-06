@@ -31,6 +31,7 @@ class LLMEndpointConfig:
     model:    str
     type:     str      # "vision" | "text"
     provider: str
+    timeout_seconds: int = 120   # per-request read timeout for LLMClient
 
 
 @dataclass(frozen=True)

@@ -14,6 +14,8 @@ Fallback endpoints (no registry.yaml present) match llm-integration.spec.md:
 
 from __future__ import annotations
 
+import dataclasses
+import json
 from pathlib import Path
 from typing import Optional
 
@@ -95,10 +97,11 @@ def load_vault_config(project_root: Optional[Path] = None) -> VaultConfig:
             registry = load_registry(project_root)
             endpoints: dict[str, LLMEndpointConfig] = {
                 alias: LLMEndpointConfig(
-                    url      = ep.url,
-                    model    = ep.model,
-                    type     = ep.type,
-                    provider = ep.provider,
+                    url             = ep.url,
+                    model           = ep.model,
+                    type            = ep.type,
+                    provider        = ep.provider,
+                    timeout_seconds = ep.timeout_seconds,
                 )
                 for alias, ep in registry.llm_endpoints.items()
             }
@@ -112,3 +115,37 @@ def load_vault_config(project_root: Optional[Path] = None) -> VaultConfig:
         system_paths  = SystemPaths(project_root=project_root),
         llm_endpoints = endpoints,
     )
+
+
+def load_llm_endpoint(
+    alias: str,
+    *,
+    fallback: LLMEndpointConfig,
+    agent_dir: Optional[Path] = None,
+    task_id: Optional[str] = None,
+    project_root: Optional[Path] = None,
+) -> LLMEndpointConfig:
+    """Resolve an LLM endpoint config for one agent tool script.
+
+    Precedence for timeout_seconds (highest wins):
+      1. agent.json  tasks.<task_id>.llm.timeout_seconds
+      2. registry.yaml  llm_endpoints.<alias>.timeout_seconds
+      3. LLMEndpointConfig default (120)
+
+    Endpoint url/model/type/provider come from registry.yaml when present,
+    else from ``fallback`` (each script's hardcoded config).
+    """
+    try:
+        cfg = load_vault_config(project_root).llm_endpoints[alias]
+    except Exception:
+        cfg = fallback
+
+    if agent_dir is not None and task_id is not None:
+        try:
+            raw = json.loads((agent_dir / "agent.json").read_text(encoding="utf-8"))
+            override = int(raw["tasks"][task_id]["llm"]["timeout_seconds"])
+            cfg = dataclasses.replace(cfg, timeout_seconds=override)
+        except Exception:
+            pass  # no agent.json / no llm block — registry or default applies
+
+    return cfg

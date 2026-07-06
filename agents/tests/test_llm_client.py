@@ -81,6 +81,36 @@ class TestLLMClientChat:
             with pytest.raises(LLMOfflineError):
                 client.chat([], max_tokens=50)
 
+    def test_raises_llm_offline_on_read_timeout(self, client):
+        with patch("urllib.request.urlopen", side_effect=TimeoutError("timed out")):
+            with pytest.raises(LLMOfflineError):
+                client.chat([], max_tokens=50)
+
+    def test_raises_llm_offline_on_connection_reset(self, client):
+        with patch("urllib.request.urlopen",
+                   side_effect=ConnectionResetError(10054, "forcibly closed")):
+            with pytest.raises(LLMOfflineError):
+                client.chat([], max_tokens=50)
+
+    def test_uses_configured_timeout(self, cfg):
+        import dataclasses
+        client   = LLMClient(dataclasses.replace(cfg, timeout_seconds=300))
+        timeouts = []
+        body     = _make_response("OK")
+
+        class MockResp:
+            def read(self): return body
+            def __enter__(self): return self
+            def __exit__(self, *a): pass
+
+        def mock_urlopen(req, timeout=None):
+            timeouts.append(timeout)
+            return MockResp()
+
+        with patch("urllib.request.urlopen", side_effect=mock_urlopen):
+            client.chat([{"role": "user", "content": "hi"}], max_tokens=50)
+        assert timeouts == [300]
+
     def test_raises_llm_response_error_after_retries(self, client):
         bad_body = json.dumps({"no_choices": []}).encode()
 

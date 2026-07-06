@@ -719,6 +719,7 @@ class LLMEndpointSpec(BaseModel):
     model:    str
     type:     str    # "vision" | "text"
     provider: str
+    timeout_seconds: int = 120
 
 
 class AgentSharedStateSpec(BaseModel):

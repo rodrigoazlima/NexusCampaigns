@@ -33,6 +33,7 @@ from shared import (  # noqa: E402
     locked_update_queue_entry,
 )
 from shared.config import LLMEndpointConfig  # noqa: E402
+from shared.loaders import load_llm_endpoint  # noqa: E402
 
 TASK_ID         = "classification-agent"
 SCRIPT_BASENAME = "enrich_tags.py"
@@ -62,11 +63,17 @@ _ALLOWED_TYPES: frozenset[str] = frozenset({
     "religion", "organization", "timeline", "lore",
 })
 
-_LLM_CFG = LLMEndpointConfig(
-    url      = "http://localhost:8080/v1/chat/completions",
-    model    = "auto",
-    type     = "text",
-    provider = "lmstudio",
+_LLM_CFG = load_llm_endpoint(
+    "local_router",
+    fallback = LLMEndpointConfig(
+        url      = "http://localhost:8080/v1/chat/completions",
+        model    = "auto",
+        type     = "text",
+        provider = "lmstudio",
+    ),
+    agent_dir    = _AGENTS_DIR / "classification",
+    task_id      = TASK_ID,
+    project_root = _PROJECT_ROOT,
 )
 
 # Minimum difflib ratio to flag a slug as similar-to a library slug
