@@ -241,13 +241,13 @@ function Ensure-Junction([string]$LinkPath, [string]$TargetPath) {
 
     if (Test-Path $LinkPath) {
         $item = Get-Item -LiteralPath $LinkPath -Force
-        if ($item.LinkType -eq "Junction") {
+        if ($item.LinkType -in @("Junction", "SymbolicLink")) {
             $currentTarget = [string](@($item.Target)[0]).TrimEnd('\')
-            if ($currentTarget -ieq $targetFull) {
+            if ($currentTarget -ieq $targetFull -and $item.LinkType -eq "Junction") {
                 Log "Junction OK: $LinkPath -> $targetFull"
                 return
             }
-            Log "Repointing junction: $LinkPath -> $targetFull (was $currentTarget)"
+            Log "Repointing $($item.LinkType): $LinkPath -> $targetFull (was $currentTarget)"
             Remove-Item -LiteralPath $LinkPath -Force
         } elseif ($item.PSIsContainer) {
             $hasContent = @(Get-ChildItem -LiteralPath $LinkPath -Force -ErrorAction SilentlyContinue).Count -gt 0
@@ -265,13 +265,15 @@ function Ensure-Junction([string]$LinkPath, [string]$TargetPath) {
     Log "Junction created: $LinkPath -> $targetFull"
 }
 
-# Every agent (except shared/tests) gets a real prompts\, state\, tools\ dir —
-# creates only what's missing, never touches an existing one.
+# Every agent (except shared/tests) gets a real prompts\ and state\ dir —
+# creates only what's missing, never touches an existing one. tools\ is not
+# scaffolded: static task code lives in system/src/nexus/tasks, and LLM
+# agents track their tools\ in git.
 function Ensure-AgentScaffold([string]$ProjectRoot) {
     $agentDirs = Get-ChildItem "$ProjectRoot\agents" -Directory -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -notin @("tests", "shared") }
     foreach ($a in $agentDirs) {
-        foreach ($sub in @("prompts", "state", "tools")) {
+        foreach ($sub in @("prompts", "state")) {
             $p = Join-Path $a.FullName $sub
             if (-not (Test-Path $p)) {
                 New-Item -ItemType Directory -Force -Path $p | Out-Null
@@ -313,8 +315,9 @@ $script:AgentRelations = @{
 # For each agent, creates agents\<agent-name>\.<related-path> -> the real target,
 # so an agent can reach everything it touches by a fixed relative path without
 # hardcoding "..\..\..". "agents/*" entries fan out to every other agent dir.
-# Every agent also gets agents\shared (shared runtime library) and system\state
-# regardless of its entry in $script:AgentRelations.
+# Every agent also gets system\state regardless of its entry in
+# $script:AgentRelations. (agents\shared is gone — the shared library is the
+# installed nexus.shared package now, imported, not reached via mounts.)
 #
 # Every generated mount's top path segment is dot-prefixed by convention
 # (.knowledge-base, .agents, .system, ...) — agents\<name>\agents\<other> in
@@ -334,7 +337,7 @@ function Ensure-AgentRelationLinks([string]$ProjectRoot) {
         if (-not (Test-Path $agentRoot)) { continue }
 
         $rels  = $script:AgentRelations[$agentName]
-        $extra = @("agents/shared")
+        $extra = @()
         if ($rels -notcontains "system") { $extra += "system/state" }  # "system" already covers state/
 
         foreach ($rel in ($extra + $rels)) {

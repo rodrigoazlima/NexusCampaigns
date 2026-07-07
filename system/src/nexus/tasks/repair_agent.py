@@ -22,7 +22,6 @@ import re
 import socket
 import subprocess
 import sys
-import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -43,7 +42,6 @@ _ORCH_STATE   = _AGENTS_DIR / "runtime" / "state"
 _LOCK_FILE    = _ORCH_STATE / "runner.lock"
 _MASTER_LOG   = _ORCH_STATE / "logs" / "automation.log"
 _TASKS_STATE  = _ORCH_STATE / "tasks-state.json"
-_METRICS_FILE = _ORCH_STATE / "agent-metrics.json"
 _AGENT_STATE  = _AGENTS_DIR / "repair" / "state"
 _LOGS_DIR     = _AGENT_STATE / "logs"
 _REPORTS_DIR  = _AGENTS_DIR / "review" / "state" / "reports"
@@ -295,13 +293,15 @@ def _create_missing_dirs(log: Logger) -> int:
 
 
 def _ensure_agent_scaffold(log: Logger) -> int:
-    """Every agent (except shared/tests) gets a real prompts/, state/, tools/
-    dir. Creates only what's missing — never touches an existing one."""
+    """Every agent (except shared/tests) gets a real prompts/ and state/ dir.
+    Creates only what's missing — never touches an existing one. tools/ is
+    not scaffolded: static task code lives in nexus.tasks, and LLM agents
+    track their tools/ in git."""
     created = 0
     for agent_root in _AGENTS_DIR.iterdir():
         if not agent_root.is_dir() or agent_root.name in {"tests", "shared"}:
             continue
-        for sub in ("prompts", "state", "tools"):
+        for sub in ("prompts", "state"):
             p = agent_root / sub
             if not p.exists():
                 p.mkdir(parents=True, exist_ok=True)
@@ -361,9 +361,11 @@ def _ensure_agent_relation_links(log: Logger) -> int:
         if not agent_root.exists():
             continue
 
-        # Every agent also gets agents/shared and system/state regardless of
-        # its table entry ("system" already covers state/ — skip the overlap).
-        extra = ["agents/shared"] + (["system/state"] if "system" not in rels else [])
+        # Every agent also gets system/state regardless of its table entry
+        # ("system" already covers state/ — skip the overlap). agents/shared
+        # mounts are gone: the shared library is the installed nexus.shared
+        # package, imported rather than reached via junctions.
+        extra = ["system/state"] if "system" not in rels else []
         for rel in extra + rels:
             targets = (
                 [f"agents/{a}" for a in all_agents if a != agent_name]
