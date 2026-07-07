@@ -1,14 +1,12 @@
 import { execFile } from 'child_process'
-import path from 'path'
 import { promisify } from 'util'
 import { NextRequest, NextResponse } from 'next/server'
-import { PROJECT_ROOT } from '@/lib/vault'
 
 export const dynamic = 'force-dynamic'
 
 const execFileAsync = promisify(execFile)
 
-const RUNNER = path.join(PROJECT_ROOT, 'agents', 'runtime', 'tools', 'runner.py')
+const RUNNER_ARGS = ['-m', 'nexus.runner']
 const PYTHON = 'python'
 const REPAIR_TIMEOUT_MS = 60_000
 
@@ -19,7 +17,7 @@ export async function POST(req: NextRequest) {
     try {
       const { stdout, stderr } = await execFileAsync(
         PYTHON,
-        [RUNNER, '--task', 'repair-agent', '--force'],
+        [...RUNNER_ARGS, '--task', 'repair-agent', '--force'],
         { timeout: REPAIR_TIMEOUT_MS, env: { ...process.env } }
       )
       return NextResponse.json({ ok: true, agent: body.agent ?? null, stdout, stderr })

@@ -1,9 +1,9 @@
-"""wikilink.tools.wikilink_library
+"""nexus.tasks.wikilink_library
 
 Actions: ScoreEntityPairs · InsertWikilinks
-Reads:   02-Library/**/*.md, agents/wikilink/state/wikilink-state.json
+Reads:   02-Library/**/*.md, system/state/wikilink/wikilink-state.json
 Writes:  ## Related sections in-place in 02-Library/ (body only, never frontmatter)
-         agents/wikilink/state/wikilink-state.json
+         system/state/wikilink/wikilink-state.json
 No LLM. No 00-Inbox or 01-Processing writes.
 Batch: 20 files per run.
 """
@@ -17,14 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-_TOOLS_DIR    = Path(__file__).resolve().parent
-_AGENTS_DIR   = _TOOLS_DIR.parents[1]
-_PROJECT_ROOT = _AGENTS_DIR.parent
-
-if str(_AGENTS_DIR) not in sys.path:
-    sys.path.insert(0, str(_AGENTS_DIR))
-
-from shared import (  # noqa: E402
+from nexus.shared import (
     FrontmatterIO,
     Logger,
     StateStore,
@@ -34,7 +27,10 @@ from shared import (  # noqa: E402
     required_type_boost,
     WIKILINK_STATE_DEFAULT,
 )
-from shared.interfaces import IWikilinkResolver  # noqa: E402
+from nexus.shared.interfaces import IWikilinkResolver
+from nexus.shared.loaders import _find_project_root
+
+_PROJECT_ROOT = _find_project_root(Path(__file__).resolve().parent)
 
 TASK_ID         = "wikilink-agent"
 SCRIPT_BASENAME = "wikilink_library.py"
@@ -44,9 +40,10 @@ MAX_LINKS       = 10  # max new links inserted per file per run
 
 _VAULT_ROOT  = _PROJECT_ROOT / ".knowledge-base"
 _LIBRARY     = _VAULT_ROOT / "02-Library"
-_AGENT_STATE = _AGENTS_DIR / "wikilink" / "state"
+_STATE_ROOT  = _PROJECT_ROOT / "system" / "state"
+_AGENT_STATE = _STATE_ROOT / "wikilink"
 _LOGS_DIR    = _AGENT_STATE / "logs"
-_MASTER_LOG  = _AGENTS_DIR / "runtime" / "state" / "logs" / "automation.log"
+_MASTER_LOG  = _STATE_ROOT / "runtime" / "logs" / "automation.log"
 _STATE_FILE  = _AGENT_STATE / "wikilink-state.json"
 
 _RELATED_HEADER_RE = re.compile(r"^## Related\s*$", re.MULTILINE)
@@ -339,78 +336,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
-# ---------------------------------------------------------------------------
-# Agentic tool interface
-# ---------------------------------------------------------------------------
-
-from shared.agent_tools import SELF_MANAGEMENT_TOOLS, call_self_management_tool  # noqa: E402
-
-_MODULE_FILE = Path(__file__)
-
-TOOLS = SELF_MANAGEMENT_TOOLS + [
-    {
-        "name": "score_entity_pairs",
-        "description": (
-            "Build a slug index of all approved entities in 02-Library/ "
-            "and return the count available for cross-linking."
-        ),
-        "input_schema": {"type": "object", "properties": {}},
-    },
-    {
-        "name": "insert_wikilinks",
-        "description": (
-            "Process up to BATCH_SIZE Library entities, inserting missing [[slug]] "
-            "cross-references into their ## Related sections (creating the section "
-            "if absent). Returns count of files processed and total links inserted."
-        ),
-        "input_schema": {"type": "object", "properties": {}},
-    },
-]
-
-
-def call_tool(name: str, args: dict, context: dict) -> str:
-    result = call_self_management_tool(
-        name, args, context, module_file=_MODULE_FILE, task_id=TASK_ID
-    )
-    if result is not None:
-        return result
-
-    if name == "score_entity_pairs":
-        fio      = FrontmatterIO()
-        resolver = WikilinkResolver(fio)
-        idx      = resolver.build_slug_index(_LIBRARY)
-        return f"Library slug index built: {len(idx)} entities available for cross-linking"
-
-    if name == "insert_wikilinks":
-        log      = Logger(TASK_ID, SCRIPT_BASENAME, _LOGS_DIR, _MASTER_LOG)
-        store    = _make_store()
-        store.init_defaults()
-        fio      = FrontmatterIO()
-        resolver = WikilinkResolver(fio)
-        slug_idx = resolver.build_slug_index(_LIBRARY)
-        processed = _load_processed(store)
-
-        count        = 0
-        total_links  = 0
-
-        for md_path in sorted(_LIBRARY.glob("**/*.md")):
-            if count >= BATCH_SIZE:
-                break
-            rel = md_path.relative_to(_PROJECT_ROOT).as_posix()
-            if rel in processed:
-                continue
-            try:
-                n = resolver.insert_wikilinks(md_path, slug_idx)
-                _mark_processed(store, rel, n)
-                total_links += n
-                count += 1
-                if n:
-                    log.info(f"Inserted {n} link(s) in {md_path.name}")
-            except Exception as exc:
-                log.error(f"Error processing {md_path.name}: {exc}")
-
-        return f"Processed {count} file(s); {total_links} link(s) inserted"
-
-    raise ValueError(f"Unknown tool: {name!r}")

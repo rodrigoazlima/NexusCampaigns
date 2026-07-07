@@ -1,4 +1,4 @@
-"""Tests for cleanup.tools.cleanup_agent."""
+"""Tests for nexus.tasks.cleanup_agent."""
 
 import json
 import time
@@ -42,8 +42,8 @@ def _write_old_file(directory: Path, name: str, age_days: int) -> Path:
 
 class TestPurgeDir:
     def test_deletes_files_older_than_cutoff(self, agent_dirs, tmp_path):
-        from cleanup.tools.cleanup_agent import _purge_dir
-        from shared.logger import Logger
+        from nexus.tasks.cleanup_agent import _purge_dir
+        from nexus.shared.logger import Logger
 
         d = agent_dirs / "review" / "state" / "logs"
         old = _write_old_file(d, "old.log", age_days=100)
@@ -59,8 +59,8 @@ class TestPurgeDir:
         assert new.exists()
 
     def test_returns_zero_for_missing_dir(self, agent_dirs, tmp_path):
-        from cleanup.tools.cleanup_agent import _purge_dir
-        from shared.logger import Logger
+        from nexus.tasks.cleanup_agent import _purge_dir
+        from nexus.shared.logger import Logger
 
         missing = agent_dirs / "nonexistent" / "state" / "logs"
         log = Logger("cleanup-agent", "cleanup_agent.py",
@@ -69,8 +69,8 @@ class TestPurgeDir:
         assert _purge_dir(missing, keep_days=90, log=log) == 0
 
     def test_skips_directories(self, agent_dirs, tmp_path):
-        from cleanup.tools.cleanup_agent import _purge_dir
-        from shared.logger import Logger
+        from nexus.tasks.cleanup_agent import _purge_dir
+        from nexus.shared.logger import Logger
 
         d = agent_dirs / "review" / "state" / "logs"
         subdir = d / "subdir"
@@ -89,8 +89,8 @@ class TestPurgeDir:
 
 class TestPurgeLogs:
     def test_scans_all_agent_log_dirs(self, agent_dirs, monkeypatch):
-        from cleanup.tools import cleanup_agent
-        from shared.logger import Logger
+        from nexus.tasks import cleanup_agent
+        from nexus.shared.logger import Logger
 
         monkeypatch.setattr(cleanup_agent, "_AGENTS_DIR", agent_dirs)
 
@@ -111,8 +111,8 @@ class TestPurgeLogs:
 
 class TestPurgeReports:
     def test_scans_all_agent_report_dirs(self, agent_dirs, monkeypatch):
-        from cleanup.tools import cleanup_agent
-        from shared.logger import Logger
+        from nexus.tasks import cleanup_agent
+        from nexus.shared.logger import Logger
 
         monkeypatch.setattr(cleanup_agent, "_AGENTS_DIR", agent_dirs)
 
@@ -136,8 +136,8 @@ class TestPurgeReports:
 
 class TestTrimMetrics:
     def test_trims_to_max_runs(self, agent_dirs, tmp_path, monkeypatch):
-        from cleanup.tools import cleanup_agent
-        from shared.logger import Logger
+        from nexus.tasks import cleanup_agent
+        from nexus.shared.logger import Logger
 
         metrics_file = agent_dirs / "runtime" / "state" / "agent-metrics.json"
         monkeypatch.setattr(cleanup_agent, "_METRICS_FILE", metrics_file)
@@ -157,8 +157,8 @@ class TestTrimMetrics:
         assert result["vision-agent"]["runs"][0]["startedAt"] == "2024-01-11T00:00:00Z"
 
     def test_no_trim_when_under_limit(self, agent_dirs, monkeypatch):
-        from cleanup.tools import cleanup_agent
-        from shared.logger import Logger
+        from nexus.tasks import cleanup_agent
+        from nexus.shared.logger import Logger
 
         metrics_file = agent_dirs / "runtime" / "state" / "agent-metrics.json"
         monkeypatch.setattr(cleanup_agent, "_METRICS_FILE", metrics_file)
@@ -177,8 +177,8 @@ class TestTrimMetrics:
         assert json.loads(metrics_file.read_text(encoding="utf-8")) == json.loads(original)
 
     def test_returns_zero_when_file_missing(self, agent_dirs, monkeypatch):
-        from cleanup.tools import cleanup_agent
-        from shared.logger import Logger
+        from nexus.tasks import cleanup_agent
+        from nexus.shared.logger import Logger
 
         missing = agent_dirs / "runtime" / "state" / "agent-metrics.json"
         monkeypatch.setattr(cleanup_agent, "_METRICS_FILE", missing)
@@ -189,8 +189,8 @@ class TestTrimMetrics:
         assert cleanup_agent.trim_metrics(max_runs=100, log=log) == 0
 
     def test_strips_bom(self, agent_dirs, monkeypatch):
-        from cleanup.tools import cleanup_agent
-        from shared.logger import Logger
+        from nexus.tasks import cleanup_agent
+        from nexus.shared.logger import Logger
 
         metrics_file = agent_dirs / "runtime" / "state" / "agent-metrics.json"
         monkeypatch.setattr(cleanup_agent, "_METRICS_FILE", metrics_file)
@@ -212,7 +212,7 @@ class TestTrimMetrics:
 
 class TestWriteReport:
     def test_writes_cleanup_report_json(self, agent_dirs, monkeypatch):
-        from cleanup.tools import cleanup_agent
+        from nexus.tasks import cleanup_agent
 
         reports_dir = agent_dirs / "cleanup" / "state" / "reports"
         monkeypatch.setattr(cleanup_agent, "_REPORTS_DIR", reports_dir)
@@ -229,7 +229,7 @@ class TestWriteReport:
         assert data["date"] == today
 
     def test_write_is_atomic(self, agent_dirs, monkeypatch):
-        from cleanup.tools import cleanup_agent
+        from nexus.tasks import cleanup_agent
 
         reports_dir = agent_dirs / "cleanup" / "state" / "reports"
         monkeypatch.setattr(cleanup_agent, "_REPORTS_DIR", reports_dir)
@@ -239,33 +239,3 @@ class TestWriteReport:
         today = datetime.now().strftime("%Y-%m-%d")
         tmp = reports_dir / f"cleanup-{today}.tmp"
         assert not tmp.exists(), "tmp file should have been renamed to .json"
-
-
-# ---------------------------------------------------------------------------
-# _load_cleanup_days
-# ---------------------------------------------------------------------------
-
-class TestLoadCleanupDays:
-    def test_reads_from_agent_json(self, tmp_path, monkeypatch):
-        from cleanup.tools import cleanup_agent
-
-        agent_json = tmp_path / "agent.json"
-        agent_json.write_text(json.dumps({"cleanupDays": 30}), encoding="utf-8")
-        monkeypatch.setattr(cleanup_agent, "_AGENT_JSON", agent_json)
-
-        assert cleanup_agent._load_cleanup_days() == 30
-
-    def test_defaults_to_90_when_field_missing(self, tmp_path, monkeypatch):
-        from cleanup.tools import cleanup_agent
-
-        agent_json = tmp_path / "agent.json"
-        agent_json.write_text(json.dumps({"tasks": {}}), encoding="utf-8")
-        monkeypatch.setattr(cleanup_agent, "_AGENT_JSON", agent_json)
-
-        assert cleanup_agent._load_cleanup_days() == 90
-
-    def test_defaults_to_90_when_file_missing(self, tmp_path, monkeypatch):
-        from cleanup.tools import cleanup_agent
-
-        monkeypatch.setattr(cleanup_agent, "_AGENT_JSON", tmp_path / "nonexistent.json")
-        assert cleanup_agent._load_cleanup_days() == 90

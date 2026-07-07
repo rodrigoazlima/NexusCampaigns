@@ -17,8 +17,8 @@ import yaml
 
 pytestmark = pytest.mark.e2e
 
-_AGENTS_DIR    = Path(__file__).resolve().parents[2]
-_PROJECT_ROOT  = _AGENTS_DIR.parent
+_PROJECT_ROOT    = Path(__file__).resolve().parents[2]
+_AGENTS_DIR  = _PROJECT_ROOT / "agents"
 _REGISTRY_FILE = _AGENTS_DIR / "registry.yaml"
 
 _DASHBOARD_BASE = "http://localhost:48080"

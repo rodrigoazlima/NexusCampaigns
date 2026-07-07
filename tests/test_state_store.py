@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from shared.state_store import StateStore, TextStateStore, bootstrap_vault_state
+from nexus.shared.state_store import StateStore, TextStateStore, bootstrap_vault_state
 
 
 @pytest.fixture

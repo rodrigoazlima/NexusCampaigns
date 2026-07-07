@@ -1,7 +1,7 @@
-"""review.tools.daily_report
+"""nexus.tasks.daily_report
 
 Aggregates automation logs + vault health into a JSON report every 15 min.
-Rebuilds state/reports/reports-data.js after each report.
+Rebuilds system/state/review/reports/reports-data.js after each report.
 No LLM. No 02-Library writes. May inject suggestedQuality into 01-Processing files.
 """
 
@@ -15,14 +15,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-_TOOLS_DIR    = Path(__file__).resolve().parent
-_AGENTS_DIR   = _TOOLS_DIR.parents[1]
-_PROJECT_ROOT = _AGENTS_DIR.parent
-
-if str(_AGENTS_DIR) not in sys.path:
-    sys.path.insert(0, str(_AGENTS_DIR))
-
-from shared import (  # noqa: E402
+from nexus.shared import (
     FrontmatterIO,
     Logger,
     describe_violations,
@@ -30,6 +23,9 @@ from shared import (  # noqa: E402
     is_orphan,
     slugs_from_relationships,
 )
+from nexus.shared.loaders import _find_project_root
+
+_PROJECT_ROOT = _find_project_root(Path(__file__).resolve().parent)
 
 TASK_ID         = "review-agent"
 SCRIPT_BASENAME = "daily_report.py"
@@ -37,12 +33,11 @@ SCRIPT_BASENAME = "daily_report.py"
 _VAULT_ROOT   = _PROJECT_ROOT / ".knowledge-base"
 _PROCESSING   = _VAULT_ROOT / "01-Processing"
 _LIBRARY      = _VAULT_ROOT / "02-Library"
-_ORCH_STATE   = _AGENTS_DIR / "runtime" / "state"
-_MASTER_LOG   = _ORCH_STATE / "logs" / "automation.log"
-_AGENT_STATE  = _AGENTS_DIR / "review" / "state"
-_LOGS_DIR     = _AGENT_STATE / "logs"
-_REPORTS_DIR  = _AGENT_STATE / "reports"
-_QUEUE_FILE   = _PROJECT_ROOT / "system" / "state" / "inbox-queue.json"
+_STATE_ROOT   = _PROJECT_ROOT / "system" / "state"
+_MASTER_LOG   = _STATE_ROOT / "runtime" / "logs" / "automation.log"
+_LOGS_DIR     = _STATE_ROOT / "review" / "logs"
+_REPORTS_DIR  = _STATE_ROOT / "review" / "reports"
+_QUEUE_FILE   = _STATE_ROOT / "inbox-queue.json"
 
 _LOG_LINE_RE  = re.compile(
     r"^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\] \[([^\]]+)\] (\w+): (.+)$"
@@ -248,9 +243,13 @@ def _library_link_violations(fio: FrontmatterIO) -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 def _load_tasks_config() -> dict[str, Any]:
-    """Discover task configs by scanning */agent.json files."""
+    """Discover task configs by scanning agents/*/agent.json files.
+
+    ponytail: covers LLM agents only — static script tasks live in
+    registry.yaml; add them here if reports-data.js ever needs them.
+    """
     tasks = []
-    agents_dir = Path(__file__).resolve().parents[2]
+    agents_dir = _PROJECT_ROOT / "agents"
     for agent_json in sorted(agents_dir.glob("*/agent.json")):
         try:
             raw = json.loads(agent_json.read_text(encoding="utf-8"))
@@ -331,82 +330,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
-# ---------------------------------------------------------------------------
-# Agentic tool interface
-# ---------------------------------------------------------------------------
-
-from shared.agent_tools import SELF_MANAGEMENT_TOOLS, call_self_management_tool  # noqa: E402
-
-_MODULE_FILE = Path(__file__)
-
-TOOLS = SELF_MANAGEMENT_TOOLS + [
-    {
-        "name": "parse_automation_log",
-        "description": "Parse automation.log for the last N hours and return per-agent summaries.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "hours": {"type": "integer", "description": "How many hours back to scan (default: 24)", "default": 24},
-            },
-        },
-    },
-    {
-        "name": "scan_vault_health",
-        "description": (
-            "Scan 01-Processing/ for pending reviews, orphans, and quality scores. "
-            "Also scans 02-Library/ for link-rule violations (missing required links per linking-rules.spec.md). "
-            "Loads inbox-queue.json for queue depth metrics (total/pending/done). "
-            "Returns health dict including libraryLinkViolations and queueDepth."
-        ),
-        "input_schema": {"type": "object", "properties": {}},
-    },
-    {
-        "name": "write_report",
-        "description": "Write the daily JSON report file and rebuild reports-data.js for the dashboard.",
-        "input_schema": {"type": "object", "properties": {}},
-    },
-]
-
-
-def call_tool(name: str, args: dict, context: dict) -> str:
-    import json as _json
-    result = call_self_management_tool(
-        name, args, context, module_file=_MODULE_FILE, task_id=TASK_ID
-    )
-    if result is not None:
-        return result
-
-    log = _make_logger()
-    fio = FrontmatterIO()
-
-    if name == "parse_automation_log":
-        hours = int(args.get("hours", 24))
-        since = datetime.now(timezone.utc) - timedelta(hours=hours)
-        summaries = _parse_automation_log(since)
-        return _json.dumps(summaries, indent=2, default=str)
-
-    if name == "scan_vault_health":
-        health = _vault_health(fio, log)
-        return _json.dumps(health, indent=2, default=str)
-
-    if name == "write_report":
-        _REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-        now = datetime.now(timezone.utc)
-        since = now - timedelta(hours=24)
-        today = now.strftime("%Y-%m-%d")
-        summaries = _parse_automation_log(since)
-        health = _vault_health(fio, log)
-        report = {
-            "generatedAt":    now.isoformat(),
-            "date":           today,
-            "agentSummaries": summaries,
-            "vaultHealth":    health,
-        }
-        report_path = _REPORTS_DIR / f"report-{today}.json"
-        report_path.write_text(_json.dumps(report, indent=2, default=str), encoding="utf-8")
-        _write_reports_js(log)
-        return f"Report written: {report_path.name}"
-
-    raise ValueError(f"Unknown tool: {name!r}")

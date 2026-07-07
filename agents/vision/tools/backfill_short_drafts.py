@@ -25,8 +25,8 @@ _PROJECT_ROOT = _AGENTS_DIR.parent
 if str(_AGENTS_DIR) not in sys.path:
     sys.path.insert(0, str(_AGENTS_DIR))
 
-from shared import FrontmatterIO  # noqa: E402
-from shared.models import Element, Environment, ImageType, VisionClassification  # noqa: E402
+from nexus.shared import FrontmatterIO  # noqa: E402
+from nexus.shared.models import Element, Environment, ImageType, VisionClassification  # noqa: E402
 
 # Import the rich body builders from classify_images
 from vision.tools.classify_images import (  # noqa: E402

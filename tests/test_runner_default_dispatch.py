@@ -9,10 +9,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from shared.models import AgentRegistryEntry, DefaultDispatchConfig, RegistryConfig
+from nexus.shared.models import AgentRegistryEntry, DefaultDispatchConfig, RegistryConfig
 
 _RUNNER_PATH = (
-    Path(__file__).resolve().parents[1] / "runtime" / "tools" / "runner.py"
+    Path(__file__).resolve().parents[1] / "system" / "src" / "nexus" / "runner.py"
 )
 
 

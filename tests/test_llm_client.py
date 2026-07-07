@@ -9,9 +9,9 @@ import urllib.error
 
 import pytest
 
-from shared.config import LLMEndpointConfig
-from shared.llm_client import LLMClient, _resize_and_encode
-from shared.interfaces import LLMOfflineError, LLMResponseError
+from nexus.shared.config import LLMEndpointConfig
+from nexus.shared.llm_client import LLMClient, _resize_and_encode
+from nexus.shared.interfaces import LLMOfflineError, LLMResponseError
 
 
 @pytest.fixture

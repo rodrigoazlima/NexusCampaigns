@@ -6,17 +6,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Wikilink Agent (task id `wikilink-agent`). Inserts cross-reference `[[slug]]` wikilinks into the
 `## Related` section of approved `02-Library/` entities. **No LLM calls** — pure scoring/regex logic
-in `tools/wikilink_library.py`. Runs hourly via the runtime scheduler, or standalone.
+in `system/src/nexus/tasks/wikilink_library.py`. Runs hourly via the runtime scheduler, or standalone.
 
 ## Commands
 
 ```powershell
 # Run directly (from repo root, not this dir — module needs agents/ on sys.path)
-python agents/wikilink/tools/wikilink_library.py
-python agents/wikilink/tools/wikilink_library.py --min-score 2 --max-links 5
+python -m nexus.tasks.wikilink_library
+python -m nexus.tasks.wikilink_library --min-score 2 --max-links 5
 
 # Run via the runtime scheduler instead of standalone
-python agents/runtime/tools/runner.py --task wikilink-agent --force
+python -m nexus.runner --task wikilink-agent --force
 
 # Tests (from repo root)
 pytest agents/tests -k wikilink
@@ -24,7 +24,7 @@ pytest agents/tests -k wikilink
 
 ## Architecture
 
-- `tools/wikilink_library.py` — everything lives in this one file:
+- `system/src/nexus/tasks/wikilink_library.py` — everything lives in this one file:
   - `WikilinkResolver` implements `IWikilinkResolver` (see `agents/shared/interfaces.py`)
   - `build_slug_index()` — maps every `02-Library/**/*.md` filename stem → path
   - `_score()` — pairwise score between source/target entity: shared tags (+1 each, cap 3),

@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from unittest.mock import patch
 
-from shared.runners.openai_compat import OpenAICompatRunner, _to_openai_tools
+from nexus.shared.runners.openai_compat import OpenAICompatRunner, _to_openai_tools
 
 
 def test_to_openai_tools_converts_anthropic_schema():

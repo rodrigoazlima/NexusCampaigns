@@ -20,7 +20,7 @@ _AGENTS_DIR = Path(__file__).resolve().parents[1] / "agents"
 if str(_AGENTS_DIR) not in sys.path:
     sys.path.insert(0, str(_AGENTS_DIR))
 
-from shared import (
+from nexus.shared import (
     VaultGuard, QualityGate, VaultPaths, VaultWriteError,
     to_slug, build_entity_slug, is_valid_slug, extract_wikilinks, wikilink,
     is_orphan, has_required_links, describe_violations, missing_required_groups,

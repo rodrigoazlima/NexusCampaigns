@@ -7,8 +7,8 @@ import { join } from 'path';
  *
  * The runtime stages + commits each agent's declared `commit_scope` (parsed
  * from <agent>/AGENT.md). This test mirrors the parser in
- * `agents/runtime/tools/runner.py` (_COMMIT_SCOPE_RE / _SCOPE_ITEM_RE) and
- * `agents/shared/agent_tools.py` so it validates exactly what the committer
+ * `system/src/nexus/runner.py` (_COMMIT_SCOPE_RE / _SCOPE_ITEM_RE) and
+ * `system/src/nexus/shared/agent_tools.py` so it validates exactly what the committer
  * will stage. Any non-`knowledge-base/` entry is a leak and fails the suite.
  *
  * An empty scope (agent produces no vault content) is valid — the runner skips

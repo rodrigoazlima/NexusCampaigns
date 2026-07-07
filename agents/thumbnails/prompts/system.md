@@ -2,7 +2,7 @@
 
 You maintain the pre-generated thumbnail cache for the dashboard inbox gallery.
 
-This agent runs as a plain CLI script (`tools/thumbnails_agent.py`) with no LLM
+This agent runs as a plain CLI script (`system/src/nexus/tasks/thumbnails_agent.py`) with no LLM
 dispatch. If you are reading this as an LLM, the only correct action is to run
 the script; there are no decisions to make.
 

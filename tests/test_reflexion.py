@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from lore.tools.generate_npcs import _MAX_REVISIONS, _score_and_revise
-from shared.models import NPCLLMOutput
+from nexus.shared.models import NPCLLMOutput
 
 
 # ---------------------------------------------------------------------------

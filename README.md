@@ -165,16 +165,16 @@ git clone https://github.com/rodrigoazlima/NexusCampaigns.git
 cd NexusCampaigns
 
 # 2. From an ELEVATED PowerShell 7 (Run as Administrator), one command installs and starts it all:
-pwsh -ExecutionPolicy Bypass -File agents\runtime\tools\setup-service.ps1
+pwsh -ExecutionPolicy Bypass -File system\ops\setup-service.ps1
 ```
 
 When it finishes, the dashboard is live at **http://localhost:48080**.
 
 | Manage | Command |
 |--------|---------|
-| Status | `pwsh -File agents\runtime\tools\setup-service.ps1 -Status` |
-| Uninstall | `pwsh -File agents\runtime\tools\setup-service.ps1 -Uninstall` |
-| Clean install | `pwsh -File agents\runtime\tools\setup-service.ps1 -CleanInstall` |
+| Status | `pwsh -File system\ops\setup-service.ps1 -Status` |
+| Uninstall | `pwsh -File system\ops\setup-service.ps1 -Uninstall` |
+| Clean install | `pwsh -File system\ops\setup-service.ps1 -CleanInstall` |
 | Options | `-NoDashboard` to skip dashboard · `-DashboardPort 9000` for custom port · `-RunPreFlight` to run agent test cycle first (~60s) |
 
 Generates default settings at `system\.env.local` (`PROJECT_ROOT`, `VAULT_ROOT`, `PORT`, `HOSTNAME`) derived from `system\.shared\config\global.json` — change the port once in `global.json` (`ports.dashboard`). Previous installs are automatically removed before each fresh install.
@@ -221,12 +221,12 @@ vault in a separate repo/drive from the app repo? Pass `-ProjectRoot` and
 `-VaultRoot` explicitly — both accept any path, on any drive:
 
 ```powershell
-pwsh -ExecutionPolicy Bypass -File agents\runtime\tools\setup-service.ps1 `
+pwsh -ExecutionPolicy Bypass -File system\ops\setup-service.ps1 `
     -ProjectRoot "C:\path\to\NexusCampaigns" `
     -VaultRoot   "C:\path\to\vault-repo\.knowledge-base"
 ```
 
-* `-ProjectRoot` defaults to the app repo root (parent of `agents\runtime\tools`)
+* `-ProjectRoot` defaults to the app repo root (two levels above `system\ops`)
   — only needed if the script is invoked from somewhere else, or wrapped by another script.
 * `-VaultRoot` defaults to `<ProjectRoot>\.knowledge-base` — set it to point at a
   separately-cloned vault repo. The script creates the directory if missing and
@@ -266,13 +266,13 @@ Binds `0.0.0.0:48080` — accessible on local LAN:
 
 Start:
 ```powershell
-powershell -NonInteractive -File agents\runtime\tools\daemon.ps1
+powershell -NonInteractive -File system\ops\daemon.ps1
 ```
 
 Restart (kill existing first):
 ```powershell
 Get-Process python | Where-Object { $_.CommandLine -like "*runner.py*" } | Stop-Process -Force
-powershell -NonInteractive -WindowStyle Hidden -File agents\runtime\tools\daemon.ps1
+powershell -NonInteractive -WindowStyle Hidden -File system\ops\daemon.ps1
 ```
 
 ### Monitoring
@@ -282,15 +282,15 @@ powershell -NonInteractive -WindowStyle Hidden -File agents\runtime\tools\daemon
 Get-Content 'agents\runtime\state\logs\automation.log' -Tail 50 -Wait
 
 # Status check
-pwsh -File 'agents\runtime\tools\setup-service.ps1' -Status
+pwsh -File 'system\ops\setup-service.ps1' -Status
 
 # Uninstall
-pwsh -File 'agents\runtime\tools\setup-service.ps1' -Uninstall
+pwsh -File 'system\ops\setup-service.ps1' -Uninstall
 
 # Clean install — wipes all generated state, indexes, configs, and build artifacts
 # Preserves 00-Inbox (source), 02-Library, 03-Campaigns, 05-Assets, 99-Archive
 # Requires typing 'yes' to confirm
-pwsh -File 'agents\runtime\tools\setup-service.ps1' -CleanInstall
+pwsh -File 'system\ops\setup-service.ps1' -CleanInstall
 ```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>

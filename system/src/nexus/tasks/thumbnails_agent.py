@@ -1,6 +1,6 @@
-"""thumbnails.tools.thumbnails_agent
+"""nexus.tasks.thumbnails_agent
 
-Thumbnail agent — no LLM, no vault writes.
+Thumbnail task — no LLM, no vault writes.
 
 Pre-generates 320px-wide webp thumbnails for every image in the inbox queue
 (system/state/inbox-queue.json) into system/state/thumbs/<sha1(path)>.webp,
@@ -19,22 +19,19 @@ import json
 import sys
 from pathlib import Path
 
-_TOOLS_DIR    = Path(__file__).resolve().parent
-_AGENTS_DIR   = _TOOLS_DIR.parents[1]
-_PROJECT_ROOT = _AGENTS_DIR.parent
+from nexus.shared import Logger
+from nexus.shared.loaders import _find_project_root
 
-if str(_AGENTS_DIR) not in sys.path:
-    sys.path.insert(0, str(_AGENTS_DIR))
-
-from shared import Logger  # noqa: E402
+_PROJECT_ROOT = _find_project_root(Path(__file__).resolve().parent)
 
 TASK_ID         = "thumbnails-agent"
 SCRIPT_BASENAME = "thumbnails_agent.py"
 
-_QUEUE_FILE  = _PROJECT_ROOT / "system" / "state" / "inbox-queue.json"
-_THUMBS_DIR  = _PROJECT_ROOT / "system" / "state" / "thumbs"
-_LOGS_DIR    = _AGENTS_DIR / "thumbnails" / "state" / "logs"
-_MASTER_LOG  = _AGENTS_DIR / "runtime" / "state" / "logs" / "automation.log"
+_STATE_ROOT  = _PROJECT_ROOT / "system" / "state"
+_QUEUE_FILE  = _STATE_ROOT / "inbox-queue.json"
+_THUMBS_DIR  = _STATE_ROOT / "thumbs"
+_LOGS_DIR    = _STATE_ROOT / "thumbnails" / "logs"
+_MASTER_LOG  = _STATE_ROOT / "runtime" / "logs" / "automation.log"
 
 THUMB_WIDTH = 320
 WEBP_QUALITY = 80

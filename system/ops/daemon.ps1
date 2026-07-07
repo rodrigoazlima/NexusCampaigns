@@ -1,4 +1,4 @@
-# Vault Nexus Campaigns daemon — calls runner.py every $IntervalSec seconds.
+# Vault Nexus Campaigns daemon — calls the nexus.runner scheduler every $IntervalSec seconds.
 #
 # Auth strategy (priority order):
 #   1. ANTHROPIC_API_KEY already in environment (permanent API key — preferred)
@@ -10,12 +10,10 @@
 #   powershell -NonInteractive -File daemon.ps1 -ProjectRoot C:\path\to\repo
 
 param(
-    [string]$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..")).Path,
+    [string]$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path,
     [string]$Python      = "python",
     [int]   $IntervalSec = 60
 )
-
-$Runner = "$ProjectRoot\agents\runtime\tools\runner.py"
 
 # ---------------------------------------------------------------------------
 # Auth bootstrap — set ANTHROPIC_AUTH_TOKEN from Claude credentials if needed
@@ -137,7 +135,7 @@ while ($true) {
     # Re-load auth on every iteration so token refresh is picked up automatically
     Load-AnthropicAuth
 
-    & $Python $Runner --once
+    & $Python -m nexus.runner --once
 
     $exitCode = $LASTEXITCODE
     if ($exitCode -ne 0) {

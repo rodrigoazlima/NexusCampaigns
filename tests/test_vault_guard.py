@@ -3,9 +3,9 @@
 import pytest
 from pathlib import Path
 
-from shared.config import VaultPaths
-from shared.vault_guard import VaultGuard, _is_under
-from shared.interfaces import VaultWriteError
+from nexus.shared.config import VaultPaths
+from nexus.shared.vault_guard import VaultGuard, _is_under
+from nexus.shared.interfaces import VaultWriteError
 
 
 @pytest.fixture

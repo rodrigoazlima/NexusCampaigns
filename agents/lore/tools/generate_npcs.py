@@ -26,7 +26,7 @@ _PROJECT_ROOT = _AGENTS_DIR.parent
 if str(_AGENTS_DIR) not in sys.path:
     sys.path.insert(0, str(_AGENTS_DIR))
 
-from shared import (  # noqa: E402
+from nexus.shared import (  # noqa: E402
     FrontmatterIO,
     LLMClient,
     LLMOfflineError,
@@ -35,7 +35,7 @@ from shared import (  # noqa: E402
     QualityGate,
     locked_update_queue_entry,
 )
-from shared.config import LLMEndpointConfig  # noqa: E402
+from nexus.shared.config import LLMEndpointConfig  # noqa: E402
 
 TASK_ID         = "lore-agent"
 SCRIPT_BASENAME = "generate_npcs.py"
@@ -300,7 +300,7 @@ def _score_and_revise(
 
 def _load_scenarios() -> list[dict]:
     if not _SCENARIOS.exists():
-        from shared.defaults import SCENARIOS_DEFAULT
+        from nexus.shared.defaults import SCENARIOS_DEFAULT
         _AGENT_STATE.mkdir(parents=True, exist_ok=True)
         _SCENARIOS.write_text(json.dumps(SCENARIOS_DEFAULT, indent=2), encoding="utf-8")
     return json.loads(_SCENARIOS.read_text(encoding="utf-8"))
@@ -521,7 +521,7 @@ def _run_batch_impl(log: "_Logger") -> tuple[int, int]:
             )
 
         # --- Write draft ---
-        from shared import to_slug as _to_slug  # noqa: PLC0415
+        from nexus.shared import to_slug as _to_slug  # noqa: PLC0415
         arc      = scenario.get("arc", "a0").lower()
         stem     = f"npc-{_to_slug(img_path.stem)}-{arc}"
         out_path = _unique_output(stem)
@@ -586,7 +586,7 @@ if __name__ == "__main__":
 # Agentic tool interface
 # ---------------------------------------------------------------------------
 
-from shared.agent_tools import SELF_MANAGEMENT_TOOLS, call_self_management_tool  # noqa: E402
+from nexus.shared.agent_tools import SELF_MANAGEMENT_TOOLS, call_self_management_tool  # noqa: E402
 
 _MODULE_FILE = Path(__file__)
 

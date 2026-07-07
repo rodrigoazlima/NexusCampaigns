@@ -15,7 +15,7 @@ dependencies:
   - ingestion
 dispatch_config: agent.json
 owned_tools:
-  - tools/wikilink_library.py
+  - system/src/nexus/tasks/wikilink_library.py
 responsibilities:
   - Collect all entity slugs from 02-Library/ (filename stems)
   - For each .md in 02-Library/: parse frontmatter + body

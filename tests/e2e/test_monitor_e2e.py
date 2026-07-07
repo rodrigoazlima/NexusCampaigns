@@ -25,9 +25,9 @@ import requests
 # Constants
 # ---------------------------------------------------------------------------
 
-_AGENTS_DIR   = Path(__file__).resolve().parents[2]
-_PROJECT_ROOT = _AGENTS_DIR.parent
-_RUNNER_PY    = _AGENTS_DIR / "runtime" / "tools" / "runner.py"
+_PROJECT_ROOT   = Path(__file__).resolve().parents[2]
+_AGENTS_DIR = _PROJECT_ROOT / "agents"
+_RUNNER_PY    = _PROJECT_ROOT / "system" / "src" / "nexus" / "runner.py"
 
 _VAULT_ROOT  = _PROJECT_ROOT / ".knowledge-base"
 _INBOX_DIR   = _VAULT_ROOT   / "00-Inbox" / "images" / "e2e-monitor"

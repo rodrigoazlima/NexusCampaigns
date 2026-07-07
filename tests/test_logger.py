@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from shared.logger import Logger, _ensure_utf8_stdout
+from nexus.shared.logger import Logger, _ensure_utf8_stdout
 
 
 @pytest.fixture

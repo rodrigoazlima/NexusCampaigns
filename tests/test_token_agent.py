@@ -1,4 +1,4 @@
-"""Tests for token.tools.generate_tokens — agent-token.spec.md compliance."""
+"""Tests for nexus.tasks.generate_tokens — agent-token.spec.md compliance."""
 
 from __future__ import annotations
 
@@ -15,8 +15,8 @@ import pytest
 # "token" collides with stdlib token module — import via file path
 # ---------------------------------------------------------------------------
 
-_AGENTS_DIR = Path(__file__).resolve().parents[1]
-_MOD_PATH = _AGENTS_DIR / "token" / "tools" / "generate_tokens.py"
+_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+_MOD_PATH = _PROJECT_ROOT / "system" / "src" / "nexus" / "tasks" / "generate_tokens.py"
 _spec = importlib.util.spec_from_file_location("token_generate_tokens", _MOD_PATH)
 mod = importlib.util.module_from_spec(_spec)  # type: ignore[arg-type]
 sys.modules["token_generate_tokens"] = mod
@@ -207,130 +207,6 @@ class TestEligibleFilter:
 
 
 # ---------------------------------------------------------------------------
-# call_tool — list_pending_portraits
-# ---------------------------------------------------------------------------
-
-class TestCallToolListPendingPortraits:
-    def test_returns_json_list(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, vision_state_ok: dict) -> None:
-        p = tmp_path / "processed-images.json"
-        p.write_text(json.dumps(vision_state_ok), encoding="utf-8")
-        monkeypatch.setattr(mod, "_VISION_STATE", p)
-        monkeypatch.setattr(mod, "_GEN_TOKENS", tmp_path / "generated-tokens.json")
-        monkeypatch.setattr(mod, "_AGENT_STATE", tmp_path)
-
-        result = mod.call_tool("list_pending_portraits", {}, {"project_root": str(tmp_path)})
-        paths = json.loads(result)
-        assert isinstance(paths, list)
-        # only portrait/body images; not battlemap, not tokens
-        assert all("dungeon-map" not in p for p in paths)
-        assert all("hero-token" not in p for p in paths)
-
-    def test_excludes_already_in_gen_tokens(
-        self,
-        tmp_path: Path,
-        monkeypatch: pytest.MonkeyPatch,
-        vision_state_ok: dict,
-        gen_tokens_partial: dict,
-    ) -> None:
-        p = tmp_path / "processed-images.json"
-        p.write_text(json.dumps(vision_state_ok), encoding="utf-8")
-        g = tmp_path / "generated-tokens.json"
-        g.write_text(json.dumps(gen_tokens_partial), encoding="utf-8")
-        monkeypatch.setattr(mod, "_VISION_STATE", p)
-        monkeypatch.setattr(mod, "_GEN_TOKENS", g)
-        monkeypatch.setattr(mod, "_AGENT_STATE", tmp_path)
-
-        result = mod.call_tool("list_pending_portraits", {}, {"project_root": str(tmp_path)})
-        paths = json.loads(result)
-        # hero already in gen_tokens → must not appear
-        assert not any("hero.png" in p and "token" not in p for p in paths)
-
-
-# ---------------------------------------------------------------------------
-# call_tool — generate_token (SHA256 key lookup)
-# ---------------------------------------------------------------------------
-
-class TestCallToolGenerateToken:
-    def test_saves_with_sha256_key(
-        self,
-        tmp_path: Path,
-        monkeypatch: pytest.MonkeyPatch,
-        vision_state_ok: dict,
-    ) -> None:
-        # create a real 1×1 PNG so Pillow can open it
-        try:
-            from PIL import Image
-        except ImportError:
-            pytest.skip("Pillow not installed")
-
-        img_dir = tmp_path / ".knowledge-base" / "00-Inbox" / "images" / "A1"
-        img_dir.mkdir(parents=True)
-        img_path = img_dir / "hero.png"
-        Image.new("RGBA", (100, 100), (200, 100, 50, 255)).save(str(img_path))
-
-        p = tmp_path / "processed-images.json"
-        # update vision_state paths to use tmp_path
-        rel = ".knowledge-base/00-Inbox/images/A1/hero.png"
-        vision_state_ok["pathIndex"][rel] = "abc123"
-        p.write_text(json.dumps(vision_state_ok), encoding="utf-8")
-
-        monkeypatch.setattr(mod, "_VISION_STATE", p)
-        monkeypatch.setattr(mod, "_GEN_TOKENS", tmp_path / "generated-tokens.json")
-        monkeypatch.setattr(mod, "_AGENT_STATE", tmp_path)
-        monkeypatch.setattr(mod, "_PROJECT_ROOT", tmp_path)
-        monkeypatch.setattr(mod, "_LOGS_DIR", tmp_path / "logs")
-        monkeypatch.setattr(mod, "_MASTER_LOG", tmp_path / "automation.log")
-
-        result = mod.call_tool(
-            "generate_token",
-            {"image_path": str(img_path)},
-            {"project_root": str(tmp_path)},
-        )
-
-        assert "hero" in result
-        gen = json.loads((tmp_path / "generated-tokens.json").read_text(encoding="utf-8"))
-        # key must be the SHA256 from pathIndex, not the path string
-        assert "abc123" in gen
-
-    def test_falls_back_to_path_key_when_not_in_index(
-        self,
-        tmp_path: Path,
-        monkeypatch: pytest.MonkeyPatch,
-        vision_state_ok: dict,
-    ) -> None:
-        try:
-            from PIL import Image
-        except ImportError:
-            pytest.skip("Pillow not installed")
-
-        img_dir = tmp_path / ".knowledge-base" / "00-Inbox" / "images" / "A1"
-        img_dir.mkdir(parents=True)
-        img_path = img_dir / "unknown.png"
-        Image.new("RGBA", (100, 100), (10, 20, 30, 255)).save(str(img_path))
-
-        # vision state has no entry for unknown.png
-        p = tmp_path / "processed-images.json"
-        p.write_text(json.dumps(vision_state_ok), encoding="utf-8")
-
-        monkeypatch.setattr(mod, "_VISION_STATE", p)
-        monkeypatch.setattr(mod, "_GEN_TOKENS", tmp_path / "generated-tokens.json")
-        monkeypatch.setattr(mod, "_AGENT_STATE", tmp_path)
-        monkeypatch.setattr(mod, "_PROJECT_ROOT", tmp_path)
-        monkeypatch.setattr(mod, "_LOGS_DIR", tmp_path / "logs")
-        monkeypatch.setattr(mod, "_MASTER_LOG", tmp_path / "automation.log")
-
-        mod.call_tool(
-            "generate_token",
-            {"image_path": str(img_path)},
-            {"project_root": str(tmp_path)},
-        )
-
-        gen = json.loads((tmp_path / "generated-tokens.json").read_text(encoding="utf-8"))
-        # fallback key starts with "path:"
-        assert any(k.startswith("path:") for k in gen)
-
-
-# ---------------------------------------------------------------------------
 # _upper_center_crop
 # ---------------------------------------------------------------------------
 
@@ -354,7 +230,7 @@ class TestUpperCenterCrop:
 
 class TestLoggerDoneFormat:
     def test_done_uses_generated_keyword(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        from shared.logger import Logger
+        from nexus.shared.logger import Logger
 
         logs_dir = tmp_path / "logs"
         master = tmp_path / "auto.log"

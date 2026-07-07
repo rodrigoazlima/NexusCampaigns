@@ -9,7 +9,8 @@
     <key>ProgramArguments</key>
     <array>
         <string>/usr/bin/python3</string>
-        <string><project_root>/agents/runtime/tools/runner.py</string>
+        <string>-m</string>
+        <string>nexus.runner</string>
     </array>
 
     <key>WorkingDirectory</key>

@@ -1,6 +1,6 @@
 """Tests for shared.defaults — default state structures."""
 
-from shared.defaults import (
+from nexus.shared.defaults import (
     AGENT_METRICS_DEFAULT,
     GENERATED_TOKENS_DEFAULT,
     INBOX_QUEUE_DEFAULT,

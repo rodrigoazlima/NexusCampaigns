@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic'
 const execFileAsync = promisify(execFile)
 
 const CHAT_QUEUE = path.join(PROJECT_ROOT, 'system', 'state', 'chat-queue.json')
-const RUNNER     = path.join(PROJECT_ROOT, 'agents', 'runtime', 'tools', 'runner.py')
+const RUNNER_ARGS = ['-m', 'nexus.runner']
 const PYTHON     = 'python'
 const CHAT_TIMEOUT_MS = 120_000
 
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
     const chatId = enqueue(agent, fullMessage)
 
     try {
-      await execFileAsync(PYTHON, [RUNNER, '--chat-id', chatId], {
+      await execFileAsync(PYTHON, [...RUNNER_ARGS, '--chat-id', chatId], {
         timeout: CHAT_TIMEOUT_MS,
         env: { ...process.env },
       })

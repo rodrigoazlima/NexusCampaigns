@@ -4,11 +4,11 @@
 #
 # Prerequisites:
 #   1. nssm.exe on PATH  (https://nssm.cc/download)
-#   2. pip install -r requirements.txt
+#   2. pip install -e . (from the repo root)
 #   3. Set API key params below or export them as environment variables before running
 
 param(
-    [string]$ProjectRoot      = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..")).Path,
+    [string]$ProjectRoot      = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path,
     [string]$Python           = "python",
     [string]$ApiKey           = $env:ANTHROPIC_API_KEY,
     [string]$OpenAIKey        = $(if ($env:OPENAI_API_KEY) { $env:OPENAI_API_KEY } else { "lm-studio" }),
@@ -17,21 +17,20 @@ param(
 )
 
 $SvcName = "vault-knowledge-factory"
-$Runner  = "$ProjectRoot\agents\runtime\tools\runner.py"
 $LogsDir = "$ProjectRoot\agents\runtime\state\logs"
 
 New-Item -ItemType Directory -Force $LogsDir | Out-Null
 
 # Verify runner starts cleanly before registering
 Write-Host "Verifying runner (--once)..."
-& $Python $Runner --once
+& $Python -m nexus.runner --once
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Runner exited with code $LASTEXITCODE. Fix before installing service."
     exit 1
 }
 
 nssm install $SvcName $Python
-nssm set $SvcName AppParameters "`"$Runner`""
+nssm set $SvcName AppParameters "-m nexus.runner"
 nssm set $SvcName AppDirectory $ProjectRoot
 nssm set $SvcName DisplayName "Vault Nexus Campaigns"
 nssm set $SvcName Description "DM pipeline - ingests, classifies, and links vault entities on schedule"

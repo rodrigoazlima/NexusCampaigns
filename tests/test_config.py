@@ -2,7 +2,7 @@
 
 from pathlib import Path
 import pytest
-from shared.config import LLMEndpointConfig, SystemPaths, VaultConfig, VaultPaths
+from nexus.shared.config import LLMEndpointConfig, SystemPaths, VaultConfig, VaultPaths
 
 
 class TestLLMEndpointConfig:

@@ -15,7 +15,7 @@ if str(_AGENTS_DIR) not in sys.path:
     sys.path.insert(0, str(_AGENTS_DIR))
 
 import classification.tools.enrich_tags as _mod
-from shared.interfaces import VaultWriteError
+from nexus.shared.interfaces import VaultWriteError
 
 
 # ---------------------------------------------------------------------------

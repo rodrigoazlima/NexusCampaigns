@@ -22,7 +22,7 @@ _PROJECT_ROOT = _AGENTS_DIR.parent
 if str(_AGENTS_DIR) not in sys.path:
     sys.path.insert(0, str(_AGENTS_DIR))
 
-from shared import (  # noqa: E402
+from nexus.shared import (  # noqa: E402
     FrontmatterIO,
     LLMClient,
     LLMOfflineError,
@@ -32,7 +32,7 @@ from shared import (  # noqa: E402
     VaultWriteError,
     locked_update_queue_entry,
 )
-from shared.config import LLMEndpointConfig  # noqa: E402
+from nexus.shared.config import LLMEndpointConfig  # noqa: E402
 
 TASK_ID         = "classification-agent"
 SCRIPT_BASENAME = "enrich_tags.py"
@@ -490,7 +490,7 @@ def _run_flag_duplicates() -> int:
 # Agentic tool interface
 # ---------------------------------------------------------------------------
 
-from shared.agent_tools import SELF_MANAGEMENT_TOOLS, call_self_management_tool  # noqa: E402
+from nexus.shared.agent_tools import SELF_MANAGEMENT_TOOLS, call_self_management_tool  # noqa: E402
 
 _MODULE_FILE = Path(__file__)
 

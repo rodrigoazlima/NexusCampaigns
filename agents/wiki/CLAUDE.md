@@ -14,7 +14,7 @@ Note: `AGENT.md` here is the authoritative, current contract. The vault-level `A
 
 ```powershell
 # Run this agent standalone via the shared runner
-python ..\runtime\tools\runner.py --task wiki-agent --force
+python -m nexus.runner --task wiki-agent --force
 
 # Run compile_wiki.py's tool functions directly for debugging
 python -c "from tools import compile_wiki; compile_wiki.main()"
@@ -37,7 +37,7 @@ Dispatch is configured in `agent.json` as `lm-studio` (`http://localhost:1234/v1
 - Never touches `02-Library/`, never sets `reviewed: true`, `status: approved`, or `status: review`.
 - Never processes queue entries with `type != document`.
 - Never invents entity types outside the allowed list; never sets its own quality score above 0.
-- Agents in this repo never self-commit — the shared runner (`agents/runtime/tools/runner.py`) commits only the paths in `commit_scope`.
+- Agents in this repo never self-commit — the shared runner (`system/src/nexus/runner.py (run: python -m nexus.runner)`) commits only the paths in `commit_scope`.
 
 ## Vault conventions this agent must honor
 

@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from shared.loaders import load_registry, load_vault_config
-from shared.models import (
+from nexus.shared.loaders import load_registry, load_vault_config
+from nexus.shared.models import (
     AgentRegistryEntry,
     AgentSharedStateSpec,
     LLMEndpointSpec,

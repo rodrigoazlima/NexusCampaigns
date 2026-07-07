@@ -1,10 +1,10 @@
-"""runtime.tools.runner
+"""nexus.runner
 
-Python runtime — the only static code in the agent pipeline.
+Python runtime — the scheduler for the agent pipeline.
 Discovers agents from agent.json files, checks intervals, dispatches Claude agents.
 
-CLI: python runner.py [--once] [--task TASK_ID] [--interval SECONDS]
-     python runner.py --chat-id <uuid>   # dispatch one chat queue item
+CLI: python -m nexus.runner [--once] [--task TASK_ID] [--interval SECONDS]
+     python -m nexus.runner --chat-id <uuid>   # dispatch one chat queue item
 """
 
 from __future__ import annotations
@@ -23,13 +23,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Optional
 
-# agents/ must be on sys.path so `import shared` resolves
-_AGENTS_DIR  = Path(__file__).resolve().parents[2]
-_PROJECT_ROOT = _AGENTS_DIR.parent
-if str(_AGENTS_DIR) not in sys.path:
-    sys.path.insert(0, str(_AGENTS_DIR))
-
-from shared import (  # noqa: E402
+from nexus.shared import (
     AgentDispatchConfig,
     AgentFolderConfig,
     DispatchError,
@@ -41,15 +35,18 @@ from shared import (  # noqa: E402
     get_runner,
     TASKS_STATE_DEFAULT,
 )
-from shared.loaders import load_registry  # noqa: E402
-from shared.models import LmStudioConfig, RunResult  # noqa: E402
-from shared.signal_bus import SignalConsumer  # noqa: E402
+from nexus.shared.loaders import _find_project_root, load_registry
+from nexus.shared.models import LmStudioConfig, RunResult
+from nexus.shared.signal_bus import SignalConsumer
+
+_PROJECT_ROOT = _find_project_root(Path(__file__).resolve().parent)
+_AGENTS_DIR   = _PROJECT_ROOT / "agents"
 
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
 
-_RUNTIME_STATE = Path(__file__).resolve().parents[1] / "state"
+_RUNTIME_STATE = _AGENTS_DIR / "runtime" / "state"
 _STATE_JSON    = _RUNTIME_STATE / "tasks-state.json"
 _METRICS_JSON  = _RUNTIME_STATE / "agent-metrics.json"
 _LOCK_FILE     = _RUNTIME_STATE / "runner.lock"

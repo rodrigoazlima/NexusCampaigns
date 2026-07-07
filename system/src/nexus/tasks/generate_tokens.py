@@ -1,4 +1,4 @@
-"""token.tools.generate_tokens
+"""nexus.tasks.generate_tokens
 
 Generates 512×512 circular portrait tokens from classified character images.
 Face detection: MTCNN (robust on stylized art) → OpenCV Haar (topmost) → upper-center crop fallback.
@@ -28,16 +28,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
-_TOOLS_DIR    = Path(__file__).resolve().parent
-_AGENTS_DIR   = _TOOLS_DIR.parents[1]
-_PROJECT_ROOT = _AGENTS_DIR.parent
+from nexus.shared.logger import Logger, _ensure_utf8_stdout
+from nexus.shared.loaders import _find_project_root
+from nexus.shared import locked_update_queue_entry
 
-if str(_AGENTS_DIR) not in sys.path:
-    sys.path.insert(0, str(_AGENTS_DIR))
-
-from shared.logger import Logger, _ensure_utf8_stdout  # noqa: E402
-from shared.agent_tools import SELF_MANAGEMENT_TOOLS, call_self_management_tool  # noqa: E402
-from shared import locked_update_queue_entry  # noqa: E402
+_PROJECT_ROOT = _find_project_root(Path(__file__).resolve().parent)
 
 TASK_ID         = "token-agent"
 SCRIPT_BASENAME = "generate_tokens.py"
@@ -45,14 +40,14 @@ BATCH_SIZE      = 10
 
 _VAULT_ROOT   = _PROJECT_ROOT / ".knowledge-base"
 _INBOX_IMAGES = _VAULT_ROOT / "00-Inbox" / "images"
-_AGENT_STATE  = _AGENTS_DIR / "token" / "state"
+_STATE_ROOT   = _PROJECT_ROOT / "system" / "state"
+_AGENT_STATE  = _STATE_ROOT / "token"
 _LOGS_DIR     = _AGENT_STATE / "logs"
-_MASTER_LOG   = _AGENTS_DIR / "runtime" / "state" / "logs" / "automation.log"
-_VISION_STATE = _AGENTS_DIR / "vision" / "state" / "processed-images.json"
+_MASTER_LOG   = _STATE_ROOT / "runtime" / "logs" / "automation.log"
+_VISION_STATE = _PROJECT_ROOT / "agents" / "vision" / "state" / "processed-images.json"
 _GEN_TOKENS   = _AGENT_STATE / "generated-tokens.json"
-_CONFIG_FILE  = _AGENT_STATE / "10-generate-tokens.json"  # legacy fallback
-_AGENT_JSON   = _AGENTS_DIR / "token" / "agent.json"
-_QUEUE_FILE   = _PROJECT_ROOT / "system" / "state" / "inbox-queue.json"
+_CONFIG_FILE  = _AGENT_STATE / "10-generate-tokens.json"
+_QUEUE_FILE   = _STATE_ROOT / "inbox-queue.json"
 
 _DEFAULT_CFG: dict[str, Any] = {
     "size":           512,
@@ -65,8 +60,6 @@ _DEFAULT_CFG: dict[str, Any] = {
 }
 
 _SKIP_TYPES = frozenset({"battlemap", "scene"})
-
-_MODULE_FILE = Path(__file__)
 
 
 def _is_token_stem(p: Path) -> bool:
@@ -84,17 +77,6 @@ def _make_logger() -> Logger:
 
 
 def _load_config() -> dict[str, Any]:
-    # Primary: read token_config from agent.json (edited via dashboard config dialog)
-    if _AGENT_JSON.exists():
-        try:
-            agent = json.loads(_AGENT_JSON.read_text(encoding="utf-8"))
-            if "token_config" in agent:
-                cfg = dict(_DEFAULT_CFG)
-                cfg.update(agent["token_config"])
-                return cfg
-        except Exception:
-            pass
-    # Fallback: legacy state config file
     if not _CONFIG_FILE.exists():
         _AGENT_STATE.mkdir(parents=True, exist_ok=True)
         _CONFIG_FILE.write_text(json.dumps(_DEFAULT_CFG, indent=2), encoding="utf-8")
@@ -613,104 +595,3 @@ if __name__ == "__main__":
     if _args.image:
         raise SystemExit(run_single(_args.image, _args.moldura, _args.image_type))
     main()
-
-
-# ---------------------------------------------------------------------------
-# Agentic tool interface
-# ---------------------------------------------------------------------------
-
-TOOLS = SELF_MANAGEMENT_TOOLS + [
-    {
-        "name": "list_pending_portraits",
-        "description": "Return JSON list of portrait/body image paths not yet tokenized.",
-        "input_schema": {"type": "object", "properties": {}},
-    },
-    {
-        "name": "generate_token",
-        "description": (
-            "Generate a circular 512×512 portrait token from a source image. "
-            "Detects face and centers crop on it. Scales to fill moldura inner circle. "
-            "Optional: pass image_type to select per-type moldura from config."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "image_path": {"type": "string", "description": "Absolute or project-relative path to source image"},
-                "image_type": {"type": "string", "description": "Vision type (npc, creature, body…) for moldura selection"},
-                "moldura_override": {"type": "string", "description": "Explicit moldura PNG path, overrides config"},
-            },
-            "required": ["image_path"],
-        },
-    },
-    {
-        "name": "run_batch",
-        "description": "Generate tokens for up to BATCH_SIZE pending portrait images. Returns count generated.",
-        "input_schema": {"type": "object", "properties": {}},
-    },
-]
-
-
-def call_tool(name: str, args: dict, context: dict) -> str:
-    import io, contextlib, json as _json
-    result = call_self_management_tool(
-        name, args, context, module_file=_MODULE_FILE, task_id=TASK_ID
-    )
-    if result is not None:
-        return result
-
-    if name == "list_pending_portraits":
-        vision_state = _load_vision_state()
-        gen_tokens = _load_gen_tokens()
-        images = vision_state.get("images", {})
-        pending = [
-            entry.get("path", "")
-            for img_key, entry in images.items()
-            if entry.get("status") == "ok"
-            and not entry.get("isToken", False)
-            and entry.get("type") not in _SKIP_TYPES
-            and img_key not in gen_tokens
-        ]
-        return _json.dumps(pending[:20])
-
-    if name == "generate_token":
-        cfg = _load_config()
-        log = _make_logger()
-        img_path = Path(args["image_path"])
-        if not img_path.exists():
-            img_path = _PROJECT_ROOT / args["image_path"]
-
-        moldura_path: Path | None = None
-        if args.get("moldura_override"):
-            moldura_path = Path(args["moldura_override"])
-        elif args.get("image_type"):
-            moldura_path = _pick_moldura({"type": args["image_type"]}, cfg)
-
-        out_path = img_path.parent / (img_path.stem + "-token.png")
-        ok, face = _make_token(img_path, out_path, cfg, log, moldura_path=moldura_path)
-        if ok:
-            gen = _load_gen_tokens()
-            rel = img_path.relative_to(_PROJECT_ROOT).as_posix()
-            vision_state = _load_vision_state()
-            sha_key = vision_state.get("pathIndex", {}).get(rel, "")
-            key = sha_key if sha_key and not sha_key.startswith("path:") else f"path:{rel}"
-            gen[key] = {
-                "sourcePath":  rel,
-                "tokenPath":   out_path.relative_to(_PROJECT_ROOT).as_posix(),
-                "generatedAt": datetime.now(timezone.utc).isoformat(),
-            }
-            _save_gen_tokens(gen)
-            _store_face(rel, face, log)
-            _set_queue_token_slot(rel, "done", log)
-            return f"Token generated: {out_path.name}"
-        return f"Token generation failed for: {img_path.name}"
-
-    if name == "run_batch":
-        buf = io.StringIO()
-        try:
-            with contextlib.redirect_stdout(buf):
-                main()
-        except SystemExit:
-            pass
-        return buf.getvalue().strip() or "Token batch run complete"
-
-    raise ValueError(f"Unknown tool: {name!r}")

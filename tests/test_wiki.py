@@ -13,7 +13,7 @@ if str(_AGENTS_DIR) not in sys.path:
     sys.path.insert(0, str(_AGENTS_DIR))
 
 import wiki.tools.compile_wiki as _mod
-from shared.interfaces import VaultWriteError
+from nexus.shared.interfaces import VaultWriteError
 
 
 # ---------------------------------------------------------------------------
@@ -32,7 +32,7 @@ def vault(tmp_path):
 @pytest.fixture
 def patch_roots(vault, tmp_path, monkeypatch):
     """Redirect all module-level path constants to tmp_path layout."""
-    from shared.config import VaultPaths
+    from nexus.shared.config import VaultPaths
 
     monkeypatch.setattr(_mod, "_PROJECT_ROOT", tmp_path)
     monkeypatch.setattr(_mod, "_VAULT_ROOT",   vault)
@@ -140,7 +140,7 @@ class TestPendingDocuments:
 
 class TestEnforceAndWrite:
     def test_enforces_draft_status(self, vault, patch_roots):
-        from shared import FrontmatterIO
+        from nexus.shared import FrontmatterIO
         fio  = FrontmatterIO()
         out  = vault / "01-Processing" / "test-entity.md"
         llm_output = (
@@ -155,7 +155,7 @@ class TestEnforceAndWrite:
         assert fm["quality"]  == 0
 
     def test_injects_source_field(self, vault, patch_roots):
-        from shared import FrontmatterIO
+        from nexus.shared import FrontmatterIO
         fio = FrontmatterIO()
         out = vault / "01-Processing" / "test-source.md"
         _mod._enforce_and_write(
@@ -168,7 +168,7 @@ class TestEnforceAndWrite:
         assert fm["source"] == ["original-notes.md"]
 
     def test_defaults_invalid_type_to_lore(self, vault, patch_roots):
-        from shared import FrontmatterIO
+        from nexus.shared import FrontmatterIO
         fio = FrontmatterIO()
         out = vault / "01-Processing" / "test-type.md"
         _mod._enforce_and_write(
@@ -181,7 +181,7 @@ class TestEnforceAndWrite:
         assert fm["type"] == "lore"
 
     def test_handles_no_frontmatter(self, vault, patch_roots):
-        from shared import FrontmatterIO
+        from nexus.shared import FrontmatterIO
         fio = FrontmatterIO()
         out = vault / "01-Processing" / "test-nofm.md"
         _mod._enforce_and_write("Just plain text with no frontmatter.", "notes.md", out, fio)
@@ -191,7 +191,7 @@ class TestEnforceAndWrite:
         assert fm["type"]     == "lore"
 
     def test_ensures_list_fields(self, vault, patch_roots):
-        from shared import FrontmatterIO
+        from nexus.shared import FrontmatterIO
         fio = FrontmatterIO()
         out = vault / "01-Processing" / "test-lists.md"
         _mod._enforce_and_write(
@@ -343,12 +343,12 @@ class TestMainHappyPath:
         assert len(out_files) == 1
 
         # Frontmatter must be enforced
-        from shared import FrontmatterIO
+        from nexus.shared import FrontmatterIO
         fm, _ = FrontmatterIO().read(out_files[0])
         assert fm["status"]   == "draft"
         assert fm["reviewed"] == False
         assert fm["quality"]  == 0
-        assert fm["source"]   == ["goblin-chief.md"]
+        assert fm["source"]   == ["00-Inbox/goblin-chief.md"]
 
         # Queue must be marked done
         updated = json.loads(queue_path.read_text(encoding="utf-8"))
@@ -356,8 +356,8 @@ class TestMainHappyPath:
 
     def test_does_not_write_to_library(self, vault, patch_roots, tmp_path):
         """VaultGuard must block any attempt to write into 02-Library/."""
-        from shared import VaultGuard
-        from shared.config import VaultPaths
+        from nexus.shared import VaultGuard
+        from nexus.shared.config import VaultPaths
         guard = VaultGuard(VaultPaths(vault_root=vault))
         with pytest.raises(VaultWriteError):
             guard.assert_writable(vault / "02-Library" / "some-entity.md")
@@ -578,7 +578,7 @@ class TestContentTruncation:
 
 class TestLLMErrorHandling:
     def test_llm_response_error_records_bad_doc(self, vault, patch_roots, tmp_path):
-        from shared import LLMResponseError
+        from nexus.shared import LLMResponseError
         queue_path = tmp_path / "system" / "state" / "inbox-queue.json"
         queue_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -609,7 +609,7 @@ class TestLLMErrorHandling:
         assert "broken-doc.md" in bad_docs_path.read_text(encoding="utf-8")
 
     def test_llm_offline_during_batch_aborts_without_bad_doc(self, vault, patch_roots, tmp_path):
-        from shared import LLMOfflineError
+        from nexus.shared import LLMOfflineError
         queue_path = tmp_path / "system" / "state" / "inbox-queue.json"
         queue_path.parent.mkdir(parents=True, exist_ok=True)
 

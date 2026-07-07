@@ -39,7 +39,7 @@
 #   pwsh -ExecutionPolicy Bypass -File setup-service.ps1 -CleanInstall
 
 param(
-    [string] $ProjectRoot    = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..")).Path,
+    [string] $ProjectRoot    = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path,
     [string] $VaultRoot      = "",        # knowledge base dir; may live outside ProjectRoot
     [switch] $VaultGitInit,               # git init the vault dir if it isn't a repo yet
     [string] $Python         = "python",
@@ -64,7 +64,7 @@ USAGE
   pwsh -ExecutionPolicy Bypass -File setup-service.ps1 [parameters]
 
 PARAMETERS
-  -ProjectRoot   <path>   App repo root (where this script lives). Default: parent of agents\runtime\tools
+  -ProjectRoot   <path>   App repo root. Default: two levels above this script (system\ops)
   -VaultRoot     <path>   Knowledge base dir. May be on another drive/repo entirely.
                             Default: read from global.json (vault_root), else <ProjectRoot>\.knowledge-base
                             Linked into the app repo via a directory junction so every
@@ -128,8 +128,7 @@ $ServiceName  = "vault-knowledge-factory"
 $TaskName     = "VaultKnowledgeFactory"
 $DisplayName  = "Vault Nexus Campaigns"
 $Description  = "DM pipeline: ingests, classifies, and links vault entities on schedule"
-$DaemonScript = "$ProjectRoot\agents\runtime\tools\daemon.ps1"
-$RunnerScript = "$ProjectRoot\agents\runtime\tools\runner.py"
+$DaemonScript = "$ProjectRoot\system\ops\daemon.ps1"
 $LogDir       = "$ProjectRoot\agents\runtime\state\logs"
 
 $DashboardSvc = "vault-dashboard"                       # NSSM service name
@@ -324,7 +323,7 @@ $script:AgentRelations = @{
 # walk (git status, backup, indexers) can recurse into that forever. Dot-prefixing
 # every mount lets a single .gitignore block ("### Generated junction mounts")
 # prune descent into all of them uniformly. Don't rename without updating
-# .gitignore (and agents/repair/tools/repair_agent.py's mirror) too.
+# .gitignore (and system/src/nexus/tasks/repair_agent.py's mirror) too.
 function Ensure-AgentRelationLinks([string]$ProjectRoot) {
     $allAgents = Get-ChildItem "$ProjectRoot\agents" -Directory -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -notin @("tests", "shared") } |
@@ -648,7 +647,7 @@ function Assert-ServicesRunning {
 
     # Runner process (active mid-cycle only — absence between cycles is normal)
     $runnerProcs = @(Get-Process python -ErrorAction SilentlyContinue |
-                     Where-Object { $_.CommandLine -like "*runner.py*" })
+                     Where-Object { $_.CommandLine -like "*nexus.runner*" -or $_.CommandLine -like "*runner.py*" })
     if ($runnerProcs.Count -gt 0) {
         Log "  [PASS] Runner process(es) active — PIDs: $($runnerProcs.Id -join ', ')"
     } else {
@@ -772,7 +771,7 @@ if ($Uninstall) {
 
     # Kill any lingering daemon/runner processes
     Get-Process powershell, python -ErrorAction SilentlyContinue |
-        Where-Object { $_.CommandLine -like "*daemon.ps1*" -or $_.CommandLine -like "*runner.py*" } |
+        Where-Object { $_.CommandLine -like "*daemon.ps1*" -or $_.CommandLine -like "*nexus.runner*" -or $_.CommandLine -like "*runner.py*" } |
         ForEach-Object { Log "Stopping process PID=$($_.Id)"; Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }
 
     # Wait (up to 10s) for every PID we just told to die to actually exit before
@@ -944,7 +943,7 @@ foreach ($keyName in @($TaskName, $DashboardRun)) {
 
 # Stop any lingering runner/daemon processes
 Get-Process powershell, pwsh, python -ErrorAction SilentlyContinue |
-    Where-Object { $_.CommandLine -like "*daemon.ps1*" -or $_.CommandLine -like "*runner.py*" } |
+    Where-Object { $_.CommandLine -like "*daemon.ps1*" -or $_.CommandLine -like "*nexus.runner*" -or $_.CommandLine -like "*runner.py*" } |
     ForEach-Object { Log "  Stopping process PID=$($_.Id)"; Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }
 
 # Free the dashboard port. A stale process squatting $DashboardPort (e.g. a manual
@@ -1010,9 +1009,9 @@ try {
     exit 1
 }
 
-# Verify runner script exists
-if (-not (Test-Path $RunnerScript)) {
-    Log "Runner script not found: $RunnerScript" "ERROR"
+# Verify runner package source exists (installed editable below)
+if (-not (Test-Path "$ProjectRoot\system\src\nexus\runner.py")) {
+    Log "Runner module not found: $ProjectRoot\system\src\nexus\runner.py" "ERROR"
     exit 1
 }
 
@@ -1027,21 +1026,21 @@ try {
 
 Step-Progress "Installing Python dependencies..." 25
 Log "Installing pip dependencies..."
-& $Python -m pip install -r "$ProjectRoot\requirements.txt" --quiet
+& $Python -m pip install -e $ProjectRoot --quiet
 if ($LASTEXITCODE -ne 0) {
-    Log "pip install failed — check requirements.txt." "ERROR"
+    Log "pip install failed — check pyproject.toml." "ERROR"
     exit 1
 }
 Log "Dependencies OK."
 
 # agent.json is gitignored (matches the repo's blanket *.json rule), so a fresh
 # clone has none — the scheduler would discover 0 tasks and the pipeline would
-# never run. runner.py --ensure-config synthesizes any missing agent.json from
+# never run. nexus.runner --ensure-config synthesizes any missing agent.json from
 # registry.yaml defaults; safe/idempotent to run on every install.
 Log "Ensuring agents/*/agent.json exist (synthesizing missing ones from registry.yaml)..."
-& $Python $RunnerScript --ensure-config
+& $Python -m nexus.runner --ensure-config
 if ($LASTEXITCODE -ne 0) {
-    Log "runner.py --ensure-config exited $LASTEXITCODE — check logs; agent.json may be incomplete." "WARN"
+    Log "nexus.runner --ensure-config exited $LASTEXITCODE — check logs; agent.json may be incomplete." "WARN"
 } else {
     Log "agent.json config OK."
 }
@@ -1060,7 +1059,7 @@ if ($RunPreFlight) {
     Log "Pre-flight: running runner --once..."
     if ($auth -and $auth.Var -eq "ANTHROPIC_AUTH_TOKEN") { $env:ANTHROPIC_AUTH_TOKEN = $auth.Value }
     if ($auth -and $auth.Var -eq "ANTHROPIC_API_KEY")    { $env:ANTHROPIC_API_KEY    = $auth.Value }
-    & $Python $RunnerScript --once
+    & $Python -m nexus.runner --once
     if ($LASTEXITCODE -ne 0) {
         Log "Runner --once exited $LASTEXITCODE. Check logs before installing service." "WARN"
     }
@@ -1113,7 +1112,7 @@ if ($Method -eq "nssm") {
     $nssmLog = "$LogDir\nssm-install.log"
     Log "Installing NSSM service '$ServiceName' (details: $nssmLog)..."
     & $nssmPath install     $ServiceName $Python                                              2>&1 | Out-File $nssmLog -Append -Encoding UTF8
-    & $nssmPath set         $ServiceName AppParameters  $RunnerScript                        2>&1 | Out-File $nssmLog -Append -Encoding UTF8
+    & $nssmPath set         $ServiceName AppParameters  "-m nexus.runner"                    2>&1 | Out-File $nssmLog -Append -Encoding UTF8
     & $nssmPath set         $ServiceName AppDirectory   $ProjectRoot                         2>&1 | Out-File $nssmLog -Append -Encoding UTF8
     & $nssmPath set         $ServiceName DisplayName    $DisplayName                         2>&1 | Out-File $nssmLog -Append -Encoding UTF8
     & $nssmPath set         $ServiceName Description    $Description                         2>&1 | Out-File $nssmLog -Append -Encoding UTF8

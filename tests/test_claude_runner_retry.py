@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import anthropic
 import httpx
 
-from shared.runners.claude import _create_with_retry, _retry_after
+from nexus.shared.runners.claude import _create_with_retry, _retry_after
 
 
 def _rate_limit_error(retry_after: str | None = None) -> anthropic.RateLimitError:
@@ -27,7 +27,7 @@ def test_retry_after_falls_back_to_default_without_header():
 
 
 def test_create_with_retry_recovers_from_one_rate_limit(monkeypatch):
-    monkeypatch.setattr("shared.runners.claude.time.sleep", lambda _s: None)
+    monkeypatch.setattr("nexus.shared.runners.claude.time.sleep", lambda _s: None)
 
     client = MagicMock()
     ok_response = MagicMock(stop_reason="end_turn")

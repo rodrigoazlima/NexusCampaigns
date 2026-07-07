@@ -1,4 +1,4 @@
-"""token.tools.remove_background
+"""nexus.tasks.remove_background
 
 Turn glow-on-dark logo / emblem art into transparent PNGs, plus an optional
 "filled shape" variant that keeps the interior background color of an enclosed
@@ -18,7 +18,7 @@ the enclosed interior, and keeps the original colors inside the silhouette.
 
 No LLM. Pure image processing (numpy + Pillow + OpenCV).
 
-Config: every tunable comes from `bg_config` in agents/token/agent.json
+Config: every tunable comes from system/state/token/bg-config.json
 (falls back to _DEFAULT_CFG below).
 """
 
@@ -31,30 +31,25 @@ from typing import Any
 
 import numpy as np
 
-_TOOLS_DIR    = Path(__file__).resolve().parent
-_AGENTS_DIR   = _TOOLS_DIR.parents[1]
-_PROJECT_ROOT = _AGENTS_DIR.parent
+from nexus.shared.logger import Logger, _ensure_utf8_stdout
+from nexus.shared.loaders import _find_project_root
 
-if str(_AGENTS_DIR) not in sys.path:
-    sys.path.insert(0, str(_AGENTS_DIR))
-
-from shared.logger import Logger, _ensure_utf8_stdout  # noqa: E402
-from shared.agent_tools import SELF_MANAGEMENT_TOOLS, call_self_management_tool  # noqa: E402
+_PROJECT_ROOT = _find_project_root(Path(__file__).resolve().parent)
 
 TASK_ID         = "token-agent"
 SCRIPT_BASENAME = "remove_background.py"
-_MODULE_FILE    = Path(__file__)
 
-_AGENT_JSON   = _AGENTS_DIR / "token" / "agent.json"
-_AGENT_STATE  = _AGENTS_DIR / "token" / "state"
+_STATE_ROOT   = _PROJECT_ROOT / "system" / "state"
+_AGENT_STATE  = _STATE_ROOT / "token"
+_BG_CONFIG    = _AGENT_STATE / "bg-config.json"
 _LOGS_DIR     = _AGENT_STATE / "logs"
-_MASTER_LOG   = _AGENTS_DIR / "runtime" / "state" / "logs" / "automation.log"
+_MASTER_LOG   = _STATE_ROOT / "runtime" / "logs" / "automation.log"
 
 # Rec.709 luminance weights (perceptual brightness)
 _LUMA_W = np.array([0.2126, 0.7152, 0.0722], dtype=np.float32)
 
 # --------------------------------------------------------------------------
-# Configuration — defaults; live values come from agent.json -> bg_config
+# Configuration — defaults; live values come from system/state/token/bg-config.json
 # --------------------------------------------------------------------------
 _DEFAULT_CFG: dict[str, Any] = {
     "method":        "hybrid",   # hybrid | luma | color
@@ -75,13 +70,13 @@ _DEFAULT_CFG: dict[str, Any] = {
 
 
 def _load_config() -> dict[str, Any]:
-    """Read `bg_config` from agent.json, merged over defaults."""
+    """Read bg-config.json (optional), merged over defaults."""
     cfg = dict(_DEFAULT_CFG)
-    if _AGENT_JSON.exists():
+    if _BG_CONFIG.exists():
         try:
-            agent = json.loads(_AGENT_JSON.read_text(encoding="utf-8"))
-            if isinstance(agent.get("bg_config"), dict):
-                cfg.update(agent["bg_config"])
+            stored = json.loads(_BG_CONFIG.read_text(encoding="utf-8"))
+            if isinstance(stored, dict):
+                cfg.update(stored)
         except Exception:
             pass
     return cfg
@@ -334,54 +329,6 @@ def main(inputs: list[str] | None = None) -> None:
     sys.exit(0 if failed == 0 else 1)
 
 
-# --------------------------------------------------------------------------
-# Agentic tool interface
-# --------------------------------------------------------------------------
-
-TOOLS = SELF_MANAGEMENT_TOOLS + [
-    {
-        "name": "remove_background",
-        "description": (
-            "Key out the dark background of glow-on-dark logo art -> transparent PNG. "
-            "Omit image_path to batch the configured input_dir. "
-            "method: hybrid (default) | luma | color."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "image_path": {"type": "string", "description": "Source image (omit to batch input_dir)"},
-                "method": {"type": "string", "enum": ["hybrid", "luma", "color"]},
-                "margin": {"type": "number", "description": "Distance above bg floor before pixels show"},
-                "gamma": {"type": "number", "description": "Alpha curve; <1 keeps glow, >1 hardens edges"},
-                "trim": {"type": "boolean", "description": "Autocrop to content bounding box"},
-            },
-        },
-    },
-    {
-        "name": "fill_shield",
-        "description": (
-            "Make a variant that KEEPS the interior background color of an enclosed "
-            "emblem (e.g. a shield): detect the bright outline, fill the silhouette, "
-            "keep original colors inside, transparent outside. Output: <name><fill_suffix>.png."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "image_path": {"type": "string", "description": "Source image with an enclosed emblem"},
-                "threshold": {"type": "number", "description": "Luminance threshold for the bright outline"},
-                "close_radius": {"type": "integer", "description": "Dilation px to close outline gaps"},
-            },
-            "required": ["image_path"],
-        },
-    },
-    {
-        "name": "run_batch",
-        "description": "Remove background for all images in the configured input_dir.",
-        "input_schema": {"type": "object", "properties": {}},
-    },
-]
-
-
 def _resolve(image_path: str) -> Path:
     p = Path(image_path)
     if not p.is_absolute():
@@ -390,61 +337,9 @@ def _resolve(image_path: str) -> Path:
     return p
 
 
-def call_tool(name: str, args: dict, context: dict) -> str:
-    import io, contextlib
-
-    result = call_self_management_tool(
-        name, args, context, module_file=_MODULE_FILE, task_id=TASK_ID
-    )
-    if result is not None:
-        return result
-
-    if name == "remove_background":
-        if not args.get("image_path"):
-            buf = io.StringIO()
-            try:
-                with contextlib.redirect_stdout(buf):
-                    main()
-            except SystemExit:
-                pass
-            return buf.getvalue().strip() or "Batch background removal complete"
-        src = _resolve(args["image_path"])
-        if not src.exists():
-            return f"Image not found: {args['image_path']}"
-        dest = _out_path(src)
-        stats = remove_bg(
-            src, dest,
-            method=args.get("method"), margin=args.get("margin"),
-            gamma=args.get("gamma"), trim=args.get("trim"),
-        )
-        return f"Wrote {dest.name} [opaque={stats['opaque_pct']}% {stats['size']}]"
-
-    if name == "fill_shield":
-        src = _resolve(args["image_path"])
-        if not src.exists():
-            return f"Image not found: {args['image_path']}"
-        dest = OUTPUT_DIR / (src.stem + FILL_SUFFIX + ".png")
-        stats = fill_shape(
-            src, dest,
-            threshold=args.get("threshold"), close_radius=args.get("close_radius"),
-        )
-        return f"Wrote {dest.name} [shape={stats['shape_pct']}% {stats['size']}]"
-
-    if name == "run_batch":
-        buf = io.StringIO()
-        try:
-            with contextlib.redirect_stdout(buf):
-                main()
-        except SystemExit:
-            pass
-        return buf.getvalue().strip() or "Batch background removal complete"
-
-    raise ValueError(f"Unknown tool: {name!r}")
-
-
 if __name__ == "__main__":
     import argparse
-    ap = argparse.ArgumentParser(description="Background removal / shape fill (config: agent.json bg_config)")
+    ap = argparse.ArgumentParser(description="Background removal / shape fill (config: bg-config.json)")
     ap.add_argument("inputs", nargs="*", help="files/dirs (default: configured input_dir)")
     ap.add_argument("--fill", metavar="IMAGE", help="fill enclosed emblem interior instead of removing bg")
     a = ap.parse_args()

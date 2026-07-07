@@ -1,4 +1,4 @@
-"""Tests for wikilink.tools.wikilink_library."""
+"""Tests for nexus.tasks.wikilink_library."""
 
 import json
 import sys
@@ -10,8 +10,8 @@ _AGENTS_DIR = Path(__file__).resolve().parents[1]
 if str(_AGENTS_DIR) not in sys.path:
     sys.path.insert(0, str(_AGENTS_DIR))
 
-import wikilink.tools.wikilink_library as _mod
-from shared import FrontmatterIO
+import nexus.tasks.wikilink_library as _mod
+from nexus.shared import FrontmatterIO
 
 
 # ---------------------------------------------------------------------------
@@ -263,7 +263,7 @@ class TestInsertWikilinks:
 class TestStateHelpers:
     def test_mark_and_load_processed(self, vault, patch_roots, tmp_path):
         state_file = tmp_path / "agents" / "wikilink" / "state" / "wikilink-state.json"
-        from shared import StateStore, WIKILINK_STATE_DEFAULT
+        from nexus.shared import StateStore, WIKILINK_STATE_DEFAULT
         store = StateStore(state_file, WIKILINK_STATE_DEFAULT)
         store.init_defaults()
 
@@ -273,7 +273,7 @@ class TestStateHelpers:
 
     def test_init_defaults_idempotent(self, vault, patch_roots, tmp_path):
         state_file = tmp_path / "agents" / "wikilink" / "state" / "wikilink-state.json"
-        from shared import StateStore, WIKILINK_STATE_DEFAULT
+        from nexus.shared import StateStore, WIKILINK_STATE_DEFAULT
         store = StateStore(state_file, WIKILINK_STATE_DEFAULT)
         store.init_defaults()
         store.init_defaults()  # second call must not overwrite

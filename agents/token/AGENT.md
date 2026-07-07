@@ -18,7 +18,7 @@ dependencies:
   - vision
 dispatch_config: agent.json
 owned_tools:
-  - tools/generate_tokens.py
+  - system/src/nexus/tasks/generate_tokens.py
 responsibilities:
   - Load config from state/10-generate-tokens.json (size, padding, ratios, moldura path)
   - Filter processed-images.json to status=ok, isToken=false, type not in battlemap/scene

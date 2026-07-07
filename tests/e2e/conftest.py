@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-_AGENTS_DIR = Path(__file__).resolve().parents[2]
-_PROJECT_ROOT = _AGENTS_DIR.parent
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+_AGENTS_DIR = _PROJECT_ROOT / "agents"
 if str(_AGENTS_DIR) not in sys.path:
     sys.path.insert(0, str(_AGENTS_DIR))
 

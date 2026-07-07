@@ -22,8 +22,8 @@ _PROJECT_ROOT = _AGENTS_DIR.parent
 if str(_AGENTS_DIR) not in sys.path:
     sys.path.insert(0, str(_AGENTS_DIR))
 
-from shared import FrontmatterIO, LLMClient, Logger, LLMOfflineError  # noqa: E402
-from shared.config import LLMEndpointConfig  # noqa: E402
+from nexus.shared import FrontmatterIO, LLMClient, Logger, LLMOfflineError  # noqa: E402
+from nexus.shared.config import LLMEndpointConfig  # noqa: E402
 
 TASK_ID         = "vision-agent"
 SCRIPT_BASENAME = "extract_text.py"
@@ -180,7 +180,7 @@ if __name__ == "__main__":
 # Agentic tool interface (claude-api dispatch)
 # ---------------------------------------------------------------------------
 
-from shared.agent_tools import SELF_MANAGEMENT_TOOLS, call_self_management_tool  # noqa: E402
+from nexus.shared.agent_tools import SELF_MANAGEMENT_TOOLS, call_self_management_tool  # noqa: E402
 
 _MODULE_FILE = Path(__file__)
 

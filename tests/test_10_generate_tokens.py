@@ -31,7 +31,7 @@ from PIL import Image, ImageDraw
 # ---------------------------------------------------------------------------
 
 SCRIPT_PATH = (
-    Path(__file__).parent.parent / "agents" / "token" / "tools" / "generate_tokens.py"
+    Path(__file__).parent.parent / "system" / "src" / "nexus" / "tasks" / "generate_tokens.py"
 )
 
 _AGENTS_DIR = Path(__file__).resolve().parents[1] / "agents"
@@ -74,7 +74,7 @@ if _MISSING_API:
     pytest.skip(
         f"generate_tokens.py API changed — functions not found: {_MISSING_API}. "
         "Refactored module uses _load_config/_make_token/etc. (internal names). "
-        "Next step: rewrite these tests against agents/token/tools/generate_tokens.py API "
+        "Next step: rewrite these tests against nexus/tasks/generate_tokens.py API "
         "or extend agents/tests/test_token_agent.py.",
         allow_module_level=True,
     )

@@ -13,15 +13,15 @@ from pathlib import Path
 
 import pytest
 
-from shared import (
+from nexus.shared import (
     FrontmatterIO,
     Logger,
     StateStore,
     VaultGuard,
     load_vault_config,
 )
-from shared.config import VaultPaths, SystemPaths, VaultConfig, LLMEndpointConfig
-from shared.defaults import (
+from nexus.shared.config import VaultPaths, SystemPaths, VaultConfig, LLMEndpointConfig
+from nexus.shared.defaults import (
     INBOX_QUEUE_DEFAULT,
     PROCESSED_IMAGES_DEFAULT,
     PROCESSED_NPCS_DEFAULT,
@@ -29,8 +29,8 @@ from shared.defaults import (
     STATE_FILE_DEFAULTS,
     TASKS_STATE_DEFAULT,
 )
-from shared.interfaces import VaultWriteError
-from shared.models import (
+from nexus.shared.interfaces import VaultWriteError
+from nexus.shared.models import (
     AgentSlots,
     AgentSlotStatus,
     EntityFrontmatter,
@@ -505,16 +505,16 @@ class TestBootstrapAllDefaults:
 
 class TestLLMClientOfflineBehaviour:
     def test_is_available_returns_false_when_server_down(self, cfg):
-        from shared.llm_client import LLMClient
+        from nexus.shared.llm_client import LLMClient
         client = LLMClient(cfg.llm_endpoints["vision"])
         # Real localhost:1234 likely not running in CI
         result = client.is_available()
         assert isinstance(result, bool)   # just check it doesn't crash
 
     def test_chat_raises_llm_offline_error(self, cfg):
-        from shared.llm_client import LLMClient
-        from shared.interfaces import LLMOfflineError
-        from shared.config import LLMEndpointConfig
+        from nexus.shared.llm_client import LLMClient
+        from nexus.shared.interfaces import LLMOfflineError
+        from nexus.shared.config import LLMEndpointConfig
 
         # Point to a port that definitely has nothing running
         ep = LLMEndpointConfig(
@@ -530,9 +530,9 @@ class TestLLMClientOfflineBehaviour:
     def test_vision_chat_raises_llm_offline_error(self, cfg, tmp_path):
         pytest.importorskip("PIL")
         from PIL import Image
-        from shared.llm_client import LLMClient
-        from shared.interfaces import LLMOfflineError
-        from shared.config import LLMEndpointConfig
+        from nexus.shared.llm_client import LLMClient
+        from nexus.shared.interfaces import LLMOfflineError
+        from nexus.shared.config import LLMEndpointConfig
 
         img = tmp_path / "test.png"
         Image.new("RGB", (50, 50), color=(0, 128, 0)).save(img)

@@ -12,7 +12,7 @@ if str(_AGENTS_DIR) not in sys.path:
     sys.path.insert(0, str(_AGENTS_DIR))
 
 import vision.tools.classify_images as _mod
-from shared.models import Element, Environment, ImageType, VisionClassification
+from nexus.shared.models import Element, Environment, ImageType, VisionClassification
 
 
 # ---------------------------------------------------------------------------
@@ -618,7 +618,7 @@ class TestFailedImageStorage:
 
 class TestSignalEmission:
     def test_emits_image_classified_signal(self, patch_roots, tmp_path):
-        from shared.signal_bus import SignalConsumer
+        from nexus.shared.signal_bus import SignalConsumer
         signals_dir = tmp_path / "agents" / "runtime" / "state" / "signals"
 
         with patch.object(_mod, "LLMClient") as MockClient:

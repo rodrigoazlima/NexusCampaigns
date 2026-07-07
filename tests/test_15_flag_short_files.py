@@ -36,7 +36,7 @@ import pytest
 # ---------------------------------------------------------------------------
 
 _SCRIPT = (
-    Path(__file__).parent.parent / "agents" / "review" / "tools" / "flag_short_files.py"
+    Path(__file__).parent.parent / "system" / "src" / "nexus" / "tasks" / "flag_short_files.py"
 )
 
 _AGENTS_DIR = Path(__file__).resolve().parents[1] / "agents"
@@ -76,7 +76,7 @@ if _MISSING_API:
     pytest.skip(
         f"flag_short_files.py API changed — functions not found: {_MISSING_API}. "
         "Refactored module uses _flag_short_file/main/call_tool. "
-        "Next step: rewrite these tests against agents/review/tools/flag_short_files.py API.",
+        "Next step: rewrite these tests against nexus/tasks/flag_short_files.py API.",
         allow_module_level=True,
     )
 

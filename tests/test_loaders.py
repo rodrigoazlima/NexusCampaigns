@@ -3,8 +3,8 @@
 import pytest
 from pathlib import Path
 
-from shared.loaders import load_vault_config, _find_project_root
-from shared.config import VaultConfig
+from nexus.shared.loaders import load_vault_config, _find_project_root
+from nexus.shared.config import VaultConfig
 
 
 @pytest.fixture
@@ -25,6 +25,11 @@ class TestFindProjectRoot:
         assert found == project_root
 
     def test_raises_if_no_knowledge_base(self, tmp_path):
+        # _find_project_root walks to the drive root, so an ancestor of
+        # tmp_path (e.g. %USERPROFILE%) holding .knowledge-base makes the
+        # negative case untestable on this machine.
+        if any((a / ".knowledge-base").is_dir() for a in [tmp_path, *tmp_path.parents]):
+            pytest.skip("an ancestor of tmp_path contains .knowledge-base")
         with pytest.raises(FileNotFoundError, match=".knowledge-base"):
             _find_project_root(tmp_path)
 

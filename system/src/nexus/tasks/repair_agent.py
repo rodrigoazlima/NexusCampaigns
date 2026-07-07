@@ -1,4 +1,4 @@
-"""repair.tools.repair_agent
+"""nexus.tasks.repair_agent
 
 Maintenance agent — no LLM, no vault content changes.
 
@@ -29,15 +29,12 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-_TOOLS_DIR    = Path(__file__).resolve().parent
-_AGENTS_DIR   = _TOOLS_DIR.parents[1]
-_PROJECT_ROOT = _AGENTS_DIR.parent
+from nexus.shared import Logger, REQUIRED_DIRS
+from nexus.shared.agent_tools import SELF_MANAGEMENT_TOOLS, call_self_management_tool
+from nexus.shared.loaders import _find_project_root
 
-if str(_AGENTS_DIR) not in sys.path:
-    sys.path.insert(0, str(_AGENTS_DIR))
-
-from shared import Logger, REQUIRED_DIRS  # noqa: E402
-from shared.agent_tools import SELF_MANAGEMENT_TOOLS, call_self_management_tool  # noqa: E402
+_PROJECT_ROOT = _find_project_root(Path(__file__).resolve().parent)
+_AGENTS_DIR   = _PROJECT_ROOT / "agents"
 
 TASK_ID         = "repair-agent"
 SCRIPT_BASENAME = "repair_agent.py"
@@ -177,11 +174,18 @@ def _remove_stale_lock(log: Logger) -> int:
 # self-heals instead of silently sitting idle forever.
 # ---------------------------------------------------------------------------
 
+# Static (no-LLM) tasks dispatch as cli against nexus.tasks.* modules; only
+# the LLM agents (vision, lore, classification, wiki) scaffold claude-api.
 _AGENT_JSON_SPECS: dict[str, list[dict]] = {
     "ingestion": [
-        {"task_id": "ingestion-agent", "model": "claude-haiku-4-5-20251001",
-         "tools_module": "ingestion.tools.ingestion_agent", "interval": 900,
+        {"task_id": "ingestion-agent", "interval": 900,
+         "dispatch": "cli", "cli_args": ["-m", "nexus.tasks.ingestion_agent"],
          "description": "Vault ingestion — emoji-strip filenames, convert DOCX, register inbox queue."},
+    ],
+    "repair": [
+        {"task_id": "repair-agent", "interval": 900,
+         "dispatch": "cli", "cli_args": ["-m", "nexus.tasks.repair_agent"],
+         "description": "Pipeline self-maintenance — stale locks, missing dirs, queue validation."},
     ],
     "vision": [
         {"task_id": "vision-agent", "model": "claude-sonnet-4-6",
@@ -194,8 +198,8 @@ _AGENT_JSON_SPECS: dict[str, list[dict]] = {
          "description": "Generate NPC drafts from classified images."},
     ],
     "token": [
-        {"task_id": "token-agent", "model": "claude-haiku-4-5-20251001",
-         "tools_module": "token.tools.generate_tokens", "interval": 900,
+        {"task_id": "token-agent", "interval": 900,
+         "dispatch": "cli", "cli_args": ["-m", "nexus.tasks.generate_tokens"],
          "description": "Generate VTT tokens from classified portrait images."},
     ],
     "classification": [
@@ -209,27 +213,26 @@ _AGENT_JSON_SPECS: dict[str, list[dict]] = {
          "description": "Compile enriched drafts into wiki entity pages."},
     ],
     "review": [
-        {"task_id": "review-agent", "model": "claude-haiku-4-5-20251001",
-         "tools_module": "review.tools.daily_report", "interval": 900,
+        {"task_id": "review-agent", "interval": 900,
+         "dispatch": "cli", "cli_args": ["-m", "nexus.tasks.daily_report"],
          "description": "Daily pipeline health + pending-review report."},
-        {"task_id": "review-agent-short-files", "model": "claude-haiku-4-5-20251001",
-         "tools_module": "review.tools.flag_short_files", "interval": 3600,
-         "description": "Flag drafts under 10 body lines for reprocessing.",
-         "prompt_file": "prompts/system-short-files.md"},
+        {"task_id": "review-agent-short-files", "interval": 3600,
+         "dispatch": "cli", "cli_args": ["-m", "nexus.tasks.flag_short_files"],
+         "description": "Flag drafts under 10 body lines for reprocessing."},
     ],
     "wikilink": [
-        {"task_id": "wikilink-agent", "model": "claude-haiku-4-5-20251001",
-         "tools_module": "wikilink.tools.wikilink_library", "interval": 3600,
+        {"task_id": "wikilink-agent", "interval": 3600,
+         "dispatch": "cli", "cli_args": ["-m", "nexus.tasks.wikilink_library"],
          "description": "Link Library entities via wikilinks."},
     ],
     "cleanup": [
-        {"task_id": "cleanup-agent", "model": "claude-haiku-4-5-20251001",
-         "tools_module": "cleanup.tools.cleanup_agent", "interval": 86400,
+        {"task_id": "cleanup-agent", "interval": 86400,
+         "dispatch": "cli", "cli_args": ["-m", "nexus.tasks.cleanup_agent"],
          "description": "Prune old logs and stale state."},
     ],
     "thumbnails": [
         {"task_id": "thumbnails-agent", "interval": 3600,
-         "dispatch": "cli", "cli_args": ["agents/thumbnails/tools/thumbnails_agent.py"],
+         "dispatch": "cli", "cli_args": ["-m", "nexus.tasks.thumbnails_agent"],
          "timeout": 1800,
          "description": "Pre-generate 320px webp thumbnails for inbox images."},
     ],

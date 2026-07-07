@@ -10,10 +10,10 @@ First-stage agent of the vault pipeline (see repo-root `CLAUDE.md` for the full 
 
 ```powershell
 # Run standalone (bypasses runner scheduling)
-python tools/ingestion_agent.py
+python -m nexus.tasks.ingestion_agent
 
 # Run via the shared scheduler (from repo root)
-python agents/runtime/tools/runner.py --task ingestion-agent --force
+python -m nexus.runner --task ingestion-agent --force
 
 # Relevant tests (repo root)
 pytest agents/tests/test_11_ingestion_agent.py
@@ -21,7 +21,7 @@ pytest agents/tests/test_11_ingestion_agent.py
 
 ## Layout
 
-- `tools/ingestion_agent.py` — all logic; `IngestionAgent(BaseAgent)` + `TOOLS`/`call_tool()` for agentic dispatch.
+- `system/src/nexus/tasks/ingestion_agent.py` — all logic; `IngestionAgent(BaseAgent)` + `TOOLS`/`call_tool()` for agentic dispatch.
 - `agent.json` — task config (hourly, `lm-studio` dispatch).
 - `AGENT.md` — contract: inputs/outputs, `commit_scope`, restrictions (read before changing behavior).
 - `prompts/system.md`, `prompts/prompt.md` — instructions for the dispatched model; keep in sync with the step order in `run_batch()`.
@@ -29,7 +29,7 @@ pytest agents/tests/test_11_ingestion_agent.py
 - `.knowledge-base/00-Inbox` → symlink to the vault's real inbox.
 - `.system/state` → symlink to `system/state/` (shared `inbox-queue.json` lives here, not under this agent's own `state/`).
 
-## `run_batch()` pipeline order (in `tools/ingestion_agent.py`)
+## `run_batch()` pipeline order (in `system/src/nexus/tasks/ingestion_agent.py`)
 
 1. `absorb_stray_entries` — move stray top-level vault folders into `00-Inbox/`, only if `registry.yaml`'s `ingestion_options.auto_absorb_stray` is true; otherwise just logs a warning per stray entry so nothing silently vanishes.
 2. `strip_emoji_filenames` — idempotent emoji/non-ASCII strip on `00-Inbox/` filenames, collision-safe (timestamp suffix on conflict).
@@ -51,4 +51,4 @@ Each step is independently safe to fail — `run_batch()` accumulates `(count, f
 - `00-Inbox/` subfolders: `images/` (organized by arc), `docs/`, `songs/`, `tokens/` — preserve originals, never modify/delete.
 - Agent priority order for the whole pipeline: reusability > consistency > traceability > human review > knowledge-graph connectivity.
 - Only humans may set `reviewed: true` / `status: approved` — no agent in this repo does.
-- `AGENTS.md`'s own "Ingestion Agent" section (image slug/metadata generation, `agents/vision/state/processed-images.json` updates) describes an **older spec**, not this implementation — current code (`tools/ingestion_agent.py`) does filename cleanup + DOCX conversion + queue registration only, no per-image metadata generation (that's the `vision` agent's job now, tracked via `agents/vision/state/processed-images.json`, which this agent's `_reindex_moved_prefix()` patches on stray-absorb moves).
+- `AGENTS.md`'s own "Ingestion Agent" section (image slug/metadata generation, `agents/vision/state/processed-images.json` updates) describes an **older spec**, not this implementation — current code (`system/src/nexus/tasks/ingestion_agent.py`) does filename cleanup + DOCX conversion + queue registration only, no per-image metadata generation (that's the `vision` agent's job now, tracked via `agents/vision/state/processed-images.json`, which this agent's `_reindex_moved_prefix()` patches on stray-absorb moves).

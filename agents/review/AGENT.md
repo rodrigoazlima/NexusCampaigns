@@ -17,8 +17,8 @@ outputs:
 dependencies: []
 dispatch_config: agent.json
 owned_tools:
-  - tools/daily_report.py
-  - tools/flag_short_files.py
+  - system/src/nexus/tasks/daily_report.py
+  - system/src/nexus/tasks/flag_short_files.py
 responsibilities:
   - Parse automation.log for all lines in last 24h matching [timestamp][taskId] format
   - Count START/DONE markers per task to compute runs and completedRuns

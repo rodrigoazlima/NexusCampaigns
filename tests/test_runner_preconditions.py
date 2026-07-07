@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 _RUNNER_PATH = (
-    Path(__file__).resolve().parents[1] / "runtime" / "tools" / "runner.py"
+    Path(__file__).resolve().parents[1] / "system" / "src" / "nexus" / "runner.py"
 )
 
 

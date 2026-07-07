@@ -26,7 +26,7 @@ Full contract (inputs/outputs/responsibilities/restrictions) is in `AGENT.md` fr
 python agents\vision\tools\classify_images.py
 
 # Or via the shared runner (respects intervalSeconds / preconditions)
-python agents\runtime\tools\runner.py --task vision-agent --force
+python -m nexus.runner --task vision-agent --force
 
 # One-time migration for old short-body drafts in 01-Processing/ (safe to re-run)
 python agents\vision\tools\backfill_short_drafts.py

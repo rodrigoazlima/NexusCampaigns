@@ -5,8 +5,8 @@ from pathlib import Path
 from abc import ABC
 from unittest.mock import MagicMock
 
-from shared.config import VaultConfig, VaultPaths, SystemPaths
-from shared.interfaces import (
+from nexus.shared.config import VaultConfig, VaultPaths, SystemPaths
+from nexus.shared.interfaces import (
     BaseAgent,
     IAgent,
     IFaceMatcher,

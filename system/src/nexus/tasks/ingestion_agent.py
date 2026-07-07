@@ -1,6 +1,6 @@
-"""ingestion.tools.ingestion_agent
+"""nexus.tasks.ingestion_agent
 
-Ingestion Agent — first stage of the vault pipeline.
+Ingestion task — first stage of the vault pipeline.
   - Strips emoji from filenames in 00-Inbox/ (idempotent)
   - Converts .docx files vault-wide to GFM Markdown via Pandoc
   - Registers new Inbox files into system/state/inbox-queue.json
@@ -21,15 +21,7 @@ from typing import Optional
 
 import yaml
 
-# agents/ must be on sys.path so `import shared` resolves
-_TOOLS_DIR    = Path(__file__).resolve().parent
-_AGENTS_DIR   = _TOOLS_DIR.parents[1]
-_PROJECT_ROOT = _AGENTS_DIR.parent
-
-if str(_AGENTS_DIR) not in sys.path:
-    sys.path.insert(0, str(_AGENTS_DIR))
-
-from shared import (  # noqa: E402
+from nexus.shared import (
     AgentSlots,
     AgentSlotStatus,
     BaseAgent,
@@ -38,8 +30,11 @@ from shared import (  # noqa: E402
     InboxQueueEntry,
     locked_update_queue_entry,
 )
-from shared.logger import Logger  # noqa: E402
-from shared.loaders import load_vault_config  # noqa: E402
+from nexus.shared.logger import Logger
+from nexus.shared.loaders import _find_project_root, load_vault_config
+
+_PROJECT_ROOT = _find_project_root(Path(__file__).resolve().parent)
+_AGENTS_DIR   = _PROJECT_ROOT / "agents"
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -58,7 +53,7 @@ _INBOX        = _VAULT_ROOT / "00-Inbox"
 _SHARED_STATE = _PROJECT_ROOT / "system" / "state"
 _QUEUE_FILE   = _SHARED_STATE / "inbox-queue.json"
 
-_AGENT_STATE    = _AGENTS_DIR / "ingestion" / "state"
+_AGENT_STATE    = _SHARED_STATE / "ingestion"
 _LOGS_DIR       = _AGENT_STATE / "logs"
 _PROCESSED_DOCX = _AGENT_STATE / "processed-docx.txt"
 
@@ -105,7 +100,7 @@ def _make_logger() -> Logger:
         task_id         = TASK_ID,
         script_basename = SCRIPT_BASENAME,
         logs_dir        = _LOGS_DIR,
-        master_log      = _AGENTS_DIR / "runtime" / "state" / "logs" / "automation.log",
+        master_log      = _SHARED_STATE / "runtime" / "logs" / "automation.log",
     )
 
 
@@ -589,64 +584,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
-# ---------------------------------------------------------------------------
-# Agentic tool interface (claude-api tool-use dispatch)
-# ---------------------------------------------------------------------------
-
-from shared.agent_tools import SELF_MANAGEMENT_TOOLS, call_self_management_tool  # noqa: E402
-
-_MODULE_FILE = Path(__file__)
-
-TOOLS = SELF_MANAGEMENT_TOOLS + [
-    {
-        "name": "clean_filenames",
-        "description": "Strip emoji and non-ASCII characters from all filenames in 00-Inbox/. Idempotent.",
-        "input_schema": {"type": "object", "properties": {}},
-    },
-    {
-        "name": "convert_docx",
-        "description": "Convert all unprocessed .docx files in the vault to GFM Markdown via Pandoc. Extracts embedded images.",
-        "input_schema": {"type": "object", "properties": {}},
-    },
-    {
-        "name": "register_queue",
-        "description": "Scan 00-Inbox/ for files not yet in inbox-queue.json and register them with appropriate agent slots.",
-        "input_schema": {"type": "object", "properties": {}},
-    },
-    {
-        "name": "absorb_stray_folders",
-        "description": (
-            "Move top-level vault folders/files outside 00-Inbox into 00-Inbox/, "
-            "when ingestion_options.auto_absorb_stray is enabled in registry.yaml. "
-            "Reindexes inbox-queue.json/processed-images.json entries referencing the old path."
-        ),
-        "input_schema": {"type": "object", "properties": {}},
-    },
-]
-
-
-def call_tool(name: str, args: dict, context: dict) -> str:
-    result = call_self_management_tool(
-        name, args, context, module_file=_MODULE_FILE, task_id=TASK_ID
-    )
-    if result is not None:
-        return result
-
-    log = _make_logger()
-    if name == "clean_filenames":
-        n = strip_emoji_filenames(_INBOX, log)
-        return f"Cleaned {n} filename(s)"
-    if name == "convert_docx":
-        ok, failed = process_docx_files(log)
-        return f"Converted {ok} docx file(s); {failed} failed"
-    if name == "register_queue":
-        ok, failed = register_new_files(log)
-        _reconcile_slots(log)
-        return f"Registered {ok} file(s); {failed} failed"
-    if name == "absorb_stray_folders":
-        n = absorb_stray_entries(log)
-        return f"Absorbed {n} stray folder/file(s)"
-
-    raise ValueError(f"Unknown tool: {name!r}")

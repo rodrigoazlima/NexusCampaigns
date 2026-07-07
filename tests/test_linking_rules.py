@@ -9,7 +9,7 @@ _AGENTS_DIR = Path(__file__).resolve().parents[1]
 if str(_AGENTS_DIR) not in sys.path:
     sys.path.insert(0, str(_AGENTS_DIR))
 
-from shared.linking_rules import (
+from nexus.shared.linking_rules import (
     REQUIRED_LINK_GROUPS,
     describe_violations,
     has_required_links,

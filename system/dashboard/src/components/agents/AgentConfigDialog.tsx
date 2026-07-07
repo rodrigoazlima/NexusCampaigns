@@ -1228,7 +1228,7 @@ function RuntimeForm({ config, onChange }: { config: RuntimeConfig; onChange: (f
       <div className="space-y-3">
         <FieldRow label="Poll Interval (s)">
           <NumberInput value={config.intervalSec} onChange={(v) => onChange('intervalSec', v)} min={10} />
-          <p className="text-[10px] text-zinc-600 mt-1">How often the daemon calls runner.py — {intervalLabel(config.intervalSec)}</p>
+          <p className="text-[10px] text-zinc-600 mt-1">How often the daemon runs a scheduler cycle — {intervalLabel(config.intervalSec)}</p>
         </FieldRow>
         <FieldRow label="Python Executable">
           <TextInput value={config.python} onChange={(v) => onChange('python', v)} mono />

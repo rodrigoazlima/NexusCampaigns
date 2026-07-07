@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```powershell
 # Run this agent once, bypassing due/precondition checks (from repo root)
-python agents/runtime/tools/runner.py --task lore-agent --force
+python -m nexus.runner --task lore-agent --force
 
 # Run the batch script directly (LM Studio must be running at localhost:1234)
 python agents/lore/tools/generate_npcs.py

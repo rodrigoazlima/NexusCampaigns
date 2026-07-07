@@ -25,7 +25,7 @@ outputs:
 dependencies: []
 dispatch_config: agent.json
 owned_tools:
-  - tools/repair_agent.py
+  - system/src/nexus/tasks/repair_agent.py
 responsibilities:
   - GitUpdate: git fetch + git pull --ff-only if project root is a git repository; non-fatal on failure
   - ParseErrorPatterns: scan automation.log (last 24h) for stale-lock / missing-directory / missing-image-ref patterns

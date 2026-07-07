@@ -42,7 +42,7 @@ Status: **spec-only**. `AGENT.md` (contract) exists; `tools/`, `prompts/`, `agen
 
 ```powershell
 pytest agents/tests/test_*canon* -k canon      # once tests exist for this agent
-python agents/runtime/tools/runner.py --task canon-agent --force   # once agent.json exists
+python -m nexus.runner --task canon-agent --force   # once agent.json exists
 ```
 
 No dedicated build/lint for this folder — it's pure Python under the shared pytest suite at repo root.

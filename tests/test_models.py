@@ -4,7 +4,7 @@ import pytest
 from datetime import date, datetime, timezone
 from pydantic import ValidationError
 
-from shared.models import (
+from nexus.shared.models import (
     AgentMetrics,
     AgentMetricsEntry,
     AgentLogSummary,

@@ -7,7 +7,7 @@ Wants=network.target
 Type=simple
 User=<service_user>
 WorkingDirectory=<project_root>
-ExecStart=/usr/bin/python3 <project_root>/agents/runtime/tools/runner.py
+ExecStart=/usr/bin/python3 -m nexus.runner
 Restart=always
 RestartSec=30
 

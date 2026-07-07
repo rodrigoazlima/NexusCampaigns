@@ -13,7 +13,7 @@ Second-stage agent of the vault pipeline (see repo-root `CLAUDE.md` for the full
 python tools/enrich_tags.py
 
 # Run via the shared scheduler (from repo root)
-python agents/runtime/tools/runner.py --task classification-agent --force
+python -m nexus.runner --task classification-agent --force
 
 # Relevant tests (repo root)
 pytest agents/tests/test_classification.py

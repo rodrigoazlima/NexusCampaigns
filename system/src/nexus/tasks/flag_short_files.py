@@ -1,4 +1,4 @@
-"""review.tools.flag_short_files
+"""nexus.tasks.flag_short_files
 
 Scans 01-Processing/ for draft .md files with fewer than 10 body lines.
 Sets needs_reprocessing: true in frontmatter and injects suggestedQuality: 0
@@ -13,14 +13,10 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-_TOOLS_DIR    = Path(__file__).resolve().parent
-_AGENTS_DIR   = _TOOLS_DIR.parents[1]
-_PROJECT_ROOT = _AGENTS_DIR.parent
+from nexus.shared import FrontmatterIO, Logger, locked_update_queue_entry
+from nexus.shared.loaders import _find_project_root
 
-if str(_AGENTS_DIR) not in sys.path:
-    sys.path.insert(0, str(_AGENTS_DIR))
-
-from shared import FrontmatterIO, Logger, locked_update_queue_entry  # noqa: E402
+_PROJECT_ROOT = _find_project_root(Path(__file__).resolve().parent)
 
 TASK_ID         = "review-agent-short-files"
 SCRIPT_BASENAME = "flag_short_files.py"
@@ -28,10 +24,10 @@ MIN_BODY_LINES  = 10
 
 _VAULT_ROOT  = _PROJECT_ROOT / ".knowledge-base"
 _PROCESSING  = _VAULT_ROOT / "01-Processing"
-_AGENT_STATE = _AGENTS_DIR / "review" / "state"
-_LOGS_DIR    = _AGENT_STATE / "logs"
-_MASTER_LOG  = _AGENTS_DIR / "runtime" / "state" / "logs" / "automation.log"
-_QUEUE_FILE  = _PROJECT_ROOT / "system" / "state" / "inbox-queue.json"
+_STATE_ROOT  = _PROJECT_ROOT / "system" / "state"
+_LOGS_DIR    = _STATE_ROOT / "review" / "logs"
+_MASTER_LOG  = _STATE_ROOT / "runtime" / "logs" / "automation.log"
+_QUEUE_FILE  = _STATE_ROOT / "inbox-queue.json"
 
 
 def _make_logger() -> Logger:
@@ -148,74 +144,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
-# ---------------------------------------------------------------------------
-# Agentic tool interface
-# ---------------------------------------------------------------------------
-
-from shared.agent_tools import SELF_MANAGEMENT_TOOLS, call_self_management_tool  # noqa: E402
-
-_MODULE_FILE = Path(__file__)
-
-TOOLS = SELF_MANAGEMENT_TOOLS + [
-    {
-        "name": "scan_short_files",
-        "description": (
-            "Scan 01-Processing/ for draft .md files with fewer than 10 body lines. "
-            "Returns a JSON list of {path, body_lines} objects."
-        ),
-        "input_schema": {"type": "object", "properties": {}},
-    },
-    {
-        "name": "flag_reprocessing",
-        "description": (
-            "Set needs_reprocessing: true and inject suggestedQuality: 0 (if quality=0 "
-            "and suggestedQuality absent) into the frontmatter of a short file."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "path": {"type": "string", "description": "Absolute path to the .md file"},
-            },
-            "required": ["path"],
-        },
-    },
-]
-
-
-def _tool_scan_short_files() -> str:
-    import json as _json
-    fio = FrontmatterIO()
-    results = []
-    if not _PROCESSING.exists():
-        return _json.dumps([])
-    for md_path in sorted(_PROCESSING.glob("**/*.md")):
-        try:
-            _, body = fio.read(md_path)
-            body_lines = [ln for ln in body.splitlines() if ln.strip()]
-            if len(body_lines) < MIN_BODY_LINES:
-                results.append({
-                    "path": str(md_path),
-                    "body_lines": len(body_lines),
-                })
-        except Exception:
-            continue
-    return _json.dumps(results)
-
-
-def call_tool(name: str, args: dict, context: dict) -> str:
-    result = call_self_management_tool(
-        name, args, context, module_file=_MODULE_FILE, task_id=TASK_ID
-    )
-    if result is not None:
-        return result
-
-    log = _make_logger()
-    if name == "scan_short_files":
-        return _tool_scan_short_files()
-    if name == "flag_reprocessing":
-        _flag_short_file(Path(args["path"]), FrontmatterIO(), log)
-        return f"Flagged: {args['path']}"
-
-    raise ValueError(f"Unknown tool: {name!r}")

@@ -19,7 +19,7 @@ outputs:
 dependencies: []
 dispatch_config: agent.json
 owned_tools:
-  - tools/cleanup_agent.py
+  - system/src/nexus/tasks/cleanup_agent.py
 responsibilities:
   - Read cleanupDays from agent.json top-level field (default 90 if absent)
   - Walk all log directories; delete .log files with mtime > cleanupDays

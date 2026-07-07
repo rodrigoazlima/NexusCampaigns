@@ -28,7 +28,7 @@ _PROJECT_ROOT = _AGENTS_DIR.parent
 if str(_AGENTS_DIR) not in sys.path:
     sys.path.insert(0, str(_AGENTS_DIR))
 
-from shared import (  # noqa: E402
+from nexus.shared import (  # noqa: E402
     FrontmatterIO,
     LLMClient,
     LLMOfflineError,
@@ -39,7 +39,7 @@ from shared import (  # noqa: E402
     INBOX_QUEUE_DEFAULT,
     to_slug,
 )
-from shared.config import LLMEndpointConfig, VaultPaths  # noqa: E402
+from nexus.shared.config import LLMEndpointConfig, VaultPaths  # noqa: E402
 
 TASK_ID         = "wiki-agent"
 SCRIPT_BASENAME = "compile_wiki.py"
@@ -357,7 +357,7 @@ def main() -> None:
 # Agentic tool interface
 # ---------------------------------------------------------------------------
 
-from shared.agent_tools import SELF_MANAGEMENT_TOOLS, call_self_management_tool  # noqa: E402
+from nexus.shared.agent_tools import SELF_MANAGEMENT_TOOLS, call_self_management_tool  # noqa: E402
 
 _MODULE_FILE = Path(__file__)
 

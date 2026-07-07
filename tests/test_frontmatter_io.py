@@ -5,7 +5,7 @@ import pytest
 from pathlib import Path
 from unittest.mock import patch
 
-from shared.frontmatter_io import FrontmatterIO, _load_yaml, _dump_yaml
+from nexus.shared.frontmatter_io import FrontmatterIO, _load_yaml, _dump_yaml
 
 
 @pytest.fixture
