@@ -317,3 +317,4 @@ ehthumbs.db
 !tsconfig.*.json
 
 
+system/dashboard/tsconfig.tsbuildinfo
