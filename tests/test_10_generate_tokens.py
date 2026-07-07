@@ -31,7 +31,7 @@ from PIL import Image, ImageDraw
 # ---------------------------------------------------------------------------
 
 SCRIPT_PATH = (
-    Path(__file__).parent.parent / "system" / "src" / "nexus" / "tasks" / "generate_tokens.py"
+    Path(__file__).parent.parent / "system" / "src" / "nexus" / "workers" / "token.py"
 )
 
 _AGENTS_DIR = Path(__file__).resolve().parents[1] / "agents"

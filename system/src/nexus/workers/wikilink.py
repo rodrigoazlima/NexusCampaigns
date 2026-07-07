@@ -1,25 +1,26 @@
-"""nexus.tasks.wikilink_library
+"""nexus.workers.wikilink — cross-link approved canon (queue consumer, derived pending set).
 
-Actions: ScoreEntityPairs · InsertWikilinks
-Reads:   02-Library/**/*.md, system/state/wikilink/wikilink-state.json
-Writes:  ## Related sections in-place in 02-Library/ (body only, never frontmatter)
-         system/state/wikilink/wikilink-state.json
-No LLM. No 00-Inbox or 01-Processing writes.
-Batch: 20 files per run.
+Scores entity pairs across 02-Library/**/*.md and inserts ## Related
+wikilink sections in-place. Replaces nexus.tasks.wikilink_library.
+
+Hard invariants (vault-guard rules):
+  - Body-only edits. Frontmatter is read, never written, by this worker.
+  - No writes outside 02-Library/. The only worker allowed to write there.
+  - status: approved / reviewed: true never touched (human-only fields).
+  - Idempotent: re-running on an already-linked file changes nothing.
+
+Pending set is derived: library file mtime vs processedAt in this worker's
+own state file (corrupt state ⇒ reprocess all, self-heals).
 """
 
 from __future__ import annotations
 
 import re
-import sys
-import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
 
 from nexus.shared import (
     FrontmatterIO,
-    Logger,
     StateStore,
     extract_wikilinks,
     has_wikilink,
@@ -27,24 +28,31 @@ from nexus.shared import (
     required_type_boost,
     WIKILINK_STATE_DEFAULT,
 )
+from nexus.shared.frontmatter_io import _FENCE_RE
 from nexus.shared.interfaces import IWikilinkResolver
 from nexus.shared.loaders import _find_project_root
+from nexus.workers.base import (
+    WorkItem,
+    WorkResult,
+    adopt_legacy_file,
+    make_worker_logger,
+    worker_state_dir,
+)
 
 _PROJECT_ROOT = _find_project_root(Path(__file__).resolve().parent)
 
-TASK_ID         = "wikilink-agent"
-SCRIPT_BASENAME = "wikilink_library.py"
-BATCH_SIZE      = 20
-MIN_SCORE       = 1   # minimum pair score to insert a link
-MAX_LINKS       = 10  # max new links inserted per file per run
+MIN_SCORE = 1   # minimum pair score to insert a link
+MAX_LINKS = 10  # max new links inserted per file per run
 
 _VAULT_ROOT  = _PROJECT_ROOT / ".knowledge-base"
 _LIBRARY     = _VAULT_ROOT / "02-Library"
-_STATE_ROOT  = _PROJECT_ROOT / "system" / "state"
-_AGENT_STATE = _STATE_ROOT / "wikilink"
-_LOGS_DIR    = _AGENT_STATE / "logs"
-_MASTER_LOG  = _STATE_ROOT / "runtime" / "logs" / "automation.log"
-_STATE_FILE  = _AGENT_STATE / "wikilink-state.json"
+
+# Legacy homes (nexus.tasks.wikilink_library wrote system/state/wikilink; the
+# deployed pipeline wrote agents/wikilink/state) — adopted once, then unused
+_LEGACY_STATE_FILES = (
+    _PROJECT_ROOT / "system" / "state" / "wikilink" / "wikilink-state.json",
+    _PROJECT_ROOT / "agents" / "wikilink" / "state" / "wikilink-state.json",
+)
 
 _RELATED_HEADER_RE = re.compile(r"^## Related\s*$", re.MULTILINE)
 _SECTION_RE        = re.compile(r"(## Related[ \t]*\n)(.*?)(?=\n## |\Z)", re.DOTALL)
@@ -58,6 +66,10 @@ _STOP_WORDS: frozenset[str] = frozenset({
     "it", "its", "he", "she", "they", "his", "her", "their",
     "our", "we", "you", "i", "my", "your",
 })
+
+
+def _state_file() -> Path:
+    return worker_state_dir("wikilink") / "state.json"
 
 
 def _extract_keywords(text: str) -> frozenset[str]:
@@ -107,23 +119,18 @@ def _splice_related(body: str, new_slugs: list[str]) -> tuple[str, int]:
     return new_body, inserted_count
 
 
-def _atomic_write(path: Path, fm: dict, body: str) -> bool:
-    """Write frontmatter + body to path atomically. Returns True on success."""
+def _atomic_write(path: Path, new_body: str) -> bool:
+    """Replace the body atomically, keeping the frontmatter block
+    byte-for-byte (body-only edits are this worker's hard invariant).
+    FrontmatterIO.read's body is exactly the raw text after the fence, so
+    fence + new_body round-trips without reserializing YAML."""
     try:
-        from io import StringIO
-        from ruamel.yaml import YAML  # type: ignore[import]
-        y = YAML()
-        y.default_flow_style = False
-        y.preserve_quotes    = True
-        y.width              = 4096
-        buf = StringIO()
-        y.dump(fm, buf)
-        fm_str = buf.getvalue().rstrip("\n")
-    except ImportError:
-        import yaml
-        fm_str = yaml.dump(fm, allow_unicode=True, default_flow_style=False).rstrip("\n")
+        raw = path.read_text(encoding="utf-8")
+    except Exception:
+        return False
+    m = _FENCE_RE.match(raw)
+    content = (raw[: m.end()] if m else "") + new_body
 
-    content = f"---\n{fm_str}\n---\n{body}"
     tmp = path.with_name(path.name + ".tmp")
     try:
         tmp.write_text(content, encoding="utf-8")
@@ -245,94 +252,102 @@ class WikilinkResolver(IWikilinkResolver):
         if n == 0:
             return 0
 
-        ok = _atomic_write(target, target_fm, new_body)
+        ok = _atomic_write(target, new_body)
         if ok:
             self._cache.pop(target_slug, None)
         return n if ok else 0
 
 
 # ---------------------------------------------------------------------------
-# State helpers
+# Worker
 # ---------------------------------------------------------------------------
 
 def _make_store() -> StateStore:
-    _AGENT_STATE.mkdir(parents=True, exist_ok=True)
-    return StateStore(_STATE_FILE, WIKILINK_STATE_DEFAULT)
+    return StateStore(_state_file(), WIKILINK_STATE_DEFAULT)
 
 
-def _load_processed(store: StateStore) -> set[str]:
-    data = store.load()
-    return set(data.keys())
+class WikilinkWorker:
+    name = "wikilink"
+    kind = "queue"
 
+    def __init__(self, options: dict | None = None) -> None:
+        opts = options or {}
+        for legacy in _LEGACY_STATE_FILES:
+            adopt_legacy_file(legacy, _state_file())
+        self._store = _make_store()
+        self._store.init_defaults()
+        self._fio = FrontmatterIO()
+        # Slug index + content cache built lazily, once per instance (= per cycle)
+        self._resolver = WikilinkResolver(
+            self._fio,
+            min_score=int(opts.get("min_score", MIN_SCORE)),
+            max_links=int(opts.get("max_links", MAX_LINKS)),
+        )
+        self._slug_idx: dict[str, Path] | None = None
 
-def _mark_processed(store: StateStore, rel: str, links_inserted: int) -> None:
-    def updater(data: dict) -> dict:
-        data[rel] = {
-            "processedAt":   datetime.now(timezone.utc).isoformat(),
-            "linksInserted": links_inserted,
-        }
-        return data
-    store.update(updater)
-
-
-# ---------------------------------------------------------------------------
-# main — direct invocation
-# ---------------------------------------------------------------------------
-
-def main() -> None:
-    import argparse
-    parser = argparse.ArgumentParser(description="Insert [[wikilinks]] into 02-Library/ Related sections")
-    parser.add_argument("--min-score", type=int, default=MIN_SCORE,
-                        help=f"Minimum pair score to insert a link (default: {MIN_SCORE})")
-    parser.add_argument("--max-links", type=int, default=MAX_LINKS,
-                        help=f"Max new links inserted per file per run (default: {MAX_LINKS})")
-    args, _ = parser.parse_known_args()
-
-    log   = Logger(TASK_ID, SCRIPT_BASENAME, _LOGS_DIR, _MASTER_LOG)
-    t0    = log.start()
-    store = _make_store()
-    store.init_defaults()
-
-    if not _LIBRARY.is_dir():
-        log.info("02-Library/ does not exist — nothing to process")
-        log.done(t0, key="linked", count=0, failed=0)
-        sys.exit(0)
-
-    fio       = FrontmatterIO()
-    resolver  = WikilinkResolver(fio, min_score=args.min_score, max_links=args.max_links)
-    slug_idx  = resolver.build_slug_index(_LIBRARY)
-    processed = _load_processed(store)
-
-    log.info(f"Library: {len(slug_idx)} entities")
-
-    candidates = [
-        p for p in sorted(_LIBRARY.glob("**/*.md"))
-        if p.relative_to(_PROJECT_ROOT).as_posix() not in processed
-    ]
-
-    batch  = candidates[:BATCH_SIZE]
-    count  = 0
-    failed = 0
-
-    for md_path in batch:
-        rel = md_path.relative_to(_PROJECT_ROOT).as_posix()
+    def pending(self) -> list[WorkItem]:
+        """Library files whose mtime > processedAt (corrupt state ⇒ all)."""
+        if not _LIBRARY.is_dir():
+            return []
         try:
-            n = resolver.insert_wikilinks(md_path, slug_idx)
-            if n:
-                log.info(f"Inserted {n} link(s) in {md_path.name}")
-            _mark_processed(store, rel, n)
-            count += 1
+            state = self._store.load()
+        except Exception:
+            state = {}
+        items: list[WorkItem] = []
+        for f in sorted(_LIBRARY.glob("**/*.md")):
+            rel = f.relative_to(_PROJECT_ROOT).as_posix()
+            entry = state.get(rel)
+            if entry is not None:
+                try:
+                    processed_ts = datetime.fromisoformat(entry["processedAt"]).timestamp()
+                    if f.stat().st_mtime <= processed_ts:
+                        continue
+                except Exception:
+                    pass  # corrupt entry → reprocess
+            items.append(WorkItem(rel, {}))
+        return items
+
+    def handle(self, item: WorkItem) -> WorkResult:
+        log = make_worker_logger(self.name)
+        md_path = _PROJECT_ROOT / item.key
+        if not md_path.exists():
+            return WorkResult("skip", "file gone")
+
+        if self._slug_idx is None:
+            self._slug_idx = self._resolver.build_slug_index(_LIBRARY)
+            log.info(f"Library: {len(self._slug_idx)} entities")
+
+        try:
+            n = self._resolver.insert_wikilinks(md_path, self._slug_idx)
         except Exception as exc:
+            self._mark(item.key, 0, error=str(exc))
             log.error(f"Error processing {md_path.name}: {exc}")
-            failed += 1
+            return WorkResult("error", f"{md_path.name}: {exc}")
 
-    remaining = len(candidates) - len(batch)
-    if remaining:
-        log.info(f"{remaining} file(s) queued for next run")
+        self._mark(item.key, n)
+        if n:
+            log.info(f"Inserted {n} link(s) in {md_path.name}")
+        return WorkResult("done", f"{n} link(s) inserted")
 
-    log.done(t0, key="linked", count=count, failed=failed)
-    sys.exit(0 if failed == 0 else 1)
+    def _mark(self, rel: str, links_inserted: int, error: str | None = None) -> None:
+        def updater(data: dict) -> dict:
+            entry = {
+                "processedAt":   datetime.now(timezone.utc).isoformat(),
+                "linksInserted": links_inserted,
+            }
+            if error:
+                entry["error"] = error
+            data[rel] = entry
+            return data
+        self._store.update(updater)
+
+
+def create(options: dict | None = None) -> WikilinkWorker:
+    return WikilinkWorker(options)
 
 
 if __name__ == "__main__":
-    main()
+    worker = create()
+    for _item in worker.pending():
+        _res = worker.handle(_item)
+        print(f"{_res.status} {_item.key}: {_res.detail}")

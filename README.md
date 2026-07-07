@@ -120,33 +120,30 @@ A pipeline of scheduled agents ingests source material, classifies it with visio
 ### System Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         Agent Pipeline                              │
-│                                                                     │
-│  00-Inbox/  →  [Ingestion] → queue registration                     │
-│                    ↓                                                │
-│             [Vision Agent] → image classification                   │
-│                    ↓                                                │
-│             [Lore Agent]   → NPC sheet generation                   │
-│                    ↓                                                │
-│             [Token Agent]  → circular tokens                        │
-│                    ↓                                                │
-│             [Classification Agent] → enriched frontmatter           │
-│                    ↓                                                │
-│             (human review — sets status: approved, quality: N)      │
-│                    ↓                                                │
-│               02-Library/ (canon)                                   │
-│                    ↓                                                │
-│             [Wikilink Agent] → [[links]] in 02-Library/             │
-└─────────────────────────────────────────────────────────────────────┘
-         ↓
-┌─────────────────────────────────────────────────────────────────────┐
-│                      Health & Observability                         │
-│  [Review Agent]  → daily reports                                    │
-│  [Repair Agent]  → fix stale locks, missing dirs                   │
-│  [Cleanup Agent] → purge old logs/reports                          │
-└─────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│ nexus.runner (single process)                                        │
+│                                                                      │
+│  00-Inbox/ ──► ingestion worker ── registers entries ──┐             │
+│                                                        ▼             │
+│                     inbox-queue.json (slot: pending→done/skip/error) │
+│                          │ pending slots = work items                │
+│          ┌───────────────┼───────────────────┐                       │
+│          ▼               ▼                   ▼                       │
+│   [Vision Agent]   [Lore Agent]   queue workers: thumbnails ·        │
+│   (LLM dispatch)   [Classification]  token · wikilink · shortfiles   │
+│                    [Wiki Agent]                                      │
+│          │                                                           │
+│          ▼                                                           │
+│  (human review — sets status: approved, quality: N)                  │
+│          ▼                                                           │
+│    02-Library/ (canon) ──► wikilink worker → [[links]]               │
+│                                                                      │
+│  scheduled workers (cron-like):                                      │
+│    report (15 min) · cleanup (daily) · maintenance (daily + signal)  │
+└──────────────────────────────────────────────────────────────────────┘
 ```
+
+LLM agents dispatch via `agent.json` (subprocess); static workers run **in-process** — no per-task interpreter spawn, no agent scaffolding.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -335,20 +332,29 @@ pwsh -File 'system\ops\setup-service.ps1' -CleanInstall
 **Quality gate for `02-Library/`:** `status: approved` + `quality >= 7` + `reviewed: true`
 No agent may write these fields as `true` / `approved`.
 
-### Agents
+### Agents & Workers
+
+**LLM agents** (per-agent folder, `agent.json` dispatch):
 
 | Agent | Role |
 |-------|------|
-| Ingestion | Emoji cleanup, DOCX→MD conversion, queue registration |
 | Vision | Image classification via vision LLM; writes `01-Processing/` drafts |
 | Lore | NPC sheet generation from image + scenario context |
-| Token | Circular token generation with moldura frame |
 | Classification | Tag enrichment and type inference for sparse notes |
 | Wiki | Synthesizes entity pages from markdown notes |
-| Wikilink | Inserts `[[wikilinks]]` into `## Related` sections of `02-Library/` |
-| Review | Pending review list, orphan detection, quality suggestions |
-| Repair | Fixes stale locks, missing dirs, broken image refs; detects overdue agents |
-| Cleanup | Purges logs/reports older than configured retention |
+
+**Static workers** (in-process `nexus.workers.*`, configured in `agents/registry.yaml` `workers:` block — queue workers poll every cycle, scheduled workers run on an interval):
+
+| Worker | Kind | Role |
+|--------|------|------|
+| Ingestion | queue | Emoji cleanup, DOCX→MD conversion, queue registration |
+| Thumbnails | queue | 320px webp thumbnails for the dashboard gallery |
+| Token | queue | Circular token generation with moldura frame |
+| Wikilink | queue | Inserts `[[wikilinks]]` into `## Related` sections of `02-Library/` |
+| Shortfiles | queue | Flags drafts under 10 body lines for reprocessing |
+| Report | scheduled | Pending review list, orphan detection, quality suggestions |
+| Cleanup | scheduled | Purges logs/reports older than configured retention |
+| Maintenance | scheduled + signal | Fixes stale locks, missing dirs, broken image refs; detects overdue agents; resets retryable `error` queue slots |
 
 LLM calls run at `temperature: 0`, up to 3 retries with 3s backoff. Connection errors → skip batch, retry next run.
 

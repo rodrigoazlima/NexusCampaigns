@@ -15,11 +15,10 @@ export async function POST(req: NextRequest) {
     }
 
     const cfg = readTokenConfig()
-    const scriptPath = path.join(PROJECT_ROOT, 'agents', 'token', 'tools', 'generate_tokens.py')
 
     const tokenPath = await new Promise<string>((resolve, reject) => {
-      const args = ['--image', imagePath, '--moldura', cfg.molduraPath]
-      const proc = spawn('python', [scriptPath, ...args], {
+      const args = ['-m', 'nexus.workers.token', '--image', imagePath, '--moldura', cfg.molduraPath]
+      const proc = spawn('python', args, {
         cwd: PROJECT_ROOT,
         env: { ...process.env },
       })

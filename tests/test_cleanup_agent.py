@@ -1,4 +1,4 @@
-"""Tests for nexus.tasks.cleanup_agent."""
+"""Tests for nexus.workers.cleanup."""
 
 import json
 import time
@@ -42,7 +42,7 @@ def _write_old_file(directory: Path, name: str, age_days: int) -> Path:
 
 class TestPurgeDir:
     def test_deletes_files_older_than_cutoff(self, agent_dirs, tmp_path):
-        from nexus.tasks.cleanup_agent import _purge_dir
+        from nexus.workers.cleanup import _purge_dir
         from nexus.shared.logger import Logger
 
         d = agent_dirs / "review" / "state" / "logs"
@@ -59,7 +59,7 @@ class TestPurgeDir:
         assert new.exists()
 
     def test_returns_zero_for_missing_dir(self, agent_dirs, tmp_path):
-        from nexus.tasks.cleanup_agent import _purge_dir
+        from nexus.workers.cleanup import _purge_dir
         from nexus.shared.logger import Logger
 
         missing = agent_dirs / "nonexistent" / "state" / "logs"
@@ -69,7 +69,7 @@ class TestPurgeDir:
         assert _purge_dir(missing, keep_days=90, log=log) == 0
 
     def test_skips_directories(self, agent_dirs, tmp_path):
-        from nexus.tasks.cleanup_agent import _purge_dir
+        from nexus.workers.cleanup import _purge_dir
         from nexus.shared.logger import Logger
 
         d = agent_dirs / "review" / "state" / "logs"
@@ -89,7 +89,7 @@ class TestPurgeDir:
 
 class TestPurgeLogs:
     def test_scans_all_agent_log_dirs(self, agent_dirs, monkeypatch):
-        from nexus.tasks import cleanup_agent
+        from nexus.workers import cleanup as cleanup_agent
         from nexus.shared.logger import Logger
 
         monkeypatch.setattr(cleanup_agent, "_AGENTS_DIR", agent_dirs)
@@ -111,7 +111,7 @@ class TestPurgeLogs:
 
 class TestPurgeReports:
     def test_scans_all_agent_report_dirs(self, agent_dirs, monkeypatch):
-        from nexus.tasks import cleanup_agent
+        from nexus.workers import cleanup as cleanup_agent
         from nexus.shared.logger import Logger
 
         monkeypatch.setattr(cleanup_agent, "_AGENTS_DIR", agent_dirs)
@@ -136,7 +136,7 @@ class TestPurgeReports:
 
 class TestTrimMetrics:
     def test_trims_to_max_runs(self, agent_dirs, tmp_path, monkeypatch):
-        from nexus.tasks import cleanup_agent
+        from nexus.workers import cleanup as cleanup_agent
         from nexus.shared.logger import Logger
 
         metrics_file = agent_dirs / "runtime" / "state" / "agent-metrics.json"
@@ -157,7 +157,7 @@ class TestTrimMetrics:
         assert result["vision-agent"]["runs"][0]["startedAt"] == "2024-01-11T00:00:00Z"
 
     def test_no_trim_when_under_limit(self, agent_dirs, monkeypatch):
-        from nexus.tasks import cleanup_agent
+        from nexus.workers import cleanup as cleanup_agent
         from nexus.shared.logger import Logger
 
         metrics_file = agent_dirs / "runtime" / "state" / "agent-metrics.json"
@@ -177,7 +177,7 @@ class TestTrimMetrics:
         assert json.loads(metrics_file.read_text(encoding="utf-8")) == json.loads(original)
 
     def test_returns_zero_when_file_missing(self, agent_dirs, monkeypatch):
-        from nexus.tasks import cleanup_agent
+        from nexus.workers import cleanup as cleanup_agent
         from nexus.shared.logger import Logger
 
         missing = agent_dirs / "runtime" / "state" / "agent-metrics.json"
@@ -189,7 +189,7 @@ class TestTrimMetrics:
         assert cleanup_agent.trim_metrics(max_runs=100, log=log) == 0
 
     def test_strips_bom(self, agent_dirs, monkeypatch):
-        from nexus.tasks import cleanup_agent
+        from nexus.workers import cleanup as cleanup_agent
         from nexus.shared.logger import Logger
 
         metrics_file = agent_dirs / "runtime" / "state" / "agent-metrics.json"
@@ -212,7 +212,7 @@ class TestTrimMetrics:
 
 class TestWriteReport:
     def test_writes_cleanup_report_json(self, agent_dirs, monkeypatch):
-        from nexus.tasks import cleanup_agent
+        from nexus.workers import cleanup as cleanup_agent
 
         reports_dir = agent_dirs / "cleanup" / "state" / "reports"
         monkeypatch.setattr(cleanup_agent, "_REPORTS_DIR", reports_dir)
@@ -229,7 +229,7 @@ class TestWriteReport:
         assert data["date"] == today
 
     def test_write_is_atomic(self, agent_dirs, monkeypatch):
-        from nexus.tasks import cleanup_agent
+        from nexus.workers import cleanup as cleanup_agent
 
         reports_dir = agent_dirs / "cleanup" / "state" / "reports"
         monkeypatch.setattr(cleanup_agent, "_REPORTS_DIR", reports_dir)

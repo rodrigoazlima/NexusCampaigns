@@ -65,17 +65,14 @@ AGENT_METRICS_DEFAULT: dict[str, Any] = {}
 """agent-metrics.json — per-task run history keyed by task-id; populated by runner."""
 
 TASKS_STATE_DEFAULT: dict[str, Any] = {
-    "repair-agent":             {"lastRun": "1970-01-01T00:00:00+00:00"},
-    "review-agent":             {"lastRun": "1970-01-01T00:00:00+00:00"},
-    "ingestion-agent":          {"lastRun": "1970-01-01T00:00:00+00:00"},
-    "vision-agent":             {"lastRun": "1970-01-01T00:00:00+00:00"},
-    "lore-agent":               {"lastRun": "1970-01-01T00:00:00+00:00"},
-    "token-agent":              {"lastRun": "1970-01-01T00:00:00+00:00"},
-    "wiki-agent":               {"lastRun": "1970-01-01T00:00:00+00:00"},
-    "classification-agent":     {"lastRun": "1970-01-01T00:00:00+00:00"},
-    "review-agent-short-files": {"lastRun": "1970-01-01T00:00:00+00:00"},
-    "wikilink-agent":           {"lastRun": "1970-01-01T00:00:00+00:00"},
-    "cleanup-agent":            {"lastRun": "1970-01-01T00:00:00+00:00"},
+    "vision-agent":         {"lastRun": "1970-01-01T00:00:00+00:00"},
+    "lore-agent":           {"lastRun": "1970-01-01T00:00:00+00:00"},
+    "wiki-agent":           {"lastRun": "1970-01-01T00:00:00+00:00"},
+    "classification-agent": {"lastRun": "1970-01-01T00:00:00+00:00"},
+    # workers appear as worker:<name> keys, written by the runner's worker loop
+    "worker:report":        {"lastRun": "1970-01-01T00:00:00+00:00"},
+    "worker:cleanup":       {"lastRun": "1970-01-01T00:00:00+00:00"},
+    "worker:maintenance":   {"lastRun": "1970-01-01T00:00:00+00:00"},
 }
 """tasks-state.json — last-run timestamps, reset to epoch forces immediate first run."""
 
@@ -144,10 +141,10 @@ STATE_FILE_DEFAULTS: dict[str, Any] = {
     "agents/vision/state/token-links.json":                    TOKEN_LINKS_DEFAULT,
     "agents/lore/state/processed-npcs.json":                   PROCESSED_NPCS_DEFAULT,
     "agents/lore/state/scenarios.json":                        SCENARIOS_DEFAULT,
-    "agents/token/state/generated-tokens.json":                GENERATED_TOKENS_DEFAULT,
+    "system/state/workers/token/generated-tokens.json":       GENERATED_TOKENS_DEFAULT,
     "agents/runtime/state/tasks-state.json":                   TASKS_STATE_DEFAULT,
     "agents/runtime/state/agent-metrics.json":                 AGENT_METRICS_DEFAULT,
-    "agents/wikilink/state/wikilink-state.json":               WIKILINK_STATE_DEFAULT,
+    "system/state/workers/wikilink/state.json":                WIKILINK_STATE_DEFAULT,
     "agents/relationship/state/relationship-graph.json":       RELATIONSHIP_GRAPH_DEFAULT,
     "agents/canon/state/canon-report-latest.json":             CANON_REPORT_DEFAULT,
     "agents/search/state/search-index.json":                   SEARCH_INDEX_DEFAULT,
@@ -160,36 +157,29 @@ STATE_FILE_DEFAULTS: dict[str, Any] = {
 # ---------------------------------------------------------------------------
 
 TEXT_STATE_FILES: list[str] = [
-    "agents/ingestion/state/processed-docx.txt",
+    "system/state/workers/ingestion/processed-docx.txt",
     "agents/wiki/state/processed.txt",
     "agents/wiki/state/bad-wiki-docs.txt",
     "agents/classification/state/bad-docs.txt",
 ]
 """Plain-text state files bootstrapped as empty on first run."""
 
-# Directories that must exist before any agent runs
+# Directories that must exist before any agent or worker runs.
+# Static tasks are workers now — their state lives under system/state/workers/.
 REQUIRED_DIRS: list[str] = [
     "system/state",
+    "system/state/workers",
     "agents/runtime/state",
     "agents/runtime/state/logs",
-    "agents/ingestion/state",
     "agents/vision/state",
     "agents/lore/state",
-    "agents/token/state",
     "agents/classification/state",
     "agents/wiki/state",
-    "agents/review/state",
-    "agents/review/state/reports",
-    "agents/review/state/logs",
-    "agents/repair/state",
-    "agents/wikilink/state",
     "agents/relationship/state",
     "agents/canon/state",
     "agents/canon/state/reports",
     "agents/search/state",
     "agents/deduplication/state",
     "agents/deduplication/state/reports",
-    "agents/cleanup/state",
-    "agents/cleanup/state/reports",
     "agents/curator/state",
 ]

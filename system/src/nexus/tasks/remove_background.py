@@ -36,14 +36,14 @@ from nexus.shared.loaders import _find_project_root
 
 _PROJECT_ROOT = _find_project_root(Path(__file__).resolve().parent)
 
-TASK_ID         = "token-agent"
+TASK_ID         = "token"
 SCRIPT_BASENAME = "remove_background.py"
 
 _STATE_ROOT   = _PROJECT_ROOT / "system" / "state"
-_AGENT_STATE  = _STATE_ROOT / "token"
+_AGENT_STATE  = _STATE_ROOT / "workers" / "token"
 _BG_CONFIG    = _AGENT_STATE / "bg-config.json"
 _LOGS_DIR     = _AGENT_STATE / "logs"
-_MASTER_LOG   = _STATE_ROOT / "runtime" / "logs" / "automation.log"
+_MASTER_LOG   = _PROJECT_ROOT / "agents" / "runtime" / "state" / "logs" / "automation.log"
 
 # Rec.709 luminance weights (perceptual brightness)
 _LUMA_W = np.array([0.2126, 0.7152, 0.0722], dtype=np.float32)

@@ -1,16 +1,24 @@
-"""nexus.tasks.repair_agent
+"""nexus.workers.maintenance — pipeline self-healing (scheduled + signal-triggered).
 
-Maintenance agent — no LLM, no vault content changes.
+Replaces nexus.tasks.repair_agent. Runs daily, or immediately after any
+worker item errors (worker-error signal, consumed by the runner loop).
 
-Actions (per agent-repair.spec.md):
-  ParseErrorPatterns      — scan automation.log (last 24h) for fixable error patterns
-  RemoveStaleLock         — delete runner.lock if age > 30 min
-  CreateMissingDirs       — ensure all required dirs exist
-  EnsureAgentRelationLinks — recreate deleted agents/<name>/<related-path> junctions
-  ValidateImageRefs       — verify processed-images.json refs by SHA256 identity
-  ValidateInboxQueue      — prune inbox-queue.json entries whose file is gone
-  DetectOverdueAgents     — flag agents not run within 2 × intervalSeconds
-  WriteRepairReport       — emit repair-YYYY-MM-DD.json to reports dir
+Actions (each isolated — a failure never blocks the others):
+  GitUpdate                  — git fetch + pull --ff-only
+  ParseErrorPatterns         — scan automation.log (last 24h) for fixable patterns
+  RemoveStaleLock            — delete runner.lock if age > 30 min
+  GenerateMissingAgentConfigs— scaffold agent.json for LLM agents only
+  CreateMissingDirs          — ensure REQUIRED_DIRS exist
+  EnsureAgentScaffold        — prompts/ + state/ dirs for LLM agents only
+  EnsureAgentRelationLinks   — junctions for LLM/planned agents only
+  ValidateImageRefs          — verify processed-images.json refs by SHA256
+  ValidateInboxQueue         — prune gone-file entries, backfill missing slots,
+                               reset resolvable error slots (reruns < 3),
+                               report poison pills (error slots, reruns >= 3)
+  DetectOverdueAgents        — LLM agents by agent.json interval,
+                               workers by registry workers: interval
+  CheckDashboardHealth       — TCP + HTTP probe
+  WriteRepairReport          — system/state/workers/maintenance/reports/
 """
 
 from __future__ import annotations
@@ -21,7 +29,6 @@ import os
 import re
 import socket
 import subprocess
-import sys
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -29,29 +36,30 @@ from pathlib import Path
 from typing import Any
 
 from nexus.shared import Logger, REQUIRED_DIRS
-from nexus.shared.agent_tools import SELF_MANAGEMENT_TOOLS, call_self_management_tool
 from nexus.shared.loaders import _find_project_root
+from nexus.workers.base import (
+    MASTER_LOG,
+    WorkItem,
+    WorkResult,
+    make_worker_logger,
+    worker_state_dir,
+)
 
 _PROJECT_ROOT = _find_project_root(Path(__file__).resolve().parent)
 _AGENTS_DIR   = _PROJECT_ROOT / "agents"
 
-TASK_ID         = "repair-agent"
-SCRIPT_BASENAME = "repair_agent.py"
-
 _ORCH_STATE   = _AGENTS_DIR / "runtime" / "state"
 _LOCK_FILE    = _ORCH_STATE / "runner.lock"
-_MASTER_LOG   = _ORCH_STATE / "logs" / "automation.log"
 _TASKS_STATE  = _ORCH_STATE / "tasks-state.json"
-_AGENT_STATE  = _AGENTS_DIR / "repair" / "state"
-_LOGS_DIR     = _AGENT_STATE / "logs"
-_REPORTS_DIR  = _AGENTS_DIR / "review" / "state" / "reports"
 _QUEUE_FILE   = _PROJECT_ROOT / "system" / "state" / "inbox-queue.json"
 _PROC_IMAGES  = _AGENTS_DIR / "vision" / "state" / "processed-images.json"
 _ENV_FILE     = _PROJECT_ROOT / "system" / ".env.local"
+_REGISTRY     = _AGENTS_DIR / "registry.yaml"
 
-_LOCK_STALE_S     = 1800  # 30 minutes
-_DASHBOARD_PORT   = 48080  # fallback if PORT missing from .env.local
+_LOCK_STALE_S        = 1800  # 30 minutes
+_DASHBOARD_PORT      = 48080  # fallback if PORT missing from .env.local
 _DASHBOARD_TIMEOUT_S = 3
+_MAX_RERUNS          = 3     # poison-pill threshold (worker-contract.spec.md)
 
 # Fixable pattern regexes (case-insensitive) → fix label
 _ERROR_PATTERNS: list[tuple[re.Pattern[str], str]] = [
@@ -59,8 +67,6 @@ _ERROR_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"directory.*not\s+found|cannot\s+find\s+path", re.I),  "missing-directory"),
     (re.compile(r"missing_image_ref", re.I),                             "missing-image-ref"),
 ]
-
-_MODULE_FILE = Path(__file__)
 
 
 def _git_update(log: Logger) -> dict:
@@ -88,15 +94,6 @@ def _git_update(log: Logger) -> dict:
     return {"skipped": False, "fetch": "ok", "pull": status, "output": pull.stdout.strip()}
 
 
-def _make_logger() -> Logger:
-    return Logger(
-        task_id=TASK_ID,
-        script_basename=SCRIPT_BASENAME,
-        logs_dir=_LOGS_DIR,
-        master_log=_MASTER_LOG,
-    )
-
-
 # ---------------------------------------------------------------------------
 # ParseErrorPatterns
 # ---------------------------------------------------------------------------
@@ -106,14 +103,14 @@ def _parse_error_patterns(log: Logger) -> list[str]:
 
     Returns de-duplicated list of fix labels found.
     """
-    if not _MASTER_LOG.exists():
+    if not MASTER_LOG.exists():
         return []
 
     cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
     found: set[str] = set()
 
     try:
-        lines = _MASTER_LOG.read_text(encoding="utf-8", errors="replace").splitlines()
+        lines = MASTER_LOG.read_text(encoding="utf-8", errors="replace").splitlines()
     except Exception as exc:
         log.error(f"Cannot read automation.log: {exc}")
         return []
@@ -164,27 +161,13 @@ def _remove_stale_lock(log: Logger) -> int:
 
 
 # ---------------------------------------------------------------------------
-# GenerateMissingAgentConfigs — agent.json is gitignored (machine-local
-# dispatch config) and nothing else regenerates it. A fresh checkout has
-# zero agent.json files, so runner.py's agents/*/agent.json glob discovers
-# zero tasks and no agent ever dispatches. Scaffold them from this table
-# (sourced from docs/specs/agents/agent-*.spec.md) so the pipeline
-# self-heals instead of silently sitting idle forever.
+# GenerateMissingAgentConfigs — LLM agents only. agent.json is gitignored
+# (machine-local dispatch config); a fresh clone has none, so runner.py's
+# agents/*/agent.json glob discovers zero LLM tasks. Static tasks are
+# workers now — configured in registry.yaml, nothing to regenerate.
 # ---------------------------------------------------------------------------
 
-# Static (no-LLM) tasks dispatch as cli against nexus.tasks.* modules; only
-# the LLM agents (vision, lore, classification, wiki) scaffold claude-api.
 _AGENT_JSON_SPECS: dict[str, list[dict]] = {
-    "ingestion": [
-        {"task_id": "ingestion-agent", "interval": 900,
-         "dispatch": "cli", "cli_args": ["-m", "nexus.tasks.ingestion_agent"],
-         "description": "Vault ingestion — emoji-strip filenames, convert DOCX, register inbox queue."},
-    ],
-    "repair": [
-        {"task_id": "repair-agent", "interval": 900,
-         "dispatch": "cli", "cli_args": ["-m", "nexus.tasks.repair_agent"],
-         "description": "Pipeline self-maintenance — stale locks, missing dirs, queue validation."},
-    ],
     "vision": [
         {"task_id": "vision-agent", "model": "claude-sonnet-4-6",
          "tools_module": "vision.tools.classify_images", "interval": 900,
@@ -195,11 +178,6 @@ _AGENT_JSON_SPECS: dict[str, list[dict]] = {
          "tools_module": "lore.tools.generate_npcs", "interval": 900,
          "description": "Generate NPC drafts from classified images."},
     ],
-    "token": [
-        {"task_id": "token-agent", "interval": 900,
-         "dispatch": "cli", "cli_args": ["-m", "nexus.tasks.generate_tokens"],
-         "description": "Generate VTT tokens from classified portrait images."},
-    ],
     "classification": [
         {"task_id": "classification-agent", "model": "claude-haiku-4-5-20251001",
          "tools_module": "classification.tools.enrich_tags", "interval": 900,
@@ -209,30 +187,6 @@ _AGENT_JSON_SPECS: dict[str, list[dict]] = {
         {"task_id": "wiki-agent", "model": "claude-sonnet-4-6",
          "tools_module": "wiki.tools.compile_wiki", "interval": 900,
          "description": "Compile enriched drafts into wiki entity pages."},
-    ],
-    "review": [
-        {"task_id": "review-agent", "interval": 900,
-         "dispatch": "cli", "cli_args": ["-m", "nexus.tasks.daily_report"],
-         "description": "Daily pipeline health + pending-review report."},
-        {"task_id": "review-agent-short-files", "interval": 3600,
-         "dispatch": "cli", "cli_args": ["-m", "nexus.tasks.flag_short_files"],
-         "description": "Flag drafts under 10 body lines for reprocessing."},
-    ],
-    "wikilink": [
-        {"task_id": "wikilink-agent", "interval": 3600,
-         "dispatch": "cli", "cli_args": ["-m", "nexus.tasks.wikilink_library"],
-         "description": "Link Library entities via wikilinks."},
-    ],
-    "cleanup": [
-        {"task_id": "cleanup-agent", "interval": 86400,
-         "dispatch": "cli", "cli_args": ["-m", "nexus.tasks.cleanup_agent"],
-         "description": "Prune old logs and stale state."},
-    ],
-    "thumbnails": [
-        {"task_id": "thumbnails-agent", "interval": 3600,
-         "dispatch": "cli", "cli_args": ["-m", "nexus.tasks.thumbnails_agent"],
-         "timeout": 1800,
-         "description": "Pre-generate 320px webp thumbnails for inbox images."},
     ],
 }
 
@@ -246,25 +200,14 @@ def _generate_missing_agent_configs(log: Logger) -> int:
             continue
         payload: dict[str, Any] = {"tasks": {}}
         for t in tasks:
-            if t.get("dispatch") == "cli":
-                dispatch: dict[str, Any] = {
-                    "type": "cli",
-                    "cli": {
-                        "command": "python",
-                        "args": t["cli_args"],
-                        "cwd": "project_root",
-                        "timeout_seconds": t.get("timeout", 300),
-                    },
-                }
-            else:
-                dispatch = {
-                    "type": "claude-api",
-                    "claude_api": {
-                        "model": t["model"],
-                        "tools_module": t["tools_module"],
-                        "prompt_file": t.get("prompt_file", "prompts/system.md"),
-                    },
-                }
+            dispatch = {
+                "type": "claude-api",
+                "claude_api": {
+                    "model": t["model"],
+                    "tools_module": t["tools_module"],
+                    "prompt_file": t.get("prompt_file", "prompts/system.md"),
+                },
+            }
             payload["tasks"][t["task_id"]] = {
                 "intervalSeconds": t["interval"],
                 "description": t["description"],
@@ -278,7 +221,7 @@ def _generate_missing_agent_configs(log: Logger) -> int:
 
 
 # ---------------------------------------------------------------------------
-# CreateMissingDirs
+# CreateMissingDirs + agent scaffold (LLM agents only)
 # ---------------------------------------------------------------------------
 
 def _create_missing_dirs(log: Logger) -> int:
@@ -293,59 +236,47 @@ def _create_missing_dirs(log: Logger) -> int:
 
 
 def _ensure_agent_scaffold(log: Logger) -> int:
-    """Every agent (except shared/tests) gets a real prompts/ and state/ dir.
-    Creates only what's missing — never touches an existing one. tools/ is
-    not scaffolded: static task code lives in nexus.tasks, and LLM agents
-    track their tools/ in git."""
+    """LLM agents get a real prompts/ and state/ dir. Creates only what's
+    missing — never touches an existing one."""
     created = 0
-    for agent_root in _AGENTS_DIR.iterdir():
-        if not agent_root.is_dir() or agent_root.name in {"tests", "shared"}:
+    for agent_name in _AGENT_JSON_SPECS:
+        agent_root = _AGENTS_DIR / agent_name
+        if not agent_root.is_dir():
             continue
         for sub in ("prompts", "state"):
             p = agent_root / sub
             if not p.exists():
                 p.mkdir(parents=True, exist_ok=True)
-                log.info(f"Agent scaffold: created {agent_root.name}/{sub}")
+                log.info(f"Agent scaffold: created {agent_name}/{sub}")
                 created += 1
     return created
 
 
 # ---------------------------------------------------------------------------
 # EnsureAgentRelationLinks — mirrors setup-service.ps1's Ensure-AgentRelationLinks
-# (see docs/specs/agents/agent-relationships.md). Only creates a junction where
-# the path is completely absent (a destroyed link) — never touches a path that
-# already exists, whether that's an intact junction, a user-created directory,
-# or a stray file. Includes "repair" itself so this agent self-heals too.
+# (see docs/specs/agents/agent-relationships.md). LLM + planned agents only —
+# static agents are workers now and have no folders. Only creates a junction
+# where the path is completely absent (a destroyed link) — never touches a
+# path that already exists.
 #
 # Every generated mount's top path segment is dot-prefixed by convention
-# (.knowledge-base, .agents, .system, ...) — agents/<name>/agents/<other> in
-# particular is a real cycle on disk (agents/repair links to agents/cleanup,
-# which links back to agents/repair, etc.), and a reparse-point-unaware
-# directory walk (git status, backup, indexers) can recurse into that forever.
-# Dot-prefixing every mount lets a single .gitignore block prune descent into
-# all of them uniformly. Keep in sync with setup-service.ps1's mirror.
+# (.knowledge-base, .agents, .system, ...) so a single .gitignore block can
+# prune reparse-point-unaware walks. Keep in sync with setup-service.ps1.
 # ---------------------------------------------------------------------------
 
 _AGENT_RELATIONS: dict[str, list[str]] = {
     "adventure-builder": [".knowledge-base/02-Library", ".knowledge-base/03-Campaigns", "agents/lore", "agents/canon", "agents/relationship"],
     "canon":             [".knowledge-base/02-Library"],
     "classification":    [".knowledge-base/00-Inbox", ".knowledge-base/01-Processing", ".knowledge-base/02-Library"],
-    "cleanup":           ["agents/runtime", "agents/review", "agents/repair", "agents/canon", "agents/deduplication"],
     "curator":           [".knowledge-base/01-Processing"],
     "deduplication":     [".knowledge-base/00-Inbox", ".knowledge-base/01-Processing", ".knowledge-base/02-Library"],
     "encounter-builder": [".knowledge-base/02-Library", ".knowledge-base/03-Campaigns"],
-    "ingestion":         [".knowledge-base/00-Inbox", "system/state"],
     "lore":              [".knowledge-base/00-Inbox", ".knowledge-base/01-Processing", ".knowledge-base/02-Library", "agents/vision", "system/state"],
     "relationship":      [".knowledge-base/02-Library", ".knowledge-base/04-Relationships"],
-    "repair":            ["agents/runtime", "agents/review", "agents/vision", "agents/*", "system"],
-    "review":            ["agents/runtime", ".knowledge-base/01-Processing", "agents/*"],
-    "runtime":           ["agents/*", "system"],
     "search":            [".knowledge-base/01-Processing", ".knowledge-base/02-Library"],
     "session-builder":   [".knowledge-base/03-Campaigns", "agents/adventure-builder"],
-    "token":             ["agents/vision", ".knowledge-base/00-Inbox", ".knowledge-base/05-Assets"],
     "vision":            [".knowledge-base/00-Inbox", ".knowledge-base/01-Processing", "system/state"],
     "wiki":              [".knowledge-base/01-Processing", ".knowledge-base/02-Library", "system/state"],
-    "wikilink":          [".knowledge-base/02-Library"],
 }
 
 
@@ -362,9 +293,7 @@ def _ensure_agent_relation_links(log: Logger) -> int:
             continue
 
         # Every agent also gets system/state regardless of its table entry
-        # ("system" already covers state/ — skip the overlap). agents/shared
-        # mounts are gone: the shared library is the installed nexus.shared
-        # package, imported rather than reached via junctions.
+        # ("system" already covers state/ — skip the overlap).
         extra = ["system/state"] if "system" not in rels else []
         for rel in extra + rels:
             targets = (
@@ -484,23 +413,26 @@ def _validate_image_refs(log: Logger) -> tuple[int, list[str]]:
 
 
 # ---------------------------------------------------------------------------
-# ValidateInboxQueue — prune entries whose source file is gone
+# ValidateInboxQueue — prune gone files, backfill slots, reset resolvable
+# error slots, collect poison pills
 # ---------------------------------------------------------------------------
 
-def _validate_inbox_queue(log: Logger) -> tuple[int, list[str]]:
-    """Prune inbox-queue.json entries whose file no longer exists on disk.
+def _validate_inbox_queue(log: Logger) -> tuple[int, list[str], list[dict]]:
+    """Validate inbox-queue.json.
 
-    Ingestion registers every file under 00-Inbox/ but by design never removes
-    an entry once its file disappears — it only logs a "phantom" warning (see
-    ingestion/CLAUDE.md). Renamed-outside-the-normal-flow, deleted, or
-    overwritten-by-collision files then sit in the queue as 'pending' forever,
-    since nothing can ever mark them done — inflating the dashboard's queue
-    count long after the files themselves are gone.
+    - Prunes entries whose file no longer exists on disk (nothing else ever
+      shrinks the queue back to reality).
+    - Backfills missing agent slots through AgentSlots defaults (schema
+      evolution — moved here from the old ingestion batch task).
+    - Resets slots stuck at 'error' with reruns < 3 back to 'pending' and
+      increments reruns.<slot> (the underlying file exists, so the cause may
+      be resolved — worth a retry).
+    - Collects poison pills: error slots with reruns >= 3, for the report.
 
-    Returns (repairs_applied, pruned_paths).
+    Returns (repairs_applied, pruned_paths, poison_pills).
     """
     if not _QUEUE_FILE.exists():
-        return 0, []
+        return 0, [], []
 
     try:
         queue: dict[str, Any] = json.loads(
@@ -508,33 +440,84 @@ def _validate_inbox_queue(log: Logger) -> tuple[int, list[str]]:
         )
     except Exception as exc:
         log.error(f"inbox-queue read error: {exc}")
-        return 0, []
+        return 0, [], []
+
+    from nexus.shared import AgentSlots, AgentSlotStatus
 
     pruned: list[str] = []
+    poison: list[dict] = []
+    repairs = 0
+    changed = False
+
     for rel_path in list(queue.keys()):
         if not (_PROJECT_ROOT / rel_path).exists():
             del queue[rel_path]
             pruned.append(rel_path)
+            changed = True
             log.info(f"Pruned missing inbox-queue ref: {rel_path}")
+            continue
 
-    if pruned:
+        entry = queue[rel_path]
+        if not isinstance(entry, dict):
+            continue
+
+        # Backfill missing slots in canonical field order
+        old_agents = entry.get("agents", {})
+        try:
+            new_agents = AgentSlots.model_validate(old_agents).model_dump(mode="json")
+            new_agents["ingestion"] = AgentSlotStatus.done.value  # entry exists => ingested
+            if new_agents != old_agents:
+                entry["agents"] = new_agents
+                repairs += 1
+                changed = True
+        except Exception:
+            new_agents = old_agents
+
+        # Error-slot reset / poison-pill collection
+        reruns = entry.setdefault("reruns", {})
+        for slot, status in list(entry.get("agents", {}).items()):
+            if status != "error":
+                continue
+            n = int(reruns.get(slot, 0))
+            if n < _MAX_RERUNS:
+                entry["agents"][slot] = "pending"
+                reruns[slot] = n + 1
+                repairs += 1
+                changed = True
+                log.info(f"Reset error slot {slot} → pending ({rel_path}, rerun {n + 1})")
+            else:
+                poison.append({"path": rel_path, "slot": slot, "reruns": n})
+
+    if changed:
         tmp = _QUEUE_FILE.with_suffix(".tmp")
         tmp.write_text(json.dumps(queue, indent=2, default=str), encoding="utf-8")
         tmp.replace(_QUEUE_FILE)
 
-    return len(pruned), pruned
+    if poison:
+        log.warning(f"Poison-pill queue slots (reruns >= {_MAX_RERUNS}): {len(poison)}")
+
+    return len(pruned) + repairs, pruned, poison
 
 
 # ---------------------------------------------------------------------------
-# DetectOverdueAgents
+# DetectOverdueAgents — LLM agents (agent.json) + workers (registry.yaml)
 # ---------------------------------------------------------------------------
+
+def _load_registry_raw() -> dict:
+    if not _REGISTRY.exists():
+        return {}
+    try:
+        import yaml as _yaml
+        return _yaml.safe_load(_REGISTRY.read_text(encoding="utf-8")) or {}
+    except Exception:
+        return {}
+
 
 def _detect_overdue_agents(log: Logger) -> list[str]:
-    """Flag agents not run within 2 × intervalSeconds."""
+    """Flag LLM agents and scheduled workers not run within 2 × their interval."""
     now = datetime.now(timezone.utc)
     overdue: list[str] = []
 
-    # Load last-run timestamps
     tasks_state: dict[str, Any] = {}
     if _TASKS_STATE.exists():
         try:
@@ -542,7 +525,7 @@ def _detect_overdue_agents(log: Logger) -> list[str]:
         except Exception as exc:
             log.error(f"Cannot read tasks-state.json: {exc}")
 
-    # Collect intervalSeconds from each agent.json
+    # LLM agents: intervalSeconds from each agent.json
     intervals: dict[str, int] = {}
     for agent_json in _AGENTS_DIR.glob("*/agent.json"):
         try:
@@ -553,6 +536,13 @@ def _detect_overdue_agents(log: Logger) -> list[str]:
                     intervals[task_id] = int(iv)
         except Exception as exc:
             log.warning(f"Cannot parse {agent_json}: {exc}")
+
+    # Scheduled workers: interval_seconds from registry.yaml workers: block.
+    # Queue workers poll every cycle and have no interval — not checked here.
+    for name, raw in (_load_registry_raw().get("workers") or {}).items():
+        raw = raw or {}
+        if raw.get("kind") == "scheduled" and raw.get("enabled", True):
+            intervals[f"worker:{name}"] = int(raw.get("interval_seconds", 900))
 
     for task_id, iv in intervals.items():
         entry = tasks_state.get(task_id, {})
@@ -635,10 +625,12 @@ def _write_repair_report(
     git_update: dict | None = None,
     dashboard_health: dict | None = None,
     pruned_queue_refs: list[str] | None = None,
-) -> None:
-    _REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    poison_pills: list[dict] | None = None,
+) -> Path:
+    reports_dir = worker_state_dir("maintenance") / "reports"
+    reports_dir.mkdir(parents=True, exist_ok=True)
     today = datetime.now().strftime("%Y-%m-%d")
-    report_path = _REPORTS_DIR / f"repair-{today}.json"
+    report_path = reports_dir / f"repair-{today}.json"
 
     report = {
         "date":              today,
@@ -649,6 +641,7 @@ def _write_repair_report(
         "overdueAgents":     overdue_agents,
         "invalidImageRefs":  invalid_refs,
         "prunedInboxQueueRefs": pruned_queue_refs or [],
+        "poisonPillSlots":   poison_pills or [],
         "dashboardHealth":   dashboard_health,
     }
 
@@ -656,10 +649,11 @@ def _write_repair_report(
     tmp.write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
     tmp.replace(report_path)
     log.info(f"Wrote repair report: {report_path.name}")
+    return report_path
 
 
 # ---------------------------------------------------------------------------
-# Standalone entry point (direct execution / testing)
+# Worker
 # ---------------------------------------------------------------------------
 
 def _run_step(log: Logger, name: str, fn, default):
@@ -673,221 +667,60 @@ def _run_step(log: Logger, name: str, fn, default):
         return default
 
 
-def main() -> None:
-    log = _make_logger()
-    t0  = log.start()
+class MaintenanceWorker:
+    name = "maintenance"
+    kind = "scheduled"
 
-    git_result = _run_step(log, "git_update", lambda: _git_update(log),
-                            {"skipped": True, "reason": "step raised"})
-    fix_labels = _run_step(log, "parse_error_patterns", lambda: _parse_error_patterns(log), [])
+    def __init__(self, options: dict | None = None) -> None:
+        pass
 
-    repairs  = 0
-    repairs += _run_step(log, "remove_stale_lock", lambda: _remove_stale_lock(log), 0)
-    repairs += _run_step(log, "generate_missing_agent_configs", lambda: _generate_missing_agent_configs(log), 0)
-    repairs += _run_step(log, "create_missing_dirs", lambda: _create_missing_dirs(log), 0)
-    repairs += _run_step(log, "ensure_agent_scaffold", lambda: _ensure_agent_scaffold(log), 0)
-    repairs += _run_step(log, "ensure_agent_relation_links", lambda: _ensure_agent_relation_links(log), 0)
+    def pending(self) -> list[WorkItem]:
+        return [WorkItem("", {})]
 
-    img_repairs, invalid_refs = _run_step(log, "validate_image_refs", lambda: _validate_image_refs(log), (0, []))
-    repairs += img_repairs
+    def handle(self, item: WorkItem) -> WorkResult:
+        log = make_worker_logger(self.name)
+        t0  = log.start()
 
-    queue_repairs, pruned_queue_refs = _run_step(log, "validate_inbox_queue", lambda: _validate_inbox_queue(log), (0, []))
-    repairs += queue_repairs
+        git_result = _run_step(log, "git_update", lambda: _git_update(log),
+                                {"skipped": True, "reason": "step raised"})
+        fix_labels = _run_step(log, "parse_error_patterns", lambda: _parse_error_patterns(log), [])
 
-    overdue   = _run_step(log, "detect_overdue_agents", lambda: _detect_overdue_agents(log), [])
-    dashboard = _run_step(log, "check_dashboard_health", lambda: _check_dashboard_health(log),
-                           {"port": None, "portListening": False, "httpStatus": None, "healthy": False})
+        repairs  = 0
+        repairs += _run_step(log, "remove_stale_lock", lambda: _remove_stale_lock(log), 0)
+        repairs += _run_step(log, "generate_missing_agent_configs", lambda: _generate_missing_agent_configs(log), 0)
+        repairs += _run_step(log, "create_missing_dirs", lambda: _create_missing_dirs(log), 0)
+        repairs += _run_step(log, "ensure_agent_scaffold", lambda: _ensure_agent_scaffold(log), 0)
+        repairs += _run_step(log, "ensure_agent_relation_links", lambda: _ensure_agent_relation_links(log), 0)
 
-    _write_repair_report(fix_labels, repairs, overdue, invalid_refs, log, git_update=git_result,
-                          dashboard_health=dashboard, pruned_queue_refs=pruned_queue_refs)
+        img_repairs, invalid_refs = _run_step(log, "validate_image_refs", lambda: _validate_image_refs(log), (0, []))
+        repairs += img_repairs
 
-    log.done(t0, key="repairs", count=repairs, failed=0)
-    sys.exit(0)
+        queue_repairs, pruned_queue_refs, poison = _run_step(
+            log, "validate_inbox_queue", lambda: _validate_inbox_queue(log), (0, [], []))
+        repairs += queue_repairs
+
+        overdue   = _run_step(log, "detect_overdue_agents", lambda: _detect_overdue_agents(log), [])
+        dashboard = _run_step(log, "check_dashboard_health", lambda: _check_dashboard_health(log),
+                               {"port": None, "portListening": False, "httpStatus": None, "healthy": False})
+
+        try:
+            _write_repair_report(fix_labels, repairs, overdue, invalid_refs, log,
+                                 git_update=git_result, dashboard_health=dashboard,
+                                 pruned_queue_refs=pruned_queue_refs, poison_pills=poison)
+        except Exception as exc:
+            log.done(t0, key="repairs", count=repairs, failed=1)
+            return WorkResult("error", f"cannot write repair report: {exc}")
+
+        log.done(t0, key="repairs", count=repairs, failed=0)
+        return WorkResult("done", f"repairs={repairs} overdue={len(overdue)} poison={len(poison)}")
+
+
+def create(options: dict | None = None) -> MaintenanceWorker:
+    return MaintenanceWorker(options)
 
 
 if __name__ == "__main__":
-    main()
-
-
-# ---------------------------------------------------------------------------
-# Agentic tool interface
-# ---------------------------------------------------------------------------
-
-TOOLS = SELF_MANAGEMENT_TOOLS + [
-    {
-        "name": "git_update",
-        "description": (
-            "Run git fetch + git pull --ff-only if the project is a git repository. "
-            "Call this first, before any repair actions. Failure is non-fatal."
-        ),
-        "input_schema": {"type": "object", "properties": {}},
-    },
-    {
-        "name": "parse_error_patterns",
-        "description": (
-            "Scan automation.log (last 24h) for known fixable error patterns. "
-            "Returns the list of fix labels detected (stale-lock, missing-directory, missing-image-ref)."
-        ),
-        "input_schema": {"type": "object", "properties": {}},
-    },
-    {
-        "name": "remove_stale_lock",
-        "description": (
-            "Remove runner.lock if it is older than 30 minutes. "
-            "Safe to call unconditionally — returns 0 if lock is absent or fresh."
-        ),
-        "input_schema": {"type": "object", "properties": {}},
-    },
-    {
-        "name": "create_missing_dirs",
-        "description": "Create any required agents/ and system/ subdirectories that do not yet exist.",
-        "input_schema": {"type": "object", "properties": {}},
-    },
-    {
-        "name": "ensure_agent_scaffold",
-        "description": (
-            "Create any missing prompts/, state/, tools/ dir under each agent "
-            "(except shared/tests). Only fills in what's absent."
-        ),
-        "input_schema": {"type": "object", "properties": {}},
-    },
-    {
-        "name": "ensure_agent_relation_links",
-        "description": (
-            "Recreate any deleted agents/<name>/<related-path> junctions (per "
-            "docs/specs/agents/agent-relationships.md), including repair's own. "
-            "Only fills in paths that are completely absent — never touches an "
-            "existing link, directory, or file."
-        ),
-        "input_schema": {"type": "object", "properties": {}},
-    },
-    {
-        "name": "generate_missing_agent_configs",
-        "description": (
-            "Scaffold agents/<name>/agent.json for any active agent missing one "
-            "(gitignored, machine-local dispatch config). Without this, runner.py "
-            "discovers zero tasks and no agent ever dispatches."
-        ),
-        "input_schema": {"type": "object", "properties": {}},
-    },
-    {
-        "name": "validate_image_refs",
-        "description": (
-            "Validate all entries in processed-images.json by SHA256 identity. "
-            "Prunes missing-file entries; flags entries where stored SHA256 does not match the actual file."
-        ),
-        "input_schema": {"type": "object", "properties": {}},
-    },
-    {
-        "name": "validate_inbox_queue",
-        "description": (
-            "Prune inbox-queue.json entries whose source file no longer exists on disk. "
-            "Ingestion never removes an entry once its file is gone, so this is the only "
-            "thing that shrinks the dashboard's queue count back to reality."
-        ),
-        "input_schema": {"type": "object", "properties": {}},
-    },
-    {
-        "name": "detect_overdue_agents",
-        "description": (
-            "Check all registered agents against their intervalSeconds. "
-            "Returns list of task IDs that have not run within 2 × intervalSeconds."
-        ),
-        "input_schema": {"type": "object", "properties": {}},
-    },
-    {
-        "name": "check_dashboard_health",
-        "description": (
-            "Check whether the Next.js dashboard is up: reads its port from "
-            "system/.env.local, probes the TCP port, then does an HTTP GET. "
-            "Returns {port, portListening, httpStatus, healthy}. No side effects."
-        ),
-        "input_schema": {"type": "object", "properties": {}},
-    },
-    {
-        "name": "write_repair_report",
-        "description": (
-            "Write a structured repair-YYYY-MM-DD.json report to "
-            "agents/review/state/reports/. "
-            "Call after all repair actions are complete."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "fix_labels":     {"type": "array",   "items": {"type": "string"}, "description": "Fix labels detected by parse_error_patterns"},
-                "repairs_applied": {"type": "integer", "description": "Total number of repairs performed"},
-                "overdue_agents": {"type": "array",   "items": {"type": "string"}, "description": "Task IDs flagged as overdue"},
-                "invalid_refs":   {"type": "array",   "items": {"type": "string"}, "description": "Image paths with invalid or missing refs"},
-                "dashboard_health": {"type": "object", "description": "Result of check_dashboard_health, if run"},
-                "pruned_queue_refs": {"type": "array", "items": {"type": "string"}, "description": "Inbox-queue paths pruned by validate_inbox_queue, if run"},
-            },
-            "required": ["fix_labels", "repairs_applied", "overdue_agents", "invalid_refs"],
-        },
-    },
-]
-
-
-def call_tool(name: str, args: dict, context: dict) -> str:
-    result = call_self_management_tool(
-        name, args, context, module_file=_MODULE_FILE, task_id=TASK_ID
-    )
-    if result is not None:
-        return result
-
-    log = _make_logger()
-
-    if name == "git_update":
-        return json.dumps(_git_update(log))
-
-    if name == "parse_error_patterns":
-        labels = _parse_error_patterns(log)
-        return json.dumps({"fixLabelsDetected": labels})
-
-    if name == "remove_stale_lock":
-        n = _remove_stale_lock(log)
-        return f"Removed {n} stale lock(s)"
-
-    if name == "create_missing_dirs":
-        n = _create_missing_dirs(log)
-        return f"Created {n} missing director(ies)"
-
-    if name == "ensure_agent_scaffold":
-        n = _ensure_agent_scaffold(log)
-        return f"Created {n} missing scaffold director(ies)"
-
-    if name == "ensure_agent_relation_links":
-        n = _ensure_agent_relation_links(log)
-        return f"Recreated {n} missing agent relation link(s)"
-
-    if name == "generate_missing_agent_configs":
-        n = _generate_missing_agent_configs(log)
-        return f"Generated {n} missing agent.json file(s)"
-
-    if name == "validate_image_refs":
-        n, invalid = _validate_image_refs(log)
-        return json.dumps({"repairsApplied": n, "invalidImageRefs": invalid})
-
-    if name == "validate_inbox_queue":
-        n, pruned = _validate_inbox_queue(log)
-        return json.dumps({"repairsApplied": n, "prunedInboxQueueRefs": pruned})
-
-    if name == "detect_overdue_agents":
-        overdue = _detect_overdue_agents(log)
-        return json.dumps({"overdueAgents": overdue})
-
-    if name == "check_dashboard_health":
-        return json.dumps(_check_dashboard_health(log))
-
-    if name == "write_repair_report":
-        _write_repair_report(
-            fix_labels=args.get("fix_labels", []),
-            repairs_applied=args.get("repairs_applied", 0),
-            overdue_agents=args.get("overdue_agents", []),
-            invalid_refs=args.get("invalid_refs", []),
-            log=log,
-            dashboard_health=args.get("dashboard_health"),
-            pruned_queue_refs=args.get("pruned_queue_refs"),
-        )
-        return "Repair report written"
-
-    raise ValueError(f"Unknown tool: {name!r}")
+    worker = create()
+    for _item in worker.pending():
+        _res = worker.handle(_item)
+        print(f"{_res.status}: {_res.detail}")

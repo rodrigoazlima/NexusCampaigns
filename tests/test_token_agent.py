@@ -1,4 +1,4 @@
-"""Tests for nexus.tasks.generate_tokens — agent-token.spec.md compliance."""
+"""Tests for nexus.workers.token — agent-token.spec.md compliance."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ import pytest
 # ---------------------------------------------------------------------------
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
-_MOD_PATH = _PROJECT_ROOT / "system" / "src" / "nexus" / "tasks" / "generate_tokens.py"
+_MOD_PATH = _PROJECT_ROOT / "system" / "src" / "nexus" / "workers" / "token.py"
 _spec = importlib.util.spec_from_file_location("token_generate_tokens", _MOD_PATH)
 mod = importlib.util.module_from_spec(_spec)  # type: ignore[arg-type]
 sys.modules["token_generate_tokens"] = mod
@@ -140,12 +140,10 @@ class TestLoadVisionState:
 class TestGenTokensIO:
     def test_returns_empty_when_missing(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(mod, "_GEN_TOKENS", tmp_path / "generated-tokens.json")
-        monkeypatch.setattr(mod, "_AGENT_STATE", tmp_path)
         assert mod._load_gen_tokens() == {}
 
     def test_round_trip(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(mod, "_GEN_TOKENS", tmp_path / "generated-tokens.json")
-        monkeypatch.setattr(mod, "_AGENT_STATE", tmp_path)
         data = {"sha1": {"sourcePath": "a", "tokenPath": "b", "generatedAt": "2026-01-01"}}
         mod._save_gen_tokens(data)
         assert mod._load_gen_tokens() == data
@@ -154,7 +152,6 @@ class TestGenTokensIO:
         """save must use tmp → replace (no partial writes)."""
         out = tmp_path / "generated-tokens.json"
         monkeypatch.setattr(mod, "_GEN_TOKENS", out)
-        monkeypatch.setattr(mod, "_AGENT_STATE", tmp_path)
         mod._save_gen_tokens({"key": {"sourcePath": "x", "tokenPath": "y", "generatedAt": "z"}})
         assert out.exists()
         assert not (tmp_path / "generated-tokens.tmp").exists()

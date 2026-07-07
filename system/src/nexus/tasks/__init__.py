@@ -1,1 +1,2 @@
-"""Static (no-LLM) pipeline tasks. Each module is runnable via `python -m nexus.tasks.<name>`."""
+"""Manual CLI utilities. Scheduled static work lives in `nexus.workers` —
+the only module left here is `remove_background` (no trigger, no schedule)."""

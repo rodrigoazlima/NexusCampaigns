@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     try {
       const { stdout, stderr } = await execFileAsync(
         PYTHON,
-        [...RUNNER_ARGS, '--task', 'repair-agent', '--force'],
+        [...RUNNER_ARGS, '--task', 'worker:maintenance', '--force'],
         { timeout: REPAIR_TIMEOUT_MS, env: { ...process.env } }
       )
       return NextResponse.json({ ok: true, agent: body.agent ?? null, stdout, stderr })

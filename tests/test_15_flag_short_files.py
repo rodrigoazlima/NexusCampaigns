@@ -36,7 +36,7 @@ import pytest
 # ---------------------------------------------------------------------------
 
 _SCRIPT = (
-    Path(__file__).parent.parent / "system" / "src" / "nexus" / "tasks" / "flag_short_files.py"
+    Path(__file__).parent.parent / "system" / "src" / "nexus" / "workers" / "shortfiles.py"
 )
 
 _AGENTS_DIR = Path(__file__).resolve().parents[1] / "agents"

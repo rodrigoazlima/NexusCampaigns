@@ -226,24 +226,15 @@ __marimo__/
 agents/runtime/state/tasks-state.json
 agents/runtime/state/logs/
 
-# Per-agent mutable state (regenerated each run)
-agents/thumbnails/state/
-system/state/thumbs/
-agents/ingestion/state/processed-docx.txt
+# Shared runtime state — inbox queue, worker state (system/state/workers/),
+# thumbs cache, review reports. Nothing under system/state/ is committed.
+system/state/
+
+# Per-agent mutable state (LLM agents; regenerated each run)
 agents/vision/state/processed-images.json
 agents/vision/state/token-links.json
 agents/lore/state/processed-npcs.json
-agents/token/state/generated-tokens.json
 agents/classification/state/
-
-# Shared queue (mutable, runtime-only)
-system/state/inbox-queue.json
-
-# Reports (runtime output)
-agents/review/state/reports/report-*.json
-agents/review/state/reports/reports-data.js
-agents/review/state/logs/
-agents/repair/state/repair-*.json
 
 # Legacy .system paths (kept for backward compat during migration)
 system/tasks-state.json
@@ -278,7 +269,7 @@ system/tests/.last-run.json
 # mount dir itself is pruned before descent — which is what a gitignore'd
 # directory name achieves. See Ensure-Junction / Ensure-AgentRelationLinks in
 # system/ops/setup-service.ps1 and its mirror in
-# system/src/nexus/tasks/repair_agent.py. Keep every new junction dot-prefixed
+# system/src/nexus/workers/maintenance.py. Keep every new junction dot-prefixed
 # and listed here — don't invent a differently-named mount.
 .knowledge-base
 .knowledge-base/

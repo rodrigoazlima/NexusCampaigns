@@ -43,22 +43,69 @@ pipeline_mode: sync
 
 execution_order:
   - runtime
-  - repair
-  - ingestion
   - vision
   - lore
-  - token
   - wiki
   - classification
-  - review
-  - wikilink
-  - cleanup
-  - thumbnails
+
+# ---------------------------------------------------------------------------
+# Static workers (no LLM) — run in-process inside nexus.runner each cycle.
+# See docs/refactor/remove-agentic-useless-static-code/worker-contract.spec.md.
+# Declared order = execution order.
+#
+# kind: queue     — polled every cycle; pending() derives the work items.
+#                   Queue workers have NO interval.
+# kind: scheduled — cron-like; interval_seconds is the only trigger
+#                   (maintenance also fires on a worker-error signal).
+#
+# Defaults when a key is absent: enabled: true, batch_size: 10,
+# interval_seconds: 900 (scheduled only), commit_scope: [] (never commit).
+# ---------------------------------------------------------------------------
+workers_enabled: true
+workers:
+  ingestion:
+    kind: queue
+    batch_size: 25                # files per cycle; inbox dumps can be large
+    commit_scope: [".knowledge-base/00-Inbox"]   # renames + docx conversions
+  thumbnails:
+    kind: queue
+    batch_size: 10
+    commit_scope: []              # everything gitignored
+  token:
+    kind: queue
+    batch_size: 10
+    commit_scope: [".knowledge-base/00-Inbox/images"]   # tokens written next to sources
+    options:
+      moldura_by_type: {}
+  wikilink:
+    kind: queue
+    batch_size: 20
+    commit_scope: [".knowledge-base/02-Library"]
+  shortfiles:
+    kind: queue
+    batch_size: 50                # cheap per-item work
+    commit_scope: [".knowledge-base/01-Processing"]
+  report:
+    kind: scheduled
+    interval_seconds: 900
+    commit_scope: [".knowledge-base/01-Processing"]     # suggestedQuality writes
+  cleanup:
+    kind: scheduled
+    interval_seconds: 86400
+    commit_scope: []
+    options:
+      retention_days: 90
+  maintenance:
+    kind: scheduled
+    interval_seconds: 86400       # daily; worker-error signals force earlier runs
+    commit_scope: []
 
 shared_state_files:
   inbox-queue.json:
     path: system/state/inbox-queue.json
-    owner: ingestion
+    # Produced by the in-process ingestion worker, which lives inside the
+    # runtime — owner must name an entry in agents:.
+    owner: runtime
     updaters:
       - vision
       - lore
@@ -67,30 +114,11 @@ shared_state_files:
 agents:
   runtime:
     status: active
-    description: "Python scheduler and dispatch runtime — the only static code. Not an AI agent."
+    description: "Python scheduler, worker loop, and dispatch runtime — the only static code. Not an AI agent."
     interval_seconds: 60
     llm: none
     tools:
       - tools/runner.py
-
-  repair:
-    status: active
-    task_id: repair-agent
-    interval_seconds: 86400
-    llm: none
-    tools:
-      - tools/repair_agent.py
-
-  ingestion:
-    status: active
-    task_id: ingestion-agent
-    interval_seconds: 900
-    llm: none
-    tools:
-      - tools/ingestion_agent.py
-    shared_state:
-      writes:
-        - system/state/inbox-queue.json
 
   vision:
     status: active
@@ -123,17 +151,6 @@ agents:
       updates:
         - system/state/inbox-queue.json
 
-  token:
-    status: active
-    task_id: token-agent
-    interval_seconds: 900
-    llm: none
-    tools:
-      - tools/generate_tokens.py
-    shared_state:
-      reads:
-        - agents/vision/state/processed-images.json
-
   classification:
     status: active
     task_id: classification-agent
@@ -161,46 +178,6 @@ agents:
       reads:
         - system/state/inbox-queue.json
       updates:
-        - system/state/inbox-queue.json
-
-  review:
-    status: active
-    task_id: review-agent
-    interval_seconds: 900
-    llm: none
-    tools:
-      - tools/daily_report.py
-      - tools/flag_short_files.py
-
-  wikilink:
-    status: active
-    task_id: wikilink-agent
-    interval_seconds: 3600
-    llm: none
-    tools:
-      - tools/wikilink_library.py
-    shared_state:
-      reads:
-        - agents/wikilink/state/wikilink-state.json
-
-  cleanup:
-    status: active
-    task_id: cleanup-agent
-    interval_seconds: 86400
-    llm: none
-    tools:
-      - tools/cleanup_agent.py
-
-  thumbnails:
-    status: active
-    task_id: thumbnails-agent
-    interval_seconds: 3600
-    llm: none
-    description: "Pre-generate 320px webp thumbnails for inbox images (dashboard gallery)."
-    tools:
-      - tools/thumbnails_agent.py
-    shared_state:
-      reads:
         - system/state/inbox-queue.json
 
   relationship:

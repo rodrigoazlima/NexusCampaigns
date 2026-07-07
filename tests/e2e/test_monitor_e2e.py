@@ -187,7 +187,7 @@ def test_stage2_ingestion():
     img_path = _INBOX_DIR / IMAGE_NAME
     assert img_path.exists(), "Run test_stage1 first"
 
-    result = _run_agent("ingestion-agent", timeout=60)
+    result = _run_agent("worker:ingestion", timeout=60)
     assert result.returncode == 0, (
         f"ingestion-agent failed (exit {result.returncode})\n{result.stdout[-2000:]}"
     )

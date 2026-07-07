@@ -37,7 +37,7 @@ where = ["system/src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--tb=short -q"
+addopts = "--tb=short -q -m \"not e2e\""
 markers = [
     "e2e: end-to-end pipeline tests (require network + Pillow; run with -m e2e)",
 ]

@@ -244,7 +244,7 @@ class TestBootstrapVaultState:
 
     def test_creates_text_state_files(self, tmp_path):
         bootstrap_vault_state(tmp_path)
-        assert (tmp_path / "agents" / "ingestion" / "state" / "processed-docx.txt").exists()
+        assert (tmp_path / "system" / "state" / "workers" / "ingestion" / "processed-docx.txt").exists()
         assert (tmp_path / "agents" / "wiki" / "state" / "processed.txt").exists()
         assert (tmp_path / "agents" / "wiki" / "state" / "bad-wiki-docs.txt").exists()
         assert (tmp_path / "agents" / "classification" / "state" / "bad-docs.txt").exists()

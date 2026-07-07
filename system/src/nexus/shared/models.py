@@ -138,6 +138,7 @@ class AgentSlotStatus(str, Enum):
     pending = "pending"
     done    = "done"
     skip    = "skip"
+    error   = "error"   # terminal until maintenance/human resets to pending (reruns += 1)
 
 
 class ImageProcessStatus(str, Enum):

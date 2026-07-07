@@ -37,16 +37,14 @@ class TestDefaults:
         assert len(SCENARIOS_DEFAULT) >= 1
         assert SCENARIOS_DEFAULT[0]["active"] is False
 
-    def test_tasks_state_has_all_agents(self):
-        expected_agents = [
-            "repair-agent", "review-agent", "ingestion-agent",
-            "vision-agent", "lore-agent", "token-agent",
-            "wiki-agent", "classification-agent",
-            "review-agent-short-files", "wikilink-agent",
+    def test_tasks_state_has_all_agents_and_scheduled_workers(self):
+        expected = [
+            "vision-agent", "lore-agent", "wiki-agent", "classification-agent",
+            "worker:report", "worker:cleanup", "worker:maintenance",
         ]
-        for agent in expected_agents:
-            assert agent in TASKS_STATE_DEFAULT, f"Missing: {agent}"
-            assert TASKS_STATE_DEFAULT[agent]["lastRun"].startswith("1970")
+        for key in expected:
+            assert key in TASKS_STATE_DEFAULT, f"Missing: {key}"
+            assert TASKS_STATE_DEFAULT[key]["lastRun"].startswith("1970")
 
     def test_state_file_defaults_covers_all_files(self):
         assert "system/state/inbox-queue.json" in STATE_FILE_DEFAULTS
@@ -57,11 +55,10 @@ class TestDefaults:
     def test_required_dirs_contains_shared_state(self):
         assert "system/state" in REQUIRED_DIRS
 
-    def test_required_dirs_covers_all_agents(self):
-        agent_names = ["ingestion", "vision", "lore", "token",
-                       "classification", "wiki", "review", "repair", "wikilink"]
-        for name in agent_names:
+    def test_required_dirs_covers_llm_agents_and_workers(self):
+        for name in ["vision", "lore", "classification", "wiki"]:
             assert any(name in d for d in REQUIRED_DIRS), f"Missing dir for: {name}"
+        assert "system/state/workers" in REQUIRED_DIRS
 
 
 class TestNewDefaults:
@@ -74,7 +71,7 @@ class TestNewDefaults:
 
     def test_text_state_files_contains_all_four(self):
         expected = [
-            "agents/ingestion/state/processed-docx.txt",
+            "system/state/workers/ingestion/processed-docx.txt",
             "agents/wiki/state/processed.txt",
             "agents/wiki/state/bad-wiki-docs.txt",
             "agents/classification/state/bad-docs.txt",

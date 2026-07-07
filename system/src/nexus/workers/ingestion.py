@@ -1,11 +1,14 @@
-"""nexus.tasks.ingestion_agent
+"""nexus.workers.ingestion — vault ingestion (queue producer).
 
-Ingestion task — first stage of the vault pipeline.
-  - Strips emoji from filenames in 00-Inbox/ (idempotent)
-  - Converts .docx files vault-wide to GFM Markdown via Pandoc
-  - Registers new Inbox files into system/state/inbox-queue.json
+First pipeline stage and the only queue producer: turns raw files dropped
+into 00-Inbox/ into inbox-queue entries the consumer workers feed on.
+Replaces nexus.tasks.ingestion_agent (BaseAgent lifecycle dropped).
 
-No LLM calls. No 02-Library writes. No 00-Inbox deletes.
+Per file: strip emoji from the filename (idempotent rename) → convert .docx
+to GFM Markdown via Pandoc → register the queue entry with per-slot defaults.
+Registration is the last step, so a crash before it re-picks the file next
+cycle (idempotent). Stray top-level vault entries are absorbed into
+00-Inbox/ when ingestion_options.auto_absorb_stray (registry.yaml) is true.
 """
 
 from __future__ import annotations
@@ -14,7 +17,6 @@ import json
 import re
 import shutil
 import subprocess
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -24,26 +26,21 @@ import yaml
 from nexus.shared import (
     AgentSlots,
     AgentSlotStatus,
-    BaseAgent,
     FileLock,
-    InboxQueue,
-    InboxQueueEntry,
     locked_update_queue_entry,
 )
 from nexus.shared.logger import Logger
-from nexus.shared.loaders import _find_project_root, load_vault_config
+from nexus.shared.loaders import _find_project_root
+from nexus.workers.base import (
+    WorkItem,
+    WorkResult,
+    adopt_legacy_file,
+    make_worker_logger,
+    worker_state_dir,
+)
 
 _PROJECT_ROOT = _find_project_root(Path(__file__).resolve().parent)
 _AGENTS_DIR   = _PROJECT_ROOT / "agents"
-
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
-
-TASK_ID         = "ingestion-agent"
-SCRIPT_BASENAME = "ingestion_agent"
-BATCH_SIZE      = 10
-DONE_KEY        = "processed"
 
 IMAGE_EXTS    = frozenset({".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tiff", ".tif"})
 DOCUMENT_EXTS = frozenset({".docx", ".doc", ".pdf", ".md", ".txt", ".odt"})
@@ -53,11 +50,9 @@ _INBOX        = _VAULT_ROOT / "00-Inbox"
 _SHARED_STATE = _PROJECT_ROOT / "system" / "state"
 _QUEUE_FILE   = _SHARED_STATE / "inbox-queue.json"
 
-_AGENT_STATE    = _SHARED_STATE / "ingestion"
-_LOGS_DIR       = _AGENT_STATE / "logs"
-_PROCESSED_DOCX = _AGENT_STATE / "processed-docx.txt"
-
 _REGISTRY_FILE = _AGENTS_DIR / "registry.yaml"
+
+_MAX_ATTEMPTS = 3   # poison-pill guard (worker-contract.spec.md)
 
 # Canonical vault-root folders per CLAUDE.md — anything else at vault root
 # is "stray" content that landed outside the pipeline (e.g. a reorganized
@@ -91,57 +86,65 @@ _EMOJI_RE = re.compile(
 
 
 # ---------------------------------------------------------------------------
-# Logger factory — used by call_tool() agentic dispatch (no agent instance)
+# Worker state — processed-docx list + per-file attempt counter
 # ---------------------------------------------------------------------------
 
-def _make_logger() -> Logger:
-    """Construct a shared Logger from module-level path constants."""
-    return Logger(
-        task_id         = TASK_ID,
-        script_basename = SCRIPT_BASENAME,
-        logs_dir        = _LOGS_DIR,
-        master_log      = _SHARED_STATE / "runtime" / "logs" / "automation.log",
-    )
+def _processed_docx_file() -> Path:
+    return worker_state_dir("ingestion") / "processed-docx.txt"
+
+
+def _attempts_file() -> Path:
+    return worker_state_dir("ingestion") / "attempts.json"
+
+
+def _load_processed_docx() -> set[str]:
+    p = _processed_docx_file()
+    if not p.exists():
+        return set()
+    return {
+        ln.strip()
+        for ln in p.read_text(encoding="utf-8").splitlines()
+        if ln.strip()
+    }
+
+
+def _mark_docx_processed(path: Path) -> None:
+    rel = path.relative_to(_PROJECT_ROOT).as_posix()
+    with open(_processed_docx_file(), "a", encoding="utf-8") as fh:
+        fh.write(rel + "\n")
+
+
+def _load_attempts() -> dict[str, int]:
+    p = _attempts_file()
+    if not p.exists():
+        return {}
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _bump_attempts(rel: str) -> int:
+    attempts = _load_attempts()
+    attempts[rel] = attempts.get(rel, 0) + 1
+    p = _attempts_file()
+    tmp = p.with_suffix(".tmp")
+    tmp.write_text(json.dumps(attempts, indent=2), encoding="utf-8")
+    tmp.replace(p)
+    return attempts[rel]
 
 
 # ---------------------------------------------------------------------------
 # Queue I/O
 # ---------------------------------------------------------------------------
 
-def _load_queue() -> InboxQueue:
+def _load_queue_raw() -> dict:
     if not _QUEUE_FILE.exists():
         return {}
-    raw: dict = json.loads(_QUEUE_FILE.read_text(encoding="utf-8"))
-    return {k: InboxQueueEntry.model_validate(v) for k, v in raw.items()}
-
-
-def _save_queue(queue: InboxQueue) -> None:
-    _SHARED_STATE.mkdir(parents=True, exist_ok=True)
-    tmp     = _QUEUE_FILE.with_suffix(".tmp")
-    payload = {k: v.model_dump(mode="json") for k, v in queue.items()}
-    tmp.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
-    tmp.replace(_QUEUE_FILE)
-
-
-# ---------------------------------------------------------------------------
-# Processed-DOCX state
-# ---------------------------------------------------------------------------
-
-def _load_processed_docx() -> set[str]:
-    if not _PROCESSED_DOCX.exists():
-        return set()
-    return {
-        ln.strip()
-        for ln in _PROCESSED_DOCX.read_text(encoding="utf-8").splitlines()
-        if ln.strip()
-    }
-
-
-def _mark_docx_processed(path: Path) -> None:
-    _AGENT_STATE.mkdir(parents=True, exist_ok=True)
-    rel = path.relative_to(_PROJECT_ROOT).as_posix()
-    with open(_PROCESSED_DOCX, "a", encoding="utf-8") as fh:
-        fh.write(rel + "\n")
+    try:
+        return json.loads(_QUEUE_FILE.read_text(encoding="utf-8").lstrip("﻿"))
+    except Exception:
+        return {}
 
 
 # ---------------------------------------------------------------------------
@@ -155,32 +158,20 @@ def _strip_emoji(text: str) -> str:
     return cleaned or text  # never return empty
 
 
-def strip_emoji_filenames(inbox: Path, log: Logger) -> int:
-    """Rename files in inbox/ that contain emoji. Idempotent. Returns count renamed."""
-    renamed = 0
-    scanned = 0
-    for path in sorted(inbox.rglob("*")):
-        if not path.is_file():
-            continue
-        scanned += 1
-        if not _EMOJI_RE.search(path.stem):
-            continue
-
-        clean_stem = _strip_emoji(path.stem)
-        candidate  = path.with_name(clean_stem + path.suffix)
-        if candidate == path:
-            continue
-
-        if candidate.exists():
-            ts        = datetime.now().strftime("%Y%m%d%H%M%S")
-            candidate = path.with_name(f"{clean_stem}-{ts}{path.suffix}")
-
-        path.rename(candidate)
-        log.info(f"Emoji strip: {path.name!r} → {candidate.name!r}")
-        renamed += 1
-
-    log.info(f"Emoji check: {scanned} files scanned, {renamed} renamed")
-    return renamed
+def _strip_emoji_filename(path: Path, log: Logger) -> Path:
+    """Rename one file if its stem contains emoji. Idempotent. Returns final path."""
+    if not _EMOJI_RE.search(path.stem):
+        return path
+    clean_stem = _strip_emoji(path.stem)
+    candidate  = path.with_name(clean_stem + path.suffix)
+    if candidate == path:
+        return path
+    if candidate.exists():
+        ts        = datetime.now().strftime("%Y%m%d%H%M%S")
+        candidate = path.with_name(f"{clean_stem}-{ts}{path.suffix}")
+    path.rename(candidate)
+    log.info(f"Emoji strip: {path.name!r} → {candidate.name!r}")
+    return candidate
 
 
 # ---------------------------------------------------------------------------
@@ -288,41 +279,8 @@ def _fix_md_image_refs(md_path: Path, images_dir: Path) -> None:
         pass  # non-fatal — images still exist, paths just need manual fix
 
 
-def process_docx_files(log: Logger) -> tuple[int, int]:
-    """Discover + convert unprocessed .docx files vault-wide (max BATCH_SIZE)."""
-    if not _ensure_pandoc(log):
-        log.warning("DOCX conversion skipped — pandoc unavailable")
-        return 0, 0
-
-    processed = _load_processed_docx()
-    all_docx  = [
-        p for p in _VAULT_ROOT.rglob("*.docx")
-        if ".git"    not in p.parts
-        if "agents" not in p.parts
-        if p.relative_to(_PROJECT_ROOT).as_posix() not in processed
-    ]
-
-    batch = all_docx[:BATCH_SIZE]
-    if not batch:
-        log.info(f"DOCX check: 0 unprocessed docx found (pandoc available, {len(processed)} already converted)")
-        return 0, 0
-
-    log.info(f"DOCX batch: {len(batch)} of {len(all_docx)} unprocessed file(s)")
-    count, failed = 0, 0
-    for docx_path in batch:
-        out = _convert_docx(docx_path, log)
-        if out:
-            _mark_docx_processed(docx_path)
-            count += 1
-        else:
-            failed += 1
-
-    return count, failed
-
-
 # ---------------------------------------------------------------------------
-# Stray vault entries — content outside 00-Inbox that should be treated as
-# inbox material (agent-ingestion.spec.md: auto_absorb_stray)
+# Stray vault entries (agent-ingestion.spec.md: auto_absorb_stray)
 # ---------------------------------------------------------------------------
 
 def find_stray_entries(vault_root: Path) -> list[Path]:
@@ -367,6 +325,7 @@ def _reindex_moved_prefix(old_prefix: str, new_prefix: str, log: Logger) -> None
     for path in (_QUEUE_FILE, _AGENTS_DIR / "vision" / "state" / "processed-images.json"):
         if not path.exists():
             continue
+        changed = 0
         with FileLock(path):
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
@@ -381,34 +340,16 @@ def _reindex_moved_prefix(old_prefix: str, new_prefix: str, log: Logger) -> None
             log.info(f"Reindexed {changed} path(s) in {path.name}: {old_prefix} -> {new_prefix}")
 
 
-def absorb_stray_entries(log: Logger) -> int:
-    """Move stray top-level vault entries into 00-Inbox/ when auto_absorb_stray is enabled.
-
-    Returns count of entries moved. Always logs strays found even when the
-    toggle is off, so they're visible instead of silently ignored.
-    """
-    strays = find_stray_entries(_VAULT_ROOT)
-    if not strays:
-        return 0
-
-    if not _auto_absorb_enabled():
-        for s in strays:
-            log.warning(f"Stray vault entry outside 00-Inbox (auto_absorb_stray disabled): {s.name}")
-        return 0
-
-    moved = 0
-    for src in strays:
-        dest = _INBOX / src.name
-        if dest.exists():
-            log.warning(f"Skip absorbing {src.name} — {dest} already exists")
-            continue
-        old_prefix = src.relative_to(_PROJECT_ROOT).as_posix()
-        new_prefix = dest.relative_to(_PROJECT_ROOT).as_posix()
-        shutil.move(str(src), str(dest))
-        log.info(f"Absorbed stray vault entry: {old_prefix} -> {new_prefix}")
-        _reindex_moved_prefix(old_prefix, new_prefix, log)
-        moved += 1
-    return moved
+def _absorb_stray(src: Path, log: Logger) -> WorkResult:
+    dest = _INBOX / src.name
+    if dest.exists():
+        return WorkResult("skip", f"{dest} already exists")
+    old_prefix = src.relative_to(_PROJECT_ROOT).as_posix()
+    new_prefix = dest.relative_to(_PROJECT_ROOT).as_posix()
+    shutil.move(str(src), str(dest))
+    log.info(f"Absorbed stray vault entry: {old_prefix} -> {new_prefix}")
+    _reindex_moved_prefix(old_prefix, new_prefix, log)
+    return WorkResult("done", f"absorbed {src.name}")
 
 
 # ---------------------------------------------------------------------------
@@ -428,8 +369,8 @@ def _make_slots(file_type: str) -> AgentSlots:
     p = AgentSlotStatus.pending
     s = AgentSlotStatus.skip
     d = AgentSlotStatus.done
-    # ingestion is always done (the entry exists because this agent ingested the file).
-    # wikilink is a library-stage agent and never runs on inbox items -> skip.
+    # ingestion is always done (the entry exists because this worker ingested the file).
+    # wikilink is a library-stage worker and never runs on inbox items -> skip.
     # review tracks the automated review pass over the draft(s) a file produces.
     if file_type == "image":
         return AgentSlots(ingestion=d, vision=p, lore=p, classification=p,
@@ -441,146 +382,128 @@ def _make_slots(file_type: str) -> AgentSlots:
                       wiki=s, wikilink=s, token=s, review=s)
 
 
-def _reconcile_slots(log: Logger) -> int:
-    """Backfill missing agent slots in existing queue entries (idempotent).
-
-    Re-validates each entry's agents through AgentSlots so newly introduced
-    slots (ingestion / wikilink / review) appear with their defaults in
-    canonical field order, without disturbing slots an agent has already set.
-    Returns the number of entries changed.
-    """
-    if not _QUEUE_FILE.exists():
-        return 0
-    changed = 0
-    with FileLock(_QUEUE_FILE):
-        raw: dict = json.loads(_QUEUE_FILE.read_text(encoding="utf-8"))
-        for entry in raw.values():
-            old_agents = entry.get("agents", {})
-            new_agents = AgentSlots.model_validate(old_agents).model_dump(mode="json")
-            new_agents["ingestion"] = AgentSlotStatus.done.value   # entry exists => ingested
-            if new_agents != old_agents:
-                entry["agents"] = new_agents
-                changed += 1
-        if changed:
-            _SHARED_STATE.mkdir(parents=True, exist_ok=True)
-            tmp = _QUEUE_FILE.with_suffix(".tmp")
-            tmp.write_text(json.dumps(raw, indent=2, default=str), encoding="utf-8")
-            tmp.replace(_QUEUE_FILE)
-    if changed:
-        log.info(f"Reconciled agent slots in {changed} queue entry/entries")
-    return changed
-
-
-def _is_token_file(p: "Path") -> bool:
+def _is_token_file(p: Path) -> bool:
     """Return True for generated token files (not original source images)."""
     stem = p.stem
     return stem.endswith("-token") or ".token" in stem
 
 
-def register_new_files(log: Logger) -> tuple[int, int]:
-    """Scan 00-Inbox/ recursively; add files absent from queue. Returns (added, 0)."""
-    queue = _load_queue()
-    added = 0
-    scanned = 0
+def _register_file(path: Path, log: Logger) -> None:
+    rel = path.relative_to(_PROJECT_ROOT).as_posix()
+    ft = _file_type(path)
+    payload = {
+        "ingestedAt": datetime.now(timezone.utc).isoformat(),
+        "type":       ft,
+        "agents":     _make_slots(ft).model_dump(mode="json"),
+    }
 
-    inbox_paths: set[str] = set()
-    for path in sorted(_INBOX.rglob("*")):
-        if not path.is_file():
-            continue
-        scanned += 1
-        rel = path.relative_to(_PROJECT_ROOT).as_posix()
-        inbox_paths.add(rel)
-        if rel in queue:
-            continue
+    def _apply(entry: dict) -> Optional[str]:
+        entry.update(payload)
+        return None
 
-        if _is_token_file(path):
-            continue
-
-        ft = _file_type(path)
-        new_entry = InboxQueueEntry(
-            ingestedAt=datetime.now(timezone.utc),
-            type=ft,
-            agents=_make_slots(ft),
-        )
-
-        # Locked, one item at a time — avoids clobbering concurrent agent
-        # slot updates on other keys made while this scan is still running.
-        def _register(entry: dict, _dump=new_entry.model_dump(mode="json")) -> Optional[str]:
-            entry.update(_dump)
-            return None
-
-        locked_update_queue_entry(_QUEUE_FILE, rel, _register)
-        queue[rel] = new_entry
-        log.info(f"Queued [{ft}]: {rel}")
-        added += 1
-
-    phantom = [k for k in queue if k.startswith(".knowledge-base/00-Inbox/") and k not in inbox_paths]
-    log.info(
-        f"Queue scan: {scanned} inbox files, {scanned - added} already queued, "
-        f"{added} new, {len(phantom)} phantom (queued but missing from disk)"
-    )
-    if phantom:
-        for p in phantom:
-            log.info(f"  Phantom entry: {p}")
-
-    return added, 0
+    locked_update_queue_entry(_QUEUE_FILE, rel, _apply)
+    log.info(f"Queued [{ft}]: {rel}")
 
 
 # ---------------------------------------------------------------------------
-# Agent
+# Worker
 # ---------------------------------------------------------------------------
 
-class IngestionAgent(BaseAgent):
-    TASK_ID         = TASK_ID
-    SCRIPT_BASENAME = SCRIPT_BASENAME
-    BATCH_SIZE      = BATCH_SIZE
-    DONE_KEY        = DONE_KEY
+class IngestionWorker:
+    name = "ingestion"
+    kind = "queue"
 
-    def __init__(self) -> None:
-        cfg = load_vault_config(_PROJECT_ROOT)
-        super().__init__(cfg=cfg)
-
-    def bootstrap(self) -> None:
-        """Ensure required state dirs and queue file exist. Idempotent."""
-        _AGENT_STATE.mkdir(parents=True, exist_ok=True)
-        _LOGS_DIR.mkdir(parents=True, exist_ok=True)
-        _SHARED_STATE.mkdir(parents=True, exist_ok=True)
+    def __init__(self, options: dict | None = None) -> None:
         (_INBOX / "docs").mkdir(parents=True, exist_ok=True)
         (_INBOX / "images").mkdir(parents=True, exist_ok=True)
-        if not _QUEUE_FILE.exists():
-            _save_queue({})
+        adopt_legacy_file(
+            _SHARED_STATE / "ingestion" / "processed-docx.txt",
+            _processed_docx_file(),
+        )
+        self._pandoc_ok: bool | None = None   # resolved once per instance
 
-    def run_batch(self) -> tuple[int, int]:
-        # self._logger set by BaseAgent.execute() before run_batch() is called
-        log = self._logger
-        total_count, total_failed = 0, 0
+    def pending(self) -> list[WorkItem]:
+        items: list[WorkItem] = []
+        attempts = _load_attempts()
 
-        absorbed = absorb_stray_entries(log)
-        total_count += absorbed
+        # Stray top-level vault entries (absorbed or logged, one item each)
+        for stray in find_stray_entries(_VAULT_ROOT):
+            rel = stray.relative_to(_PROJECT_ROOT).as_posix()
+            items.append(WorkItem(rel, {"action": "absorb"}))
 
-        renamed = strip_emoji_filenames(_INBOX, log)
-        total_count += renamed
+        # Inbox files not yet registered in the queue
+        if _INBOX.exists():
+            queue = _load_queue_raw()
+            for f in sorted(_INBOX.rglob("*")):
+                if not f.is_file() or _is_token_file(f):
+                    continue
+                rel = f.relative_to(_PROJECT_ROOT).as_posix()
+                if rel in queue or attempts.get(rel, 0) >= _MAX_ATTEMPTS:
+                    continue
+                items.append(WorkItem(rel, {"action": "ingest"}))
 
-        docx_count, docx_failed = process_docx_files(log)
-        total_count  += docx_count
-        total_failed += docx_failed
+        # Unconverted .docx living outside 00-Inbox (vault-wide sweep)
+        processed = _load_processed_docx()
+        for p in _VAULT_ROOT.rglob("*.docx"):
+            if ".git" in p.parts or "agents" in p.parts:
+                continue
+            rel = p.relative_to(_PROJECT_ROOT).as_posix()
+            if rel in processed or attempts.get(rel, 0) >= _MAX_ATTEMPTS:
+                continue
+            if any(i.key == rel for i in items):
+                continue  # already picked up as an inbox item
+            items.append(WorkItem(rel, {"action": "docx"}))
 
-        added, _ = register_new_files(log)
-        total_count += added
+        return items
 
-        _reconcile_slots(log)
+    def handle(self, item: WorkItem) -> WorkResult:
+        log = make_worker_logger(self.name)
+        path = _PROJECT_ROOT / item.key
+        action = item.payload.get("action", "ingest")
 
-        return total_count, total_failed
+        if action == "absorb":
+            if not path.exists():
+                return WorkResult("skip", "stray entry gone")
+            if not _auto_absorb_enabled():
+                log.warning(f"Stray vault entry outside 00-Inbox (auto_absorb_stray disabled): {path.name}")
+                return WorkResult("skip", "auto_absorb_stray disabled")
+            return _absorb_stray(path, log)
+
+        if not path.exists():
+            return WorkResult("skip", "file gone")
+
+        if action == "docx" or path.suffix.lower() == ".docx":
+            if self._pandoc_ok is None:
+                self._pandoc_ok = _ensure_pandoc(log)
+            if not self._pandoc_ok:
+                _bump_attempts(item.key)
+                return WorkResult("error", "pandoc unavailable — DOCX conversion skipped")
+
+        # 1. Emoji strip (rename changes the queue key going forward)
+        path = _strip_emoji_filename(path, log)
+
+        # 2. DOCX → GFM Markdown (output .md is registered on the next cycle)
+        if path.suffix.lower() == ".docx":
+            out = _convert_docx(path, log)
+            if out is None:
+                _bump_attempts(item.key)
+                return WorkResult("error", f"pandoc conversion failed: {path.name}")
+            _mark_docx_processed(path)
+
+        # 3. Register queue entry — last step, so a crash before it re-picks
+        #    the file next cycle
+        if action == "ingest":
+            _register_file(path, log)
+            return WorkResult("done", f"registered {path.name}")
+        return WorkResult("done", f"converted {path.name}")
 
 
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
-
-def main() -> None:
-    agent = IngestionAgent()
-    sys.exit(agent.execute())
+def create(options: dict | None = None) -> IngestionWorker:
+    return IngestionWorker(options)
 
 
 if __name__ == "__main__":
-    main()
+    worker = create()
+    for _item in worker.pending():
+        _res = worker.handle(_item)
+        print(f"{_res.status} {_item.key}: {_res.detail}")

@@ -43,11 +43,10 @@ export async function POST(req: NextRequest) {
 
     // Run token generation using the uploaded base image
     const cfg = readTokenConfig()
-    const scriptPath = path.join(PROJECT_ROOT, 'agents', 'token', 'tools', 'generate_tokens.py')
 
     const tokenPath = await new Promise<string>((resolve, reject) => {
-      const args = ['--image', absBase, '--moldura', cfg.molduraPath]
-      const proc = spawn('python', [scriptPath, ...args], {
+      const args = ['-m', 'nexus.workers.token', '--image', absBase, '--moldura', cfg.molduraPath]
+      const proc = spawn('python', args, {
         cwd: PROJECT_ROOT,
         env: { ...process.env },
       })
@@ -69,7 +68,7 @@ export async function POST(req: NextRequest) {
     })
 
     // Re-link the generated token back to the original source in generated-tokens.json
-    const genPath = path.join(PROJECT_ROOT, 'agents', 'token', 'state', 'generated-tokens.json')
+    const genPath = path.join(PROJECT_ROOT, 'system', 'state', 'workers', 'token', 'generated-tokens.json')
     try {
       const genTokens = JSON.parse(fs.readFileSync(genPath, 'utf-8')) as Record<string, {
         sourcePath: string; tokenPath: string; generatedAt: string

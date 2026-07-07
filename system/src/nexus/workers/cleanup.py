@@ -1,54 +1,42 @@
-"""nexus.tasks.cleanup_agent
+"""nexus.workers.cleanup — scheduled housekeeping worker.
 
-Cleanup task — log/report rotation and metrics trimming.
-  - Purge log files older than CLEANUP_DAYS (90)
-  - Purge report files older than CLEANUP_DAYS
-  - Trim agent-metrics.json run history to last 100 entries per agent
-  - Write CleanupReport to system/state/cleanup/reports/cleanup-{YYYY-MM-DD}.json
-
+Purges log/report files older than retention_days, trims agent-metrics.json
+run history, writes a CleanupReport. Replaces nexus.tasks.cleanup_agent.
 No LLM. No vault content changes.
 """
 
 from __future__ import annotations
 
 import json
-import sys
-import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-from nexus.shared.logger import Logger
 from nexus.shared.loaders import _find_project_root
+from nexus.shared.logger import Logger
+from nexus.workers.base import WORKERS_STATE_ROOT, WorkItem, WorkResult, make_worker_logger
 
 _PROJECT_ROOT = _find_project_root(Path(__file__).resolve().parent)
 
-TASK_ID         = "cleanup-agent"
-SCRIPT_BASENAME = "cleanup_agent.py"
 MAX_METRIC_RUNS = 100
-# ponytail: fixed retention — registry-level override if a need ever shows up
-CLEANUP_DAYS    = 90
 
 _AGENTS_DIR   = _PROJECT_ROOT / "agents"
 _STATE_ROOT   = _PROJECT_ROOT / "system" / "state"
-_AGENT_STATE  = _STATE_ROOT / "cleanup"
-_LOGS_DIR     = _AGENT_STATE / "logs"
-_REPORTS_DIR  = _AGENT_STATE / "reports"
-_MASTER_LOG   = _STATE_ROOT / "runtime" / "logs" / "automation.log"
-_METRICS_FILE = _STATE_ROOT / "runtime" / "agent-metrics.json"
+_WORKERS_ROOT = _STATE_ROOT / "workers"
+_METRICS_FILE = _AGENTS_DIR / "runtime" / "state" / "agent-metrics.json"
+_REPORTS_DIR  = WORKERS_STATE_ROOT / "cleanup" / "reports"
 
 
-def _make_logger() -> Logger:
-    return Logger(
-        task_id        = TASK_ID,
-        script_basename= SCRIPT_BASENAME,
-        logs_dir       = _LOGS_DIR,
-        master_log     = _MASTER_LOG,
-    )
+def _scan_dirs(sub: str) -> list[Path]:
+    """All log/report directories across runtime, LLM agents, and workers.
 
+    Tracks the state layout, which is code's business — not config.
+    """
+    return [
+        *_AGENTS_DIR.glob(f"*/state/{sub}"),      # LLM agents + runtime
+        *_STATE_ROOT.glob(f"*/{sub}"),            # legacy system/state/<x>/logs
+        *_WORKERS_ROOT.glob(f"*/{sub}"),          # system/state/workers/<name>/logs
+    ]
 
-# ---------------------------------------------------------------------------
-# Core operations
-# ---------------------------------------------------------------------------
 
 def _purge_dir(directory: Path, keep_days: int, log: Logger) -> int:
     """Delete files in directory older than keep_days. Returns count deleted."""
@@ -72,19 +60,11 @@ def _purge_dir(directory: Path, keep_days: int, log: Logger) -> int:
 
 
 def purge_logs(keep_days: int, log: Logger) -> int:
-    """Purge log files older than keep_days across all task/agent log directories."""
-    total = 0
-    for logs_dir in (*_AGENTS_DIR.glob("*/state/logs"), *_STATE_ROOT.glob("*/logs")):
-        total += _purge_dir(logs_dir, keep_days, log)
-    return total
+    return sum(_purge_dir(d, keep_days, log) for d in _scan_dirs("logs"))
 
 
 def purge_reports(keep_days: int, log: Logger) -> int:
-    """Purge report files older than keep_days across all task/agent report directories."""
-    total = 0
-    for reports_dir in (*_AGENTS_DIR.glob("*/state/reports"), *_STATE_ROOT.glob("*/reports")):
-        total += _purge_dir(reports_dir, keep_days, log)
-    return total
+    return sum(_purge_dir(d, keep_days, log) for d in _scan_dirs("reports"))
 
 
 def trim_metrics(max_runs: int, log: Logger) -> int:
@@ -116,8 +96,8 @@ def trim_metrics(max_runs: int, log: Logger) -> int:
 
 
 def _write_report(logs_deleted: int, reports_deleted: int, metrics_trimmed: int) -> None:
-    """Write CleanupReport to state/reports/cleanup-{date}.json atomically."""
-    _REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    reports_dir = _REPORTS_DIR
+    reports_dir.mkdir(parents=True, exist_ok=True)
     today = datetime.now().strftime("%Y-%m-%d")
     report = {
         "date":           today,
@@ -126,30 +106,50 @@ def _write_report(logs_deleted: int, reports_deleted: int, metrics_trimmed: int)
         "reportsDeleted": reports_deleted,
         "metricsTrimmed": metrics_trimmed,
     }
-    out = _REPORTS_DIR / f"cleanup-{today}.json"
+    out = reports_dir / f"cleanup-{today}.json"
     tmp = out.with_suffix(".tmp")
     tmp.write_text(json.dumps(report, indent=2), encoding="utf-8")
     tmp.replace(out)
 
 
-# ---------------------------------------------------------------------------
-# Standalone entry point
-# ---------------------------------------------------------------------------
+class CleanupWorker:
+    name = "cleanup"
+    kind = "scheduled"
 
-def main() -> None:
-    log = _make_logger()
-    t0  = log.start()
+    def __init__(self, options: dict | None = None) -> None:
+        opts = options or {}
+        self.retention_days = int(opts.get("retention_days", 90))
 
-    logs_deleted    = purge_logs(CLEANUP_DAYS, log)
-    reports_deleted = purge_reports(CLEANUP_DAYS, log)
-    metrics_trimmed = trim_metrics(MAX_METRIC_RUNS, log)
+    def pending(self) -> list[WorkItem]:
+        return [WorkItem("", {})]
 
-    _write_report(logs_deleted, reports_deleted, metrics_trimmed)
+    def handle(self, item: WorkItem) -> WorkResult:
+        log = make_worker_logger(self.name)
+        t0 = log.start()
 
-    total = logs_deleted + reports_deleted + metrics_trimmed
-    log.done(t0, key="processed", count=total, failed=0)
-    sys.exit(0)
+        logs_deleted    = purge_logs(self.retention_days, log)
+        reports_deleted = purge_reports(self.retention_days, log)
+        metrics_trimmed = trim_metrics(MAX_METRIC_RUNS, log)
+
+        total = logs_deleted + reports_deleted + metrics_trimmed
+        if total == 0:
+            log.done(t0, key="processed", count=0, failed=0)
+            return WorkResult("skip", "nothing old enough")
+
+        _write_report(logs_deleted, reports_deleted, metrics_trimmed)
+        log.done(t0, key="processed", count=total, failed=0)
+        return WorkResult(
+            "done",
+            f"logs={logs_deleted} reports={reports_deleted} metricsTrimmed={metrics_trimmed}",
+        )
+
+
+def create(options: dict | None = None) -> CleanupWorker:
+    return CleanupWorker(options)
 
 
 if __name__ == "__main__":
-    main()
+    worker = create()
+    for _item in worker.pending():
+        _res = worker.handle(_item)
+        print(f"{_res.status}: {_res.detail}")

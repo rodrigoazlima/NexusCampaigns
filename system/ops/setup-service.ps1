@@ -290,26 +290,21 @@ function Ensure-AgentScaffold([string]$ProjectRoot) {
 # reparse-point awareness (git status, backup, indexers) can recurse forever through
 # it. The cycle is contained via .gitignore ("agents/*/agents/" etc. — git prunes
 # descent into ignored dirs) — see .gitignore. Don't remove that ignore rule.
+# LLM + planned agents only — static tasks are in-process workers now
+# (nexus.workers, configured in registry.yaml) and have no agents/ folders.
 $script:AgentRelations = @{
     "adventure-builder" = @(".knowledge-base/02-Library", ".knowledge-base/03-Campaigns", "agents/lore", "agents/canon", "agents/relationship")
     "canon"             = @(".knowledge-base/02-Library")
     "classification"    = @(".knowledge-base/00-Inbox", ".knowledge-base/01-Processing", ".knowledge-base/02-Library")
-    "cleanup"           = @("agents/runtime", "agents/review", "agents/repair", "agents/canon", "agents/deduplication")
     "curator"           = @(".knowledge-base/01-Processing")
     "deduplication"     = @(".knowledge-base/00-Inbox", ".knowledge-base/01-Processing", ".knowledge-base/02-Library")
     "encounter-builder" = @(".knowledge-base/02-Library", ".knowledge-base/03-Campaigns")
-    "ingestion"         = @(".knowledge-base/00-Inbox", "system/state")
     "lore"              = @(".knowledge-base/00-Inbox", ".knowledge-base/01-Processing", ".knowledge-base/02-Library", "agents/vision", "system/state")
     "relationship"      = @(".knowledge-base/02-Library", ".knowledge-base/04-Relationships")
-    "repair"            = @("agents/runtime", "agents/review", "agents/vision", "agents/*", "system")
-    "review"            = @("agents/runtime", ".knowledge-base/01-Processing", "agents/*")
-    "runtime"           = @("agents/*", "system")
     "search"            = @(".knowledge-base/01-Processing", ".knowledge-base/02-Library")
     "session-builder"   = @(".knowledge-base/03-Campaigns", "agents/adventure-builder")
-    "token"             = @("agents/vision", ".knowledge-base/00-Inbox", ".knowledge-base/05-Assets")
     "vision"            = @(".knowledge-base/00-Inbox", ".knowledge-base/01-Processing", "system/state")
     "wiki"              = @(".knowledge-base/01-Processing", ".knowledge-base/02-Library", "system/state")
-    "wikilink"          = @(".knowledge-base/02-Library")
 }
 
 # For each agent, creates agents\<agent-name>\.<related-path> -> the real target,
@@ -326,7 +321,7 @@ $script:AgentRelations = @{
 # walk (git status, backup, indexers) can recurse into that forever. Dot-prefixing
 # every mount lets a single .gitignore block ("### Generated junction mounts")
 # prune descent into all of them uniformly. Don't rename without updating
-# .gitignore (and system/src/nexus/tasks/repair_agent.py's mirror) too.
+# .gitignore (and system/src/nexus/workers/maintenance.py's mirror) too.
 function Ensure-AgentRelationLinks([string]$ProjectRoot) {
     $allAgents = Get-ChildItem "$ProjectRoot\agents" -Directory -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -notin @("tests", "shared") } |

@@ -16,10 +16,11 @@ pytest -m e2e                                  # end-to-end tests (need network 
 
 # Run the scheduler once (dry loop) vs a single task, bypassing due/precondition checks
 python -m nexus.runner --once
-python -m nexus.runner --task ingestion-agent --force
+python -m nexus.runner --task vision-agent --force        # LLM agent
+python -m nexus.runner --task worker:maintenance --force  # static worker
 
-# Run a static (no-LLM) task directly
-python -m nexus.tasks.repair_agent
+# Run a static (no-LLM) worker directly
+python -m nexus.workers.maintenance
 
 # Start the always-on daemon (what the Windows service wraps)
 powershell -NonInteractive -File system\ops\daemon.ps1
@@ -39,19 +40,22 @@ Get-Content 'agents\runtime\state\logs\automation.log' -Tail 50 -Wait
 
 ## Architecture
 
-**Two repos, one working tree.** `.knowledge-base/` is an NTFS junction/symlink to a separate vault repo (content, gitignored from this repo's perspective). `system/src/nexus/` is the installable Python package (`pip install -e .`): `nexus.runner` (scheduler), `nexus.shared` (agent library), `nexus.tasks` (all static, no-LLM task scripts — cleanup, ingestion, repair, review, thumbnails, token, wikilink). `agents/<name>/` folders hold per-agent manifests (`agent.json`, `AGENT.md`, `state/`) plus, for the LLM-driven agents only (vision, lore, classification, wiki), their `tools/` code and prompts. `system/dashboard/` is the Next.js UI; `system/ops/` holds the daemon/service install scripts.
+**Two repos, one working tree.** `.knowledge-base/` is an NTFS junction/symlink to a separate vault repo (content, gitignored from this repo's perspective). `system/src/nexus/` is the installable Python package (`pip install -e .`): `nexus.runner` (scheduler + worker loop), `nexus.shared` (agent library), `nexus.workers` (all static, no-LLM work — ingestion, thumbnails, token, wikilink, shortfiles, report, cleanup, maintenance — run **in-process** by the runner), `nexus.tasks` (manual CLI utilities only: `remove_background`). `agents/<name>/` folders exist only for the LLM-driven agents (vision, lore, classification, wiki): manifests (`agent.json`, `AGENT.md`, `state/`), `tools/` code and prompts. `system/dashboard/` is the Next.js UI; `system/ops/` holds the daemon/service install scripts.
 
 **Runtime dispatch loop** (`nexus/runner.py`):
-1. `_discover_tasks()` globs `agents/*/agent.json`, orders tasks by `execution_order` in `agents/registry.yaml` (fallback: alphabetical).
-2. Each cycle checks `is_due()` (elapsed ≥ `intervalSeconds` since `state/tasks-state.json`) OR a pending signal in `state/signals/` (`SignalConsumer`/`nexus/shared/signal_bus.py`), then a cheap precondition function in `_PRECONDITIONS` (e.g. `_inbox_has_new_files`) that skips dispatch — and burns no LLM tokens — when an agent has no pending work.
+1. `_discover_tasks()` globs `agents/*/agent.json` (LLM agents only), orders tasks by `execution_order` in `agents/registry.yaml` (fallback: alphabetical).
+2. Each cycle checks `is_due()` (elapsed ≥ `intervalSeconds` since `state/tasks-state.json`) OR a pending signal in `state/signals/` (`SignalConsumer`/`nexus/shared/signal_bus.py`), then a cheap precondition in `_PRECONDITIONS` (inbox-queue slot checks) that skips dispatch — and burns no LLM tokens — when an agent has no pending work.
 3. `_load_agent_dispatch()` reads the task's `agent.json`; if missing/incomplete it falls back to `registry.yaml`'s `default_dispatch` (see `docs/specs/agents/agent-dispatch-settings.md`).
-4. Dispatch type (`cli` / `claude-api` / `claude-code` / `openai-api` / `gemini-api` / `openrouter-api` / `lm-studio` / `codex-cli`) selects a runner from `nexus/shared/runners/` via `get_runner()`. A per-task `fallback_dispatch` retries on non-zero exit. Static tasks dispatch as `cli` with args `["-m", "nexus.tasks.<module>"]`.
+4. Dispatch type (`cli` / `claude-api` / `claude-code` / `openai-api` / `gemini-api` / `openrouter-api` / `lm-studio` / `codex-cli`) selects a runner from `nexus/shared/runners/` via `get_runner()`. A per-task `fallback_dispatch` retries on non-zero exit.
 5. On success, `commit_changes()` stages only the paths in the agent's `AGENT.md` `commit_scope:` block and commits — agents never commit their own changes.
 6. Metrics (`state/agent-metrics.json`), token costs (`state/costs/`), and per-task/master logs (`state/logs/`) are recorded every cycle regardless of outcome.
+7. **Worker loop** — after agent dispatch, the runner iterates the `workers:` block in `registry.yaml` (gated by `workers_enabled`): queue workers are polled every cycle via `pending()` (no interval); scheduled workers (report, cleanup, maintenance) run on `interval_seconds`. Each pending item goes through `handle(item)` in-process with per-item try/except; an `error` result emits a `worker-error` signal that makes the maintenance worker due next cycle. Worker `lastRun` lives under `worker:<name>` in `tasks-state.json`; metrics entries carry `kind: "worker"`; workers never write cost entries. Commits use the worker's `commit_scope` from its registry entry.
 
-**Agent contract** (`nexus/shared/interfaces.py`, `nexus/shared/models.py`): every agent subclasses `BaseAgent` (`bootstrap()` → `run_batch()` → default `execute()` lifecycle logging START/DONE), and each pipeline concern (LLM client, state store, frontmatter I/O, vault guard, quality gate, wikilink resolver, etc.) is an `I*` Protocol/ABC in `interfaces.py` with a concrete implementation under the owning agent's `tools/`. Read the relevant `docs/specs/agents/agent-*.spec.md` before touching an agent — it is the source of truth for that agent's contract, not the code.
+**Worker contract** (`nexus/workers/base.py`, spec: `docs/refactor/remove-agentic-useless-static-code/worker-contract.spec.md`): a worker is a plain module `nexus/workers/<name>.py` exposing `create(options)` → object with `name`, `kind` (`queue`/`scheduled`), `pending() -> list[WorkItem]` (cheap, no side effects) and `handle(item) -> WorkResult` (`done`/`skip`/`error`, idempotent, persists its own progress). No LLM imports under `nexus.workers` — that boundary is the point. Worker state lives in `system/state/workers/<name>/`; queue-slot writes go through `locked_update_queue_entry`; slots stuck at `error` with `reruns >= 3` are poison pills reported by the maintenance worker.
 
-**Each agent folder** (`agents/<name>/`) has: `agent.json` (task ids, `intervalSeconds`, dispatch config), `AGENT.md` (purpose, inputs/outputs, `commit_scope:`, restrictions — read before modifying), `state/` (gitignored runtime state, JSON files with atomic tmp-rename writes), and — LLM agents only — `prompts/system.md` + `tools/<name>_agent.py`. Static task code lives in `system/src/nexus/tasks/` instead. Adding a new automation means creating these plus a `state/tasks-state.json` entry — see "Adding a New Automation" below.
+**Agent contract** (`nexus/shared/interfaces.py`, `nexus/shared/models.py`): each pipeline concern (LLM client, state store, frontmatter I/O, vault guard, quality gate, wikilink resolver, etc.) is an `I*` Protocol/ABC in `interfaces.py` with a concrete implementation under the owning agent's `tools/`. Read the relevant `docs/specs/agents/agent-*.spec.md` before touching an agent — it is the source of truth for that agent's contract, not the code.
+
+**Each LLM agent folder** (`agents/<name>/`) has: `agent.json` (task ids, `intervalSeconds`, dispatch config — gitignored, regenerated by the maintenance worker), `AGENT.md` (purpose, inputs/outputs, `commit_scope:`, restrictions — read before modifying), `state/` (gitignored runtime state, JSON files with atomic tmp-rename writes), `prompts/system.md` + `tools/<name>_agent.py`. Static work has no folders — see "Adding a New Automation" below.
 
 **Security boundary** (`nexus/shared/vault_guard.py`, `IVaultGuard`): agents must call `assert_writable()` / `assert_not_self_approved()` before any frontmatter write. `status: approved` and `reviewed: true` are human-only fields — no agent may set them. `02-Library/` is never written by agents directly; only humans promote drafts there from `01-Processing/`.
 
@@ -195,21 +199,20 @@ Log line format: `[YYYY-MM-DD HH:mm:ss] [<task-id>] <message>`
 Every script must emit `--- START ---` and `--- DONE ---` markers via `Write-Log`.
 
 ### Adding a New Automation
-Static (no LLM):
-1. Create `system/src/nexus/tasks/<name>.py` (plain script with a `main()`)
-2. Create `agents/<name>/agent.json` with `tasks.<task-id>.intervalSeconds`, `.description`, and cli dispatch: `{"command": "python", "args": ["-m", "nexus.tasks.<name>"]}`
-3. Add the task to `_AGENT_JSON_SPECS` in `system/src/nexus/tasks/repair_agent.py` (agent.json is gitignored; repair scaffolds it on fresh clones)
+Static (no LLM) — a worker:
+1. Create `system/src/nexus/workers/<name>.py` implementing the worker contract: `create(options)` returning an object with `name`, `kind` (`queue` or `scheduled`), `pending()`, `handle(item)` (see `nexus/workers/base.py`)
+2. Add an entry to the `workers:` block in `agents/registry.yaml` (`kind`, `batch_size`, `commit_scope`; `interval_seconds` for scheduled kind only — queue workers have no interval)
+3. Worker state goes in `system/state/workers/<name>/` — no agents/ folder, no agent.json
 
-LLM-driven:
+LLM-driven — an agent:
 1. Create `agents/<name>/tools/<name>_agent.py` with `TOOLS` list and `call_tool()` function
-2. Create `agents/<name>/agent.json` with `tasks.<task-id>.intervalSeconds`, `.description`, and `dispatch.claude_api` config
+2. Create `agents/<name>/agent.json` with `tasks.<task-id>.intervalSeconds`, `.description`, and `dispatch.claude_api` config (also add it to `_AGENT_JSON_SPECS` in `system/src/nexus/workers/maintenance.py` — agent.json is gitignored; maintenance scaffolds it on fresh clones)
 3. Create `agents/<name>/prompts/system.md` with agent role, tools, and success criteria
 
-Both: add entry to `agents/runtime/state/tasks-state.json` with `lastRun: "1970-01-01T00:00:00Z"`
-
-### Task Intervals
-- `3600` — hourly (cleanup, compile, classify, generate)
-- `86400` — daily (remove-emoji-filenames)
+### Task Intervals (scheduled work only)
+- `900` — every 15 min (report)
+- `86400` — daily (cleanup, maintenance)
+- Queue workers (ingestion, thumbnails, token, wikilink, shortfiles) have **no interval** — the runner polls `pending()` every cycle
 
 ---
 

@@ -189,7 +189,9 @@ class TestExecutionOrder:
     def test_live_registry_execution_order(self) -> None:
         reg = load_registry()
         assert "runtime" in reg.execution_order
-        assert "cleanup" in reg.execution_order
+        assert "vision" in reg.execution_order
+        # static agents left execution_order — they run as in-process workers
+        assert "cleanup" not in reg.execution_order
 
 
 # ---------------------------------------------------------------------------

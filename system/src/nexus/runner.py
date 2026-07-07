@@ -37,7 +37,13 @@ from nexus.shared import (
 )
 from nexus.shared.loaders import _find_project_root, load_registry
 from nexus.shared.models import LmStudioConfig, RunResult
-from nexus.shared.signal_bus import SignalConsumer
+from nexus.shared.signal_bus import SignalConsumer, SignalEmitter
+from nexus.workers.base import (
+    WorkerConfig,
+    create_worker,
+    load_worker_configs,
+    workers_enabled,
+)
 
 _PROJECT_ROOT = _find_project_root(Path(__file__).resolve().parent)
 _AGENTS_DIR   = _PROJECT_ROOT / "agents"
@@ -59,22 +65,20 @@ _GIT_COMMIT_LOCK_TARGET = _RUNTIME_STATE / "git-commit"
 _LOCK_STALE_SECONDS = 1800   # 30 min
 _DEFAULT_INTERVAL   = 60     # orchestrator poll cadence
 
+# Signal emitted by the worker loop on any error result; makes the
+# maintenance worker due on the next cycle regardless of its interval.
+_WORKER_ERROR_SIGNAL = "worker-error"
+
 _SYSTEM_STATE  = _PROJECT_ROOT / "system" / "state"
 _CHAT_QUEUE    = _SYSTEM_STATE / "chat-queue.json"
 _INBOX_QUEUE   = _SYSTEM_STATE / "inbox-queue.json"
-_VAULT_ROOT    = _PROJECT_ROOT / ".knowledge-base"
 
-_IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tiff"}
-
-# Maps dashboard agent name → task_id used in agent.json
+# Maps dashboard agent name → task_id used in agent.json (LLM agents only)
 _AGENT_NAME_TO_TASK: dict[str, str] = {
     "lore":           "lore-agent",
     "wiki":           "wiki-agent",
     "classification": "classification-agent",
     "vision":         "vision-agent",
-    "ingestion":      "ingestion-agent",
-    "repair":         "repair-agent",
-    "review":         "review-agent",
 }
 _MAX_METRICS_RUNS   = 100
 
@@ -234,6 +238,28 @@ def _record_metrics(
     _save_metrics(data)
 
 
+def _record_worker_metrics(
+    name: str,
+    started_at: datetime,
+    processed: int,
+    failed: int,
+    duration_ms: int,
+) -> None:
+    """Worker run entry (worker-contract.spec.md §Metrics). No cost entry ever."""
+    data = _load_metrics()
+    entry = data.setdefault(name, {"runs": []})
+    entry["kind"] = "worker"
+    entry["runs"].append({
+        "at":         started_at.isoformat(),
+        "processed":  processed,
+        "failed":     failed,
+        "durationMs": duration_ms,
+    })
+    if len(entry["runs"]) > _MAX_METRICS_RUNS:
+        entry["runs"] = entry["runs"][-_MAX_METRICS_RUNS:]
+    _save_metrics(data)
+
+
 # ---------------------------------------------------------------------------
 # Cost recording
 # ---------------------------------------------------------------------------
@@ -327,16 +353,6 @@ def _load_pipeline_mode() -> str:
     return mode if mode == "async" else "sync"
 
 
-# task_id used for every tool beyond the first in a multi-tool agent, keyed by
-# (agent_name, tool file stem). Needed because runner.py's precondition table
-# (_PRECONDITIONS) hardcodes "review-agent-short-files" as its own task_id —
-# registry.yaml only records one task_id per agent, so the extra tasks an
-# agent's "tools" list implies must be named to match that table exactly.
-_EXTRA_TASK_ID_OVERRIDES: dict[tuple[str, str], str] = {
-    ("review", "flag_short_files"): "review-agent-short-files",
-}
-
-
 def _synthesize_agent_json(agent_name: str, entry: dict) -> Optional[dict]:
     """Build a default agent.json payload for `agent_name` from its registry.yaml entry.
 
@@ -357,7 +373,7 @@ def _synthesize_agent_json(agent_name: str, entry: dict) -> Optional[dict]:
     tasks: dict = {}
     for i, tool in enumerate(tools):
         stem = Path(tool).stem
-        tid = task_id if i == 0 else _EXTRA_TASK_ID_OVERRIDES.get((agent_name, stem), f"{task_id}-{stem}")
+        tid = task_id if i == 0 else f"{task_id}-{stem}"
         tasks[tid] = {
             "intervalSeconds": interval,
             "description": description if i == 0 else f"{description} ({stem})",
@@ -462,9 +478,8 @@ def _agent_name_from_task_id(task_id: str) -> str:
     """Map task_id → agent directory name.
 
     Examples:
-      repair-agent              → repair
-      review-agent              → review
-      review-agent-short-files  → review
+      vision-agent → vision
+      lore-agent   → lore
     """
     name = re.sub(r"-agent(?:-.*)?$", "", task_id)
     return name or task_id
@@ -664,7 +679,10 @@ class Runtime(IOrchestrator):
                 f"No commit_scope declared for {task_id} — skipping git commit"
             )
             return
+        self._commit_scoped(task_id, scope)
 
+    def _commit_scoped(self, label: str, scope: list[str]) -> None:
+        """Stage only the scoped paths and commit. Shared by agents and workers."""
         # `git reset` clobbers the whole index, so in async mode two agents
         # committing at once could wipe each other's staged scope — serialize
         # the reset→add→commit critical section regardless of pipeline_mode.
@@ -693,13 +711,13 @@ class Runtime(IOrchestrator):
                 return
 
             ts  = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-            msg = f"chore(auto): {task_id} run at {ts}"
+            msg = f"chore(auto): {label} run at {ts}"
             subprocess.run(
                 ["git", "commit", "-m", msg, "--", *scope],
                 cwd=str(_PROJECT_ROOT),
                 check=True,
             )
-        self._log.info(f"Committed scoped changes for {task_id} (paths: {scope})")
+        self._log.info(f"Committed scoped changes for {label} (paths: {scope})")
 
     # Internals -------------------------------------------------------------
 
@@ -762,15 +780,21 @@ class Runtime(IOrchestrator):
         pipeline_mode (registry.yaml) controls dispatch order:
           sync  — one agent at a time, in execution_order (default)
           async — all due/signalled agents for this cycle run concurrently
+
+        task_filter "worker:<name>" runs only that worker (no agent dispatch).
         """
         self.reload()
         _SIGNALS_DIR.mkdir(parents=True, exist_ok=True)
+
+        worker_filter: Optional[str] = None
+        if task_filter and task_filter.startswith("worker:"):
+            worker_filter = task_filter.split(":", 1)[1]
 
         signal_triggered = _check_signals(self._tasks, self._log)
 
         to_run: list[tuple[str, TaskDispatchEntry, str]] = []
         for task_id, entry in self._tasks:
-            if task_filter and task_id != task_filter:
+            if worker_filter or (task_filter and task_id != task_filter):
                 continue
 
             if force:
@@ -823,6 +847,112 @@ class Runtime(IOrchestrator):
                         f"Consumed {len(consumed)} '{signal_type}' signal(s) for {task_id}"
                     )
 
+        # Worker loop — in-process static workers (worker-contract.spec.md).
+        # Skipped when a specific agent task was requested via --task.
+        if task_filter is None or worker_filter is not None:
+            self._run_workers(worker_filter=worker_filter, force=force)
+
+    # Worker loop ------------------------------------------------------------
+
+    def _worker_due(self, cfg: WorkerConfig) -> bool:
+        """Scheduled workers run on interval_seconds; queue workers poll every cycle."""
+        if cfg.kind != "scheduled":
+            return True
+        state = self._state or {}
+        entry = state.get(f"worker:{cfg.name}")
+        if entry is None:
+            return True
+        last = entry.lastRun
+        if last.tzinfo is None:
+            last = last.replace(tzinfo=timezone.utc)
+        return (datetime.now(timezone.utc) - last).total_seconds() >= cfg.interval_seconds
+
+    def _run_workers(self, worker_filter: Optional[str] = None, force: bool = False) -> None:
+        registry = _load_registry()
+        if not workers_enabled(registry) and not force:
+            return
+
+        emitter  = SignalEmitter(_SIGNALS_DIR)
+        consumer = SignalConsumer(_SIGNALS_DIR)
+
+        for cfg in load_worker_configs(registry):
+            if worker_filter and cfg.name != worker_filter:
+                continue
+            if not cfg.enabled and not force:
+                continue
+
+            # A worker-error signal forces the maintenance worker to run now
+            # instead of waiting out its daily interval.
+            signalled = (
+                cfg.name == "maintenance"
+                and bool(consumer.pending(_WORKER_ERROR_SIGNAL))
+            )
+            if not force and not signalled and not self._worker_due(cfg):
+                continue
+
+            try:
+                worker = create_worker(cfg)
+            except Exception as exc:
+                self._log.error(f"Worker '{cfg.name}' failed to load: {exc}")
+                continue
+
+            try:
+                items = worker.pending()[: cfg.batch_size]
+            except Exception as exc:
+                self._log.warning(f"Worker '{cfg.name}' pending() failed: {exc} — treating as empty")
+                items = []
+            if not items:
+                continue
+
+            started_at = datetime.now(timezone.utc)
+            t0 = time.monotonic()
+            processed = failed = done_count = 0
+            for item in items:
+                try:
+                    result = worker.handle(item)
+                except Exception as exc:
+                    result = None
+                    failed += 1
+                    self._log.error(f"Worker '{cfg.name}' item {item.key!r} raised: {exc}")
+                    emitter.emit(_WORKER_ERROR_SIGNAL, cfg.name, ref=item.key)
+                    continue
+                if result.status == "error":
+                    failed += 1
+                    self._log.warning(f"Worker '{cfg.name}' item {item.key!r} error: {result.detail}")
+                    emitter.emit(_WORKER_ERROR_SIGNAL, cfg.name, ref=item.key)
+                else:
+                    processed += 1
+                    if result.status == "done":
+                        done_count += 1
+
+            duration_ms = int((time.monotonic() - t0) * 1000)
+            self._log.info(
+                f"Worker '{cfg.name}': processed={processed} failed={failed} ({duration_ms}ms)"
+            )
+
+            assert self._state is not None
+            self._state[f"worker:{cfg.name}"] = TaskStateEntry(lastRun=datetime.now(timezone.utc))
+            with FileLock(_STATE_JSON, timeout=30.0):
+                _save_state(self._state)
+
+            try:
+                _record_worker_metrics(cfg.name, started_at, processed, failed, duration_ms)
+            except Exception as exc:
+                self._log.warning(f"Metrics update failed for worker '{cfg.name}': {exc}")
+
+            if done_count and cfg.commit_scope:
+                try:
+                    self._commit_scoped(f"worker:{cfg.name}", cfg.commit_scope)
+                except Exception as exc:
+                    self._log.warning(f"Git commit failed for worker '{cfg.name}': {exc}")
+
+            if signalled:
+                consumed = consumer.consume_all(_WORKER_ERROR_SIGNAL)
+                if consumed:
+                    self._log.info(
+                        f"Consumed {len(consumed)} '{_WORKER_ERROR_SIGNAL}' signal(s) for maintenance"
+                    )
+
 
 # ---------------------------------------------------------------------------
 # Precondition checks — skip dispatch when agent has no work
@@ -855,128 +985,15 @@ def _inbox_has_slot(slot: str) -> bool:
     return False
 
 
-_CANON_VAULT_DIRS = frozenset({
-    "00-Inbox", "01-Processing", "02-Library", "03-Campaigns",
-    "04-Relationships", "05-Assets", "99-Archive",
-})
-
-
-def _vault_has_stray_entries() -> bool:
-    """Return True if the vault root has top-level content outside the canonical folders.
-
-    Ingestion's auto_absorb_stray step (agent-ingestion.spec.md) needs to run
-    even when 00-Inbox itself is fully registered, so stray content still
-    triggers dispatch instead of being skipped by the precondition check.
-    """
-    if not _VAULT_ROOT.exists():
-        return False
-    for entry in _VAULT_ROOT.iterdir():
-        if entry.name in _CANON_VAULT_DIRS or entry.name.startswith("."):
-            continue
-        return True
-    return False
-
-
-def _inbox_has_new_files() -> bool:
-    """Return True if 00-Inbox has any file not yet registered, or stray vault content exists."""
-    if _vault_has_stray_entries():
-        return True
-    inbox = _VAULT_ROOT / "00-Inbox"
-    if not inbox.exists():
-        return False
-    queue = _read_inbox_queue()
-    for f in inbox.rglob("*"):
-        if not f.is_file():
-            continue
-        rel = f.relative_to(_PROJECT_ROOT).as_posix()
-        if rel not in queue:
-            return True
-    return False
-
-
-def _token_has_pending() -> bool:
-    """Return True if any classified image lacks a generated token."""
-    vision_state_path = _AGENTS_DIR / "vision" / "state" / "processed-images.json"
-    gen_tokens_path   = _AGENTS_DIR / "token"  / "state" / "generated-tokens.json"
-    try:
-        vs = json.loads(vision_state_path.read_text(encoding="utf-8"))
-        gt = json.loads(gen_tokens_path.read_text(encoding="utf-8")) if gen_tokens_path.exists() else {}
-        images = vs.get("images", {})
-        for img_key, entry in images.items():
-            if (
-                entry.get("status") == "ok"
-                and not entry.get("isToken", False)
-                and img_key not in gt
-            ):
-                return True
-    except Exception:
-        pass
-    return False
-
-
-def _wikilink_has_pending() -> bool:
-    """Return True if 02-Library/ has files unprocessed or modified since last wikilink run."""
-    library = _VAULT_ROOT / "02-Library"
-    if not library.exists():
-        return False
-    state_path = _AGENTS_DIR / "wikilink" / "state" / "wikilink-state.json"
-    try:
-        state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.exists() else {}
-    except Exception:
-        state = {}
-    for f in library.rglob("*.md"):
-        rel = str(f.relative_to(_PROJECT_ROOT)).replace("\\", "/")
-        if rel not in state:
-            return True  # never processed
-        try:
-            processed_ts = datetime.fromisoformat(state[rel]["processedAt"]).timestamp()
-            if f.stat().st_mtime > processed_ts:
-                return True  # modified after last run
-        except Exception:
-            return True  # state corrupt → re-process
-    return False
-
-
-def _processing_has_files() -> bool:
-    """Return True if 01-Processing/ has at least one .md file."""
-    proc = _VAULT_ROOT / "01-Processing"
-    if not proc.exists():
-        return False
-    return any(proc.rglob("*.md"))
-
-
-def _has_old_logs(days: int = 7) -> bool:
-    """Return True if log files older than `days` exist."""
-    import time as _time
-    cutoff = _time.time() - days * 86400
-    logs_dir = _AGENTS_DIR / "runtime" / "state" / "logs"
-    if not logs_dir.exists():
-        return False
-    for f in logs_dir.iterdir():
-        if f.is_file() and f.stat().st_mtime < cutoff:
-            return True
-    return False
-
-
-# Map task_id → precondition function (returns bool; True = has work, False = skip)
-_PRECONDITIONS: dict[str, "Callable[[], bool]"] = {}
-
-def _build_preconditions() -> None:
-    """Populate _PRECONDITIONS after module-level paths are set."""
-    _PRECONDITIONS.update({
-        "ingestion-agent":              _inbox_has_new_files,
-        "vision-agent":                 lambda: _inbox_has_slot("vision"),
-        "lore-agent":                   lambda: _inbox_has_slot("lore"),
-        "classification-agent":         lambda: _inbox_has_slot("classification"),
-        "wiki-agent":                   lambda: _inbox_has_slot("wiki"),
-        "token-agent":                  _token_has_pending,
-        "wikilink-agent":               _wikilink_has_pending,
-        "review-agent-short-files":     _processing_has_files,
-        "cleanup-agent":                lambda: _has_old_logs(days=7),
-        # review-agent and repair-agent always run (health monitors)
-    })
-
-_build_preconditions()
+# Map task_id → precondition function (returns bool; True = has work, False = skip).
+# LLM agents only — a skipped dispatch burns no tokens. Static work has no
+# preconditions anymore: workers derive their own pending sets in pending().
+_PRECONDITIONS: dict[str, "Callable[[], bool]"] = {
+    "vision-agent":         lambda: _inbox_has_slot("vision"),
+    "lore-agent":           lambda: _inbox_has_slot("lore"),
+    "classification-agent": lambda: _inbox_has_slot("classification"),
+    "wiki-agent":           lambda: _inbox_has_slot("wiki"),
+}
 
 
 def _check_preconditions(task_id: str, log: _Logger) -> bool:

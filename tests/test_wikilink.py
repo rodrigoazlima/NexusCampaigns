@@ -1,4 +1,4 @@
-"""Tests for nexus.tasks.wikilink_library."""
+"""Tests for nexus.workers.wikilink."""
 
 import json
 import sys
@@ -10,8 +10,11 @@ _AGENTS_DIR = Path(__file__).resolve().parents[1]
 if str(_AGENTS_DIR) not in sys.path:
     sys.path.insert(0, str(_AGENTS_DIR))
 
-import nexus.tasks.wikilink_library as _mod
+import nexus.workers.base as _base
+import nexus.workers.wikilink as _mod
 from nexus.shared import FrontmatterIO
+
+BATCH_SIZE = 20  # registry.yaml workers.wikilink.batch_size
 
 
 # ---------------------------------------------------------------------------
@@ -30,21 +33,27 @@ def patch_roots(vault, tmp_path, monkeypatch):
     monkeypatch.setattr(_mod, "_PROJECT_ROOT", tmp_path)
     monkeypatch.setattr(_mod, "_VAULT_ROOT",   vault)
     monkeypatch.setattr(_mod, "_LIBRARY",      vault / "02-Library")
+    monkeypatch.setattr(_mod, "_LEGACY_STATE_FILES", ())
 
-    agent_state = tmp_path / "agents" / "wikilink" / "state"
-    agent_state.mkdir(parents=True)
-    logs_dir = agent_state / "logs"
-    logs_dir.mkdir()
     master_log = tmp_path / "agents" / "runtime" / "state" / "logs" / "automation.log"
     master_log.parent.mkdir(parents=True)
     master_log.touch()
 
-    monkeypatch.setattr(_mod, "_AGENT_STATE", agent_state)
-    monkeypatch.setattr(_mod, "_LOGS_DIR",    logs_dir)
-    monkeypatch.setattr(_mod, "_MASTER_LOG",  master_log)
-    monkeypatch.setattr(_mod, "_STATE_FILE",  agent_state / "wikilink-state.json")
+    # worker_state_dir / make_worker_logger read these base globals at call time
+    monkeypatch.setattr(_base, "WORKERS_STATE_ROOT", tmp_path / "system" / "state" / "workers")
+    monkeypatch.setattr(_base, "MASTER_LOG", master_log)
 
     return vault
+
+
+def _state_file(tmp_path: Path) -> Path:
+    return tmp_path / "system" / "state" / "workers" / "wikilink" / "state.json"
+
+
+def _run(options: dict | None = None, batch_size: int = BATCH_SIZE) -> list:
+    """One worker cycle: pending() capped at batch_size, handle each item."""
+    worker = _mod.create(options)
+    return [worker.handle(item) for item in worker.pending()[:batch_size]]
 
 
 def _write_entity(library: Path, slug: str, tags: list[str], body: str) -> Path:
@@ -261,55 +270,46 @@ class TestInsertWikilinks:
 # ---------------------------------------------------------------------------
 
 class TestStateHelpers:
-    def test_mark_and_load_processed(self, vault, patch_roots, tmp_path):
-        state_file = tmp_path / "agents" / "wikilink" / "state" / "wikilink-state.json"
-        from nexus.shared import StateStore, WIKILINK_STATE_DEFAULT
-        store = StateStore(state_file, WIKILINK_STATE_DEFAULT)
-        store.init_defaults()
-
-        _mod._mark_processed(store, ".knowledge-base/02-Library/npc-witch.md", 3)
-        processed = _mod._load_processed(store)
-        assert ".knowledge-base/02-Library/npc-witch.md" in processed
+    def test_mark_records_processed_entry(self, vault, patch_roots, tmp_path):
+        worker = _mod.create()
+        worker._mark(".knowledge-base/02-Library/npc-witch.md", 3)
+        state = json.loads(_state_file(tmp_path).read_text(encoding="utf-8"))
+        assert ".knowledge-base/02-Library/npc-witch.md" in state
+        assert state[".knowledge-base/02-Library/npc-witch.md"]["linksInserted"] == 3
 
     def test_init_defaults_idempotent(self, vault, patch_roots, tmp_path):
-        state_file = tmp_path / "agents" / "wikilink" / "state" / "wikilink-state.json"
-        from nexus.shared import StateStore, WIKILINK_STATE_DEFAULT
-        store = StateStore(state_file, WIKILINK_STATE_DEFAULT)
-        store.init_defaults()
-        store.init_defaults()  # second call must not overwrite
-        assert state_file.exists()
+        _mod.create()
+        _mod.create()  # second instance must not clobber state
+        assert _state_file(tmp_path).exists()
 
 
 # ---------------------------------------------------------------------------
-# main() — no library
+# pending() — no library
 # ---------------------------------------------------------------------------
 
-class TestMainNoLibrary:
-    def test_exits_zero_when_library_missing(self, vault, patch_roots, monkeypatch, tmp_path):
+class TestPendingNoLibrary:
+    def test_empty_when_library_missing(self, vault, patch_roots, monkeypatch, tmp_path):
         missing = tmp_path / ".knowledge-base" / "02-Library-missing"
         monkeypatch.setattr(_mod, "_LIBRARY", missing)
-        with pytest.raises(SystemExit) as exc:
-            _mod.main()
-        assert exc.value.code == 0
+        assert _mod.create().pending() == []
 
 
 # ---------------------------------------------------------------------------
-# main() — happy path
+# Worker cycle — happy path
 # ---------------------------------------------------------------------------
 
-class TestMainHappyPath:
-    def test_processes_batch_and_updates_state(self, vault, patch_roots):
+class TestWorkerHappyPath:
+    def test_processes_batch_and_updates_state(self, vault, patch_roots, tmp_path):
         lib = vault / "02-Library"
         _write_entity(lib, "npc-witch", ["undead"],
                       "## Description\nA witch.\n")
         _write_entity(lib, "npc-necromancer", ["undead"],
                       "## Description\nA necromancer.\n")
 
-        with pytest.raises(SystemExit) as exc:
-            _mod.main()
-        assert exc.value.code == 0
+        results = _run()
+        assert all(r.status == "done" for r in results)
 
-        state = json.loads(_mod._STATE_FILE.read_text(encoding="utf-8"))
+        state = json.loads(_state_file(tmp_path).read_text(encoding="utf-8"))
         assert len(state) == 2
 
     def test_skips_already_processed(self, vault, patch_roots):
@@ -319,68 +319,68 @@ class TestMainHappyPath:
         _write_entity(lib, "npc-necromancer", ["undead"],
                       "## Description\nA necromancer.\n")
 
-        # Run once to populate state
-        with pytest.raises(SystemExit):
-            _mod.main()
-
+        _run()  # populates state
         mtime_before = path_a.stat().st_mtime
 
-        # Run again — both already processed, no changes expected
-        with pytest.raises(SystemExit):
-            _mod.main()
-
-        # File should not have been modified
+        # Second cycle — both already processed, pending() must be empty
+        assert _mod.create().pending() == []
         assert path_a.stat().st_mtime == mtime_before
+
+    def test_approved_frontmatter_untouched(self, vault, patch_roots):
+        # Hard invariant: handle() never writes frontmatter
+        lib = vault / "02-Library"
+        path_a = _write_entity(lib, "npc-witch", ["undead"],
+                               "## Description\nA witch.\n")
+        _write_entity(lib, "npc-necromancer", ["undead"],
+                      "## Description\nA necromancer.\n")
+
+        fm_before = path_a.read_text(encoding="utf-8").split("---")[1]
+        _run()
+        fm_after = path_a.read_text(encoding="utf-8").split("---")[1]
+        assert fm_before == fm_after
 
 
 # ---------------------------------------------------------------------------
-# Batch size enforcement
+# Batch size enforcement (runner slices pending() at batch_size)
 # ---------------------------------------------------------------------------
 
 class TestBatchSize:
-    def test_batch_capped_at_batch_size(self, vault, patch_roots):
+    def test_batch_capped_at_batch_size(self, vault, patch_roots, tmp_path):
         lib = vault / "02-Library"
         for i in range(25):
             _write_entity(lib, f"npc-entity-{i:02d}", ["npc"],
                           "## Description\nAn entity.\n")
 
-        with pytest.raises(SystemExit):
-            _mod.main()
+        _run(batch_size=BATCH_SIZE)
 
-        state = json.loads(_mod._STATE_FILE.read_text(encoding="utf-8"))
-        assert len(state) == _mod.BATCH_SIZE
+        state = json.loads(_state_file(tmp_path).read_text(encoding="utf-8"))
+        assert len(state) == BATCH_SIZE
 
 
 # ---------------------------------------------------------------------------
-# CLI args -- --min-score and --max-links
+# Worker options — min_score and max_links
 # ---------------------------------------------------------------------------
 
-class TestCLIArgs:
-    def test_min_score_zero_inserts_all_candidates(self, vault, patch_roots, monkeypatch):
+class TestWorkerOptions:
+    def test_min_score_zero_inserts_all_candidates(self, vault, patch_roots):
         lib = vault / "02-Library"
         path_a = _write_entity(lib, "npc-witch", [], "## Description\nA witch.\n")
         _write_entity(lib, "npc-guard", [], "## Description\nA guard.\n")
 
-        monkeypatch.setattr("sys.argv", ["wikilink_library.py", "--min-score", "0"])
-        with pytest.raises(SystemExit) as exc:
-            _mod.main()
-        assert exc.value.code == 0
+        _run({"min_score": 0})
         content = path_a.read_text(encoding="utf-8")
         assert "[[npc-guard]]" in content
 
-    def test_high_min_score_skips_unrelated_pairs(self, vault, patch_roots, monkeypatch):
+    def test_high_min_score_skips_unrelated_pairs(self, vault, patch_roots):
         lib = vault / "02-Library"
         path_a = _write_entity(lib, "npc-witch", [], "## Description\nA witch.\n")
         _write_entity(lib, "npc-guard", [], "## Description\nA guard.\n")
 
-        monkeypatch.setattr("sys.argv", ["wikilink_library.py", "--min-score", "99"])
-        with pytest.raises(SystemExit) as exc:
-            _mod.main()
-        assert exc.value.code == 0
+        _run({"min_score": 99})
         content = path_a.read_text(encoding="utf-8")
         assert "[[npc-guard]]" not in content
 
-    def test_max_links_one_inserts_single_link(self, vault, patch_roots, monkeypatch):
+    def test_max_links_one_inserts_single_link(self, vault, patch_roots):
         lib = vault / "02-Library"
         path_a = _write_entity(lib, "npc-witch", ["undead", "villain"],
                                "## Description\nA witch.\n\n## Related\n")
@@ -388,10 +388,7 @@ class TestCLIArgs:
             _write_entity(lib, f"npc-enemy-{i:02d}", ["undead", "villain"],
                           f"## Description\nEnemy {i}.\n")
 
-        monkeypatch.setattr("sys.argv", ["wikilink_library.py", "--max-links", "1"])
-        with pytest.raises(SystemExit) as exc:
-            _mod.main()
-        assert exc.value.code == 0
+        _run({"max_links": 1})
 
         # Count [[...]] links added in Related section
         content = path_a.read_text(encoding="utf-8")

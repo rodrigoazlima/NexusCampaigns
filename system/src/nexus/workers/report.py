@@ -1,16 +1,20 @@
-"""nexus.tasks.daily_report
+"""nexus.workers.report — scheduled pipeline-health report worker.
 
-Aggregates automation logs + vault health into a JSON report every 15 min.
-Rebuilds system/state/review/reports/reports-data.js after each report.
-No LLM. No 02-Library writes. May inject suggestedQuality into 01-Processing files.
+Aggregates automation logs + queue depth + vault health into a JSON report,
+rebuilds reports-data.js for the dashboard, injects suggestedQuality into
+01-Processing drafts. Replaces nexus.tasks.daily_report.
+
+Report output paths deliberately stay at system/state/review/reports/ —
+dashboard /api routes read them. Only worker-internal logs moved.
+
+Guard rules: never writes 02-Library; 01-Processing frontmatter gets
+suggestedQuality only — never status, reviewed, quality.
 """
 
 from __future__ import annotations
 
 import json
 import re
-import sys
-import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -24,34 +28,21 @@ from nexus.shared import (
     slugs_from_relationships,
 )
 from nexus.shared.loaders import _find_project_root
+from nexus.workers.base import MASTER_LOG, WorkItem, WorkResult, make_worker_logger
 
 _PROJECT_ROOT = _find_project_root(Path(__file__).resolve().parent)
-
-TASK_ID         = "review-agent"
-SCRIPT_BASENAME = "daily_report.py"
 
 _VAULT_ROOT   = _PROJECT_ROOT / ".knowledge-base"
 _PROCESSING   = _VAULT_ROOT / "01-Processing"
 _LIBRARY      = _VAULT_ROOT / "02-Library"
 _STATE_ROOT   = _PROJECT_ROOT / "system" / "state"
-_MASTER_LOG   = _STATE_ROOT / "runtime" / "logs" / "automation.log"
-_LOGS_DIR     = _STATE_ROOT / "review" / "logs"
-_REPORTS_DIR  = _STATE_ROOT / "review" / "reports"
+_REPORTS_DIR  = _STATE_ROOT / "review" / "reports"   # dashboard-facing; do not move
 _QUEUE_FILE   = _STATE_ROOT / "inbox-queue.json"
 
 _LOG_LINE_RE  = re.compile(
     r"^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\] \[([^\]]+)\] (\w+): (.+)$"
 )
 _WIKILINK_RE  = re.compile(r"\[\[[^\]]+\]\]")
-
-
-def _make_logger() -> Logger:
-    return Logger(
-        task_id=TASK_ID,
-        script_basename=SCRIPT_BASENAME,
-        logs_dir=_LOGS_DIR,
-        master_log=_MASTER_LOG,
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -61,10 +52,10 @@ def _make_logger() -> Logger:
 def _parse_automation_log(since: datetime) -> dict[str, Any]:
     summaries: dict[str, Any] = {}
 
-    if not _MASTER_LOG.exists():
+    if not MASTER_LOG.exists():
         return summaries
 
-    for line in _MASTER_LOG.read_text(encoding="utf-8", errors="replace").splitlines():
+    for line in MASTER_LOG.read_text(encoding="utf-8", errors="replace").splitlines():
         m = _LOG_LINE_RE.match(line)
         if not m:
             continue
@@ -245,8 +236,8 @@ def _library_link_violations(fio: FrontmatterIO) -> list[dict[str, Any]]:
 def _load_tasks_config() -> dict[str, Any]:
     """Discover task configs by scanning agents/*/agent.json files.
 
-    ponytail: covers LLM agents only — static script tasks live in
-    registry.yaml; add them here if reports-data.js ever needs them.
+    ponytail: covers LLM agents only — worker config lives in
+    registry.yaml; add it here if reports-data.js ever needs it.
     """
     tasks = []
     agents_dir = _PROJECT_ROOT / "agents"
@@ -284,49 +275,70 @@ def _write_reports_js(log: Logger) -> None:
     log.info(f"Rebuilt reports-data.js ({len(reports)} report(s))")
 
 
-def main() -> None:
-    log = _make_logger()
-    t0  = log.start()
-    fio = FrontmatterIO()
+class ReportWorker:
+    name = "report"
+    kind = "scheduled"
 
-    _REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    def __init__(self, options: dict | None = None) -> None:
+        pass
 
-    now   = datetime.now(timezone.utc)
-    since = now - timedelta(hours=24)
-    today = now.strftime("%Y-%m-%d")
+    def pending(self) -> list[WorkItem]:
+        return [WorkItem("", {})]
 
-    log.info("Parsing automation.log for last 24h")
-    agent_summaries = _parse_automation_log(since)
+    def handle(self, item: WorkItem) -> WorkResult:
+        log = make_worker_logger(self.name)
+        t0  = log.start()
+        fio = FrontmatterIO()
 
-    log.info("Scanning vault health")
-    health = _vault_health(fio, log)
+        _REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
-    report: dict[str, Any] = {
-        "generatedAt":    now.isoformat(),
-        "date":           today,
-        "agentSummaries": agent_summaries,
-        "vaultHealth":    health,
-    }
+        now   = datetime.now(timezone.utc)
+        since = now - timedelta(hours=24)
+        today = now.strftime("%Y-%m-%d")
 
-    report_path = _REPORTS_DIR / f"report-{today}.json"
-    report_path.write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
-    log.info(f"Report written: {report_path.name}")
+        log.info("Parsing automation.log for last 24h")
+        agent_summaries = _parse_automation_log(since)
 
-    _write_reports_js(log)
+        log.info("Scanning vault health")
+        health = _vault_health(fio, log)
 
-    n_pending    = len(health["pendingReview"])
-    n_orphans    = len(health["orphans"])
-    n_violations = len(health["libraryLinkViolations"])
-    log.info(
-        f"Vault health: pendingReview={n_pending} orphans={n_orphans}"
-        f" libraryLinkViolations={n_violations}"
-        f" queueDepth={health['queueDepth']} queuePending={health['queuePending']}"
-        f" queueDone={health['queueDone']}"
-    )
+        report: dict[str, Any] = {
+            "generatedAt":    now.isoformat(),
+            "date":           today,
+            "agentSummaries": agent_summaries,
+            "vaultHealth":    health,
+        }
 
-    log.done(t0, key="processed", count=1, failed=0)
-    sys.exit(0)
+        report_path = _REPORTS_DIR / f"report-{today}.json"
+        try:
+            report_path.write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
+        except Exception as exc:
+            log.done(t0, key="processed", count=0, failed=1)
+            return WorkResult("error", f"cannot write report: {exc}")
+        log.info(f"Report written: {report_path.name}")
+
+        _write_reports_js(log)
+
+        n_pending    = len(health["pendingReview"])
+        n_orphans    = len(health["orphans"])
+        n_violations = len(health["libraryLinkViolations"])
+        log.info(
+            f"Vault health: pendingReview={n_pending} orphans={n_orphans}"
+            f" libraryLinkViolations={n_violations}"
+            f" queueDepth={health['queueDepth']} queuePending={health['queuePending']}"
+            f" queueDone={health['queueDone']}"
+        )
+
+        log.done(t0, key="processed", count=1, failed=0)
+        return WorkResult("done", f"report-{today}.json")
+
+
+def create(options: dict | None = None) -> ReportWorker:
+    return ReportWorker(options)
 
 
 if __name__ == "__main__":
-    main()
+    worker = create()
+    for _item in worker.pending():
+        _res = worker.handle(_item)
+        print(f"{_res.status}: {_res.detail}")

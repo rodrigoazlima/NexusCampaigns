@@ -1,6 +1,7 @@
 # Refactor: remove agentic scaffolding from static code — workers + queues
 
-Status: SPEC (nothing implemented)
+Status: IMPLEMENTED (2026-07-07) — all four phases landed in one pass; queue
+workers carry no interval (poll every runner cycle), only scheduled workers do.
 Input inventory: [agents-list.md](agents-list.md)
 Shared contract: [worker-contract.spec.md](worker-contract.spec.md)
 

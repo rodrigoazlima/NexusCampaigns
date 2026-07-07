@@ -1,53 +1,52 @@
-"""nexus.tasks.generate_tokens
+"""nexus.workers.token — VTT token generator (queue consumer).
 
-Generates 512×512 circular portrait tokens from classified character images.
-Face detection: MTCNN (robust on stylized art) → OpenCV Haar (topmost) → upper-center crop fallback.
-Moldura: inner radius auto-detected from frame alpha channel.
-Moldura selection: per-type override from agent config (moldura_by_type).
-No LLM. Batch: 10 per run.
+Generates 512×512 circular portrait tokens from vision-classified images.
+Face detection: MTCNN (robust on stylized art) → OpenCV Haar (topmost) →
+upper-center crop fallback. Moldura ring composed on top, inner radius
+auto-detected from the frame's alpha channel; per-type override via
+options.moldura_by_type. Output next to source as <stem>-token.png.
+Replaces nexus.tasks.generate_tokens.
 
-New logic (2026-06):
-  - Purges stale generated-tokens.json entries where tokenPath no longer exists
-  - Skips source images whose stem ends in -token or contains .token (defense-in-depth)
-  - Updates inbox-queue.json token slot: done after generation, skip for ineligible types
-
-New logic (2026-06-28):
-  - detect_ring_radii: auto-detect moldura inner radius from alpha channel
-  - Face crop scaled to fill inner circle (not fixed pixel padding)
-  - padding as fraction of inner diameter (0.0–0.49)
-  - focus_head accepts array [top, right, bottom, left] or legacy dict
-  - moldura_by_type in config: pick frame by image type from vision state
+Carried-over safeguards:
+  - purges stale generated-tokens entries whose tokenPath is gone
+  - never processes stems ending -token / containing .token
+  - stores the detected face box back into vision state via _store_face
 """
 
 from __future__ import annotations
 
 import json
-import sys
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
-from nexus.shared.logger import Logger, _ensure_utf8_stdout
-from nexus.shared.loaders import _find_project_root
 from nexus.shared import locked_update_queue_entry
+from nexus.shared.loaders import _find_project_root
+from nexus.shared.logger import Logger
+from nexus.workers.base import (
+    WORKERS_STATE_ROOT,
+    WorkItem,
+    WorkResult,
+    adopt_legacy_file,
+    make_worker_logger,
+)
 
 _PROJECT_ROOT = _find_project_root(Path(__file__).resolve().parent)
 
-TASK_ID         = "token-agent"
-SCRIPT_BASENAME = "generate_tokens.py"
-BATCH_SIZE      = 10
-
-_VAULT_ROOT   = _PROJECT_ROOT / ".knowledge-base"
-_INBOX_IMAGES = _VAULT_ROOT / "00-Inbox" / "images"
 _STATE_ROOT   = _PROJECT_ROOT / "system" / "state"
-_AGENT_STATE  = _STATE_ROOT / "token"
-_LOGS_DIR     = _AGENT_STATE / "logs"
-_MASTER_LOG   = _STATE_ROOT / "runtime" / "logs" / "automation.log"
 _VISION_STATE = _PROJECT_ROOT / "agents" / "vision" / "state" / "processed-images.json"
-_GEN_TOKENS   = _AGENT_STATE / "generated-tokens.json"
-_CONFIG_FILE  = _AGENT_STATE / "10-generate-tokens.json"
 _QUEUE_FILE   = _STATE_ROOT / "inbox-queue.json"
+
+_WORKER_STATE = WORKERS_STATE_ROOT / "token"
+_GEN_TOKENS   = _WORKER_STATE / "generated-tokens.json"
+_CONFIG_FILE  = _WORKER_STATE / "10-generate-tokens.json"
+
+# Legacy homes (nexus.tasks.generate_tokens wrote system/state/token; the
+# deployed pipeline wrote agents/token/state) — adopted once, then unused
+_LEGACY_STATE_DIRS = (
+    _STATE_ROOT / "token",
+    _PROJECT_ROOT / "agents" / "token" / "state",
+)
 
 _DEFAULT_CFG: dict[str, Any] = {
     "size":           512,
@@ -60,6 +59,15 @@ _DEFAULT_CFG: dict[str, Any] = {
 }
 
 _SKIP_TYPES = frozenset({"battlemap", "scene"})
+_MAX_RERUNS = 3   # poison-pill guard (worker-contract.spec.md)
+
+_warned_no_pillow = False
+
+
+def _adopt_legacy_state() -> None:
+    for legacy in _LEGACY_STATE_DIRS:
+        adopt_legacy_file(legacy / "generated-tokens.json", _GEN_TOKENS)
+        adopt_legacy_file(legacy / "10-generate-tokens.json", _CONFIG_FILE)
 
 
 def _is_token_stem(p: Path) -> bool:
@@ -67,23 +75,18 @@ def _is_token_stem(p: Path) -> bool:
     return stem.endswith("-token") or ".token" in stem
 
 
-def _make_logger() -> Logger:
-    return Logger(
-        task_id=TASK_ID,
-        script_basename=SCRIPT_BASENAME,
-        logs_dir=_LOGS_DIR,
-        master_log=_MASTER_LOG,
-    )
-
-
-def _load_config() -> dict[str, Any]:
-    if not _CONFIG_FILE.exists():
-        _AGENT_STATE.mkdir(parents=True, exist_ok=True)
-        _CONFIG_FILE.write_text(json.dumps(_DEFAULT_CFG, indent=2), encoding="utf-8")
-        return dict(_DEFAULT_CFG)
-    stored = json.loads(_CONFIG_FILE.read_text(encoding="utf-8"))
+def _load_config(options: dict | None = None) -> dict[str, Any]:
     cfg = dict(_DEFAULT_CFG)
-    cfg.update(stored)
+    if _CONFIG_FILE.exists():
+        try:
+            cfg.update(json.loads(_CONFIG_FILE.read_text(encoding="utf-8")))
+        except Exception:
+            pass
+    else:
+        _CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _CONFIG_FILE.write_text(json.dumps(_DEFAULT_CFG, indent=2), encoding="utf-8")
+    # registry.yaml worker options override file config (moldura_by_type etc.)
+    cfg.update(options or {})
     return cfg
 
 
@@ -123,27 +126,19 @@ def _load_gen_tokens() -> dict[str, Any]:
 
 
 def _save_gen_tokens(data: dict) -> None:
-    _AGENT_STATE.mkdir(parents=True, exist_ok=True)
+    _GEN_TOKENS.parent.mkdir(parents=True, exist_ok=True)
     tmp = _GEN_TOKENS.with_suffix(".tmp")
     tmp.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
     tmp.replace(_GEN_TOKENS)
 
 
-def _purge_stale_gen_tokens(log: Logger) -> int:
-    gen = _load_gen_tokens()
-    stale = [k for k, v in gen.items() if not (_PROJECT_ROOT / v["tokenPath"]).exists()]
-    if stale:
-        for k in stale:
-            log.info(f"Purging stale token entry: {gen[k]['tokenPath']}")
-            del gen[k]
-        _save_gen_tokens(gen)
-    return len(stale)
-
-
 def _load_queue() -> dict[str, Any]:
     if not _QUEUE_FILE.exists():
         return {}
-    return json.loads(_QUEUE_FILE.read_text(encoding="utf-8"))
+    try:
+        return json.loads(_QUEUE_FILE.read_text(encoding="utf-8").lstrip("﻿"))
+    except Exception:
+        return {}
 
 
 def _set_queue_token_slot(source_rel: str, status: str, log: Logger) -> bool:
@@ -435,113 +430,141 @@ def _make_token(img_path: Path, out_path: Path, cfg: dict, log: Logger,
         return False, None
 
 
-def main() -> None:
-    _ensure_utf8_stdout()
-    log = _make_logger()
-    t0  = log.start()
-    _AGENT_STATE.mkdir(parents=True, exist_ok=True)
+# ---------------------------------------------------------------------------
+# Worker
+# ---------------------------------------------------------------------------
 
-    try:
-        from PIL import Image  # noqa: F401
-    except ImportError:
-        log.error("Pillow not installed — install: pip install Pillow")
-        log.done(t0, key="generated", count=0, failed=0)
-        sys.exit(1)
+class TokenWorker:
+    name = "token"
+    kind = "queue"
 
-    purged = _purge_stale_gen_tokens(log)
-    if purged:
-        log.info(f"Purged {purged} stale token index entries")
+    def __init__(self, options: dict | None = None) -> None:
+        _adopt_legacy_state()
+        self._cfg = _load_config(options)
 
-    cfg          = _load_config()
-    vision_state = _load_vision_state()
-    gen_tokens   = _load_gen_tokens()
+    def pending(self) -> list[WorkItem]:
+        global _warned_no_pillow
+        try:
+            from PIL import Image  # noqa: F401
+        except ImportError:
+            if not _warned_no_pillow:
+                make_worker_logger(self.name).warning("Pillow not installed — token generation disabled")
+                _warned_no_pillow = True
+            return []
 
-    all_images = vision_state.get("images", {})
+        vision_state = _load_vision_state()
+        gen_tokens   = _load_gen_tokens()
+        queue        = _load_queue()
+        all_images   = vision_state.get("images", {})
 
-    # Mark skip-type images in queue
-    for img_key, entry in all_images.items():
-        if entry.get("status") == "ok" and not entry.get("isToken", False):
+        items: list[WorkItem] = []
+
+        # Stale index entries whose token file is gone → purge items
+        for img_key, entry_data in gen_tokens.items():
+            if not (_PROJECT_ROOT / entry_data["tokenPath"]).exists():
+                items.append(WorkItem(entry_data.get("sourcePath", img_key),
+                                      {"action": "purge", "img_key": img_key}))
+
+        for img_key, entry in all_images.items():
+            if entry.get("status") != "ok" or entry.get("isToken", False):
+                continue
+            src_rel = entry.get("path", "")
+            q_entry = queue.get(src_rel, {})
+            slot    = (q_entry.get("agents") or {}).get("token")
+            reruns  = int((q_entry.get("reruns") or {}).get("token", 0))
+
+            # Poison-pill guard: error slots stay error until reset
+            if slot == "error":
+                continue
+
             if entry.get("type") in _SKIP_TYPES:
-                _set_queue_token_slot(entry["path"], "skip", log)
+                if slot == "pending":
+                    items.append(WorkItem(src_rel, {"action": "skip-type", "img_key": img_key,
+                                                    "entry": entry}))
+                continue
 
-    # Reconcile queue slots for already-generated tokens
-    reconciled = 0
-    for entry_data in gen_tokens.values():
-        src_rel = entry_data.get("sourcePath", "")
-        if src_rel and _set_queue_token_slot(src_rel, "done", log):
-            reconciled += 1
-    if reconciled:
-        log.info(f"Reconciled {reconciled} existing token queue slots")
+            if _is_token_stem(_PROJECT_ROOT / src_rel):
+                continue
 
-    eligible = [
-        (img_key, entry)
-        for img_key, entry in all_images.items()
-        if entry.get("status") == "ok"
-        if not entry.get("isToken", False)
-        if entry.get("type") not in _SKIP_TYPES
-        if img_key not in gen_tokens
-        if not _is_token_stem(_PROJECT_ROOT / entry["path"])
-    ]
+            if img_key in gen_tokens:
+                if slot == "pending":
+                    items.append(WorkItem(src_rel, {"action": "reconcile", "img_key": img_key}))
+                continue
 
-    if not eligible:
-        log.info("No eligible images for token generation")
-        log.done(t0, key="generated", count=0, failed=0)
-        sys.exit(0)
+            if reruns >= _MAX_RERUNS:
+                continue
+            items.append(WorkItem(src_rel, {"action": "generate", "img_key": img_key,
+                                            "entry": entry}))
 
-    batch  = eligible[:BATCH_SIZE]
-    count  = 0
-    failed = 0
-    log.info(f"Batch: {len(batch)} of {len(eligible)} image(s)")
+        return items
 
-    for img_key, entry in batch:
-        src_rel  = entry["path"]
+    def handle(self, item: WorkItem) -> WorkResult:
+        log = make_worker_logger(self.name)
+        action  = item.payload.get("action", "generate")
+        img_key = item.payload.get("img_key", "")
+
+        if action == "purge":
+            gen = _load_gen_tokens()
+            entry = gen.pop(img_key, None)
+            if entry:
+                _save_gen_tokens(gen)
+                log.info(f"Purged stale token entry: {entry['tokenPath']}")
+            return WorkResult("done", f"purged stale index entry {img_key}")
+
+        if action == "skip-type":
+            _set_queue_token_slot(item.key, "skip", log)
+            return WorkResult("skip", f"ineligible type: {item.payload['entry'].get('type')}")
+
+        if action == "reconcile":
+            _set_queue_token_slot(item.key, "done", log)
+            return WorkResult("done", "reconciled existing token slot")
+
+        # generate
+        entry    = item.payload["entry"]
+        src_rel  = item.key
         img_path = _PROJECT_ROOT / src_rel
         if not img_path.exists():
-            log.warning(f"Source gone: {src_rel}")
-            failed += 1
-            continue
+            return WorkResult("skip", f"source gone: {src_rel}")
 
-        out_path    = img_path.with_name(f"{img_path.stem}-token.png")
-        moldura_path = _pick_moldura(entry, cfg)
+        out_path     = img_path.with_name(f"{img_path.stem}-token.png")
+        moldura_path = _pick_moldura(entry, self._cfg)
 
         if out_path.exists():
+            ok, face = True, None
             log.info(f"Token already exists: {out_path.name}")
-            out_rel = out_path.relative_to(_PROJECT_ROOT).as_posix()
-            gen_tokens[img_key] = {
-                "sourcePath":  src_rel,
-                "tokenPath":   out_rel,
-                "generatedAt": datetime.now(timezone.utc).isoformat(),
-            }
-            _save_gen_tokens(gen_tokens)
-            _set_queue_token_slot(src_rel, "done", log)
-            count += 1
-            continue
-
-        ok, face = _make_token(img_path, out_path, cfg, log, moldura_path=moldura_path)
-        if ok:
-            out_rel = out_path.relative_to(_PROJECT_ROOT).as_posix()
-            gen_tokens[img_key] = {
-                "sourcePath":  src_rel,
-                "tokenPath":   out_rel,
-                "generatedAt": datetime.now(timezone.utc).isoformat(),
-            }
-            _save_gen_tokens(gen_tokens)
-            _store_face(src_rel, face, log)
-            _set_queue_token_slot(src_rel, "done", log)
-            log.info(f"Token created: {out_path.name}")
-            count += 1
         else:
-            failed += 1
+            ok, face = _make_token(img_path, out_path, self._cfg, log, moldura_path=moldura_path)
 
-    log.done(t0, key="generated", count=count, failed=failed)
-    sys.exit(0 if failed == 0 else 1)
+        if not ok:
+            _set_queue_token_slot(src_rel, "error", log)
+            return WorkResult("error", f"token generation failed: {src_rel}")
 
+        gen_tokens = _load_gen_tokens()
+        gen_tokens[img_key] = {
+            "sourcePath":  src_rel,
+            "tokenPath":   out_path.relative_to(_PROJECT_ROOT).as_posix(),
+            "generatedAt": datetime.now(timezone.utc).isoformat(),
+        }
+        _save_gen_tokens(gen_tokens)
+        _store_face(src_rel, face, log)
+        _set_queue_token_slot(src_rel, "done", log)
+        log.info(f"Token created: {out_path.name}")
+        return WorkResult("done", f"token: {out_path.name}")
+
+
+def create(options: dict | None = None) -> TokenWorker:
+    return TokenWorker(options)
+
+
+# ---------------------------------------------------------------------------
+# Manual single-image entry point (used by the dashboard token editor)
+# ---------------------------------------------------------------------------
 
 def run_single(image_path: str, moldura_override: str | None = None,
                image_type: str | None = None) -> int:
     """Generate a token for a single image. Returns 0 on success, 1 on failure."""
-    _ensure_utf8_stdout()
-    log = _make_logger()
+    _adopt_legacy_state()
+    log = make_worker_logger("token")
     cfg = _load_config()
 
     img_path = Path(image_path)
@@ -594,4 +617,7 @@ if __name__ == "__main__":
     _args = _parser.parse_args()
     if _args.image:
         raise SystemExit(run_single(_args.image, _args.moldura, _args.image_type))
-    main()
+    worker = create()
+    for _item in worker.pending():
+        _res = worker.handle(_item)
+        print(f"{_res.status} {_item.key}: {_res.detail}")

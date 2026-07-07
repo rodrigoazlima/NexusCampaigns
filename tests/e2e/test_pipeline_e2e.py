@@ -35,6 +35,8 @@ from pathlib import Path
 import pytest
 import requests
 
+pytestmark = pytest.mark.e2e  # opt-in: pytest -m e2e (needs network + local LLMs)
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -48,7 +50,7 @@ _INBOX_DIR   = _VAULT_ROOT   / "00-Inbox" / "images" / "e2e-test"
 _PROCESSING  = _VAULT_ROOT   / "01-Processing"
 _QUEUE_FILE  = _PROJECT_ROOT / "system"  / "state"  / "inbox-queue.json"
 _PROC_IMAGES = _AGENTS_DIR   / "vision"   / "state"  / "processed-images.json"
-_GEN_TOKENS  = _AGENTS_DIR   / "token"    / "state"  / "generated-tokens.json"
+_GEN_TOKENS  = _PROJECT_ROOT / "system" / "state" / "workers" / "token" / "generated-tokens.json"
 
 IMAGE_URL  = (
     "https://static.wikia.nocookie.net/mortal-kombat/images/6/6e/"
@@ -174,9 +176,9 @@ def test_stage2_ingestion():
     img_path = _INBOX_DIR / IMAGE_NAME
     assert img_path.exists(), "Run test_stage1 first"
 
-    result = _run_agent("ingestion-agent", timeout=60)
+    result = _run_agent("worker:ingestion", timeout=60)
     assert result.returncode == 0, (
-        f"ingestion-agent failed (exit {result.returncode})\n{result.stdout[-2000:]}"
+        f"ingestion worker failed (exit {result.returncode})\n{result.stdout[-2000:]}"
     )
 
     assert _QUEUE_FILE.exists(), "inbox-queue.json not created"
@@ -378,14 +380,14 @@ def test_stage6_token():
     img_path = _PROJECT_ROOT / img_rel
     assert img_path.exists(), f"Source image not found at {img_rel}"
 
-    result = _run_agent("token-agent", timeout=120)
+    result = _run_agent("worker:token", timeout=120)
 
     combined = result.stdout + result.stderr
     if "Pillow not installed" in combined or "ImportError" in combined:
         pytest.skip("Pillow/numpy not installed — token generation skipped")
 
     assert result.returncode == 0, (
-        f"token-agent failed (exit {result.returncode})\n{result.stdout[-2000:]}"
+        f"token worker failed (exit {result.returncode})\n{result.stdout[-2000:]}"
     )
 
     # Token file created next to source image

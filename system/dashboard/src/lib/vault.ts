@@ -35,7 +35,7 @@ export const VAULT_ROOT =
 const AGENTS_DIR = path.join(PROJECT_ROOT, 'agents')
 const STATE_DIR = path.join(PROJECT_ROOT, 'agents', 'runtime', 'state')
 const SHARED_DIR = path.join(PROJECT_ROOT, 'system', 'state')
-const REPORTS_DIR = path.join(PROJECT_ROOT, 'agents', 'review', 'state', 'reports')
+const REPORTS_DIR = path.join(PROJECT_ROOT, 'system', 'state', 'review', 'reports')
 const LOGS_DIR = path.join(PROJECT_ROOT, 'agents', 'runtime', 'state', 'logs')
 const REGISTRY_PATH = path.join(PROJECT_ROOT, 'agents', 'registry.yaml')
 
@@ -212,9 +212,40 @@ interface RegistryAgent {
   llm?: string
 }
 
+interface RegistryWorker {
+  kind?: 'queue' | 'scheduled'
+  enabled?: boolean
+  batch_size?: number
+  interval_seconds?: number
+}
+
 interface Registry {
   agents: Record<string, RegistryAgent>
+  workers?: Record<string, RegistryWorker>
   pipeline_mode?: 'sync' | 'async'
+}
+
+const WORKER_DESCRIPTIONS: Record<string, string> = {
+  ingestion: 'Vault ingestion — emoji-strip filenames, convert DOCX, register inbox queue.',
+  thumbnails: 'Pre-generate 320px webp thumbnails for inbox images.',
+  token: 'Generate 512×512 VTT tokens from classified portrait images.',
+  wikilink: 'Link 02-Library entities via wikilinks.',
+  shortfiles: 'Flag drafts under 10 body lines for reprocessing.',
+  report: 'Pipeline health + pending-review report.',
+  cleanup: 'Prune old logs/reports, trim agent-metrics history.',
+  maintenance: 'Pipeline self-healing — stale locks, missing dirs, queue validation.',
+}
+
+// Worker metrics rows use {at, processed, failed, durationMs} (worker
+// contract §Metrics) — normalize to the AgentRun shape the UI renders.
+function normalizeRuns(runs: Array<Record<string, unknown>>): AgentRun[] {
+  return runs.map((r) => ({
+    startedAt: (r.startedAt ?? r.at ?? '') as string,
+    finishedAt: (r.finishedAt ?? r.at ?? '') as string,
+    durationMs: (r.durationMs ?? 0) as number,
+    itemsProcessed: (r.itemsProcessed ?? r.processed ?? 0) as number,
+    itemsFailed: (r.itemsFailed ?? r.failed ?? 0) as number,
+  }))
 }
 
 const RUNTIME_SERVICE_NAME = 'vault-knowledge-factory'
@@ -325,6 +356,53 @@ export function readAgents(): AgentInfo[] {
       fallbackIntelligence,
       lastRun: lastRunStr,
       nextRun,
+      totalRuns,
+      totalProcessed,
+      totalFailed,
+      avgDurationMs,
+      recentRuns: runs.slice(-5),
+    })
+  }
+
+  // Static workers (registry.yaml workers: block) — in-process, no agent.json.
+  // kind: 'worker' on the metrics entry; lastRun lives under worker:<name>.
+  for (const [key, w] of Object.entries(registry?.workers ?? {})) {
+    const stateKey = `worker:${key}`
+    const lastRunStr = tasks[stateKey]?.lastRun ?? null
+    const runs = normalizeRuns(
+      (metrics[key] as unknown as { runs?: Array<Record<string, unknown>> } | undefined)?.runs ?? []
+    )
+
+    const totalRuns = runs.length
+    const totalProcessed = runs.reduce((s, r) => s + r.itemsProcessed, 0)
+    const totalFailed = runs.reduce((s, r) => s + r.itemsFailed, 0)
+    const avgDurationMs =
+      totalRuns > 0 ? runs.reduce((s, r) => s + r.durationMs, 0) / totalRuns : 0
+
+    const scheduled = w.kind === 'scheduled'
+    const intervalSeconds = scheduled ? (w.interval_seconds ?? 900) : 60
+
+    let status: AgentStatus = 'idle'
+    if (w.enabled === false) {
+      status = 'offline'
+    } else if (scheduled && lastRunStr) {
+      const elapsed = now - new Date(lastRunStr).getTime()
+      if (elapsed > intervalSeconds * 2500) status = 'offline'
+    }
+    const lastRun = runs[runs.length - 1]
+    if (status === 'idle' && lastRun && lastRun.itemsFailed > 0) status = 'error'
+
+    agents.push({
+      id: stateKey,
+      name: key,
+      status,
+      description: WORKER_DESCRIPTIONS[key] ?? `${key} worker (${w.kind ?? 'queue'})`,
+      intervalSeconds,
+      llm: 'none',
+      intelligence: scheduled ? 'worker · scheduled' : 'worker · queue',
+      fallbackIntelligence: null,
+      lastRun: lastRunStr,
+      nextRun: scheduled && lastRunStr ? addSeconds(lastRunStr, intervalSeconds) : null,
       totalRuns,
       totalProcessed,
       totalFailed,
@@ -1236,7 +1314,7 @@ export function readVisionPathIndex(): Record<string, string> {
 }
 
 export function readGeneratedTokens(): Record<string, { sourcePath: string; tokenPath: string; generatedAt: string }> {
-  const genPath = path.join(PROJECT_ROOT, 'agents', 'token', 'state', 'generated-tokens.json')
+  const genPath = path.join(PROJECT_ROOT, 'system', 'state', 'workers', 'token', 'generated-tokens.json')
   return readJson<Record<string, { sourcePath: string; tokenPath: string; generatedAt: string }>>(genPath) ?? {}
 }
 
