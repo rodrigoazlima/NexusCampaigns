@@ -5,7 +5,8 @@ import Masonry from 'react-masonry-css'
 import type { InboxImage, InboxPage } from '@/lib/types'
 import PageHeader from '@/components/widgets/PageHeader'
 import InboxImageCard from '@/components/gm/InboxImageCard'
-import { Image, Loader2, AlertTriangle } from 'lucide-react'
+import { Image, Loader2, AlertTriangle, Upload } from 'lucide-react'
+import { uploadImage, enqueueImage, isImageFile } from '@/lib/upload-image'
 
 const MASONRY_BREAKPOINTS = { default: 4, 1279: 3, 1023: 2, 639: 1 }
 const PAGE_SIZE = 60
@@ -15,8 +16,10 @@ export default function GMInboxPage() {
   const [summary, setSummary] = useState<Pick<InboxPage, 'total' | 'stuck' | 'withToken'> | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
   const fetchingRef = useRef(false)
   const sentinelRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const loadPage = useCallback((offset: number) => {
     if (fetchingRef.current) return
@@ -45,6 +48,18 @@ export default function GMInboxPage() {
     loadPage(0)
   }, [loadPage])
 
+  const handleFilesSelected = useCallback(async (fileList: FileList | null) => {
+    const files = Array.from(fileList ?? []).filter(isImageFile)
+    if (files.length === 0) return
+    setUploading(true)
+    await Promise.all(files.map(async (f) => {
+      const result = await uploadImage({ file: f })
+      if (result.ok && result.path) await enqueueImage(result.path)
+    }))
+    setUploading(false)
+    loadPage(0)
+  }, [loadPage])
+
   const hasMore = summary !== null && items.length < summary.total
 
   useEffect(() => {
@@ -70,6 +85,29 @@ export default function GMInboxPage() {
         icon={Image}
         title="Inbox Gallery"
         subtitle={`${total} images in queue`}
+        actions={
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                handleFilesSelected(e.target.files)
+                e.target.value = ''
+              }}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-primary/15 text-primary border border-primary/30 hover:bg-primary/25 transition-colors disabled:opacity-50"
+            >
+              {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+              {uploading ? 'Uploading…' : 'Upload'}
+            </button>
+          </>
+        }
       />
 
       {/* Stats strip */}

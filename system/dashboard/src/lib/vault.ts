@@ -1205,11 +1205,7 @@ export function readInboxImages(): InboxImage[] {
     })
   }
 
-  results.sort((a, b) => {
-    if (a.isStuck && !b.isStuck) return -1
-    if (!a.isStuck && b.isStuck) return 1
-    return new Date(b.ingestedAt).getTime() - new Date(a.ingestedAt).getTime()
-  })
+  results.sort((a, b) => new Date(b.ingestedAt).getTime() - new Date(a.ingestedAt).getTime())
 
   inboxCache = { mtimeMs, at: Date.now(), data: results }
   return results
