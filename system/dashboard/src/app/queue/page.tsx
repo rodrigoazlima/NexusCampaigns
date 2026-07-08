@@ -27,7 +27,7 @@ export default async function QueuePage() {
       />
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
         <div className="panel p-4">
           <div className="text-xs text-zinc-500 mb-1 uppercase tracking-wide">Total</div>
           <div className="text-3xl font-mono font-semibold text-zinc-100">{queue.total}</div>
@@ -48,6 +48,12 @@ export default async function QueuePage() {
           <div className="text-xs text-zinc-500 mb-1 uppercase tracking-wide">Stuck (&gt;24h)</div>
           <div className={`text-3xl font-mono font-semibold ${queue.stuck > 0 ? 'text-danger' : 'text-zinc-400'}`}>
             {queue.stuck}
+          </div>
+        </div>
+        <div className="panel p-4">
+          <div className="text-xs text-zinc-500 mb-1 uppercase tracking-wide">Error</div>
+          <div className={`text-3xl font-mono font-semibold ${queue.error > 0 ? 'text-danger' : 'text-zinc-400'}`}>
+            {queue.error}
           </div>
         </div>
       </div>

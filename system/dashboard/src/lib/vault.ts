@@ -26,6 +26,7 @@ import type {
   CampaignFrame,
 } from './types'
 import { addSeconds } from './utils'
+import { resolveStatus } from './queue-status'
 
 export const PROJECT_ROOT =
   process.env.PROJECT_ROOT ?? path.resolve(process.cwd(), '..', '..')
@@ -161,7 +162,7 @@ export function readQueue(): QueueStats {
   }>>(path.join(SHARED_DIR, 'inbox-queue.json'))
 
   if (!raw) {
-    return { total: 0, pending: 0, done: 0, stuck: 0, paused: 0, byType: {}, items: [] }
+    return { total: 0, pending: 0, done: 0, stuck: 0, paused: 0, error: 0, byType: {}, items: [] }
   }
 
   const draftBySource = draftBySourceMap()
@@ -184,30 +185,20 @@ export function readQueue(): QueueStats {
   let done = 0
   let stuck = 0
   let paused = 0
-
-  const cutoff24h = Date.now() - 24 * 60 * 60 * 1000
+  let error = 0
 
   for (const item of items) {
     byType[item.type] = (byType[item.type] ?? 0) + 1
-    const agentStatuses = Object.values(item.agents)
-    const allDone = agentStatuses.every((s) => s === 'done' || s === 'skip')
-    const anyPaused = agentStatuses.some((s) => s === 'paused')
-    const anyPending = agentStatuses.some((s) => s === 'pending')
-    if (allDone) {
-      done++
-    } else if (anyPaused) {
-      paused++
-    } else if (anyPending) {
-      const ingestedTime = new Date(item.ingestedAt).getTime()
-      if (!isNaN(ingestedTime) && ingestedTime < cutoff24h) {
-        stuck++
-      } else {
-        pending++
-      }
+    switch (resolveStatus(item)) {
+      case 'done': done++; break
+      case 'error': error++; break
+      case 'paused': paused++; break
+      case 'stuck': stuck++; break
+      case 'pending': pending++; break
     }
   }
 
-  return { total: items.length, pending, done, stuck, paused, byType, items }
+  return { total: items.length, pending, done, stuck, paused, error, byType, items }
 }
 
 // ---------------------------------------------------------------------------

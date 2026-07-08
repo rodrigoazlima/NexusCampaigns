@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import QueueTable from './QueueTable'
-import { isDone, isPaused, isStuck } from '@/lib/queue-status'
+import { QUEUE_STATUSES, STATUS_META, resolveStatus } from '@/lib/queue-status'
 import type { QueueItem, QueueAgentStat } from '@/lib/types'
 
 interface Props {
@@ -13,10 +13,6 @@ interface Props {
 }
 
 const filename = (p: string) => p.split('/').pop() ?? p
-
-const STATUS_LABELS: Record<string, string> = {
-  stuck: 'Stuck', pending: 'Pending', paused: 'Paused',
-}
 
 export default function QueueBoard({ items, agentStats, byType }: Props) {
   const [search, setSearch] = useState('')
@@ -39,23 +35,27 @@ export default function QueueBoard({ items, agentStats, byType }: Props) {
     })
   }
 
-  const filtered = useMemo(() => {
+  // Search + type filtered, before the status narrowing — this is also what
+  // status chip counts are computed against.
+  const searched = useMemo(() => {
     const q = search.trim().toLowerCase()
     return items
       .filter((i) => types.size === 0 || types.has(i.type))
       .filter((i) => !q || filename(i.path).toLowerCase().includes(q))
   }, [items, search, types])
 
-  const stuckItems = filtered.filter(isStuck)
-  const pausedItems = filtered.filter(isPaused)
-  const pendingItems = filtered.filter((i) => !isDone(i) && !isStuck(i) && !isPaused(i))
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const s of QUEUE_STATUSES) counts[s] = 0
+    for (const item of searched) counts[resolveStatus(item)]++
+    return counts
+  }, [searched])
 
-  const statusCounts: Record<string, number> = {
-    stuck: stuckItems.length, pending: pendingItems.length, paused: pausedItems.length,
-  }
-  // Empty selection = default view (everything but the huge Paused list); picking
-  // chips narrows down to exactly the selected status tables, Paused included.
-  const showStatus = (s: string) => (statuses.size === 0 ? s !== 'paused' : statuses.has(s))
+  // Empty status selection = show everything, no filtering applied.
+  const visible = useMemo(() => {
+    if (statuses.size === 0) return searched
+    return searched.filter((i) => statuses.has(resolveStatus(i)))
+  }, [searched, statuses])
 
   return (
     <div>
@@ -86,60 +86,27 @@ export default function QueueBoard({ items, agentStats, byType }: Props) {
           ))}
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
-          {Object.entries(STATUS_LABELS).map(([status, label]) => (
+          {QUEUE_STATUSES.map((status) => (
             <button
               key={status}
               type="button"
               onClick={() => toggleStatus(status)}
               className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${
                 statuses.has(status)
-                  ? 'bg-neutral/15 text-neutral border-neutral/40'
+                  ? STATUS_META[status].chip
                   : 'bg-surface-2 text-zinc-400 border-surface-3 hover:text-zinc-200'
               }`}
             >
-              {label} <span className="text-zinc-600">{statusCounts[status]}</span>
+              {STATUS_META[status].label} <span className="text-zinc-600">{statusCounts[status]}</span>
             </button>
           ))}
         </div>
-        {(search || types.size > 0) && (
-          <span className="text-xs text-zinc-600">{filtered.length} / {items.length}</span>
+        {(search || types.size > 0 || statuses.size > 0) && (
+          <span className="text-xs text-zinc-600">{visible.length} / {items.length}</span>
         )}
       </div>
 
-      {showStatus('stuck') && (
-        <QueueTable
-          items={stuckItems}
-          agentStats={agentStats}
-          title="Stuck Items"
-          countClass="text-danger"
-          allowPause
-          allowDelete
-          pulse
-        />
-      )}
-
-      {showStatus('pending') && (
-        <QueueTable
-          items={pendingItems}
-          agentStats={agentStats}
-          title="Pending Items"
-          countClass="text-warning"
-          limit={50}
-          allowPause
-          allowDelete
-        />
-      )}
-
-      {showStatus('paused') && (
-        <QueueTable
-          items={pausedItems}
-          agentStats={agentStats}
-          title="Paused Items"
-          countClass="text-neutral"
-          allowResume
-          allowDelete
-        />
-      )}
+      <QueueTable items={visible} agentStats={agentStats} />
     </div>
   )
 }
