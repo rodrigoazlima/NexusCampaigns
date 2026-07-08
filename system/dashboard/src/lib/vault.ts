@@ -22,6 +22,7 @@ import type {
   InboxImage,
   TokenFile,
   AgentConfig,
+  AgentDoc,
   IntelligenceConfig,
   CampaignFrame,
 } from './types'
@@ -369,6 +370,33 @@ export function readAgents(): AgentInfo[] {
   }
 
   return agents
+}
+
+/** Parses agents/{name}/AGENT.md frontmatter for the agent detail pages. */
+export function readAgentDoc(name: string): AgentDoc | null {
+  try {
+    const raw = fs.readFileSync(path.join(AGENTS_DIR, name, 'AGENT.md'), 'utf-8')
+    const { data } = matter(raw)
+    return {
+      name: data.name ?? name,
+      purpose: typeof data.purpose === 'string' ? data.purpose.trim() : '',
+      inputs: data.inputs ?? [],
+      outputs: data.outputs ?? [],
+      dependencies: data.dependencies ?? [],
+      responsibilities: data.responsibilities ?? [],
+      restrictions: data.restrictions ?? [],
+      state_files: data.state_files ?? [],
+      commit_scope: data.commit_scope ?? [],
+      owned_tools: data.owned_tools ?? [],
+    }
+  } catch {
+    return null
+  }
+}
+
+/** Raw agents/{name}/agent.json, for dispatch/task config display. */
+export function readAgentConfig(name: string): AgentConfig | null {
+  return readJson<AgentConfig>(path.join(AGENTS_DIR, name, 'agent.json'))
 }
 
 // ---------------------------------------------------------------------------

@@ -26,6 +26,38 @@ export interface AgentInfo {
   recentRuns: AgentRun[]
 }
 
+// AGENT.md frontmatter, parsed for the agent detail pages.
+export interface AgentDoc {
+  name: string
+  purpose: string
+  inputs: string[]
+  outputs: string[]
+  dependencies: string[]
+  responsibilities: string[]
+  restrictions: string[]
+  state_files: string[]
+  commit_scope: string[]
+  owned_tools: string[]
+}
+
+// Raw record shape from agents/vision/state/processed-images.json (images map).
+export interface VisionImageRecord {
+  uuid: string
+  path: string
+  processedAt: string
+  originalName: string
+  type: string
+  ancestry: string
+  class: string
+  creature_type: string
+  element: string
+  environment: string
+  description: string
+  sha256: string
+  isToken: boolean
+  status: string
+}
+
 export interface QueueItem {
   path: string
   ingestedAt: string

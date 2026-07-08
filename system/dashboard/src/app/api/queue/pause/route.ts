@@ -18,7 +18,7 @@ const QUEUE_FILE = path.join(PROJECT_ROOT, 'system', 'state', 'inbox-queue.json'
  */
 export async function POST(req: NextRequest) {
   try {
-    const body = (await req.json()) as { path?: string; paths?: string[] }
+    const body = (await req.json()) as { path?: string; paths?: string[]; agent?: string }
     const paths = body.paths ?? (body.path ? [body.path] : [])
     if (paths.length === 0) {
       return NextResponse.json({ error: 'path or paths required' }, { status: 400 })
@@ -34,7 +34,10 @@ export async function POST(req: NextRequest) {
       const entry = queue[p]
       if (!entry?.agents) continue
       let touched = false
-      for (const agent of Object.keys(entry.agents)) {
+      // When `agent` is given (e.g. an agent detail page), only that slot is
+      // touched — the other agents on this queue entry keep processing.
+      const slots = body.agent ? [body.agent] : Object.keys(entry.agents)
+      for (const agent of slots) {
         if (entry.agents[agent] === 'pending') {
           entry.agents[agent] = 'paused'
           touched = true

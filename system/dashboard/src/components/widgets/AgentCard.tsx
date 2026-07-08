@@ -1,11 +1,15 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { Settings } from 'lucide-react'
 import type { AgentInfo } from '@/lib/types'
 import { formatRelative, formatDuration, agentDisplayName, statusDotClass } from '@/lib/utils'
 import StatusBadge from './StatusBadge'
 import AgentConfigDialog from '@/components/agents/AgentConfigDialog'
+
+// Agents with a dedicated /agents/{name} detail page.
+const DETAIL_PAGES = new Set(['vision'])
 
 interface AgentCardProps {
   agent: AgentInfo
@@ -22,7 +26,13 @@ export default function AgentCard({ agent }: AgentCardProps) {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <span className={`dot ${statusDotClass(agent.status)}`} />
-              <span className="font-medium text-zinc-100 text-sm truncate">{agentDisplayName(agent.name)}</span>
+              {DETAIL_PAGES.has(agent.name) ? (
+                <Link href={`/agents/${agent.name}`} className="font-medium text-zinc-100 text-sm truncate hover:text-primary hover:underline">
+                  {agentDisplayName(agent.name)}
+                </Link>
+              ) : (
+                <span className="font-medium text-zinc-100 text-sm truncate">{agentDisplayName(agent.name)}</span>
+              )}
             </div>
             {agent.description && (
               <p className="text-xs text-zinc-500 mt-1 leading-relaxed">{agent.description}</p>

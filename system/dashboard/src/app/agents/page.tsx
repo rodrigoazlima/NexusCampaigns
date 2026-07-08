@@ -7,7 +7,11 @@ import ActivityFeed from '@/components/widgets/ActivityFeed'
 import AutoRefresh from '@/components/AutoRefresh'
 import { AgentConfigButton } from '@/components/agents/AgentConfigButton'
 import { Bot } from 'lucide-react'
+import Link from 'next/link'
 import { agentDisplayName, formatDateTime, formatDuration } from '@/lib/utils'
+
+// Agents with a dedicated /agents/{name} detail page.
+const DETAIL_PAGES = new Set(['vision'])
 
 export default async function AgentsPage() {
   const [agents, logs] = await Promise.all([
@@ -57,7 +61,15 @@ export default async function AgentsPage() {
             <tbody>
               {activeAgents.map((agent) => (
                 <tr key={agent.id} className="border-b border-surface-3/50 hover:bg-surface-2">
-                  <td className="px-4 py-2 font-medium text-zinc-200">{agentDisplayName(agent.name)}</td>
+                  <td className="px-4 py-2 font-medium text-zinc-200">
+                    {DETAIL_PAGES.has(agent.name) ? (
+                      <Link href={`/agents/${agent.name}`} className="hover:text-primary hover:underline">
+                        {agentDisplayName(agent.name)}
+                      </Link>
+                    ) : (
+                      agentDisplayName(agent.name)
+                    )}
+                  </td>
                   <td className="px-4 py-2">
                     <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded font-semibold uppercase ${
                       agent.status === 'idle' ? 'bg-success/10 text-success' :
