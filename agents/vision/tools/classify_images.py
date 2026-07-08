@@ -189,7 +189,7 @@ def _candidate_images(state: dict, queue: dict) -> list[Path]:
         if rel in gen_tokens:
             continue
         agents = queue.get(rel, {}).get("agents", {})
-        if isinstance(agents, dict) and agents.get("vision") == "done":
+        if isinstance(agents, dict) and agents.get("vision") in ("done", "paused"):
             continue
         images.append(path)
     return sorted(images, key=lambda p: (p.suffix.lower() == ".png", p))

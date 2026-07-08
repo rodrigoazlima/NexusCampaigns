@@ -46,6 +46,7 @@ export interface QueueStats {
   pending: number
   done: number
   stuck: number
+  paused: number
   byType: Record<string, number>
   items: QueueItem[]
 }

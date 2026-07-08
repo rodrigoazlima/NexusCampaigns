@@ -60,6 +60,15 @@ def _flag_short_file(path: Path, fio: FrontmatterIO, log: Logger) -> None:
         log.warning(f"Could not flag {path.name}: {exc}")
 
 
+def _load_queue() -> dict:
+    if not _QUEUE_FILE.exists():
+        return {}
+    try:
+        return json.loads(_QUEUE_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
 def _draft_source(fm: dict) -> str | None:
     """Return the first source path of a draft (normalized), or None."""
     src = fm.get("source")
@@ -113,6 +122,7 @@ def main() -> None:
     flagged = 0
     scanned = 0
     reviewed_sources: set[str] = set()
+    queue = _load_queue()
 
     if not _PROCESSING.exists():
         log.info("01-Processing/ does not exist — nothing to scan")
@@ -128,6 +138,8 @@ def main() -> None:
             continue
 
         src = _draft_source(fm)
+        if src and queue.get(src, {}).get("agents", {}).get("review") == "paused":
+            continue  # source paused — leave this draft untouched
         if src:
             reviewed_sources.add(src)
 

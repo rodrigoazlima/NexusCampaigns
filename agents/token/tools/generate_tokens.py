@@ -174,6 +174,8 @@ def _set_queue_token_slot(source_rel: str, status: str, log: Logger) -> bool:
     def _mark(entry: dict) -> Optional[str]:
         nonlocal changed
         agents = entry.setdefault("agents", {})
+        if agents.get("token") == "paused":
+            return None
         if agents.get("token") != status:
             agents["token"] = status
             changed = True
@@ -473,6 +475,7 @@ def main() -> None:
     cfg          = _load_config()
     vision_state = _load_vision_state()
     gen_tokens   = _load_gen_tokens()
+    queue        = _load_queue()
 
     all_images = vision_state.get("images", {})
 
@@ -499,6 +502,7 @@ def main() -> None:
         if entry.get("type") not in _SKIP_TYPES
         if img_key not in gen_tokens
         if not _is_token_stem(_PROJECT_ROOT / entry["path"])
+        if queue.get(entry["path"], {}).get("agents", {}).get("token") != "paused"
     ]
 
     if not eligible:

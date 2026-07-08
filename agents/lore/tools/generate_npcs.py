@@ -465,6 +465,7 @@ def _run_batch_impl(log: "_Logger") -> tuple[int, int]:
         (img_key, entry)
         for img_key, entry in vision_state.get("images", {}).items()
         if entry.get("type") in _CHARACTER_TYPES and entry.get("status") == "ok"
+        if queue.get(entry.get("path", ""), {}).get("agents", {}).get("lore") != "paused"
     ]
 
     pairs: list[tuple[str, dict, dict]] = []

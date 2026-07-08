@@ -161,7 +161,7 @@ export function readQueue(): QueueStats {
   }>>(path.join(SHARED_DIR, 'inbox-queue.json'))
 
   if (!raw) {
-    return { total: 0, pending: 0, done: 0, stuck: 0, byType: {}, items: [] }
+    return { total: 0, pending: 0, done: 0, stuck: 0, paused: 0, byType: {}, items: [] }
   }
 
   const items: QueueItem[] = Object.entries(raw).map(([p, v]) => ({
@@ -177,6 +177,7 @@ export function readQueue(): QueueStats {
   let pending = 0
   let done = 0
   let stuck = 0
+  let paused = 0
 
   const cutoff24h = Date.now() - 24 * 60 * 60 * 1000
 
@@ -184,9 +185,12 @@ export function readQueue(): QueueStats {
     byType[item.type] = (byType[item.type] ?? 0) + 1
     const agentStatuses = Object.values(item.agents)
     const allDone = agentStatuses.every((s) => s === 'done' || s === 'skip')
+    const anyPaused = agentStatuses.some((s) => s === 'paused')
     const anyPending = agentStatuses.some((s) => s === 'pending')
     if (allDone) {
       done++
+    } else if (anyPaused) {
+      paused++
     } else if (anyPending) {
       const ingestedTime = new Date(item.ingestedAt).getTime()
       if (!isNaN(ingestedTime) && ingestedTime < cutoff24h) {
@@ -197,7 +201,7 @@ export function readQueue(): QueueStats {
     }
   }
 
-  return { total: items.length, pending, done, stuck, byType, items }
+  return { total: items.length, pending, done, stuck, paused, byType, items }
 }
 
 // ---------------------------------------------------------------------------
