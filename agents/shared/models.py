@@ -138,6 +138,7 @@ class AgentSlotStatus(str, Enum):
     pending = "pending"
     done    = "done"
     skip    = "skip"
+    paused  = "paused"
 
 
 class ImageProcessStatus(str, Enum):

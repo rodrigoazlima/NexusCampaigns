@@ -14,15 +14,27 @@ interface Props {
 
 const filename = (p: string) => p.split('/').pop() ?? p
 
+const STATUS_LABELS: Record<string, string> = {
+  stuck: 'Stuck', pending: 'Pending', paused: 'Paused',
+}
+
 export default function QueueBoard({ items, agentStats, byType }: Props) {
   const [search, setSearch] = useState('')
   const [types, setTypes] = useState<Set<string>>(new Set())
-  const [showPaused, setShowPaused] = useState(false)
+  const [statuses, setStatuses] = useState<Set<string>>(new Set())
 
   const toggleType = (t: string) => {
     setTypes((prev) => {
       const next = new Set(prev)
       if (next.has(t)) next.delete(t); else next.add(t)
+      return next
+    })
+  }
+
+  const toggleStatus = (s: string) => {
+    setStatuses((prev) => {
+      const next = new Set(prev)
+      if (next.has(s)) next.delete(s); else next.add(s)
       return next
     })
   }
@@ -37,7 +49,13 @@ export default function QueueBoard({ items, agentStats, byType }: Props) {
   const stuckItems = filtered.filter(isStuck)
   const pausedItems = filtered.filter(isPaused)
   const pendingItems = filtered.filter((i) => !isDone(i) && !isStuck(i) && !isPaused(i))
-  const doneItems = filtered.filter(isDone)
+
+  const statusCounts: Record<string, number> = {
+    stuck: stuckItems.length, pending: pendingItems.length, paused: pausedItems.length,
+  }
+  // Empty selection = default view (everything but the huge Paused list); picking
+  // chips narrows down to exactly the selected status tables, Paused included.
+  const showStatus = (s: string) => (statuses.size === 0 ? s !== 'paused' : statuses.has(s))
 
   return (
     <div>
@@ -67,58 +85,61 @@ export default function QueueBoard({ items, agentStats, byType }: Props) {
             </button>
           ))}
         </div>
-        <button
-          type="button"
-          onClick={() => setShowPaused((v) => !v)}
-          className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${
-            showPaused
-              ? 'bg-neutral/15 text-neutral border-neutral/40'
-              : 'bg-surface-2 text-zinc-400 border-surface-3 hover:text-zinc-200'
-          }`}
-        >
-          Paused <span className="text-zinc-600">{pausedItems.length}</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {Object.entries(STATUS_LABELS).map(([status, label]) => (
+            <button
+              key={status}
+              type="button"
+              onClick={() => toggleStatus(status)}
+              className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${
+                statuses.has(status)
+                  ? 'bg-neutral/15 text-neutral border-neutral/40'
+                  : 'bg-surface-2 text-zinc-400 border-surface-3 hover:text-zinc-200'
+              }`}
+            >
+              {label} <span className="text-zinc-600">{statusCounts[status]}</span>
+            </button>
+          ))}
+        </div>
         {(search || types.size > 0) && (
           <span className="text-xs text-zinc-600">{filtered.length} / {items.length}</span>
         )}
       </div>
 
-      <QueueTable
-        items={stuckItems}
-        agentStats={agentStats}
-        title="Stuck Items"
-        countClass="text-danger"
-        allowPause
-        pulse
-      />
+      {showStatus('stuck') && (
+        <QueueTable
+          items={stuckItems}
+          agentStats={agentStats}
+          title="Stuck Items"
+          countClass="text-danger"
+          allowPause
+          allowDelete
+          pulse
+        />
+      )}
 
-      <QueueTable
-        items={pendingItems}
-        agentStats={agentStats}
-        title="Pending Items"
-        countClass="text-warning"
-        limit={50}
-        allowPause
-      />
+      {showStatus('pending') && (
+        <QueueTable
+          items={pendingItems}
+          agentStats={agentStats}
+          title="Pending Items"
+          countClass="text-warning"
+          limit={50}
+          allowPause
+          allowDelete
+        />
+      )}
 
-      {showPaused && (
+      {showStatus('paused') && (
         <QueueTable
           items={pausedItems}
           agentStats={agentStats}
           title="Paused Items"
           countClass="text-neutral"
+          allowResume
+          allowDelete
         />
       )}
-
-      <QueueTable
-        items={doneItems}
-        agentStats={agentStats}
-        title="Completed Items"
-        countClass="text-success"
-        limit={30}
-        hideWhenEmpty={false}
-        emptyMessage="No completed items"
-      />
     </div>
   )
 }

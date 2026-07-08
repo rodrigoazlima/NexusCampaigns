@@ -503,7 +503,21 @@ def main() -> None:
         if img_key not in gen_tokens
         if not _is_token_stem(_PROJECT_ROOT / entry["path"])
         if queue.get(entry["path"], {}).get("agents", {}).get("token") != "paused"
+        if (_PROJECT_ROOT / entry["path"]).exists()
     ]
+
+    missing_sources = [
+        (img_key, entry)
+        for img_key, entry in all_images.items()
+        if entry.get("status") == "ok"
+        if not entry.get("isToken", False)
+        if entry.get("type") not in _SKIP_TYPES
+        if img_key not in gen_tokens
+        if not (_PROJECT_ROOT / entry["path"]).exists()
+    ]
+    for img_key, entry in missing_sources:
+        log.warning(f"Source gone, skipping permanently: {entry['path']}")
+        _set_queue_token_slot(entry["path"], "skip", log)
 
     if not eligible:
         log.info("No eligible images for token generation")

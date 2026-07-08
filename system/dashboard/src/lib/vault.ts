@@ -164,14 +164,20 @@ export function readQueue(): QueueStats {
     return { total: 0, pending: 0, done: 0, stuck: 0, paused: 0, byType: {}, items: [] }
   }
 
-  const items: QueueItem[] = Object.entries(raw).map(([p, v]) => ({
-    path: p,
-    ingestedAt: v.ingestedAt,
-    type: v.type,
-    agents: v.agents,
-    // tolerate the legacy single-int shape from earlier builds
-    reruns: v.reruns && typeof v.reruns === 'object' ? v.reruns : {},
-  }))
+  const draftBySource = draftBySourceMap()
+  const items: QueueItem[] = Object.entries(raw).map(([p, v]) => {
+    const draft = draftBySource.get(p.replace(/\\/g, '/'))
+    return {
+      path: p,
+      ingestedAt: v.ingestedAt,
+      updatedAt: draft?.updated || v.ingestedAt,
+      type: v.type,
+      agents: v.agents,
+      // tolerate the legacy single-int shape from earlier builds
+      reruns: v.reruns && typeof v.reruns === 'object' ? v.reruns : {},
+      entityId: draft ? (draft.uuid || draft.id) : null,
+    }
+  })
 
   const byType: Record<string, number> = {}
   let pending = 0
@@ -464,6 +470,16 @@ function readRawDrafts(): RawDraft[] {
   }
 
   return drafts
+}
+
+// First draft per normalized source path (same pick as the old linear .find)
+function draftBySourceMap(): Map<string, RawDraft> {
+  const map = new Map<string, RawDraft>()
+  for (const d of readRawDrafts()) {
+    const src = d.source[0]?.replace(/\\/g, '/')
+    if (src && !map.has(src)) map.set(src, d)
+  }
+  return map
 }
 
 function toDraftRef(d: ReviewItem): DraftRef {
@@ -1148,12 +1164,7 @@ export function readInboxImages(): InboxImage[] {
   const cutoff24h = Date.now() - 24 * 60 * 60 * 1000
   const results: InboxImage[] = []
 
-  // First draft per normalized source path (same pick as the old linear .find)
-  const draftBySource = new Map<string, RawDraft>()
-  for (const d of readRawDrafts()) {
-    const src = d.source[0]?.replace(/\\/g, '/')
-    if (src && !draftBySource.has(src)) draftBySource.set(src, d)
-  }
+  const draftBySource = draftBySourceMap()
 
   // One readdir per unique directory instead of one existsSync per image
   const dirListings = new Map<string, Set<string>>()
@@ -1189,6 +1200,8 @@ export function readInboxImages(): InboxImage[] {
 
     const agentStatuses = Object.values(entry.agents)
     const anyPending = agentStatuses.some((s) => s === 'pending')
+    const anyPaused = agentStatuses.some((s) => s === 'paused')
+    const allDone = agentStatuses.every((s) => s === 'done' || s === 'skip')
     const ingestedTime = new Date(entry.ingestedAt).getTime()
     const isStuck = anyPending && !isNaN(ingestedTime) && ingestedTime < cutoff24h
 
@@ -1205,11 +1218,18 @@ export function readInboxImages(): InboxImage[] {
       hasToken,
       tokenPath,
       isStuck,
+      isPaused: anyPaused,
+      isDone: allDone,
+      tags: draft?.tags ?? [],
       entityId,
     })
   }
 
-  results.sort((a, b) => new Date(b.ingestedAt).getTime() - new Date(a.ingestedAt).getTime())
+  // Latest first, but paused items always sink to the bottom of the list.
+  results.sort((a, b) => {
+    if (a.isPaused !== b.isPaused) return a.isPaused ? 1 : -1
+    return new Date(b.ingestedAt).getTime() - new Date(a.ingestedAt).getTime()
+  })
 
   inboxCache = { mtimeMs, at: Date.now(), data: results }
   return results

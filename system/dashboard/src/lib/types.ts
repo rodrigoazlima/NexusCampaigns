@@ -29,9 +29,11 @@ export interface AgentInfo {
 export interface QueueItem {
   path: string
   ingestedAt: string
+  updatedAt: string                // linked draft's frontmatter `updated`, else falls back to ingestedAt
   type: string
   agents: Record<string, string>
   reruns: Record<string, number>   // per-agent manual reprocess count
+  entityId: string | null          // 01-Processing draft uuid/id for this item's source, if one exists
 }
 
 // Per-agent runtime stats surfaced in the queue pipeline tooltip.
@@ -142,6 +144,9 @@ export interface InboxImage {
   hasToken: boolean
   tokenPath: string | null
   isStuck: boolean
+  isPaused: boolean
+  isDone: boolean
+  tags: string[]
   entityId: string | null
 }
 
@@ -149,6 +154,7 @@ export interface InboxPage {
   total: number
   stuck: number
   withToken: number
+  availableTags: string[]
   items: InboxImage[]
 }
 
