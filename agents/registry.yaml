@@ -11,17 +11,21 @@ ingestion_options:
   # pipeline picks them up. When false, they're only logged as warnings.
   auto_absorb_stray: true
 
+# timeout_seconds: per-request LLM read timeout (default 120). An agent can
+# override it for its own calls via agent.json tasks.<task-id>.llm.timeout_seconds.
 llm_endpoints:
   vision_llm:
     url: "http://localhost:1234/v1/chat/completions"
     model: "qwen3-vl-4b-instruct"
     type: vision
     provider: lm-studio
+    timeout_seconds: 120
   local_router:
     url: "http://localhost:8080/v1/chat/completions"
     model: "auto"
     type: text
     provider: local-router
+    timeout_seconds: 120
 
 # Fallback dispatch used by runner.py when an agent has no agent.json (or no
 # entry for the requested task_id). Lets an agent run off its registry.yaml

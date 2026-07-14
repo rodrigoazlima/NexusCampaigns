@@ -151,6 +151,8 @@ def _set_queue_token_slot(source_rel: str, status: str, log: Logger) -> bool:
     def _mark(entry: dict) -> Optional[str]:
         nonlocal changed
         agents = entry.setdefault("agents", {})
+        if agents.get("token") == "paused":
+            return None
         if agents.get("token") != status:
             agents["token"] = status
             changed = True
@@ -477,6 +479,10 @@ class TokenWorker:
             if slot == "error":
                 continue
 
+            # Human paused this source's token generation — leave it alone
+            if slot == "paused":
+                continue
+
             if entry.get("type") in _SKIP_TYPES:
                 if slot == "pending":
                     items.append(WorkItem(src_rel, {"action": "skip-type", "img_key": img_key,
@@ -489,6 +495,11 @@ class TokenWorker:
             if img_key in gen_tokens:
                 if slot == "pending":
                     items.append(WorkItem(src_rel, {"action": "reconcile", "img_key": img_key}))
+                continue
+
+            if not (_PROJECT_ROOT / src_rel).exists():
+                if slot == "pending":
+                    items.append(WorkItem(src_rel, {"action": "skip-missing", "img_key": img_key}))
                 continue
 
             if reruns >= _MAX_RERUNS:
@@ -518,6 +529,11 @@ class TokenWorker:
         if action == "reconcile":
             _set_queue_token_slot(item.key, "done", log)
             return WorkResult("done", "reconciled existing token slot")
+
+        if action == "skip-missing":
+            log.warning(f"Source gone, skipping permanently: {item.key}")
+            _set_queue_token_slot(item.key, "skip", log)
+            return WorkResult("skip", f"source gone: {item.key}")
 
         # generate
         entry    = item.payload["entry"]

@@ -139,6 +139,7 @@ class AgentSlotStatus(str, Enum):
     done    = "done"
     skip    = "skip"
     error   = "error"   # terminal until maintenance/human resets to pending (reruns += 1)
+    paused  = "paused"
 
 
 class ImageProcessStatus(str, Enum):
@@ -720,6 +721,7 @@ class LLMEndpointSpec(BaseModel):
     model:    str
     type:     str    # "vision" | "text"
     provider: str
+    timeout_seconds: int = 120
 
 
 class AgentSharedStateSpec(BaseModel):

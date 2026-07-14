@@ -55,7 +55,7 @@ const nav: NavSection[] = [
     group: '',
     collapsible: false,
     items: [
-      { href: '/', label: 'Home', icon: Home },
+      { href: '/home', label: 'Home', icon: Home },
     ],
   },
   {
@@ -85,7 +85,6 @@ const nav: NavSection[] = [
       { href: '/gm', label: 'GM Hub', icon: Dices },
       { href: '/gm/tokens', label: 'Tokens', icon: CircleDot },
       { href: '/gm/chat', label: 'Agent Chat', icon: MessageSquare },
-      { href: '/', label: 'Executive', icon: LayoutDashboard },
       { href: '/pipeline', label: 'Pipeline', icon: GitBranch },
       { href: '/review', label: 'Review', icon: Eye },
       { href: '/library', label: 'Library', icon: BookOpen },
@@ -104,6 +103,7 @@ const nav: NavSection[] = [
         label: 'Monitoring',
         icon: Eye,
         children: [
+          { href: '/executive', label: 'Executive', icon: LayoutDashboard },
           { href: '/errors', label: 'Errors', icon: Zap },
           { href: '/prompt', label: 'Prompts', icon: FileText },
         ],

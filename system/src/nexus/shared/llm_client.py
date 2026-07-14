@@ -141,12 +141,19 @@ class LLMClient(ILLMClient):
                     headers={"Content-Type": "application/json"},
                     method="POST",
                 )
-                with urllib.request.urlopen(req, timeout=60) as resp:
+                with urllib.request.urlopen(req, timeout=self._cfg.timeout_seconds) as resp:
                     result = json.loads(resp.read().decode("utf-8"))
                     return result["choices"][0]["message"]["content"]
 
             except urllib.error.URLError as exc:
                 raise LLMOfflineError(f"LLM server unreachable: {exc}") from exc
+
+            except (TimeoutError, ConnectionError) as exc:
+                # Read timeout / connection reset mid-response: server slow or
+                # swapping models, not a bad image — must never mark the image
+                # failed, so surface as offline (caller aborts batch, retries
+                # next run).
+                raise LLMOfflineError(f"LLM connection dropped: {exc}") from exc
 
             except (KeyError, IndexError) as exc:
                 last_exc = LLMResponseError(

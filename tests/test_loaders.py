@@ -1,10 +1,12 @@
 """Tests for shared.loaders.load_vault_config."""
 
+import json
+
 import pytest
 from pathlib import Path
 
-from nexus.shared.loaders import load_vault_config, _find_project_root
-from nexus.shared.config import VaultConfig
+from nexus.shared.loaders import load_llm_endpoint, load_vault_config, _find_project_root
+from nexus.shared.config import LLMEndpointConfig, VaultConfig
 
 
 @pytest.fixture
@@ -95,3 +97,72 @@ class TestLoadVaultConfig:
         ep = cfg.llm_endpoints["vision"]
         with pytest.raises((AttributeError, TypeError)):
             ep.url = "http://other"  # type: ignore[misc]
+
+
+_FALLBACK = LLMEndpointConfig(
+    url      = "http://localhost:1234/v1/chat/completions",
+    model    = "fallback-model",
+    type     = "vision",
+    provider = "lmstudio",
+)
+
+_REGISTRY_YAML = """\
+version: 1
+vault_root: "knowledge-base"
+llm_endpoints:
+  vision_llm:
+    url: "http://localhost:1234/v1/chat/completions"
+    model: "registry-model"
+    type: vision
+    provider: lm-studio
+    timeout_seconds: 240
+"""
+
+
+class TestLoadLLMEndpoint:
+    """timeout precedence: agent.json > registry.yaml > dataclass default (120)."""
+
+    def test_default_timeout_without_registry(self, project_root):
+        cfg = load_llm_endpoint("vision_llm", fallback=_FALLBACK, project_root=project_root)
+        assert cfg == _FALLBACK
+        assert cfg.timeout_seconds == 120
+
+    def test_registry_timeout(self, project_root):
+        (project_root / "agents").mkdir()
+        (project_root / "agents" / "registry.yaml").write_text(_REGISTRY_YAML, encoding="utf-8")
+        cfg = load_llm_endpoint("vision_llm", fallback=_FALLBACK, project_root=project_root)
+        assert cfg.model == "registry-model"
+        assert cfg.timeout_seconds == 240
+
+    def test_agent_json_overrides_registry(self, project_root):
+        agent_dir = project_root / "agents" / "vision"
+        agent_dir.mkdir(parents=True)
+        (project_root / "agents" / "registry.yaml").write_text(_REGISTRY_YAML, encoding="utf-8")
+        (agent_dir / "agent.json").write_text(json.dumps({
+            "tasks": {"vision-agent": {"llm": {"timeout_seconds": 300}}}
+        }), encoding="utf-8")
+        cfg = load_llm_endpoint(
+            "vision_llm", fallback=_FALLBACK,
+            agent_dir=agent_dir, task_id="vision-agent", project_root=project_root,
+        )
+        assert cfg.model == "registry-model"
+        assert cfg.timeout_seconds == 300
+
+    def test_agent_json_without_llm_block_keeps_registry_timeout(self, project_root):
+        agent_dir = project_root / "agents" / "vision"
+        agent_dir.mkdir(parents=True)
+        (project_root / "agents" / "registry.yaml").write_text(_REGISTRY_YAML, encoding="utf-8")
+        (agent_dir / "agent.json").write_text(json.dumps({
+            "tasks": {"vision-agent": {"intervalSeconds": 900}}
+        }), encoding="utf-8")
+        cfg = load_llm_endpoint(
+            "vision_llm", fallback=_FALLBACK,
+            agent_dir=agent_dir, task_id="vision-agent", project_root=project_root,
+        )
+        assert cfg.timeout_seconds == 240
+
+    def test_unknown_alias_falls_back(self, project_root):
+        (project_root / "agents").mkdir()
+        (project_root / "agents" / "registry.yaml").write_text(_REGISTRY_YAML, encoding="utf-8")
+        cfg = load_llm_endpoint("nonexistent", fallback=_FALLBACK, project_root=project_root)
+        assert cfg == _FALLBACK

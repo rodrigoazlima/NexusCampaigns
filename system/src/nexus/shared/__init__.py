@@ -12,7 +12,7 @@ from .entity_scanner import EntityScanner
 from .file_lock import FileLock
 from .frontmatter_io import FrontmatterIO
 from .llm_client import LLMClient
-from .loaders import load_registry, load_vault_config
+from .loaders import load_llm_endpoint, load_registry, load_vault_config
 from .logger import Logger, _ensure_utf8_stdout
 from .quality_gate import QualityGate
 from .queue_store import locked_update_queue_entry
@@ -166,7 +166,7 @@ __all__ = [
     # Config — Layer 2 (JSON / AppConfig)
     "AppConfig", "LLMConfig", "LoggingConfig", "get_config", "clear_config_cache",
     # Concrete implementations
-    "EntityScanner", "FileLock", "FrontmatterIO", "LLMClient", "load_registry", "load_vault_config",
+    "EntityScanner", "FileLock", "FrontmatterIO", "LLMClient", "load_llm_endpoint", "load_registry", "load_vault_config",
     "Logger", "_ensure_utf8_stdout", "QualityGate", "locked_update_queue_entry",
     "StateStore", "TextStateStore", "bootstrap_vault_state", "VaultGuard",
     # Slug utilities

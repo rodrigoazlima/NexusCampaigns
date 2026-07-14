@@ -172,7 +172,12 @@ $VaultLinkPath = Join-Path $ProjectRoot ".knowledge-base"
 
 function Log([string]$Msg, [string]$Level = "INFO") {
     $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    Write-Host "[$ts] [setup-service] ${Level}: $Msg"
+    $color = switch ($Level) {
+        "WARN"  { "Yellow" }
+        "ERROR" { "Red" }
+        default { "Gray" }
+    }
+    Write-Host "[$ts] [setup-service] ${Level}: $Msg" -ForegroundColor $color
 }
 
 $script:ProgressPct = 0

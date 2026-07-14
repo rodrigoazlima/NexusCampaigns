@@ -3,6 +3,7 @@ import './globals.css'
 import Sidebar from '@/components/layout/Sidebar'
 import GlobalShortcuts from '@/components/layout/GlobalShortcuts'
 import GlobalDropZone from '@/components/layout/GlobalDropZone'
+import LoadingOverlay from '@/components/layout/LoadingOverlay'
 
 export const metadata: Metadata = {
   title: 'Nexus Campaigns',
@@ -24,6 +25,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className="bg-surface text-zinc-100 min-h-screen">
+        <LoadingOverlay />
         <GlobalShortcuts />
         <GlobalDropZone />
         <div className="flex h-screen overflow-hidden">

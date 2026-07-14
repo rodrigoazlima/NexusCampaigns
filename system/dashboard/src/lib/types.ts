@@ -26,12 +26,46 @@ export interface AgentInfo {
   recentRuns: AgentRun[]
 }
 
+// AGENT.md frontmatter, parsed for the agent detail pages.
+export interface AgentDoc {
+  name: string
+  purpose: string
+  inputs: string[]
+  outputs: string[]
+  dependencies: string[]
+  responsibilities: string[]
+  restrictions: string[]
+  state_files: string[]
+  commit_scope: string[]
+  owned_tools: string[]
+}
+
+// Raw record shape from agents/vision/state/processed-images.json (images map).
+export interface VisionImageRecord {
+  uuid: string
+  path: string
+  processedAt: string
+  originalName: string
+  type: string
+  ancestry: string
+  class: string
+  creature_type: string
+  element: string
+  environment: string
+  description: string
+  sha256: string
+  isToken: boolean
+  status: string
+}
+
 export interface QueueItem {
   path: string
   ingestedAt: string
+  updatedAt: string                // linked draft's frontmatter `updated`, else falls back to ingestedAt
   type: string
   agents: Record<string, string>
   reruns: Record<string, number>   // per-agent manual reprocess count
+  entityId: string | null          // 01-Processing draft uuid/id for this item's source, if one exists
 }
 
 // Per-agent runtime stats surfaced in the queue pipeline tooltip.
@@ -46,6 +80,8 @@ export interface QueueStats {
   pending: number
   done: number
   stuck: number
+  paused: number
+  error: number
   byType: Record<string, number>
   items: QueueItem[]
 }
@@ -141,6 +177,9 @@ export interface InboxImage {
   hasToken: boolean
   tokenPath: string | null
   isStuck: boolean
+  isPaused: boolean
+  isDone: boolean
+  tags: string[]
   entityId: string | null
 }
 
@@ -148,6 +187,7 @@ export interface InboxPage {
   total: number
   stuck: number
   withToken: number
+  availableTags: string[]
   items: InboxImage[]
 }
 

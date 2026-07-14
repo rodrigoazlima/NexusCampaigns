@@ -22,10 +22,12 @@ import type {
   InboxImage,
   TokenFile,
   AgentConfig,
+  AgentDoc,
   IntelligenceConfig,
   CampaignFrame,
 } from './types'
 import { addSeconds } from './utils'
+import { resolveStatus } from './queue-status'
 
 export const PROJECT_ROOT =
   process.env.PROJECT_ROOT ?? path.resolve(process.cwd(), '..', '..')
@@ -161,43 +163,43 @@ export function readQueue(): QueueStats {
   }>>(path.join(SHARED_DIR, 'inbox-queue.json'))
 
   if (!raw) {
-    return { total: 0, pending: 0, done: 0, stuck: 0, byType: {}, items: [] }
+    return { total: 0, pending: 0, done: 0, stuck: 0, paused: 0, error: 0, byType: {}, items: [] }
   }
 
-  const items: QueueItem[] = Object.entries(raw).map(([p, v]) => ({
-    path: p,
-    ingestedAt: v.ingestedAt,
-    type: v.type,
-    agents: v.agents,
-    // tolerate the legacy single-int shape from earlier builds
-    reruns: v.reruns && typeof v.reruns === 'object' ? v.reruns : {},
-  }))
+  const draftBySource = draftBySourceMap()
+  const items: QueueItem[] = Object.entries(raw).map(([p, v]) => {
+    const draft = draftBySource.get(p.replace(/\\/g, '/'))
+    return {
+      path: p,
+      ingestedAt: v.ingestedAt,
+      updatedAt: draft?.updated || v.ingestedAt,
+      type: v.type,
+      agents: v.agents,
+      // tolerate the legacy single-int shape from earlier builds
+      reruns: v.reruns && typeof v.reruns === 'object' ? v.reruns : {},
+      entityId: draft ? (draft.uuid || draft.id) : null,
+    }
+  })
 
   const byType: Record<string, number> = {}
   let pending = 0
   let done = 0
   let stuck = 0
-
-  const cutoff24h = Date.now() - 24 * 60 * 60 * 1000
+  let paused = 0
+  let error = 0
 
   for (const item of items) {
     byType[item.type] = (byType[item.type] ?? 0) + 1
-    const agentStatuses = Object.values(item.agents)
-    const allDone = agentStatuses.every((s) => s === 'done' || s === 'skip')
-    const anyPending = agentStatuses.some((s) => s === 'pending')
-    if (allDone) {
-      done++
-    } else if (anyPending) {
-      const ingestedTime = new Date(item.ingestedAt).getTime()
-      if (!isNaN(ingestedTime) && ingestedTime < cutoff24h) {
-        stuck++
-      } else {
-        pending++
-      }
+    switch (resolveStatus(item)) {
+      case 'done': done++; break
+      case 'error': error++; break
+      case 'paused': paused++; break
+      case 'stuck': stuck++; break
+      case 'pending': pending++; break
     }
   }
 
-  return { total: items.length, pending, done, stuck, byType, items }
+  return { total: items.length, pending, done, stuck, paused, error, byType, items }
 }
 
 // ---------------------------------------------------------------------------
@@ -448,6 +450,33 @@ export function readAgents(): AgentInfo[] {
   return agents
 }
 
+/** Parses agents/{name}/AGENT.md frontmatter for the agent detail pages. */
+export function readAgentDoc(name: string): AgentDoc | null {
+  try {
+    const raw = fs.readFileSync(path.join(AGENTS_DIR, name, 'AGENT.md'), 'utf-8')
+    const { data } = matter(raw)
+    return {
+      name: data.name ?? name,
+      purpose: typeof data.purpose === 'string' ? data.purpose.trim() : '',
+      inputs: data.inputs ?? [],
+      outputs: data.outputs ?? [],
+      dependencies: data.dependencies ?? [],
+      responsibilities: data.responsibilities ?? [],
+      restrictions: data.restrictions ?? [],
+      state_files: data.state_files ?? [],
+      commit_scope: data.commit_scope ?? [],
+      owned_tools: data.owned_tools ?? [],
+    }
+  } catch {
+    return null
+  }
+}
+
+/** Raw agents/{name}/agent.json, for dispatch/task config display. */
+export function readAgentConfig(name: string): AgentConfig | null {
+  return readJson<AgentConfig>(path.join(AGENTS_DIR, name, 'agent.json'))
+}
+
 // ---------------------------------------------------------------------------
 // Review items (01-Processing)
 // ---------------------------------------------------------------------------
@@ -538,6 +567,16 @@ function readRawDrafts(): RawDraft[] {
   }
 
   return drafts
+}
+
+// First draft per normalized source path (same pick as the old linear .find)
+function draftBySourceMap(): Map<string, RawDraft> {
+  const map = new Map<string, RawDraft>()
+  for (const d of readRawDrafts()) {
+    const src = d.source[0]?.replace(/\\/g, '/')
+    if (src && !map.has(src)) map.set(src, d)
+  }
+  return map
 }
 
 function toDraftRef(d: ReviewItem): DraftRef {
@@ -1222,12 +1261,7 @@ export function readInboxImages(): InboxImage[] {
   const cutoff24h = Date.now() - 24 * 60 * 60 * 1000
   const results: InboxImage[] = []
 
-  // First draft per normalized source path (same pick as the old linear .find)
-  const draftBySource = new Map<string, RawDraft>()
-  for (const d of readRawDrafts()) {
-    const src = d.source[0]?.replace(/\\/g, '/')
-    if (src && !draftBySource.has(src)) draftBySource.set(src, d)
-  }
+  const draftBySource = draftBySourceMap()
 
   // One readdir per unique directory instead of one existsSync per image
   const dirListings = new Map<string, Set<string>>()
@@ -1263,6 +1297,8 @@ export function readInboxImages(): InboxImage[] {
 
     const agentStatuses = Object.values(entry.agents)
     const anyPending = agentStatuses.some((s) => s === 'pending')
+    const anyPaused = agentStatuses.some((s) => s === 'paused')
+    const allDone = agentStatuses.every((s) => s === 'done' || s === 'skip')
     const ingestedTime = new Date(entry.ingestedAt).getTime()
     const isStuck = anyPending && !isNaN(ingestedTime) && ingestedTime < cutoff24h
 
@@ -1279,13 +1315,16 @@ export function readInboxImages(): InboxImage[] {
       hasToken,
       tokenPath,
       isStuck,
+      isPaused: anyPaused,
+      isDone: allDone,
+      tags: draft?.tags ?? [],
       entityId,
     })
   }
 
+  // Latest first, but paused items always sink to the bottom of the list.
   results.sort((a, b) => {
-    if (a.isStuck && !b.isStuck) return -1
-    if (!a.isStuck && b.isStuck) return 1
+    if (a.isPaused !== b.isPaused) return a.isPaused ? 1 : -1
     return new Date(b.ingestedAt).getTime() - new Date(a.ingestedAt).getTime()
   })
 

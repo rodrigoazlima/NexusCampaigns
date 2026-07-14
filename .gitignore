@@ -231,6 +231,7 @@ agents/runtime/state/logs/
 system/state/
 
 # Per-agent mutable state (LLM agents; regenerated each run)
+agents/**/state/
 agents/vision/state/processed-images.json
 agents/vision/state/token-links.json
 agents/lore/state/processed-npcs.json
@@ -308,3 +309,5 @@ ehthumbs.db
 !tsconfig.json
 !tsconfig.*.json
 
+
+system/dashboard/tsconfig.tsbuildinfo

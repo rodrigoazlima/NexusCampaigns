@@ -5,29 +5,49 @@ import Masonry from 'react-masonry-css'
 import type { InboxImage, InboxPage } from '@/lib/types'
 import PageHeader from '@/components/widgets/PageHeader'
 import InboxImageCard from '@/components/gm/InboxImageCard'
-import { Image, Loader2, AlertTriangle } from 'lucide-react'
+import { Image, Loader2, AlertTriangle, Upload } from 'lucide-react'
+import { uploadImage, enqueueImage, isImageFile } from '@/lib/upload-image'
 
 const MASONRY_BREAKPOINTS = { default: 4, 1279: 3, 1023: 2, 639: 1 }
 const PAGE_SIZE = 60
+const STATUS_LABELS: Record<string, string> = {
+  pending: 'Pending', stuck: 'Stuck', paused: 'Paused', done: 'Done',
+}
 
 export default function GMInboxPage() {
   const [items, setItems] = useState<InboxImage[]>([])
-  const [summary, setSummary] = useState<Pick<InboxPage, 'total' | 'stuck' | 'withToken'> | null>(null)
+  const [summary, setSummary] = useState<Pick<InboxPage, 'total' | 'stuck' | 'withToken' | 'availableTags'> | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [statuses, setStatuses] = useState<Set<string>>(new Set())
+  const [tags, setTags] = useState<Set<string>>(new Set())
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const fetchingRef = useRef(false)
   const sentinelRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const buildQuery = useCallback((offset: number) => {
+    const params = new URLSearchParams({ offset: String(offset), limit: String(PAGE_SIZE) })
+    statuses.forEach((s) => params.append('status', s))
+    tags.forEach((t) => params.append('tag', t))
+    if (dateFrom) params.set('dateFrom', dateFrom)
+    if (dateTo) params.set('dateTo', dateTo)
+    return params.toString()
+  }, [statuses, tags, dateFrom, dateTo])
 
   const loadPage = useCallback((offset: number) => {
     if (fetchingRef.current) return
     fetchingRef.current = true
-    fetch(`/api/gm/inbox?offset=${offset}&limit=${PAGE_SIZE}`)
+    setLoading(offset === 0)
+    fetch(`/api/gm/inbox?${buildQuery(offset)}`)
       .then((r) => {
         if (!r.ok) throw new Error('Failed to load')
         return r.json()
       })
       .then((data: InboxPage) => {
-        setSummary({ total: data.total, stuck: data.stuck, withToken: data.withToken })
+        setSummary({ total: data.total, stuck: data.stuck, withToken: data.withToken, availableTags: data.availableTags })
         setItems((prev) => {
           if (offset === 0) return data.items
           const seen = new Set(prev.map((i) => i.path))
@@ -39,9 +59,37 @@ export default function GMInboxPage() {
         fetchingRef.current = false
         setLoading(false)
       })
-  }, [])
+  }, [buildQuery])
 
   useEffect(() => {
+    loadPage(0)
+  }, [loadPage])
+
+  const toggleStatus = (s: string) => {
+    setStatuses((prev) => {
+      const next = new Set(prev)
+      if (next.has(s)) next.delete(s); else next.add(s)
+      return next
+    })
+  }
+
+  const toggleTag = (t: string) => {
+    setTags((prev) => {
+      const next = new Set(prev)
+      if (next.has(t)) next.delete(t); else next.add(t)
+      return next
+    })
+  }
+
+  const handleFilesSelected = useCallback(async (fileList: FileList | null) => {
+    const files = Array.from(fileList ?? []).filter(isImageFile)
+    if (files.length === 0) return
+    setUploading(true)
+    await Promise.all(files.map(async (f) => {
+      const result = await uploadImage({ file: f })
+      if (result.ok && result.path) await enqueueImage(result.path)
+    }))
+    setUploading(false)
     loadPage(0)
   }, [loadPage])
 
@@ -62,7 +110,6 @@ export default function GMInboxPage() {
 
   const total = summary?.total ?? 0
   const stuckCount = summary?.stuck ?? 0
-  const withTokenCount = summary?.withToken ?? 0
 
   return (
     <div className="p-4 md:p-6">
@@ -70,27 +117,92 @@ export default function GMInboxPage() {
         icon={Image}
         title="Inbox Gallery"
         subtitle={`${total} images in queue`}
+        actions={
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                handleFilesSelected(e.target.files)
+                e.target.value = ''
+              }}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-primary/15 text-primary border border-primary/30 hover:bg-primary/25 transition-colors disabled:opacity-50"
+            >
+              {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+              {uploading ? 'Uploading…' : 'Upload'}
+            </button>
+          </>
+        }
       />
 
-      {/* Stats strip */}
-      {!loading && total > 0 && (
-        <div className="flex flex-wrap gap-3 mb-6">
-          <div className="panel px-4 py-3 flex items-center gap-2">
-            <span className="text-2xl font-mono font-bold text-zinc-200">{total}</span>
-            <span className="text-xs text-zinc-500">total images</span>
-          </div>
-          <div className="panel px-4 py-3 flex items-center gap-2">
-            <span className={`text-2xl font-mono font-bold ${stuckCount > 0 ? 'text-danger' : 'text-success'}`}>
-              {stuckCount}
-            </span>
-            <span className="text-xs text-zinc-500">stuck (&gt;24h)</span>
-          </div>
-          <div className="panel px-4 py-3 flex items-center gap-2">
-            <span className="text-2xl font-mono font-bold text-success">{withTokenCount}</span>
-            <span className="text-xs text-zinc-500">with token</span>
-          </div>
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {Object.entries(STATUS_LABELS).map(([status, label]) => (
+            <button
+              key={status}
+              type="button"
+              onClick={() => toggleStatus(status)}
+              className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${
+                statuses.has(status)
+                  ? 'bg-primary/15 text-primary border-primary/40'
+                  : 'bg-surface-2 text-zinc-400 border-surface-3 hover:text-zinc-200'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
-      )}
+        {summary && summary.availableTags.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {summary.availableTags.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => toggleTag(tag)}
+                className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${
+                  tags.has(tag)
+                    ? 'bg-neutral/15 text-neutral border-neutral/40'
+                    : 'bg-surface-2 text-zinc-400 border-surface-3 hover:text-zinc-200'
+                }`}
+              >
+                #{tag}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="flex items-center gap-1.5 text-xs text-zinc-500">
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="bg-surface-3 border border-surface-3 text-zinc-300 px-2 py-1 rounded outline-none focus:border-primary/40 transition-colors"
+          />
+          <span>to</span>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="bg-surface-3 border border-surface-3 text-zinc-300 px-2 py-1 rounded outline-none focus:border-primary/40 transition-colors"
+          />
+        </div>
+        {(statuses.size > 0 || tags.size > 0 || dateFrom || dateTo) && (
+          <button
+            type="button"
+            onClick={() => { setStatuses(new Set()); setTags(new Set()); setDateFrom(''); setDateTo('') }}
+            className="text-xs text-zinc-500 hover:text-zinc-300 underline"
+          >
+            Clear filters
+          </button>
+        )}
+      </div>
 
       {/* Stuck warning */}
       {!loading && stuckCount > 0 && (
@@ -115,9 +227,11 @@ export default function GMInboxPage() {
         <div className="panel p-12 text-center">
           {/* eslint-disable-next-line jsx-a11y/alt-text */}
           <Image size={28} className="mx-auto text-zinc-600 mb-3" />
-          <div className="text-zinc-500 text-sm">No images in inbox queue</div>
+          <div className="text-zinc-500 text-sm">
+            {statuses.size > 0 || tags.size > 0 || dateFrom || dateTo ? 'No images match these filters' : 'No images in inbox queue'}
+          </div>
           <div className="text-xs text-zinc-600 mt-1">
-            Drop images into 00-Inbox/ to get started
+            {statuses.size > 0 || tags.size > 0 || dateFrom || dateTo ? 'Try clearing a filter' : 'Drop images into 00-Inbox/ to get started'}
           </div>
         </div>
       ) : (

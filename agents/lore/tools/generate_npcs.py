@@ -36,6 +36,7 @@ from nexus.shared import (  # noqa: E402
     locked_update_queue_entry,
 )
 from nexus.shared.config import LLMEndpointConfig  # noqa: E402
+from nexus.shared.loaders import load_llm_endpoint  # noqa: E402
 
 TASK_ID         = "lore-agent"
 SCRIPT_BASENAME = "generate_npcs.py"
@@ -55,11 +56,17 @@ _QUEUE_FILE   = _SHARED_STATE / "inbox-queue.json"
 _PROMPT_FILE  = _AGENTS_DIR / "lore" / "prompts" / "generate-npc.txt"
 _REVISE_FILE  = _AGENTS_DIR / "lore" / "prompts" / "revise-npc.md"
 
-_LLM_CFG = LLMEndpointConfig(
-    url      = "http://localhost:1234/v1/chat/completions",
-    model    = "qwen3-vl-4b-instruct",
-    type     = "vision",
-    provider = "lmstudio",
+_LLM_CFG = load_llm_endpoint(
+    "vision_llm",
+    fallback = LLMEndpointConfig(
+        url      = "http://localhost:1234/v1/chat/completions",
+        model    = "qwen3-vl-4b-instruct",
+        type     = "vision",
+        provider = "lmstudio",
+    ),
+    agent_dir    = _AGENTS_DIR / "lore",
+    task_id      = TASK_ID,
+    project_root = _PROJECT_ROOT,
 )
 
 _CHARACTER_TYPES = frozenset({"portrait", "body", "token"})
@@ -458,6 +465,7 @@ def _run_batch_impl(log: "_Logger") -> tuple[int, int]:
         (img_key, entry)
         for img_key, entry in vision_state.get("images", {}).items()
         if entry.get("type") in _CHARACTER_TYPES and entry.get("status") == "ok"
+        if queue.get(entry.get("path", ""), {}).get("agents", {}).get("lore") != "paused"
     ]
 
     pairs: list[tuple[str, dict, dict]] = []

@@ -3,7 +3,7 @@
 import { Fragment, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
-import { Check, Minus, AlertTriangle, Dot, RotateCcw, Loader2 } from 'lucide-react'
+import { Check, Minus, AlertTriangle, Dot, RotateCcw, Loader2, Pause } from 'lucide-react'
 import type { QueueItem, QueueAgentStat } from '@/lib/types'
 import { formatRelative, agentDisplayName } from '@/lib/utils'
 
@@ -17,12 +17,14 @@ const NODE_STYLE: Record<string, string> = {
   pending: 'bg-warning/20 text-warning border-warning/40',
   skip:    'bg-surface-3 text-zinc-600 border-surface-3',
   error:   'bg-danger/20 text-danger border-danger/40',
+  paused:  'bg-neutral/20 text-neutral border-neutral/40',
 }
 
 function NodeIcon({ status }: { status: string }) {
   if (status === 'done') return <Check size={11} />
   if (status === 'skip') return <Minus size={11} />
   if (status === 'error') return <AlertTriangle size={11} />
+  if (status === 'paused') return <Pause size={9} />
   return <Dot size={14} />   // pending
 }
 

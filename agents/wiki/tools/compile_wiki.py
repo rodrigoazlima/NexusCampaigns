@@ -40,6 +40,7 @@ from nexus.shared import (  # noqa: E402
     to_slug,
 )
 from nexus.shared.config import LLMEndpointConfig, VaultPaths  # noqa: E402
+from nexus.shared.loaders import load_llm_endpoint  # noqa: E402
 
 TASK_ID         = "wiki-agent"
 SCRIPT_BASENAME = "compile_wiki.py"
@@ -62,11 +63,17 @@ _HTML_RE     = re.compile(r"<[^>]+>", re.DOTALL)
 _MIN_CHARS   = 100
 _MAX_CHARS   = 6000
 
-_LLM_CFG = LLMEndpointConfig(
-    url      = "http://localhost:8080/v1/chat/completions",
-    model    = "auto",
-    type     = "text",
-    provider = "lmstudio",
+_LLM_CFG = load_llm_endpoint(
+    "local_router",
+    fallback = LLMEndpointConfig(
+        url      = "http://localhost:8080/v1/chat/completions",
+        model    = "auto",
+        type     = "text",
+        provider = "lmstudio",
+    ),
+    agent_dir    = _AGENTS_DIR / "wiki",
+    task_id      = TASK_ID,
+    project_root = _PROJECT_ROOT,
 )
 
 _ALLOWED_TYPES: frozenset[str] = frozenset({

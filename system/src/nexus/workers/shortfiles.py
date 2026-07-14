@@ -51,6 +51,15 @@ def _save_seen(seen: dict) -> None:
     tmp.replace(p)
 
 
+def _load_queue() -> dict:
+    if not _QUEUE_FILE.exists():
+        return {}
+    try:
+        return json.loads(_QUEUE_FILE.read_text(encoding="utf-8").lstrip("﻿"))
+    except Exception:
+        return {}
+
+
 def _draft_source(fm: dict) -> str | None:
     """Return the first source path of a draft (normalized), or None."""
     src = fm.get("source")
@@ -126,6 +135,8 @@ class ShortfilesWorker:
             return WorkResult("skip", f"unparseable frontmatter: {md_path.name}")
 
         src = _draft_source(fm)
+        if src and _load_queue().get(src, {}).get("agents", {}).get("review") == "paused":
+            return WorkResult("skip", f"source paused: {src}")
         if src:
             _mark_review_done(src, log)
 

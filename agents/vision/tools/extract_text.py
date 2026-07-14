@@ -24,6 +24,7 @@ if str(_AGENTS_DIR) not in sys.path:
 
 from nexus.shared import FrontmatterIO, LLMClient, Logger, LLMOfflineError  # noqa: E402
 from nexus.shared.config import LLMEndpointConfig  # noqa: E402
+from nexus.shared.loaders import load_llm_endpoint  # noqa: E402
 
 TASK_ID         = "vision-agent"
 SCRIPT_BASENAME = "extract_text.py"
@@ -37,11 +38,17 @@ _MASTER_LOG   = _AGENTS_DIR / "runtime" / "state" / "logs" / "automation.log"
 _PROC_IMAGES  = _AGENT_STATE / "processed-images.json"
 _TEXT_STATE   = _AGENT_STATE / "text-extractions.json"
 
-_LLM_CFG = LLMEndpointConfig(
-    url      = "http://localhost:1234/v1/chat/completions",
-    model    = "qwen3-vl-4b-instruct",
-    type     = "vision",
-    provider = "lmstudio",
+_LLM_CFG = load_llm_endpoint(
+    "vision_llm",
+    fallback = LLMEndpointConfig(
+        url      = "http://localhost:1234/v1/chat/completions",
+        model    = "qwen3-vl-4b-instruct",
+        type     = "vision",
+        provider = "lmstudio",
+    ),
+    agent_dir    = _AGENTS_DIR / "vision",
+    task_id      = TASK_ID,
+    project_root = _PROJECT_ROOT,
 )
 
 _PROMPT = (

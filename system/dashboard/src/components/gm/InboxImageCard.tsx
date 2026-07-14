@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { InboxImage } from '@/lib/types'
 import { formatRelative } from '@/lib/utils'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, Pause } from 'lucide-react'
 import ImageModal from './ImageModal'
 
 const AGENT_COLORS: Record<string, string> = {
@@ -67,6 +67,12 @@ export default function InboxImageCard({ item }: InboxImageCardProps) {
         {item.hasToken && (
           <div className="absolute bottom-2 right-2 bg-success/90 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded">
             Token
+          </div>
+        )}
+        {item.isPaused && (
+          <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-neutral/90 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded">
+            <Pause size={10} />
+            Paused
           </div>
         )}
       </button>
