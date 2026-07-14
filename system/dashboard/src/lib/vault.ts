@@ -415,8 +415,12 @@ export function readAgents(): AgentInfo[] {
 
   // Folders under agents/ that registry.yaml hasn't caught up with yet still
   // show up here (as planned, zero-metrics) so a new agent dir is never
-  // silently missing from the dashboard.
-  const knownKeys = new Set(Object.keys(agentEntries))
+  // silently missing from the dashboard. Workers have no agents/ folder, but
+  // exclude their keys too so a stray leftover dir never double-renders.
+  const knownKeys = new Set([
+    ...Object.keys(agentEntries),
+    ...Object.keys(registry?.workers ?? {}),
+  ])
   let dirEntries: string[] = []
   try {
     dirEntries = fs.readdirSync(AGENTS_DIR, { withFileTypes: true })
