@@ -35,6 +35,9 @@ responsibilities:
   - Inherit classification metadata from matched source portrait if face-match succeeds
   - Call Qwen3-VL with base64-encoded image (resize to max 1024px on longest side, JPEG 85%)
   - Validate LLM JSON response against PF2e vocabulary (see models.py PF2E_* constants)
+  - Harvest visual_analysis arrays (equipment/clothing/fantasy_features/environment_details)
+    into candidate_tags — free-form, never validated against a vocabulary; stored on
+    processed-images.json and the inbox-queue.json entry, never written to note frontmatter
   - Build target filename slug; bump existing same-named file to counter suffix (e.g. -01, -02)
   - Write AGENTS.md-compliant draft to 01-Processing/ (status: draft, quality: 0, reviewed: false)
   - Append row to Images Index.md

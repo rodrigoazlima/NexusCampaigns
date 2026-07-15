@@ -1,10 +1,11 @@
 ---
 name: classification
 purpose: >
-  Enriches .md files in 00-Inbox/ and 01-Processing/ with DM-domain tags and entity
+  Enriches .md files in 00-Inbox/ and 01-Processing/ with free-form DM-domain tags
+  (canonicalized against a growing tag library, not a fixed vocabulary) and entity
   type inference via LocalRouter LLM. Detects potential duplicates against 02-Library/
-  slugs. Modifies frontmatter in-place. Only processes files with 5 or fewer existing
-  tags or missing type field.
+  slugs. Modifies frontmatter in-place. Processes files with 5 or fewer existing
+  tags, missing type field, or unreviewed vision candidate_tags.
 inputs:
   - vault://00-Inbox/**/*.md
   - vault://01-Processing/**/*.md
@@ -28,9 +29,12 @@ responsibilities:
   - Load 02-Library/ slug list once per run for dedup comparison
   - For each .md in 00-Inbox/ and 01-Processing/: parse YAML frontmatter
   - Skip files in bad-docs.txt
-  - If tags count <= 5: call tag LLM with title + 500-char body snippet
-  - If type field missing: call type inference LLM with title + snippet
-  - Validate LLM tag output against 29-tag allowed list
+  - If tags count <= 5, type field missing, or source image has unreviewed
+    candidate_tags: call tag LLM with title + 500-char body snippet + candidate
+    tags (from vision) + known tags (top of the tag library)
+  - Canonicalize each returned tag against state/tag-library.json (shared-prefix
+    ratio ≥0.65 folds inflections/variants into the first-seen spelling; no
+    match registers a new canonical tag) — no fixed tag vocabulary
   - Validate type against 18-type allowed list
   - Compare slug against library slugs (exact lowercase match) → inject duplicate_of field
   - Merge new tags with existing (deduplicated); rebuild frontmatter
@@ -45,13 +49,21 @@ restrictions:
   - Tag LLM max 80 tokens; type LLM max 10 tokens
 state_files:
   - state/bad-docs.txt
+  - state/tag-library.json
 commit_scope:
   - .knowledge-base/00-Inbox
   - .knowledge-base/01-Processing
 ---
 
-## Valid Tags (28)
-npc · creature · monster · location · dungeon · city · village · faction · quest · encounter · item · artifact · lore · religion · event · organization · timeline · undead · dark · fire · light · none · portrait · battlemap · scene · token · images · pathfinder2e
+## Tag Library
+
+Tags are no longer a fixed list — the LLM proposes freely and `_canonicalize_tag()`
+folds near-duplicate spellings into whichever one was registered first in
+`state/tag-library.json` (e.g. "elven"/"elfo" fold into "elf" if "elf" already
+exists there, via a shared-prefix ratio ≥ `_TAG_FOLD_THRESHOLD` (0.65) — a
+different, word-scale heuristic from the character-overlap `_slug_similarity`
+used for duplicate-slug detection). New tags register themselves as new
+canonical entries.
 
 ## Valid Types (18)
 npc · character · faction · location · city · village · dungeon · item · artifact · quest · encounter · creature · monster · event · religion · organization · timeline · lore

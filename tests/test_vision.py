@@ -27,6 +27,7 @@ def _clf(
     element: str = "dark",
     environment: str = "none",
     description: str = "A grim warrior.",
+    candidate_tags: list[str] | None = None,
 ) -> VisionClassification:
     return VisionClassification(
         type=ImageType(type_),
@@ -36,6 +37,7 @@ def _clf(
         element=Element(element),
         environment=Environment(environment),
         description=description,
+        candidate_tags=candidate_tags or [],
     )
 
 
@@ -81,6 +83,91 @@ def patch_roots(vault, tmp_path, monkeypatch):
     monkeypatch.setattr(_mod, "_QUEUE_FILE",   shared_state / "inbox-queue.json")
     monkeypatch.setattr(_mod, "_SIGNALS_DIR",  signals_dir)
     return vault
+
+
+# ---------------------------------------------------------------------------
+# _extract_candidate_tags
+# ---------------------------------------------------------------------------
+
+class TestExtractCandidateTags:
+    def test_harvests_equipment_weapons(self):
+        raw = {"visual_analysis": {"equipment": {"weapons": ["Axe"], "shield": [], "other": []}}}
+        assert "axe" in _mod._extract_candidate_tags(raw)
+
+    def test_harvests_multiple_sections(self):
+        raw = {
+            "visual_analysis": {
+                "equipment": {"weapons": ["sword"]},
+                "clothing": {"materials": ["leather"]},
+                "fantasy_features": {"creatures": ["wolf"]},
+            }
+        }
+        tags = _mod._extract_candidate_tags(raw)
+        assert set(tags) == {"sword", "leather", "wolf"}
+
+    def test_normalizes_case_and_whitespace(self):
+        raw = {"visual_analysis": {"equipment": {"weapons": ["  Battle Axe  "]}}}
+        assert _mod._extract_candidate_tags(raw) == ["battle axe"]
+
+    def test_dedupes_preserving_order(self):
+        raw = {
+            "visual_analysis": {
+                "equipment": {"weapons": ["axe"], "tools": ["Axe"]},
+            }
+        }
+        assert _mod._extract_candidate_tags(raw) == ["axe"]
+
+    def test_drops_empty_and_non_string_items(self):
+        raw = {"visual_analysis": {"equipment": {"weapons": ["", "  ", "axe", 5, None]}}}
+        assert _mod._extract_candidate_tags(raw) == ["axe"]
+
+    def test_missing_visual_analysis_returns_empty(self):
+        assert _mod._extract_candidate_tags({}) == []
+
+    def test_malformed_shape_returns_empty_not_raises(self):
+        raw = {"visual_analysis": {"equipment": "not-a-dict"}}
+        assert _mod._extract_candidate_tags(raw) == []
+
+    def test_ignores_non_candidate_sections(self):
+        raw = {"visual_analysis": {"lighting": {"rim_lighting": True}, "composition": {"shot_type": "wide"}}}
+        assert _mod._extract_candidate_tags(raw) == []
+
+
+# ---------------------------------------------------------------------------
+# _classify_one
+# ---------------------------------------------------------------------------
+
+class TestClassifyOne:
+    def test_populates_candidate_tags_from_visual_analysis(self, tmp_path):
+        img = tmp_path / "axe.jpg"
+        img.write_bytes(b"\xff\xd8\xff" + b"\x00" * 64)
+
+        client = MagicMock()
+        client.vision_chat.return_value = {
+            "type": "scene", "ancestry": "none", "class": "none",
+            "creature_type": "none", "element": "none", "environment": "interior",
+            "description": "An axe on a table.",
+            "visual_analysis": {"equipment": {"weapons": ["axe"], "shield": [], "other": []}},
+        }
+
+        clf = _mod._classify_one(img, client, prompt="classify", is_tk=False)
+
+        assert clf.type == ImageType.scene
+        assert "axe" in clf.candidate_tags
+
+    def test_no_visual_analysis_yields_empty_candidate_tags(self, tmp_path):
+        img = tmp_path / "plain.jpg"
+        img.write_bytes(b"\xff\xd8\xff" + b"\x00" * 64)
+
+        client = MagicMock()
+        client.vision_chat.return_value = {
+            "type": "portrait", "ancestry": "human", "class": "fighter",
+            "creature_type": "none", "element": "dark", "environment": "none",
+            "description": "A warrior.",
+        }
+
+        clf = _mod._classify_one(img, client, prompt="classify", is_tk=False)
+        assert clf.candidate_tags == []
 
 
 # ---------------------------------------------------------------------------
@@ -569,6 +656,20 @@ class TestWriteDraft:
         fm_text = out.read_text(encoding="utf-8").split("---")[1]
         fm = yaml.safe_load(fm_text)
         assert "sha256" not in fm
+
+    def test_draft_never_includes_candidate_tags_in_frontmatter(self, patch_roots, vault, tmp_path):
+        """candidate_tags is state-only (processed-images.json / inbox-queue.json) —
+        it must never leak into note frontmatter, regardless of how many the
+        vision LLM brainstormed."""
+        import yaml
+        img = vault / "00-Inbox" / "images" / "warrior.jpg"
+        img.touch()
+        out = vault / "01-Processing" / "portrait-human-fighter.md"
+        _mod._write_draft(out, _clf(candidate_tags=["axe", "steel"]), img)
+        fm_text = out.read_text(encoding="utf-8").split("---")[1]
+        fm = yaml.safe_load(fm_text)
+        assert "candidate_tags" not in fm
+        assert "axe" not in (fm.get("tags") or [])
 
 
 # ---------------------------------------------------------------------------

@@ -51,6 +51,7 @@ def patch_roots(vault, tmp_path, monkeypatch):
     monkeypatch.setattr(_mod, "_LOGS_DIR",    logs_dir)
     monkeypatch.setattr(_mod, "_MASTER_LOG",  master_log)
     monkeypatch.setattr(_mod, "_BAD_DOCS",    agent_state / "bad-docs.txt")
+    monkeypatch.setattr(_mod, "_TAG_LIBRARY_FILE", agent_state / "tag-library.json")
     return vault
 
 
@@ -66,15 +67,8 @@ def _write_md(path: Path, frontmatter: dict, body: str = "") -> None:
 # ---------------------------------------------------------------------------
 
 class TestAllowedSets:
-    def test_allowed_tags_count(self):
-        assert len(_mod._ALLOWED_TAGS) == 28
-
     def test_allowed_types_count(self):
         assert len(_mod._ALLOWED_TYPES) == 18
-
-    def test_known_tags_present(self):
-        for tag in ("npc", "location", "faction", "quest", "dungeon", "pathfinder2e"):
-            assert tag in _mod._ALLOWED_TAGS
 
     def test_known_types_present(self):
         for t in ("npc", "character", "faction", "location", "dungeon", "lore"):
@@ -174,6 +168,80 @@ class TestSlugSimilarity:
     def test_symmetry(self):
         a, b = "quest-missing-villagers", "quest-missing-villager"
         assert _mod._slug_similarity(a, b) == _mod._slug_similarity(b, a)
+
+
+# ---------------------------------------------------------------------------
+# _tag_prefix_ratio / _canonicalize_tag / tag library
+# ---------------------------------------------------------------------------
+
+class TestTagPrefixRatio:
+    def test_identical(self):
+        assert _mod._tag_prefix_ratio("elf", "elf") == 1.0
+
+    def test_shared_stem_inflection(self):
+        # The exact case _TAG_FOLD_THRESHOLD exists for: "elven" is an
+        # inflection of "elf" but scores only 0.5 under character-overlap
+        # difflib ratio — prefix ratio catches it (2 of 3 chars shared).
+        assert _mod._tag_prefix_ratio("elf", "elven") >= _mod._TAG_FOLD_THRESHOLD
+
+    def test_no_shared_prefix(self):
+        assert _mod._tag_prefix_ratio("elf", "dwarf") == 0.0
+
+    def test_empty_string(self):
+        assert _mod._tag_prefix_ratio("", "elf") == 0.0
+
+
+class TestCanonicalizeTag:
+    def test_first_tag_becomes_canonical(self):
+        library = {"tags": {}}
+        result = _mod._canonicalize_tag("elf", library)
+        assert result == "elf"
+        assert library["tags"]["elf"]["count"] == 1
+        assert library["tags"]["elf"]["aliases"] == []
+
+    def test_exact_match_reuses_and_bumps_count(self):
+        library = {"tags": {"elf": {"createdAt": "t", "count": 1, "aliases": []}}}
+        result = _mod._canonicalize_tag("elf", library)
+        assert result == "elf"
+        assert library["tags"]["elf"]["count"] == 2
+
+    def test_fuzzy_variant_folds_into_first_seen(self):
+        library = {"tags": {"elf": {"createdAt": "t", "count": 1, "aliases": []}}}
+        result = _mod._canonicalize_tag("elven", library)
+        assert result == "elf"
+        assert "elven" in library["tags"]["elf"]["aliases"]
+        assert library["tags"]["elf"]["count"] == 2
+        assert "elven" not in library["tags"]  # no separate entry created
+
+    def test_unrelated_tag_registers_new_entry(self):
+        library = {"tags": {"elf": {"createdAt": "t", "count": 1, "aliases": []}}}
+        result = _mod._canonicalize_tag("axe", library)
+        assert result == "axe"
+        assert "axe" in library["tags"]
+        assert library["tags"]["elf"]["count"] == 1  # untouched
+
+    def test_normalizes_case_and_whitespace(self):
+        library = {"tags": {}}
+        assert _mod._canonicalize_tag("  Elf  ", library) == "elf"
+
+    def test_empty_tag_returns_empty(self):
+        library = {"tags": {}}
+        assert _mod._canonicalize_tag("   ", library) == ""
+        assert library["tags"] == {}
+
+
+class TestTagLibraryPersistence:
+    def test_load_missing_file_returns_empty_library(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(_mod, "_TAG_LIBRARY_FILE", tmp_path / "tag-library.json")
+        assert _mod._load_tag_library() == {"version": 1, "tags": {}}
+
+    def test_save_then_load_round_trips(self, tmp_path, monkeypatch):
+        path = tmp_path / "state" / "tag-library.json"
+        monkeypatch.setattr(_mod, "_AGENT_STATE", path.parent)
+        monkeypatch.setattr(_mod, "_TAG_LIBRARY_FILE", path)
+        library = {"version": 1, "tags": {"axe": {"createdAt": "t", "count": 1, "aliases": []}}}
+        _mod._save_tag_library(library)
+        assert _mod._load_tag_library() == library
 
 
 # ---------------------------------------------------------------------------
@@ -452,6 +520,79 @@ class TestQueueIntegration:
             count, _ = _mod._run_enrich_tags()
 
         assert count == 1
+
+    def test_candidate_tags_force_review_even_when_tags_and_type_present(
+        self, patch_roots, vault, tmp_path, monkeypatch
+    ):
+        """A source image's unreviewed candidate_tags trigger the LLM call even
+        when existing_tags > 2 and type is already set (needs_tags/needs_type
+        would otherwise both skip this file)."""
+        import yaml
+
+        proc = vault / "01-Processing" / "token-axe.md"
+        _write_md(
+            proc,
+            {
+                "id": "token-axe",
+                "tags": ["token", "steel", "metal"],
+                "type": "item",
+                "source": ["00-Inbox/images/axe.jpg"],
+            },
+            body="A gleaming axe.",
+        )
+
+        queue_data = {
+            "00-Inbox/images/axe.jpg": {
+                "agents": {"vision": "done", "classification": "pending"},
+                "candidate_tags": ["axe"],
+            }
+        }
+        q = tmp_path / "system" / "state" / "inbox-queue.json"
+        q.parent.mkdir(parents=True, exist_ok=True)
+        q.write_text(_json.dumps(queue_data), encoding="utf-8")
+        monkeypatch.setattr(_mod, "_QUEUE_FILE", q)
+
+        with patch("classification.tools.enrich_tags.LLMClient") as MockClient:
+            MockClient.return_value.is_available.return_value = True
+            MockClient.return_value.chat.return_value = '{"tags": ["axe", "weapon"], "type": null}'
+            count, failed = _mod._run_enrich_tags()
+
+        MockClient.return_value.chat.assert_called_once()
+        assert count == 1
+        assert failed == 0
+        saved = yaml.safe_load(proc.read_text(encoding="utf-8").split("---")[1])
+        assert "axe" in saved["tags"]
+        assert "weapon" in saved["tags"]
+
+    def test_no_candidate_tags_and_satisfied_tags_type_skips_llm(
+        self, patch_roots, vault, tmp_path, monkeypatch
+    ):
+        """Control case: without candidate_tags on the queue entry, a note with
+        >2 tags and a set type is skipped exactly as before this change."""
+        proc = vault / "01-Processing" / "token-plain.md"
+        _write_md(
+            proc,
+            {
+                "id": "token-plain",
+                "tags": ["token", "steel", "metal"],
+                "type": "item",
+                "source": ["00-Inbox/images/plain.jpg"],
+            },
+        )
+
+        queue_data = {"00-Inbox/images/plain.jpg": {"agents": {"classification": "pending"}}}
+        q = tmp_path / "system" / "state" / "inbox-queue.json"
+        q.parent.mkdir(parents=True, exist_ok=True)
+        q.write_text(_json.dumps(queue_data), encoding="utf-8")
+        monkeypatch.setattr(_mod, "_QUEUE_FILE", q)
+
+        with patch("classification.tools.enrich_tags.LLMClient") as MockClient:
+            MockClient.return_value.is_available.return_value = True
+            count, failed = _mod._run_enrich_tags()
+
+        MockClient.return_value.chat.assert_not_called()
+        assert count == 1
+        assert failed == 0
 
 
 # ---------------------------------------------------------------------------

@@ -50,6 +50,16 @@ Returns JSON only:
 - `battlemap` / `scene`: ancestry/class/creature_type/element set to `none`
 - `portrait` / `body`: environment set to `none`
 
+The same LLM response also includes a `visual_analysis` block (equipment,
+clothing, fantasy_features, environment_details, etc. — see
+`prompts/classify-image.txt`). `_extract_candidate_tags()` flattens a fixed
+allowlist of its array leaves (weapons, tools, materials, creatures, ...) into
+`VisionClassification.candidate_tags: list[str]` — a free-form brainstorm, not
+validated against any vocabulary. It is **never** written to note frontmatter;
+it only flows into `processed-images.json` and the `inbox-queue.json` entry,
+where the classification agent reads it to seed its tag-library
+canonicalization (see `agent-classification.spec.md`).
+
 ---
 
 ## Image Filename Slug Format
@@ -82,6 +92,7 @@ Collision resolution: bump existing file to `{base}-N.{suffix}.ext`.
       "element": "string",
       "environment": "string",
       "description": "string",
+      "candidate_tags": ["string"],
       "sha256": "string",
       "isToken": true,
       "status": "ok | failed | migrated"

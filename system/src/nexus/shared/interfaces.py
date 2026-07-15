@@ -368,7 +368,9 @@ class ITagEnricher(ABC):
         current_tags: list[str],
         content_excerpt: str,
     ) -> TagEnrichmentOutput:
-        """Return new tags and inferred type. Never returns disallowed tags."""
+        """Return new tags and inferred type. Tags are free-form, canonicalized
+        against the tag library (state/tag-library.json) rather than filtered
+        against a fixed vocabulary; type is still restricted to _ALLOWED_TYPES."""
         ...
 
 

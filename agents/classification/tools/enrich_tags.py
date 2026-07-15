@@ -11,6 +11,7 @@ from __future__ import annotations
 import json as _json
 import sys
 import time
+from datetime import datetime, timezone
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any, Optional
@@ -78,6 +79,15 @@ _LLM_CFG = load_llm_endpoint(
 
 # Minimum difflib ratio to flag a slug as similar-to a library slug
 _SIMILARITY_THRESHOLD = 0.85
+
+# Minimum shared-prefix ratio (common leading chars / shorter tag's length) to
+# fold a tag into an existing canonical one. Character-level difflib ratio
+# (used above for slugs) is the wrong tool for short single words — it scores
+# "elf"/"self" at 0.86 (false positive, no shared stem) while scoring
+# "elf"/"elven" at only 0.5 (false negative, the exact case this exists for).
+# Prefix ratio catches plurals/inflections that share a stem ("elf"->"elven",
+# "axe"->"axes") without matching unrelated words that merely share letters.
+_TAG_FOLD_THRESHOLD = 0.65
 
 # Types the vision agent assigns as placeholder defaults (portrait→npc, battlemap→location).
 # These are safe to refine — a more specific type should be inferred from content.
@@ -203,14 +213,31 @@ def _save_tag_library(library: dict[str, Any]) -> None:
     tmp.replace(_TAG_LIBRARY_FILE)
 
 
+def _tag_prefix_ratio(a: str, b: str) -> float:
+    """Shared leading-character length / shorter string's length."""
+    n = min(len(a), len(b))
+    if n == 0:
+        return 0.0
+    common = 0
+    for ca, cb in zip(a, b):
+        if ca != cb:
+            break
+        common += 1
+    return common / n
+
+
 def _canonicalize_tag(raw: str, library: dict[str, Any]) -> str:
     """Fold a free-form tag into whichever spelling was registered first.
 
     Exact match reuses the existing entry. Otherwise fuzzy-matches against
-    every known tag (ponytail: O(n) scan — fine at hundreds of tags, add an
-    index if the library grows into the thousands) and folds into the best
-    match above _SIMILARITY_THRESHOLD, recording the raw spelling as an
-    alias. No match at all registers `raw` as a brand-new canonical tag.
+    every known tag by shared-prefix ratio (ponytail: O(n) scan — fine at
+    hundreds of tags, add an index if the library grows into the thousands;
+    prefix matching is a heuristic, not real stemming — a short unrelated
+    word sharing a stem's prefix, e.g. "elf"/"elbow", can occasionally
+    over-fold. Acceptable for a DM's personal tag vocabulary; swap for real
+    stemming if it misbehaves) and folds into the best match above
+    _TAG_FOLD_THRESHOLD, recording the raw spelling as an alias. No match at
+    all registers `raw` as a brand-new canonical tag.
     """
     norm = raw.strip().lower()
     if not norm:
@@ -225,11 +252,11 @@ def _canonicalize_tag(raw: str, library: dict[str, Any]) -> str:
 
     best_key, best_score = None, 0.0
     for key in tags:
-        score = _slug_similarity(norm, key)
+        score = _tag_prefix_ratio(norm, key)
         if score > best_score:
             best_key, best_score = key, score
 
-    if best_key is not None and best_score >= _SIMILARITY_THRESHOLD:
+    if best_key is not None and best_score >= _TAG_FOLD_THRESHOLD:
         entry = tags[best_key]
         entry["count"] += 1
         if norm not in entry["aliases"]:
@@ -304,6 +331,19 @@ def _mark_queue_done(queue: dict[str, Any], rel: str) -> None:
             pass
 
 
+def _source_candidate_tags(fm: dict, queue: dict[str, Any]) -> list[str]:
+    """Collect candidate_tags the vision agent left on this note's source image
+    queue entries (see classify_images.py's _mark_vision_done). Same source-tracing
+    as _mark_queue_done's indirect branch, read-only."""
+    seen: dict[str, None] = {}
+    for src in fm.get("source") or []:
+        entry = queue.get(src)
+        if isinstance(entry, dict):
+            for tag in entry.get("candidate_tags") or []:
+                seen.setdefault(tag, None)
+    return list(seen)
+
+
 # ---------------------------------------------------------------------------
 # EnrichTags action — core loop
 # ---------------------------------------------------------------------------
@@ -320,6 +360,7 @@ def _run_enrich_tags() -> tuple[int, int]:
 
     bad_docs   = _load_bad_docs()
     queue      = _load_queue()
+    library    = _load_tag_library()
     fio        = FrontmatterIO()
     prompt_tpl = _load_prompt_template()
     count      = 0
@@ -347,20 +388,25 @@ def _run_enrich_tags() -> tuple[int, int]:
         # (portrait→npc, battlemap→location) and human hasn't reviewed yet.
         is_vision_default = current_type in _VISION_DEFAULTS and not fm.get("reviewed")
         needs_type    = not current_type or is_vision_default
+        candidate_tags = _source_candidate_tags(fm, queue)
+        needs_candidate_review = bool(candidate_tags)
 
-        if not needs_tags and not needs_type:
+        if not (needs_tags or needs_type or needs_candidate_review):
             _mark_queue_done(queue, rel)
             count += 1
             continue
 
-        title   = fm.get("id") or md_path.stem
-        excerpt = body[:500]
-        hint    = _image_hint(existing_tags)
-        prompt  = (
+        title      = fm.get("id") or md_path.stem
+        excerpt    = body[:500]
+        hint       = _image_hint(existing_tags)
+        known_tags = sorted(library.get("tags", {}), key=lambda t: -library["tags"][t]["count"])[:15]
+        prompt     = (
             prompt_tpl
             .replace("{title}", title)
             .replace("{current_tags}", ", ".join(existing_tags) if existing_tags else "none")
             .replace("{image_hint}", hint)
+            .replace("{candidate_tags}", ", ".join(candidate_tags) if candidate_tags else "none")
+            .replace("{known_tags}", ", ".join(known_tags) if known_tags else "none yet")
             .replace("{content}", excerpt)
         )
 
@@ -387,11 +433,13 @@ def _run_enrich_tags() -> tuple[int, int]:
 
         changed = False
 
-        if needs_tags and enrichment.tags:
-            valid_new = [
-                t for t in enrichment.tags
-                if t in _ALLOWED_TAGS and t not in existing_tags
-            ]
+        if (needs_tags or needs_candidate_review) and enrichment.tags:
+            canonical = [_canonicalize_tag(t, library) for t in enrichment.tags]
+            valid_new = []
+            for t in canonical:
+                if t and t not in existing_tags and t not in valid_new:
+                    valid_new.append(t)
+            _save_tag_library(library)
             if valid_new:
                 fm["tags"] = list(existing_tags) + valid_new
                 changed = True
