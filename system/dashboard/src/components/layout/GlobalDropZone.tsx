@@ -9,6 +9,7 @@ interface DropState {
   phase: Phase
   count?: number
   uploaded?: number
+  duplicate?: number
   failed?: number
 }
 
@@ -55,14 +56,15 @@ export default function GlobalDropZone() {
       setState({ phase: 'uploading', count: files.length })
       const results = await Promise.all(files.map(async f => {
         const result = await uploadImage({ file: f })
-        if (result.ok && result.path) await enqueueImage(result.path)
+        if (result.ok && result.path && !result.duplicate) await enqueueImage(result.path)
         return result
       }))
-      const uploaded = results.filter(r => r.ok).length
-      const failed = results.length - uploaded
+      const duplicate = results.filter(r => r.ok && r.duplicate).length
+      const uploaded = results.filter(r => r.ok && !r.duplicate).length
+      const failed = results.length - uploaded - duplicate
 
       if (timer.current) clearTimeout(timer.current)
-      setState({ phase: 'done', uploaded, failed })
+      setState({ phase: 'done', uploaded, duplicate, failed })
       timer.current = setTimeout(reset, 3000)
     }
 
@@ -79,7 +81,7 @@ export default function GlobalDropZone() {
     }
   }, [reset])
 
-  const { phase, count = 0, uploaded = 0, failed = 0 } = state
+  const { phase, count = 0, uploaded = 0, duplicate = 0, failed = 0 } = state
   if (phase === 'idle') return null
 
   const borderColor =
@@ -112,7 +114,9 @@ export default function GlobalDropZone() {
               : <XCircle size={44} className="text-danger" />
             }
             <p className="text-lg font-semibold text-zinc-100">
-              {uploaded} uploaded{failed > 0 ? `, ${failed} failed` : ''}
+              {uploaded} uploaded
+              {duplicate > 0 ? `, ${duplicate} duplicate` : ''}
+              {failed > 0 ? `, ${failed} failed` : ''}
             </p>
           </>
         )}

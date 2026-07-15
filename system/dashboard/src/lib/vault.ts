@@ -1356,6 +1356,13 @@ export function readVisionPathIndex(): Record<string, string> {
   return raw?.pathIndex ?? {}
 }
 
+/** Look up an already-ingested image by content hash (blake2b-32, see nexus.shared.hashing). */
+export function findImageByHash(hash: string): { path: string; originalName: string } | null {
+  const entry = readVisionState()[hash]
+  if (!entry) return null
+  return { path: String(entry.path ?? ''), originalName: String(entry.originalName ?? '') }
+}
+
 export function readGeneratedTokens(): Record<string, { sourcePath: string; tokenPath: string; generatedAt: string }> {
   const genPath = path.join(PROJECT_ROOT, 'system', 'state', 'workers', 'token', 'generated-tokens.json')
   return readJson<Record<string, { sourcePath: string; tokenPath: string; generatedAt: string }>>(genPath) ?? {}

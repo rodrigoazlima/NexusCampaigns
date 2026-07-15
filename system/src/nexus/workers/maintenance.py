@@ -23,7 +23,6 @@ Actions (each isolated — a failure never blocks the others):
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import re
@@ -35,7 +34,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from nexus.shared import Logger, REQUIRED_DIRS
+from nexus.shared import Logger, REQUIRED_DIRS, sha256_of_file
 from nexus.shared.loaders import _find_project_root
 from nexus.workers.base import (
     MASTER_LOG,
@@ -341,12 +340,7 @@ def _ensure_agent_relation_links(log: Logger) -> int:
 # ValidateImageRefs — SHA256 identity check
 # ---------------------------------------------------------------------------
 
-def _sha256_of_file(path: Path) -> str:
-    h = hashlib.blake2b(digest_size=32)
-    with open(path, "rb") as fh:
-        for chunk in iter(lambda: fh.read(4_194_304), b""):
-            h.update(chunk)
-    return h.hexdigest()
+_sha256_of_file = sha256_of_file
 
 
 def _validate_image_refs(log: Logger) -> tuple[int, list[str]]:

@@ -8,7 +8,6 @@ No LLM available → skip gracefully (no images marked failed). Batch: 10 per ru
 
 from __future__ import annotations
 
-import hashlib
 import json
 import re
 import sys
@@ -34,6 +33,7 @@ from nexus.shared import (  # noqa: E402
     SignalEmitter,
     VisionClassification,
     locked_update_queue_entry,
+    sha256_of_file,
     to_slug,
 )
 from nexus.shared.config import LLMEndpointConfig  # noqa: E402
@@ -131,12 +131,7 @@ _LLM_CFG = load_llm_endpoint(
 # Hashing
 # ---------------------------------------------------------------------------
 
-def _sha256(path: Path) -> str:
-    h = hashlib.blake2b(digest_size=32)
-    with open(path, "rb") as fh:
-        for chunk in iter(lambda: fh.read(4_194_304), b""):
-            h.update(chunk)
-    return h.hexdigest()
+_sha256 = sha256_of_file
 
 
 # ---------------------------------------------------------------------------

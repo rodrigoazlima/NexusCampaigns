@@ -87,7 +87,7 @@ export default function GMInboxPage() {
     setUploading(true)
     await Promise.all(files.map(async (f) => {
       const result = await uploadImage({ file: f })
-      if (result.ok && result.path) await enqueueImage(result.path)
+      if (result.ok && result.path && !result.duplicate) await enqueueImage(result.path)
     }))
     setUploading(false)
     loadPage(0)

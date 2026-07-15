@@ -42,6 +42,16 @@ describe('uploadImage', () => {
     expect(result).toEqual({ ok: true, path: '.knowledge-base/00-Inbox/images/art.png' })
   })
 
+  it('surfaces duplicate flag and existing path from the API', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ ok: true, duplicate: true, path: '.knowledge-base/00-Inbox/images/existing.png' }),
+    } as Response)
+
+    const result = await uploadImage({ file: makeFile('art.png') })
+    expect(result).toEqual({ ok: true, path: '.knowledge-base/00-Inbox/images/existing.png', duplicate: true })
+  })
+
   it('uses provided targetPath', async () => {
     vi.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
