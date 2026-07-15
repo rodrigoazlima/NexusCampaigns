@@ -45,6 +45,13 @@ const REGISTRY_PATH = path.join(PROJECT_ROOT, 'agents', 'registry.yaml')
 // Helpers
 // ---------------------------------------------------------------------------
 
+// gray-matter (js-yaml) auto-parses unquoted YAML date scalars (created: 2026-07-15)
+// into JS Date objects, not strings — coerce back to the vault's ISO YYYY-MM-DD.
+function frontmatterDate(v: unknown): string {
+  if (v instanceof Date) return v.toISOString().slice(0, 10)
+  return typeof v === 'string' ? v : ''
+}
+
 function readJson<T>(filePath: string): T | null {
   try {
     const raw = fs.readFileSync(filePath, 'utf-8').trim()
@@ -553,8 +560,8 @@ function readRawDrafts(): RawDraft[] {
         type: data.type ?? 'unknown',
         status: data.status ?? 'pending',
         quality: typeof data.quality === 'number' ? data.quality : 0,
-        created: data.created ?? '',
-        updated: data.updated ?? '',
+        created: frontmatterDate(data.created),
+        updated: frontmatterDate(data.updated),
         tags: Array.isArray(data.tags) ? data.tags : [],
         source: sources,
         reviewed: data.reviewed === true,
@@ -670,8 +677,8 @@ export function readLibraryItems(): ReviewItem[] {
         type: data.type ?? 'unknown',
         status: data.status ?? 'approved',
         quality: typeof data.quality === 'number' ? data.quality : 0,
-        created: data.created ?? '',
-        updated: data.updated ?? '',
+        created: frontmatterDate(data.created),
+        updated: frontmatterDate(data.updated),
         tags: Array.isArray(data.tags) ? data.tags : [],
         source: sources,
         reviewed: data.reviewed === true,
@@ -901,7 +908,7 @@ export function writeCampaign(frame: Omit<CampaignFrame, 'active'> & { id?: stri
   const filepath = path.join(CAMPAIGNS_DIR, `${id}.md`)
   let created = today
   if (fs.existsSync(filepath)) {
-    try { created = (matter(fs.readFileSync(filepath, 'utf-8')).data.created as string) || today } catch { /* keep today */ }
+    try { created = frontmatterDate(matter(fs.readFileSync(filepath, 'utf-8')).data.created) || today } catch { /* keep today */ }
   }
 
   const data = {
