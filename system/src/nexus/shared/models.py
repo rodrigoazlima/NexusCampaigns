@@ -173,6 +173,10 @@ class VisionClassification(BaseModel):
     element:       Element   = Element.none
     environment:   Environment = Environment.none
     description:   str       = ""
+    # Open brainstorm harvested from the LLM's own visual_analysis block
+    # (equipment/clothing/fantasy_features arrays) — never written to note
+    # frontmatter; state-only input to the classification agent's tag library.
+    candidate_tags: list[str] = Field(default_factory=list)
 
     model_config = {"populate_by_name": True}
 

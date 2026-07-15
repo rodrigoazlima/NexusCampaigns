@@ -51,12 +51,12 @@ _PROMPT_FILE  = _AGENTS_DIR / "classification" / "prompts" / "enrich-tags.txt"
 _SHARED_STATE = _PROJECT_ROOT / "system" / "state"
 _QUEUE_FILE   = _SHARED_STATE / "inbox-queue.json"
 
-_ALLOWED_TAGS: frozenset[str] = frozenset({
-    "npc", "creature", "monster", "location", "dungeon", "city", "village",
-    "faction", "quest", "encounter", "item", "artifact", "lore", "religion",
-    "event", "organization", "timeline", "undead", "dark", "fire", "light",
-    "none", "portrait", "battlemap", "scene", "token", "images", "pathfinder2e",
-})
+_TAG_LIBRARY_FILE = _AGENT_STATE / "tag-library.json"
+
+# Tags are no longer filtered against a fixed vocabulary — the LLM proposes
+# freely and _canonicalize_tag() folds variants into whichever spelling was
+# seen first (state/tag-library.json), so "elf" stays "elf" even if a later
+# note's model says "elven".
 _ALLOWED_TYPES: frozenset[str] = frozenset({
     "npc", "character", "faction", "location", "city", "village", "dungeon",
     "item", "artifact", "quest", "encounter", "creature", "monster", "event",
@@ -184,6 +184,60 @@ def _load_prompt_template() -> str:
 
 def _slug_similarity(a: str, b: str) -> float:
     return SequenceMatcher(None, a, b).ratio()
+
+
+# ---------------------------------------------------------------------------
+# Tag library — canonicalizes free-form LLM tags instead of a fixed vocabulary
+# ---------------------------------------------------------------------------
+
+def _load_tag_library() -> dict[str, Any]:
+    if not _TAG_LIBRARY_FILE.exists():
+        return {"version": 1, "tags": {}}
+    return _json.loads(_TAG_LIBRARY_FILE.read_text(encoding="utf-8"))
+
+
+def _save_tag_library(library: dict[str, Any]) -> None:
+    _AGENT_STATE.mkdir(parents=True, exist_ok=True)
+    tmp = _TAG_LIBRARY_FILE.with_suffix(".tmp")
+    tmp.write_text(_json.dumps(library, indent=2, default=str), encoding="utf-8")
+    tmp.replace(_TAG_LIBRARY_FILE)
+
+
+def _canonicalize_tag(raw: str, library: dict[str, Any]) -> str:
+    """Fold a free-form tag into whichever spelling was registered first.
+
+    Exact match reuses the existing entry. Otherwise fuzzy-matches against
+    every known tag (ponytail: O(n) scan — fine at hundreds of tags, add an
+    index if the library grows into the thousands) and folds into the best
+    match above _SIMILARITY_THRESHOLD, recording the raw spelling as an
+    alias. No match at all registers `raw` as a brand-new canonical tag.
+    """
+    norm = raw.strip().lower()
+    if not norm:
+        return ""
+
+    tags = library.setdefault("tags", {})
+    now = datetime.now(timezone.utc).isoformat()
+
+    if norm in tags:
+        tags[norm]["count"] += 1
+        return norm
+
+    best_key, best_score = None, 0.0
+    for key in tags:
+        score = _slug_similarity(norm, key)
+        if score > best_score:
+            best_key, best_score = key, score
+
+    if best_key is not None and best_score >= _SIMILARITY_THRESHOLD:
+        entry = tags[best_key]
+        entry["count"] += 1
+        if norm not in entry["aliases"]:
+            entry["aliases"].append(norm)
+        return best_key
+
+    tags[norm] = {"createdAt": now, "count": 1, "aliases": []}
+    return norm
 
 
 def _image_hint(tags: list[str]) -> str:

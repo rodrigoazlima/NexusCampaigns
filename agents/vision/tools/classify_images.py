@@ -699,6 +699,55 @@ def _write_draft(
 
 
 # ---------------------------------------------------------------------------
+# Candidate tag harvesting
+# ---------------------------------------------------------------------------
+
+# Array leaves under the prompt's `visual_analysis` block that name concrete,
+# visible things worth surfacing as tag candidates (classify-image.txt already
+# asks the LLM for all of these — they were previously parsed and discarded,
+# since VisionClassification has no field for them).
+_CANDIDATE_TAG_PATHS: tuple[tuple[str, str], ...] = (
+    ("equipment", "weapons"),
+    ("equipment", "shield"),
+    ("equipment", "focus_items"),
+    ("equipment", "tools"),
+    ("equipment", "musical_instruments"),
+    ("equipment", "books"),
+    ("equipment", "other"),
+    ("clothing", "materials"),
+    ("clothing", "ornaments"),
+    ("fantasy_features", "creatures"),
+    ("fantasy_features", "wings"),
+    ("fantasy_features", "horns"),
+    ("fantasy_features", "tail"),
+    ("fantasy_features", "halo"),
+    ("environment_details", "architecture"),
+    ("environment_details", "vegetation"),
+)
+
+
+def _extract_candidate_tags(raw: dict) -> list[str]:
+    """Flatten visual_analysis array leaves into a deduped raw tag list.
+
+    Best-effort: any shape surprise in the LLM's free-text visual_analysis
+    block yields [] rather than failing classification over a tagging extra.
+    """
+    try:
+        analysis = raw.get("visual_analysis") or {}
+        seen: dict[str, None] = {}
+        for section, key in _CANDIDATE_TAG_PATHS:
+            for item in (analysis.get(section) or {}).get(key) or []:
+                if not isinstance(item, str):
+                    continue
+                norm = item.strip().lower()
+                if norm:
+                    seen.setdefault(norm, None)
+        return list(seen)
+    except Exception:
+        return []
+
+
+# ---------------------------------------------------------------------------
 # Single-image classification
 # ---------------------------------------------------------------------------
 
@@ -718,6 +767,7 @@ def _classify_one(
     clf = VisionClassification.model_validate(raw)
     if is_tk:
         clf = clf.model_copy(update={"type": ImageType.token})
+    clf = clf.model_copy(update={"candidate_tags": _extract_candidate_tags(raw)})
     return clf
 
 
@@ -813,6 +863,7 @@ def main() -> None:
                     "element":       "none",
                     "environment":   "none",
                     "description":   "",
+                    "candidate_tags": [],
                     "sha256":        sha_fail,
                     "isToken":       is_tk,
                     "status":        "failed",
@@ -851,6 +902,7 @@ def main() -> None:
             "element":       clf.element.value,
             "environment":   clf.environment.value,
             "description":   clf.description,
+            "candidate_tags": clf.candidate_tags,
             "sha256":        sha,
             "isToken":       is_tk,
             "status":        "ok",
@@ -874,6 +926,7 @@ def main() -> None:
         if orig_rel in queue and isinstance(queue[orig_rel].get("agents"), dict):
             def _mark_vision_done(entry: dict) -> Optional[str]:
                 entry.setdefault("agents", {})["vision"] = "done"
+                entry["candidate_tags"] = clf.candidate_tags
                 # Rename queue key to match new image path so classification/lore
                 # can trace source frontmatter back to the correct queue entry.
                 return new_rel if new_rel != orig_rel else None
