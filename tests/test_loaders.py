@@ -166,3 +166,55 @@ class TestLoadLLMEndpoint:
         (project_root / "agents" / "registry.yaml").write_text(_REGISTRY_YAML, encoding="utf-8")
         cfg = load_llm_endpoint("nonexistent", fallback=_FALLBACK, project_root=project_root)
         assert cfg == _FALLBACK
+
+    def test_model_key_overrides_registry_model(self, project_root):
+        agent_dir = project_root / "agents" / "classification"
+        agent_dir.mkdir(parents=True)
+        (project_root / "agents" / "registry.yaml").write_text(_REGISTRY_YAML, encoding="utf-8")
+        (agent_dir / "agent.json").write_text(json.dumps({
+            "tasks": {"classification-agent": {"llm": {
+                "text_model": "my-text-model",
+                "vision_model": "my-vision-model",
+            }}}
+        }), encoding="utf-8")
+        text_cfg = load_llm_endpoint(
+            "vision_llm", fallback=_FALLBACK,
+            agent_dir=agent_dir, task_id="classification-agent",
+            project_root=project_root, model_key="text_model",
+        )
+        vision_cfg = load_llm_endpoint(
+            "vision_llm", fallback=_FALLBACK,
+            agent_dir=agent_dir, task_id="classification-agent",
+            project_root=project_root, model_key="vision_model",
+        )
+        assert text_cfg.model == "my-text-model"
+        assert vision_cfg.model == "my-vision-model"
+
+    def test_model_key_absent_from_llm_block_keeps_registry_model(self, project_root):
+        agent_dir = project_root / "agents" / "classification"
+        agent_dir.mkdir(parents=True)
+        (project_root / "agents" / "registry.yaml").write_text(_REGISTRY_YAML, encoding="utf-8")
+        (agent_dir / "agent.json").write_text(json.dumps({
+            "tasks": {"classification-agent": {"llm": {"timeout_seconds": 300}}}
+        }), encoding="utf-8")
+        cfg = load_llm_endpoint(
+            "vision_llm", fallback=_FALLBACK,
+            agent_dir=agent_dir, task_id="classification-agent",
+            project_root=project_root, model_key="text_model",
+        )
+        assert cfg.model == "registry-model"
+        assert cfg.timeout_seconds == 300
+
+    def test_no_model_key_ignores_llm_block_models(self, project_root):
+        agent_dir = project_root / "agents" / "classification"
+        agent_dir.mkdir(parents=True)
+        (project_root / "agents" / "registry.yaml").write_text(_REGISTRY_YAML, encoding="utf-8")
+        (agent_dir / "agent.json").write_text(json.dumps({
+            "tasks": {"classification-agent": {"llm": {"text_model": "my-text-model"}}}
+        }), encoding="utf-8")
+        cfg = load_llm_endpoint(
+            "vision_llm", fallback=_FALLBACK,
+            agent_dir=agent_dir, task_id="classification-agent",
+            project_root=project_root,
+        )
+        assert cfg.model == "registry-model"

@@ -137,37 +137,187 @@ class TestExtractCandidateTags:
 # _classify_one
 # ---------------------------------------------------------------------------
 
-class TestClassifyOne:
-    def test_populates_candidate_tags_from_visual_analysis(self, tmp_path):
+def _write_real_jpg(path):
+    """A real (tiny) JPEG — _image_content_block PIL-opens the file, so fake
+    bytes crash it."""
+    from PIL import Image
+    Image.new("RGB", (8, 8), (128, 64, 32)).save(path, format="JPEG")
+
+
+_CYCLE1_JSON = json.dumps({
+    "type": "scene", "ancestry": "none", "class": "none",
+    "creature_type": "none", "element": "none", "environment": "interior",
+    "description": "An axe on a table.",
+    "visual_analysis": {"equipment": {"weapons": ["axe"], "shield": [], "other": []}},
+})
+_CYCLE2_JSON = json.dumps({"category": "scene", "additional_tags": ["steel", "wood"]})
+_CYCLE3_JSON = json.dumps({"entity_type": "item", "additional_tags": ["blade"]})
+_CYCLE4_JSON = json.dumps({
+    "final_tags": ["axe", "steel", "wood", "blade", "weapon", "iron"],
+    "entity_type": "item",
+})
+
+
+class TestClassifyImageFull:
+    def test_full_four_cycle_run(self, tmp_path):
         img = tmp_path / "axe.jpg"
-        img.write_bytes(b"\xff\xd8\xff" + b"\x00" * 64)
+        _write_real_jpg(img)
 
         client = MagicMock()
-        client.vision_chat.return_value = {
-            "type": "scene", "ancestry": "none", "class": "none",
-            "creature_type": "none", "element": "none", "environment": "interior",
-            "description": "An axe on a table.",
-            "visual_analysis": {"equipment": {"weapons": ["axe"], "shield": [], "other": []}},
-        }
+        client.chat.side_effect = [_CYCLE1_JSON, _CYCLE2_JSON, _CYCLE3_JSON, _CYCLE4_JSON]
 
-        clf = _mod._classify_one(img, client, prompt="classify", is_tk=False)
+        clf = _mod.classify_image_full(img, client, prompt="classify", is_tk=False)
 
         assert clf.type == ImageType.scene
-        assert "axe" in clf.candidate_tags
+        assert clf.entity_type == "item"
+        assert clf.candidate_tags == ["axe", "steel", "wood", "blade", "weapon", "iron"]
+        assert len(clf.candidate_tags) >= _mod._MIN_TAGS_TARGET
+        assert client.chat.call_count == 4
 
-    def test_no_visual_analysis_yields_empty_candidate_tags(self, tmp_path):
-        img = tmp_path / "plain.jpg"
-        img.write_bytes(b"\xff\xd8\xff" + b"\x00" * 64)
+    def test_conversation_never_exceeds_message_cap(self, tmp_path):
+        img = tmp_path / "axe.jpg"
+        _write_real_jpg(img)
 
         client = MagicMock()
-        client.vision_chat.return_value = {
-            "type": "portrait", "ancestry": "human", "class": "fighter",
-            "creature_type": "none", "element": "dark", "environment": "none",
-            "description": "A warrior.",
-        }
+        seen_lengths = []
 
-        clf = _mod._classify_one(img, client, prompt="classify", is_tk=False)
-        assert clf.candidate_tags == []
+        def _chat(messages, **kwargs):
+            seen_lengths.append(len(messages))
+            return [_CYCLE1_JSON, _CYCLE2_JSON, _CYCLE3_JSON, _CYCLE4_JSON][len(seen_lengths) - 1]
+
+        client.chat.side_effect = _chat
+        _mod.classify_image_full(img, client, prompt="classify", is_tk=False)
+
+        # each call's message list + its reply must stay within the cap
+        assert all(n + 1 <= _mod._MAX_CONVERSATION_MESSAGES for n in seen_lengths)
+
+    def test_later_cycle_parse_failure_keeps_prior_values(self, tmp_path):
+        img = tmp_path / "axe.jpg"
+        _write_real_jpg(img)
+
+        client = MagicMock()
+        client.chat.side_effect = [_CYCLE1_JSON, "not json", "still not json", "nope"]
+
+        clf = _mod.classify_image_full(img, client, prompt="classify", is_tk=False)
+
+        # cycle 1's harvest survives; failed cycles degrade instead of raising
+        assert clf.type == ImageType.scene
+        assert "axe" in clf.candidate_tags
+        assert clf.entity_type == "none"
+
+    def test_cycle1_error_propagates(self, tmp_path):
+        img = tmp_path / "axe.jpg"
+        _write_real_jpg(img)
+
+        client = MagicMock()
+        client.chat.return_value = "not json at all"
+
+        with pytest.raises(Exception):
+            _mod.classify_image_full(img, client, prompt="classify", is_tk=False)
+
+    def test_token_flag_pins_type_against_cycle2(self, tmp_path):
+        img = tmp_path / "tok.png"
+        _write_real_jpg(img)
+
+        client = MagicMock()
+        client.chat.side_effect = [_CYCLE1_JSON, _CYCLE2_JSON, _CYCLE3_JSON, _CYCLE4_JSON]
+
+        clf = _mod.classify_image_full(img, client, prompt="classify", is_tk=True)
+        assert clf.type == ImageType.token  # cycle 2's "scene" must not un-pin a token
+
+
+class TestParseJsonResponse:
+    def test_plain_json(self):
+        assert _mod._parse_json_response('{"a": 1}') == {"a": 1}
+
+    def test_fenced_json(self):
+        assert _mod._parse_json_response('```json\n{"a": 1}\n```') == {"a": 1}
+
+    def test_fence_without_language(self):
+        assert _mod._parse_json_response('```\n{"a": 1}\n```') == {"a": 1}
+
+    def test_invalid_raises(self):
+        with pytest.raises(json.JSONDecodeError):
+            _mod._parse_json_response("not json")
+
+
+class TestRefineTagsWithLibrary:
+    _LIBRARY = {"tags": {
+        "elf": {"createdAt": "t", "count": 5, "aliases": []},
+        "axe": {"createdAt": "t", "count": 2, "aliases": []},
+    }}
+
+    def test_fresh_conversation(self, tmp_path):
+        img = tmp_path / "axe.jpg"
+        _write_real_jpg(img)
+
+        client = MagicMock()
+        client.chat.return_value = json.dumps(
+            {"final_tags": ["axe", "weapon"], "entity_type": "item"}
+        )
+
+        tags, et = _mod.refine_tags_with_library(
+            img, client, ["axe"], "none", self._LIBRARY
+        )
+        assert tags == ["axe", "weapon"]
+        assert et == "item"
+        # fresh conversation: system + user(image+prompt)
+        sent = client.chat.call_args[0][0]
+        assert sent[0]["role"] == "system"
+        assert len(sent) == 3  # + appended assistant reply
+
+    def test_extends_existing_history(self, tmp_path):
+        img = tmp_path / "axe.jpg"
+        _write_real_jpg(img)
+
+        history = [
+            {"role": "system", "content": "sys"},
+            {"role": "user", "content": "c1"},
+            {"role": "assistant", "content": "r1"},
+        ]
+        client = MagicMock()
+        client.chat.return_value = json.dumps({"final_tags": ["axe"], "entity_type": "item"})
+
+        _mod.refine_tags_with_library(img, client, ["axe"], "none", self._LIBRARY, history=history)
+        # in-conversation: appended user turn + assistant reply onto the same list
+        assert len(history) == 5
+
+    def test_over_budget_history_returns_inputs_unchanged(self, tmp_path):
+        img = tmp_path / "axe.jpg"
+        _write_real_jpg(img)
+
+        history = [{"role": "user", "content": f"m{i}"} for i in range(_mod._MAX_CONVERSATION_MESSAGES)]
+        client = MagicMock()
+
+        tags, et = _mod.refine_tags_with_library(
+            img, client, ["axe"], "item", self._LIBRARY, history=history
+        )
+        assert tags == ["axe"]
+        assert et == "item"
+        client.chat.assert_not_called()
+
+    def test_parse_failure_returns_inputs(self, tmp_path):
+        img = tmp_path / "axe.jpg"
+        _write_real_jpg(img)
+
+        client = MagicMock()
+        client.chat.return_value = "garbage"
+
+        tags, et = _mod.refine_tags_with_library(img, client, ["axe"], "item", self._LIBRARY)
+        assert tags == ["axe"]
+        assert et == "item"
+
+    def test_invalid_entity_type_rejected(self, tmp_path):
+        img = tmp_path / "axe.jpg"
+        _write_real_jpg(img)
+
+        client = MagicMock()
+        client.chat.return_value = json.dumps(
+            {"final_tags": ["axe"], "entity_type": "not-a-real-type"}
+        )
+
+        _, et = _mod.refine_tags_with_library(img, client, ["axe"], "item", self._LIBRARY)
+        assert et == "item"  # unrecognized value keeps the hint
 
 
 # ---------------------------------------------------------------------------
@@ -657,10 +807,10 @@ class TestWriteDraft:
         fm = yaml.safe_load(fm_text)
         assert "sha256" not in fm
 
-    def test_draft_never_includes_candidate_tags_in_frontmatter(self, patch_roots, vault, tmp_path):
-        """candidate_tags is state-only (processed-images.json / inbox-queue.json) —
-        it must never leak into note frontmatter, regardless of how many the
-        vision LLM brainstormed."""
+    def test_draft_merges_candidate_tags_into_tags_not_as_field(self, patch_roots, vault, tmp_path):
+        """The multi-cycle conversation's final tags land in the note's `tags:`
+        (they're already library-aligned by cycle 4) — but never as a separate
+        `candidate_tags:` frontmatter field."""
         import yaml
         img = vault / "00-Inbox" / "images" / "warrior.jpg"
         img.touch()
@@ -669,7 +819,28 @@ class TestWriteDraft:
         fm_text = out.read_text(encoding="utf-8").split("---")[1]
         fm = yaml.safe_load(fm_text)
         assert "candidate_tags" not in fm
-        assert "axe" not in (fm.get("tags") or [])
+        assert "axe" in fm["tags"]
+        assert "steel" in fm["tags"]
+
+    def test_draft_prefers_grounded_entity_type(self, patch_roots, vault, tmp_path):
+        import yaml
+        img = vault / "00-Inbox" / "images" / "axe.jpg"
+        img.touch()
+        out = vault / "01-Processing" / "scene-interior.md"
+        c = _clf(type_="scene", environment="interior")
+        c = c.model_copy(update={"entity_type": "item"})
+        _mod._write_draft(out, c, img)
+        fm = yaml.safe_load(out.read_text(encoding="utf-8").split("---")[1])
+        assert fm["type"] == "item"
+
+    def test_draft_falls_back_to_placeholder_type_when_none(self, patch_roots, vault, tmp_path):
+        import yaml
+        img = vault / "00-Inbox" / "images" / "axe.jpg"
+        img.touch()
+        out = vault / "01-Processing" / "scene-interior.md"
+        _mod._write_draft(out, _clf(type_="scene", environment="interior"), img)
+        fm = yaml.safe_load(out.read_text(encoding="utf-8").split("---")[1])
+        assert fm["type"] == "location"
 
 
 # ---------------------------------------------------------------------------
@@ -725,18 +896,18 @@ class TestSignalEmission:
         with patch.object(_mod, "LLMClient") as MockClient:
             client = MockClient.return_value
             client.is_available.return_value = True
-            client.vision_chat.return_value = {
+            client.chat.return_value = json.dumps({
                 "type": "portrait", "ancestry": "human", "class": "fighter",
                 "creature_type": "none", "element": "dark", "environment": "none",
                 "description": "A warrior.",
-            }
+            })
 
             img = (
                 (patch_roots if hasattr(patch_roots, "__truediv__") else
                  _mod._VAULT_ROOT)
                 / "00-Inbox" / "images" / "warrior.jpg"
             )
-            img.write_bytes(b"\xff\xd8\xff" + b"\x00" * 64)
+            _write_real_jpg(img)
 
             with patch.object(_mod, "_PROMPT_FILE", patch_roots / "noprompt.txt" if False else _mod._PROMPT_FILE):
                 import contextlib, io as _io, sys as _sys
@@ -900,7 +1071,7 @@ class TestCallTool:
 
     def test_classify_image_returns_error_when_llm_offline(self, patch_roots, tmp_path):
         img = tmp_path / "warrior.jpg"
-        img.write_bytes(b"\xff\xd8\xff" + b"\x00" * 64)
+        _write_real_jpg(img)
         with patch.object(_mod, "LLMClient") as MockClient:
             MockClient.return_value.is_available.return_value = False
             result = _mod.call_tool(
@@ -913,15 +1084,15 @@ class TestCallTool:
 
     def test_classify_image_returns_classification_when_llm_available(self, patch_roots, tmp_path):
         img = tmp_path / "warrior.jpg"
-        img.write_bytes(b"\xff\xd8\xff" + b"\x00" * 64)
+        _write_real_jpg(img)
         with patch.object(_mod, "LLMClient") as MockClient:
             client = MockClient.return_value
             client.is_available.return_value = True
-            client.vision_chat.return_value = {
+            client.chat.return_value = json.dumps({
                 "type": "portrait", "ancestry": "human", "class": "fighter",
                 "creature_type": "none", "element": "dark", "environment": "none",
                 "description": "A warrior.",
-            }
+            })
             result = _mod.call_tool(
                 "classify_image",
                 {"image_path": str(img)},

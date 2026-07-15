@@ -13,10 +13,10 @@ On each run:
 
 ## Rules
 
-- Only suggest tags from the approved DM vocabulary (location, npc, faction, quest, etc.)
+- Tags are free-form — canonicalized against state/tag-library.json, not filtered by a fixed vocabulary; prefer reusing known tags over inventing synonyms
 - Never remove existing tags — only add new ones
-- The local LLM (localhost:8080) suggests tags — if offline, log WARN and skip
-- A note needs enrichment if: it has ≤5 tags OR the type field is missing
+- The local text LLM (LM Studio, model per agent.json llm.text_model) suggests tags — if offline, log WARN and skip
+- A note needs enrichment if: it has ≤5 tags OR the type field is missing OR its source image carries unreviewed candidate_tags
 - Never set status: approved or reviewed: true
 - Do not modify 02-Library/ content
 - If a note is in bad-docs.txt (parse errors), skip it silently

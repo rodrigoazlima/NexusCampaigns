@@ -132,6 +132,14 @@ class TestVisionClassification:
         vc = VisionClassification(type=ImageType.scene, candidate_tags=["axe", "steel"])
         assert vc.candidate_tags == ["axe", "steel"]
 
+    def test_entity_type_defaults_to_none(self):
+        vc = VisionClassification(type=ImageType.portrait)
+        assert vc.entity_type == "none"
+
+    def test_entity_type_accepts_value(self):
+        vc = VisionClassification(type=ImageType.scene, entity_type="item")
+        assert vc.entity_type == "item"
+
     def test_alias_class(self):
         vc = VisionClassification(type=ImageType.portrait, **{"class": "wizard"})
         assert vc.char_class == "wizard"

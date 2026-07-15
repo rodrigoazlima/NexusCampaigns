@@ -25,7 +25,7 @@ pytest agents/tests/test_classification.py
 - `agent.json` — task config (hourly, `lm-studio` dispatch, `tools_module: classification.tools.enrich_tags`).
 - `AGENT.md` — contract: inputs/outputs, `commit_scope`, allowed types list + tag-library description, restrictions (read before changing behavior).
 - `prompts/system.md` — step order for the dispatched model (`enrich_tags` → `infer_type` → `flag_duplicates` → `write_log`).
-- `prompts/enrich-tags.txt` — the actual tagging/typing prompt sent to LocalRouter, including the dashboard-tab-to-entity-type mapping and the `{candidate_tags}`/`{known_tags}` hint lines; keep the entity-type list in sync with `_ALLOWED_TYPES` in code if it changes (tags themselves are no longer a fixed list).
+- `prompts/enrich-tags.txt` — the actual tagging/typing prompt sent to the configured text LLM, including the dashboard-tab-to-entity-type mapping and the `{candidate_tags}`/`{known_tags}` hint lines; keep the entity-type list in sync with `_ALLOWED_TYPES` in code if it changes (tags themselves are no longer a fixed list).
 - `.agents`, `.knowledge-base`, `.system` — symlinks into `agents/shared/`, the vault, and `system/state/` respectively (same pattern as sibling agents).
 
 ## Actions (in `tools/enrich_tags.py`)

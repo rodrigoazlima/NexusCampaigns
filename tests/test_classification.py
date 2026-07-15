@@ -564,6 +564,81 @@ class TestQueueIntegration:
         assert "axe" in saved["tags"]
         assert "weapon" in saved["tags"]
 
+    def test_vision_refinement_merges_tags_when_source_image_exists(
+        self, patch_roots, vault, tmp_path, monkeypatch
+    ):
+        """needs_candidate_review + resolvable source image → refine_tags_with_library
+        runs as a second opinion; its tags merge add-only, its entity type fills a
+        missing type."""
+        import yaml
+
+        img = tmp_path / "00-Inbox" / "images" / "axe.jpg"
+        img.parent.mkdir(parents=True, exist_ok=True)
+        img.write_bytes(b"\xff\xd8\xff" + b"\x00" * 64)
+
+        proc = vault / "01-Processing" / "token-axe.md"
+        _write_md(
+            proc,
+            {"id": "token-axe", "tags": [], "source": ["00-Inbox/images/axe.jpg"]},
+            body="A gleaming axe.",
+        )
+
+        queue_data = {
+            "00-Inbox/images/axe.jpg": {
+                "agents": {"classification": "pending"},
+                "candidate_tags": ["axe"],
+            }
+        }
+        q = tmp_path / "system" / "state" / "inbox-queue.json"
+        q.parent.mkdir(parents=True, exist_ok=True)
+        q.write_text(_json.dumps(queue_data), encoding="utf-8")
+        monkeypatch.setattr(_mod, "_QUEUE_FILE", q)
+
+        with patch("classification.tools.enrich_tags.LLMClient") as MockClient, \
+             patch("classification.tools.enrich_tags.refine_tags_with_library") as mock_refine:
+            MockClient.return_value.is_available.return_value = True
+            MockClient.return_value.chat.return_value = '{"tags": ["axe"], "type": null}'
+            mock_refine.return_value = (["axe", "weapon", "steel"], "item")
+            count, failed = _mod._run_enrich_tags()
+
+        mock_refine.assert_called_once()
+        assert count == 1
+        assert failed == 0
+        saved = yaml.safe_load(proc.read_text(encoding="utf-8").split("---")[1])
+        assert "weapon" in saved["tags"]
+        assert "steel" in saved["tags"]
+        assert saved["type"] == "item"
+
+    def test_vision_refinement_skipped_when_source_image_missing(
+        self, patch_roots, vault, tmp_path, monkeypatch
+    ):
+        proc = vault / "01-Processing" / "token-axe.md"
+        _write_md(
+            proc,
+            {"id": "token-axe", "tags": [], "source": ["00-Inbox/images/gone.jpg"]},
+            body="A gleaming axe.",
+        )
+
+        queue_data = {
+            "00-Inbox/images/gone.jpg": {
+                "agents": {"classification": "pending"},
+                "candidate_tags": ["axe"],
+            }
+        }
+        q = tmp_path / "system" / "state" / "inbox-queue.json"
+        q.parent.mkdir(parents=True, exist_ok=True)
+        q.write_text(_json.dumps(queue_data), encoding="utf-8")
+        monkeypatch.setattr(_mod, "_QUEUE_FILE", q)
+
+        with patch("classification.tools.enrich_tags.LLMClient") as MockClient, \
+             patch("classification.tools.enrich_tags.refine_tags_with_library") as mock_refine:
+            MockClient.return_value.is_available.return_value = True
+            MockClient.return_value.chat.return_value = '{"tags": ["axe"], "type": "item"}'
+            count, _ = _mod._run_enrich_tags()
+
+        mock_refine.assert_not_called()
+        assert count == 1
+
     def test_no_candidate_tags_and_satisfied_tags_type_skips_llm(
         self, patch_roots, vault, tmp_path, monkeypatch
     ):
