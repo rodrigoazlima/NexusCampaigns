@@ -177,6 +177,12 @@ class VisionClassification(BaseModel):
     # (equipment/clothing/fantasy_features arrays) — never written to note
     # frontmatter; state-only input to the classification agent's tag library.
     candidate_tags: list[str] = Field(default_factory=list)
+    # Grounded entity-type guess (EntityType's 18 values, e.g. npc/location/item)
+    # from the multi-cycle conversation's dedicated entity-type turn. Open
+    # string like ancestry/creature_type — "none" if that cycle never ran or
+    # didn't produce a recognized value; _write_draft falls back to its
+    # portrait/battlemap placeholder heuristic in that case.
+    entity_type: str = "none"
 
     model_config = {"populate_by_name": True}
 

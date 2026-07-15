@@ -181,7 +181,8 @@ _AGENT_JSON_SPECS: dict[str, list[dict]] = {
     "classification": [
         {"task_id": "classification-agent", "model": "claude-haiku-4-5-20251001",
          "tools_module": "classification.tools.enrich_tags", "interval": 900,
-         "description": "Enrich draft tags and infer entity type."},
+         "description": "Enrich draft tags and infer entity type.",
+         "llm": {"text_model": "qwen/qwen3.5-9b", "vision_model": "qwen3-vl-4b-instruct"}},
     ],
     "wiki": [
         {"task_id": "wiki-agent", "model": "claude-sonnet-4-6",
@@ -208,11 +209,14 @@ def _generate_missing_agent_configs(log: Logger) -> int:
                     "prompt_file": t.get("prompt_file", "prompts/system.md"),
                 },
             }
-            payload["tasks"][t["task_id"]] = {
+            task_payload: dict[str, Any] = {
                 "intervalSeconds": t["interval"],
                 "description": t["description"],
                 "dispatch": dispatch,
             }
+            if "llm" in t:
+                task_payload["llm"] = t["llm"]
+            payload["tasks"][t["task_id"]] = task_payload
         agent_json.parent.mkdir(parents=True, exist_ok=True)
         agent_json.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         log.info(f"Generated missing agent.json: agents/{agent_name}/agent.json")

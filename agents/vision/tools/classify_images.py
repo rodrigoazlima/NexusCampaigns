@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import sys
 import time
 import uuid as _uuid
@@ -36,8 +37,51 @@ from nexus.shared import (  # noqa: E402
     to_slug,
 )
 from nexus.shared.config import LLMEndpointConfig  # noqa: E402
+from nexus.shared.llm_client import _resize_and_encode  # noqa: E402
 from nexus.shared.loaders import load_llm_endpoint  # noqa: E402
 from nexus.shared.models import Element, Environment, ImageType  # noqa: E402
+
+# classification.tools.enrich_tags owns state/tag-library.json — read-only
+# here (cycle 4 aligns against it, never writes it; classification is the
+# sole writer of canonical entries/aliases/counts).
+_CLASSIFICATION_TAG_LIBRARY = _AGENTS_DIR / "classification" / "state" / "tag-library.json"
+
+# Same 18-value taxonomy as classification agent's _ALLOWED_TYPES
+# (agents/classification/tools/enrich_tags.py) — kept in sync manually, same
+# convention already used for the PF2E_* vocab lists.
+_ENTITY_TYPES: frozenset[str] = frozenset({
+    "npc", "character", "faction", "location", "city", "village", "dungeon",
+    "item", "artifact", "quest", "encounter", "creature", "monster", "event",
+    "religion", "organization", "timeline", "lore",
+})
+
+# Adapted from agents/classification/prompts/enrich-tags.txt's dashboard-tab
+# guidance — duplicated per this codebase's existing manual-sync convention
+# for prompt text (see vision CLAUDE.md's PF2E_* sync note); update both
+# together if the taxonomy changes.
+_ENTITY_TYPE_GUIDANCE = """Entity types by dashboard tab:
+
+CHARACTERS & NPCS — npc (named non-player character, default for people), character (playable/significant individual)
+BESTIARY — creature (reusable monster stat-block), monster (unique/legendary named monster), encounter (a placed fight)
+PLACES — location (generic site/region), city, village, dungeon (underground ruin/cave/tomb)
+FACTIONS & POWERS — faction (group with a goal/agenda), organization (formal group, no antagonist role), religion
+QUESTS & EVENTS — quest (adventure hook), event (past/ongoing event), timeline (sequence of events)
+ITEMS & LORE — item (mundane/magical object), artifact (unique powerful relic), lore (world knowledge, not a physical object)
+
+Choose the MOST SPECIFIC type. Prefer dungeon over location for a tomb/cave, creature over npc for a monster, artifact over item for relics."""
+
+_MIN_TAGS_TARGET = 6
+_MAX_CONVERSATION_MESSAGES = 10
+_VISION_SYSTEM_PROMPT = "You are a Pathfinder 2e image classifier. Return ONLY valid JSON."
+
+# Vision-model token budgets — generous on purpose (assertive over cost-
+# efficient): cycle 1's classify-image.txt asks for a large visual_analysis
+# JSON that 2048 tokens can truncate mid-object; follow-up cycles return
+# smaller JSON but tag lists shouldn't get clipped either.
+_CYCLE1_MAX_TOKENS   = 4096
+_FOLLOWUP_MAX_TOKENS = 1024
+
+_JSON_FENCE_RE = re.compile(r"^```(?:json)?\s*\n?(.*?)\n?```\s*$", re.DOTALL)
 
 TASK_ID         = "vision-agent"
 SCRIPT_BASENAME = "classify_images.py"
@@ -282,17 +326,20 @@ def _try_face_match(token_path: Path, candidates: list[Path]) -> Optional[Path]:
 def _inherit_clf_from_state(entry: dict) -> VisionClassification:
     """Rebuild a VisionClassification from a processed-images.json entry.
 
-    Overrides type to `token` — the token inherits all other metadata from
-    its matched source portrait.
+    Overrides type to `token` — the token inherits all other metadata,
+    including the source portrait's final tags/entity_type (same character,
+    so both are just as applicable to the token), from its matched source.
     """
     return VisionClassification(
-        type          = ImageType.token,
-        ancestry      = entry.get("ancestry", "none"),
+        type           = ImageType.token,
+        ancestry       = entry.get("ancestry", "none"),
         **{"class": entry.get("class", "none")},
-        creature_type = entry.get("creature_type", "none"),
-        element       = Element(entry.get("element",      "none")),
-        environment   = Environment(entry.get("environment", "none")),
-        description   = entry.get("description", ""),
+        creature_type  = entry.get("creature_type", "none"),
+        element        = Element(entry.get("element",      "none")),
+        environment    = Environment(entry.get("environment", "none")),
+        description    = entry.get("description", ""),
+        candidate_tags = entry.get("candidate_tags", []),
+        entity_type    = entry.get("entity_type", "none"),
     )
 
 
@@ -666,8 +713,19 @@ def _write_draft(
         tags.append(clf.element.value)
     if clf.environment and clf.environment.value != "none":
         tags.append(clf.environment.value)
+    # Final, library-aligned brainstorm from classify_image_full's multi-cycle
+    # conversation (state-only until now — this is the one place it becomes
+    # the note's actual tags).
+    for tag in clf.candidate_tags:
+        if tag not in tags:
+            tags.append(tag)
 
-    entity_type = "npc" if clf.type.value in ("portrait", "body", "token") else "location"
+    # Grounded guess from the multi-cycle conversation's entity-type cycle
+    # takes priority; the coarse portrait/body/token->npc, else->location
+    # placeholder only applies when that cycle didn't run or came back "none".
+    entity_type = clf.entity_type if clf.entity_type != "none" else (
+        "npc" if clf.type.value in ("portrait", "body", "token") else "location"
+    )
 
     frontmatter: dict[str, Any] = {
         "id":            slug,
@@ -748,27 +806,210 @@ def _extract_candidate_tags(raw: dict) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# Single-image classification
+# Multi-cycle classification — image stays in one conversation across up to
+# _MAX_CONVERSATION_MESSAGES messages: a clean cold call, then dedicated
+# image-type, entity-type, and tag-library-refinement follow-ups. Completion
+# goal: >= _MIN_TAGS_TARGET tags + both categories set. No message budget for
+# corrective retry turns — a cycle whose response fails to parse just keeps
+# whatever was already collected instead of spending a "please retry" turn.
 # ---------------------------------------------------------------------------
 
-def _classify_one(
+def _parse_json_response(raw: str) -> dict:
+    """Strip a leading/trailing ```json fence before parsing, if present.
+
+    Observed live this session: LocalRouter's `auto` model sometimes wraps
+    otherwise-valid JSON in a markdown code fence. Cheap insurance, not a
+    correctness risk — falls through to plain json.loads when there's no fence.
+    """
+    text = raw.strip()
+    m = _JSON_FENCE_RE.match(text)
+    if m:
+        text = m.group(1).strip()
+    return json.loads(text)
+
+
+def _read_tag_library() -> dict[str, Any]:
+    """Read-only view of classification agent's canonical tag library."""
+    try:
+        return json.loads(_CLASSIFICATION_TAG_LIBRARY.read_text(encoding="utf-8"))
+    except Exception:
+        return {"tags": {}}
+
+
+def _image_content_block(img_path: Path) -> dict:
+    b64 = _resize_and_encode(img_path)
+    return {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}}
+
+
+def _cycle2_prompt(tags_so_far: list[str]) -> str:
+    remaining = max(0, _MIN_TAGS_TARGET - len(tags_so_far))
+    return (
+        "Confirm the image category and continue tagging.\n\n"
+        "Category — respond with exactly one of: portrait, body, battlemap, scene, token.\n\n"
+        f"We have {len(tags_so_far)} tag(s) so far: {', '.join(tags_so_far) or 'none'}. "
+        "List additional short (1-3 word) concrete tags describing objects, materials, "
+        f"subjects, or themes visible in the image, not already listed"
+        + (f" — aim for at least {remaining} more so the total reaches {_MIN_TAGS_TARGET}." if remaining else ".")
+        + '\n\nReturn ONLY valid JSON:\n{"category": "...", "additional_tags": ["...", "..."]}'
+    )
+
+
+def _cycle3_prompt(tags_so_far: list[str]) -> str:
+    remaining = max(0, _MIN_TAGS_TARGET - len(tags_so_far))
+    return (
+        "Now determine the entity type this image will become once promoted "
+        "into our Dungeon Master's knowledge base.\n\n"
+        f"{_ENTITY_TYPE_GUIDANCE}\n\n"
+        f"We have {len(tags_so_far)} tag(s) so far: {', '.join(tags_so_far) or 'none'}. "
+        "List any additional concrete tags not yet mentioned"
+        + (f" — aim for at least {remaining} more so the total reaches {_MIN_TAGS_TARGET}." if remaining else ".")
+        + '\n\nReturn ONLY valid JSON:\n{"entity_type": "...", "additional_tags": ["...", "..."]}'
+    )
+
+
+def _cycle4_prompt(current_tags: list[str], known_tags: list[str], entity_type_hint: str) -> str:
+    return (
+        "Here is our tag library — canonical tags already in use elsewhere in "
+        f"this knowledge base: {', '.join(known_tags) or 'none yet'}\n\n"
+        f"Our current tag list for this image: {', '.join(current_tags) or 'none'}\n\n"
+        "Align these tags: where a known tag above means the same thing as one of "
+        "ours, prefer the known spelling. Finalize the complete tag list for this "
+        f"image (merge, dedupe, keep concrete and specific), aiming for at least "
+        f"{_MIN_TAGS_TARGET} total if the image supports it. Confirm the entity "
+        f"type (current best guess: {entity_type_hint}).\n\n"
+        'Return ONLY valid JSON:\n{"final_tags": ["...", "..."], "entity_type": "..."}'
+    )
+
+
+def refine_tags_with_library(
+    img_path: Path,
+    client: LLMClient,
+    current_tags: list[str],
+    entity_type_hint: str,
+    library: dict[str, Any],
+    *,
+    history: Optional[list[dict]] = None,
+) -> tuple[list[str], str]:
+    """Cycle 4, standalone-callable: align current_tags against the tag
+    library's known canonical tags and finalize tags + entity type, image
+    still in context. Public so other agents/system code can re-run just
+    this refinement later (e.g. after the library has grown) without
+    redoing the full classification — pass history=None for a fresh
+    conversation, or an existing message list to extend it in place.
+    """
+    known_tags = sorted(
+        library.get("tags", {}),
+        key=lambda t: -library["tags"][t].get("count", 0),
+    )[:20]
+    prompt_text = _cycle4_prompt(current_tags, known_tags, entity_type_hint)
+
+    if history is not None:
+        messages = history
+        messages.append({"role": "user", "content": prompt_text})
+    else:
+        messages = [
+            {"role": "system", "content": _VISION_SYSTEM_PROMPT},
+            {"role": "user", "content": [_image_content_block(img_path), {"type": "text", "text": prompt_text}]},
+        ]
+
+    if len(messages) + 1 > _MAX_CONVERSATION_MESSAGES:
+        # Over budget even before this turn's reply — accept what we have
+        # rather than exceed the message cap.
+        return current_tags, entity_type_hint
+
+    final_tags, entity_type = current_tags, entity_type_hint
+    try:
+        raw_text = client.chat(messages, max_tokens=_FOLLOWUP_MAX_TOKENS)
+        messages.append({"role": "assistant", "content": raw_text})
+        resp = _parse_json_response(raw_text)
+        candidate = resp.get("final_tags")
+        if isinstance(candidate, list) and candidate:
+            final_tags = [t.strip().lower() for t in candidate if isinstance(t, str) and t.strip()]
+        et = resp.get("entity_type")
+        if isinstance(et, str) and et in _ENTITY_TYPES:
+            entity_type = et
+    except (LLMOfflineError, LLMResponseError, Exception):
+        pass  # graceful degrade — keep current_tags/entity_type_hint as-is
+
+    return final_tags, entity_type
+
+
+def classify_image_full(
     img_path: Path,
     client: LLMClient,
     prompt: str,
     is_tk: bool,
 ) -> VisionClassification:
-    """Classify one image via LLM. Raises LLMOfflineError / LLMResponseError."""
-    raw = client.vision_chat(
-        img_path,
-        prompt or "Classify this RPG image. Return JSON only.",
-        system="You are a Pathfinder 2e image classifier. Return ONLY valid JSON.",
-        max_tokens=2048,
-    )
+    """Full multi-cycle classification, image held in one conversation:
+    (1) clean cold call — existing classify-image.txt prompt, unchanged,
+    (2) confirm image type + more tags, (3) infer entity type + more tags,
+    (4) tag-library refinement (refine_tags_with_library). Public — the
+    single entry point other agents/system code should call for a from-image
+    classification. Raises LLMOfflineError / LLMResponseError from cycle 1
+    only (matches the old single-call contract callers already handle);
+    later cycles degrade gracefully instead of failing the whole image.
+    """
+    messages: list[dict] = [
+        {"role": "system", "content": _VISION_SYSTEM_PROMPT},
+        {
+            "role": "user",
+            "content": [
+                _image_content_block(img_path),
+                {"type": "text", "text": prompt or "Classify this RPG image. Return JSON only."},
+            ],
+        },
+    ]
+
+    # --- Cycle 1: clean — errors propagate, same contract as the old single call ---
+    raw_text = client.chat(messages, max_tokens=_CYCLE1_MAX_TOKENS)
+    messages.append({"role": "assistant", "content": raw_text})
+    raw = _parse_json_response(raw_text)
     clf = VisionClassification.model_validate(raw)
     if is_tk:
         clf = clf.model_copy(update={"type": ImageType.token})
-    clf = clf.model_copy(update={"candidate_tags": _extract_candidate_tags(raw)})
-    return clf
+    tags: list[str] = list(dict.fromkeys(_extract_candidate_tags(raw)))
+
+    # --- Cycle 2: image type + more tags ---
+    try:
+        messages.append({"role": "user", "content": _cycle2_prompt(tags)})
+        raw_text = client.chat(messages, max_tokens=_FOLLOWUP_MAX_TOKENS)
+        messages.append({"role": "assistant", "content": raw_text})
+        resp = _parse_json_response(raw_text)
+        cat = resp.get("category")
+        if not is_tk and isinstance(cat, str) and cat in {"portrait", "body", "battlemap", "scene", "token"}:
+            clf = clf.model_copy(update={"type": ImageType(cat)})
+        for t in resp.get("additional_tags") or []:
+            if isinstance(t, str) and t.strip():
+                norm = t.strip().lower()
+                if norm not in tags:
+                    tags.append(norm)
+    except (LLMOfflineError, LLMResponseError, Exception):
+        pass  # keep cycle 1's type/tags — never fail the image over this
+
+    # --- Cycle 3: entity type + more tags ---
+    entity_type = "none"
+    try:
+        messages.append({"role": "user", "content": _cycle3_prompt(tags)})
+        raw_text = client.chat(messages, max_tokens=_FOLLOWUP_MAX_TOKENS)
+        messages.append({"role": "assistant", "content": raw_text})
+        resp = _parse_json_response(raw_text)
+        et = resp.get("entity_type")
+        if isinstance(et, str) and et in _ENTITY_TYPES:
+            entity_type = et
+        for t in resp.get("additional_tags") or []:
+            if isinstance(t, str) and t.strip():
+                norm = t.strip().lower()
+                if norm not in tags:
+                    tags.append(norm)
+    except (LLMOfflineError, LLMResponseError, Exception):
+        pass
+
+    # --- Cycle 4: tag-library refinement (in-conversation) ---
+    final_tags, entity_type = refine_tags_with_library(
+        img_path, client, tags, entity_type, _read_tag_library(), history=messages,
+    )
+
+    return clf.model_copy(update={"candidate_tags": final_tags, "entity_type": entity_type})
 
 
 # ---------------------------------------------------------------------------
@@ -835,7 +1076,7 @@ def main() -> None:
 
         if clf is None:
             try:
-                clf = _classify_one(img_path, client, prompt, is_tk)
+                clf = classify_image_full(img_path, client, prompt, is_tk)
             except LLMOfflineError:
                 # LM Studio can only hold one model loaded at a time; a
                 # concurrent request for another model briefly evicts this
@@ -844,7 +1085,7 @@ def main() -> None:
                 log.warning(f"LLM offline while processing {img_path.name} — retrying once")
                 time.sleep(10)
                 try:
-                    clf = _classify_one(img_path, client, prompt, is_tk)
+                    clf = classify_image_full(img_path, client, prompt, is_tk)
                 except LLMOfflineError:
                     log.warning(f"LLM still offline for {img_path.name} — aborting batch")
                     break
@@ -903,6 +1144,7 @@ def main() -> None:
             "environment":   clf.environment.value,
             "description":   clf.description,
             "candidate_tags": clf.candidate_tags,
+            "entity_type":   clf.entity_type,
             "sha256":        sha,
             "isToken":       is_tk,
             "status":        "ok",
@@ -1075,7 +1317,7 @@ def call_tool(name: str, args: dict, context: dict) -> str:
         prompt = _PROMPT_FILE.read_text(encoding="utf-8") if _PROMPT_FILE.exists() else ""
         is_tk  = _is_token(p)
         try:
-            clf = _classify_one(p, client, prompt, is_tk)
+            clf = classify_image_full(p, client, prompt, is_tk)
             data = clf.model_dump()
             data["is_token"] = is_tk
             return _json.dumps(data)

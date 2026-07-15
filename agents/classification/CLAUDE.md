@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Purpose
 
-Second-stage agent of the vault pipeline (see repo-root `CLAUDE.md` for the full architecture). Enriches sparse `.md` notes in `00-Inbox/` and `01-Processing/` with DM-domain tags and inferred entity `type`, and flags likely duplicates against `02-Library/`. Dispatched via `lm-studio` (`agent.json`), but the actual tag/type inference calls a separate **LocalRouter** endpoint at `localhost:8080` (`LLMClient` in `tools/enrich_tags.py`) — not the LM Studio model driving the tool-call loop.
+Second-stage agent of the vault pipeline (see repo-root `CLAUDE.md` for the full architecture). Enriches sparse `.md` notes in `00-Inbox/` and `01-Processing/` with DM-domain tags and inferred entity `type`, and flags likely duplicates against `02-Library/`. Two LLM calls of its own, both LM Studio (`localhost:1234`), both model-selectable via `agent.json` `tasks.classification-agent.llm`: a text-only call (`classification_text_llm` registry alias, override with `llm.text_model`) for tag/type inference, and a vision call (`vision_llm` alias, override with `llm.vision_model`) powering `refine_tags_with_library`'s image-grounded second opinion. Neither is the model driving the agent's own dispatch loop — that's `agent.json`'s `dispatch` block, unrelated.
 
 ## Commands
 

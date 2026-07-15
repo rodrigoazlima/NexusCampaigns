@@ -12,7 +12,9 @@ ingestion_options:
   auto_absorb_stray: true
 
 # timeout_seconds: per-request LLM read timeout (default 120). An agent can
-# override it for its own calls via agent.json tasks.<task-id>.llm.timeout_seconds.
+# override it for its own calls via agent.json tasks.<task-id>.llm.timeout_seconds
+# (and, since load_llm_endpoint's model_key param, the model itself too —
+# e.g. classification's tasks.classification-agent.llm.text_model/vision_model).
 llm_endpoints:
   vision_llm:
     url: "http://localhost:1234/v1/chat/completions"
@@ -25,6 +27,16 @@ llm_endpoints:
     model: "auto"
     type: text
     provider: local-router
+    timeout_seconds: 120
+  # Classification agent's text-only calls — LM Studio directly rather than
+  # LocalRouter's multi-provider catalog: a known-good, already-verified-local
+  # model beats router-picked "auto" for assertive/predictable behavior.
+  # wiki agent still uses local_router above; this alias is classification-only.
+  classification_text_llm:
+    url: "http://localhost:1234/v1/chat/completions"
+    model: "qwen/qwen3.5-9b"
+    type: text
+    provider: lm-studio
     timeout_seconds: 120
 
 # Fallback dispatch used by runner.py when an agent has no agent.json (or no

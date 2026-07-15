@@ -3,7 +3,10 @@
 Actions: EnrichTags · InferType · FlagDuplicates
 Reads:   00-Inbox/**/*.md, 01-Processing/**/*.md, system/state/inbox-queue.json
 Writes:  enriched frontmatter in-place (never 02-Library/)
-LLM:     LocalRouter http://localhost:8080 (openai-compat, model=auto)
+LLM:     text-only via classification_text_llm (LM Studio, model selectable
+         via agent.json tasks.classification-agent.llm.text_model); vision
+         via vision_llm (same LM Studio instance, model selectable via
+         .llm.vision_model) for refine_tags_with_library's second opinion.
 """
 
 from __future__ import annotations
@@ -35,6 +38,7 @@ from nexus.shared import (  # noqa: E402
 )
 from nexus.shared.config import LLMEndpointConfig  # noqa: E402
 from nexus.shared.loaders import load_llm_endpoint  # noqa: E402
+from vision.tools.classify_images import refine_tags_with_library  # noqa: E402
 
 TASK_ID         = "classification-agent"
 SCRIPT_BASENAME = "enrich_tags.py"
@@ -65,16 +69,34 @@ _ALLOWED_TYPES: frozenset[str] = frozenset({
 })
 
 _LLM_CFG = load_llm_endpoint(
-    "local_router",
+    "classification_text_llm",
     fallback = LLMEndpointConfig(
-        url      = "http://localhost:8080/v1/chat/completions",
-        model    = "auto",
+        url      = "http://localhost:1234/v1/chat/completions",
+        model    = "qwen/qwen3.5-9b",
         type     = "text",
-        provider = "lmstudio",
+        provider = "lm-studio",
     ),
     agent_dir    = _AGENTS_DIR / "classification",
     task_id      = TASK_ID,
     project_root = _PROJECT_ROOT,
+    model_key    = "text_model",
+)
+
+# Second opinion for refine_tags_with_library — same LM Studio instance the
+# vision agent uses, model independently selectable via agent.json so
+# classification isn't pinned to whatever model the vision agent runs.
+_VISION_LLM_CFG = load_llm_endpoint(
+    "vision_llm",
+    fallback = LLMEndpointConfig(
+        url      = "http://localhost:1234/v1/chat/completions",
+        model    = "qwen3-vl-4b-instruct",
+        type     = "vision",
+        provider = "lm-studio",
+    ),
+    agent_dir    = _AGENTS_DIR / "classification",
+    task_id      = TASK_ID,
+    project_root = _PROJECT_ROOT,
+    model_key    = "vision_model",
 )
 
 # Minimum difflib ratio to flag a slug as similar-to a library slug
@@ -355,8 +377,10 @@ def _run_enrich_tags() -> tuple[int, int]:
     client = LLMClient(_LLM_CFG)
     if not client.is_available():
         log = _make_logger()
-        log.warning("LocalRouter (localhost:8080) offline — skipping batch")
+        log.warning(f"Text LLM ({_LLM_CFG.url}) offline — skipping batch")
         return 0, 0
+
+    vision_client = LLMClient(_VISION_LLM_CFG)
 
     bad_docs   = _load_bad_docs()
     queue      = _load_queue()
@@ -449,6 +473,35 @@ def _run_enrich_tags() -> tuple[int, int]:
                 fm["type"] = enrichment.type
                 changed = True
 
+        # Second opinion, image-grounded: classification's own vision-capable
+        # call (independent of vision agent's own in-conversation cycle 4),
+        # only when there's still something to check against the picture.
+        if needs_candidate_review:
+            source_rel = next(iter(fm.get("source") or []), None)
+            image_path = _PROJECT_ROOT / source_rel if source_rel else None
+            if image_path is not None and image_path.exists() and vision_client.is_available():
+                try:
+                    refined_tags, refined_type = refine_tags_with_library(
+                        image_path,
+                        vision_client,
+                        list(fm.get("tags") or existing_tags),
+                        fm.get("type") or current_type or "none",
+                        library,
+                    )
+                    _save_tag_library(library)
+                    merged = list(fm.get("tags") or existing_tags)
+                    for t in refined_tags:
+                        if t and t not in merged:
+                            merged.append(t)
+                    if merged != (fm.get("tags") or existing_tags):
+                        fm["tags"] = merged
+                        changed = True
+                    if needs_type and refined_type in _ALLOWED_TYPES and refined_type != current_type:
+                        fm["type"] = refined_type
+                        changed = True
+                except Exception as exc:
+                    log.warning(f"Vision refinement failed for {md_path.name}: {exc} — keeping text-only result")
+
         if changed:
             ok = _write_with_retry(md_path, fm, body, fio)
             if ok:
@@ -485,7 +538,7 @@ def _run_infer_type() -> tuple[int, int]:
     log    = _make_logger()
     client = LLMClient(_LLM_CFG)
     if not client.is_available():
-        log.warning("LocalRouter offline — InferType skipped")
+        log.warning("Text LLM offline — InferType skipped")
         return 0, 0
 
     bad_docs = _load_bad_docs()
@@ -608,7 +661,7 @@ TOOLS = SELF_MANAGEMENT_TOOLS + [
         "name": "enrich_tags",
         "description": (
             "Process notes in 00-Inbox/ and 01-Processing/ that have ≤5 tags or a missing "
-            "type field. Calls LocalRouter LLM to suggest DM-domain tags and infer entity "
+            "type field. Calls the configured text LLM to suggest DM-domain tags and infer entity "
             "type in one pass. Updates inbox-queue.json classification slot to done. "
             "Returns count of enriched files."
         ),

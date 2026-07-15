@@ -124,6 +124,7 @@ def load_llm_endpoint(
     agent_dir: Optional[Path] = None,
     task_id: Optional[str] = None,
     project_root: Optional[Path] = None,
+    model_key: Optional[str] = None,
 ) -> LLMEndpointConfig:
     """Resolve an LLM endpoint config for one agent tool script.
 
@@ -131,6 +132,13 @@ def load_llm_endpoint(
       1. agent.json  tasks.<task_id>.llm.timeout_seconds
       2. registry.yaml  llm_endpoints.<alias>.timeout_seconds
       3. LLMEndpointConfig default (120)
+
+    model_key, when given, resolves a specific model the same way: agent.json
+    tasks.<task_id>.llm.<model_key> overrides registry.yaml's model for
+    ``alias`` — e.g. one agent needing both a text and a vision model can
+    call this twice against different aliases with model_key="text_model" /
+    "vision_model", letting each be picked independently via agent.json
+    without touching the shared registry.yaml endpoint definitions.
 
     Endpoint url/model/type/provider come from registry.yaml when present,
     else from ``fallback`` (each script's hardcoded config).
@@ -143,9 +151,19 @@ def load_llm_endpoint(
     if agent_dir is not None and task_id is not None:
         try:
             raw = json.loads((agent_dir / "agent.json").read_text(encoding="utf-8"))
-            override = int(raw["tasks"][task_id]["llm"]["timeout_seconds"])
-            cfg = dataclasses.replace(cfg, timeout_seconds=override)
+            llm_block = raw["tasks"][task_id]["llm"]
         except Exception:
-            pass  # no agent.json / no llm block — registry or default applies
+            llm_block = None  # no agent.json / no llm block — registry or default applies
+
+        if llm_block is not None:
+            try:
+                cfg = dataclasses.replace(cfg, timeout_seconds=int(llm_block["timeout_seconds"]))
+            except Exception:
+                pass
+            if model_key is not None:
+                try:
+                    cfg = dataclasses.replace(cfg, model=str(llm_block[model_key]))
+                except Exception:
+                    pass
 
     return cfg

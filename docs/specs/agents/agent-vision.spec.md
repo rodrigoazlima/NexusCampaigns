@@ -17,7 +17,7 @@
      GetFolderCandidates → non-token, non-battlemap images in same folder
      Invoke-TokenFaceMatch (Python face distance) → inherit meta from matched image
    else:
-     Invoke-VisionLLM → classify via Qwen3-VL
+     classify_image_full() → bounded multi-cycle conversation via Qwen3-VL (see below)
 4. Resolve-TargetFilename → slug, bump existing if collision
 5. Rename image
 6. Compute SHA256 of renamed file
@@ -54,11 +54,25 @@ The same LLM response also includes a `visual_analysis` block (equipment,
 clothing, fantasy_features, environment_details, etc. — see
 `prompts/classify-image.txt`). `_extract_candidate_tags()` flattens a fixed
 allowlist of its array leaves (weapons, tools, materials, creatures, ...) into
-`VisionClassification.candidate_tags: list[str]` — a free-form brainstorm, not
-validated against any vocabulary. It is **never** written to note frontmatter;
-it only flows into `processed-images.json` and the `inbox-queue.json` entry,
-where the classification agent reads it to seed its tag-library
-canonicalization (see `agent-classification.spec.md`).
+a seed tag list — a free-form brainstorm, not validated against any
+vocabulary — carried forward into the follow-up cycles below.
+
+---
+
+## Multi-Cycle Conversation (`classify_image_full`)
+
+The prompt above is only cycle 1. `classify_image_full(img_path, client, prompt, is_tk)`
+(public — importable by other agents/system code) keeps the same image in
+conversation context for up to **10 messages total** (1 system + 4 × user/assistant):
+
+1. **Clean** — the LLM Prompt Contract above, unchanged. Seeds the tag list via `_extract_candidate_tags`.
+2. **Image type + tags** — confirms `type` and asks for more concrete tags, told the running count.
+3. **Entity type + tags** — infers the note's eventual `EntityType` (npc/location/quest/item/etc., same 18-value taxonomy as `agent-classification.spec.md`), plus more tags.
+4. **Tag-library refinement** — `refine_tags_with_library(img_path, client, current_tags, entity_type_hint, library, history=...)` (also public, independently callable with `history=None` for a fresh conversation) sends the top known tags from classification agent's `state/tag-library.json` (read-only here — classification owns writes) and asks the model to align/finalize.
+
+**Completion goal:** ≥6 tags and both categories set by the end. No message budget for corrective retries — a cycle whose response fails to parse (or errors: `LLMOfflineError`/`LLMResponseError`/other) keeps the prior cycle's values rather than spending a message on "please retry." Only cycle 1's errors propagate to the caller (same contract the old single-call `_classify_one` had); cycles 2-4 degrade gracefully so a hiccup mid-conversation never fails an otherwise-classifiable image.
+
+The final tag list (`VisionClassification.candidate_tags`) and `entity_type` **are** written to the note's frontmatter by `_write_draft` — no longer state-only, since cycle 4 has already aligned them against the shared tag library.
 
 ---
 
@@ -93,6 +107,7 @@ Collision resolution: bump existing file to `{base}-N.{suffix}.ext`.
       "environment": "string",
       "description": "string",
       "candidate_tags": ["string"],
+      "entity_type": "string",
       "sha256": "string",
       "isToken": true,
       "status": "ok | failed | migrated"

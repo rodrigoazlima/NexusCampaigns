@@ -1,10 +1,12 @@
 ---
 name: vision
 purpose: >
-  Classifies RPG images in 00-Inbox/images/ using Qwen3-VL vision model via LM Studio.
-  Detects image type (portrait/body/battlemap/scene/token), renames files to canonical
-  slug format, writes AGENTS.md-compliant draft entities to 01-Processing/, runs
-  face-match to link tokens to their source portraits, maintains processed-images.json.
+  Classifies RPG images in 00-Inbox/images/ using Qwen3-VL vision model via LM Studio,
+  via a bounded multi-cycle conversation (classify_image_full — up to 10 messages: clean
+  classification, image-type confirmation, entity-type inference, tag-library refinement).
+  Detects image type (portrait/body/battlemap/scene/token) and entity type, renames files
+  to canonical slug format, writes AGENTS.md-compliant draft entities to 01-Processing/,
+  runs face-match to link tokens to their source portraits, maintains processed-images.json.
 inputs:
   - vault://00-Inbox/images/**/*.{png,jpg,jpeg,webp}
   - state/processed-images.json
@@ -36,8 +38,17 @@ responsibilities:
   - Call Qwen3-VL with base64-encoded image (resize to max 1024px on longest side, JPEG 85%)
   - Validate LLM JSON response against PF2e vocabulary (see models.py PF2E_* constants)
   - Harvest visual_analysis arrays (equipment/clothing/fantasy_features/environment_details)
-    into candidate_tags — free-form, never validated against a vocabulary; stored on
-    processed-images.json and the inbox-queue.json entry, never written to note frontmatter
+    into candidate_tags — free-form, never validated against a vocabulary
+  - classify_image_full() (public — importable by other agents/system code) runs three
+    more follow-up turns in the SAME conversation (image stays in context, ≤10 messages
+    total): confirm image type + more tags, infer entity type (18-value taxonomy, same
+    as classification agent's) + more tags, then refine_tags_with_library() (also public,
+    independently callable) aligns the running tag list against classification agent's
+    state/tag-library.json (read-only here) before finalizing. Target: >=6 tags + both
+    categories set; a cycle whose response fails to parse keeps the prior cycle's values
+    rather than spending a message on a retry — no budget for corrective turns
+  - Final tags (candidate_tags) and entity_type land directly in the note's frontmatter
+    via _write_draft — no longer state-only once the multi-cycle conversation finishes
   - Build target filename slug; bump existing same-named file to counter suffix (e.g. -01, -02)
   - Write AGENTS.md-compliant draft to 01-Processing/ (status: draft, quality: 0, reviewed: false)
   - Append row to Images Index.md
