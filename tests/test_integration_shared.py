@@ -18,6 +18,7 @@ from nexus.shared import (
     Logger,
     StateStore,
     VaultGuard,
+    claim_image_hash,
     load_vault_config,
 )
 from nexus.shared.config import VaultPaths, SystemPaths, VaultConfig, LLMEndpointConfig
@@ -309,6 +310,46 @@ class TestInboxQueueLifecycle:
         assert len(q) == 5
         for f in files:
             assert f in q
+
+
+# ---------------------------------------------------------------------------
+# 4b. Image-hash ledger (ingestion-time dedup — see nexus.shared.image_hashes)
+# ---------------------------------------------------------------------------
+
+class TestImageHashLedger:
+    def _ledger(self, vault):
+        return vault / "system" / "state" / "image-hashes.json"
+
+    def test_first_claim_succeeds(self, vault):
+        ledger = self._ledger(vault)
+        result = claim_image_hash(ledger, "hash-a", "00-Inbox/images/one.jpg")
+        assert result is None
+        assert json.loads(ledger.read_text())["hash-a"]["path"] == "00-Inbox/images/one.jpg"
+
+    def test_reclaiming_same_path_is_noop(self, vault):
+        ledger = self._ledger(vault)
+        claim_image_hash(ledger, "hash-a", "00-Inbox/images/one.jpg")
+        result = claim_image_hash(ledger, "hash-a", "00-Inbox/images/one.jpg")
+        assert result is None
+
+    def test_same_hash_different_path_is_flagged_duplicate(self, vault):
+        """The actual bug this closes: two different filenames, byte-identical
+        content, both landing in 00-Inbox/ — the second claim must return the
+        first's entry instead of silently registering a second copy."""
+        ledger = self._ledger(vault)
+        claim_image_hash(ledger, "hash-a", "00-Inbox/images/scene-mountain.jpg")
+        dup = claim_image_hash(ledger, "hash-a", "00-Inbox/images/scene-mountain-02.jpg")
+        assert dup is not None
+        assert dup["path"] == "00-Inbox/images/scene-mountain.jpg"
+        # loser's path must not have overwritten the winner's claim
+        assert json.loads(ledger.read_text())["hash-a"]["path"] == "00-Inbox/images/scene-mountain.jpg"
+
+    def test_different_hashes_both_claim_independently(self, vault):
+        ledger = self._ledger(vault)
+        assert claim_image_hash(ledger, "hash-a", "00-Inbox/images/one.jpg") is None
+        assert claim_image_hash(ledger, "hash-b", "00-Inbox/images/two.jpg") is None
+        data = json.loads(ledger.read_text())
+        assert set(data) == {"hash-a", "hash-b"}
 
 
 # ---------------------------------------------------------------------------

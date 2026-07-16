@@ -17,6 +17,10 @@ from typing import Any
 INBOX_QUEUE_DEFAULT: dict[str, Any] = {}
 """inbox-queue.json — populated by ingestion agent."""
 
+IMAGE_HASHES_DEFAULT: dict[str, Any] = {}
+"""image-hashes.json — content-hash ledger, populated by ingestion agent
+at queue-time (see nexus.shared.image_hashes.claim_image_hash)."""
+
 # ---------------------------------------------------------------------------
 # Vision agent state
 # ---------------------------------------------------------------------------
@@ -137,6 +141,7 @@ DEDUP_REPORT_DEFAULT: dict[str, Any] = {
 
 STATE_FILE_DEFAULTS: dict[str, Any] = {
     "system/state/inbox-queue.json":                           INBOX_QUEUE_DEFAULT,
+    "system/state/image-hashes.json":                          IMAGE_HASHES_DEFAULT,
     "agents/vision/state/processed-images.json":               PROCESSED_IMAGES_DEFAULT,
     "agents/vision/state/token-links.json":                    TOKEN_LINKS_DEFAULT,
     "agents/lore/state/processed-npcs.json":                   PROCESSED_NPCS_DEFAULT,

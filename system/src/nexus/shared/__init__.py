@@ -12,6 +12,7 @@ from .entity_scanner import EntityScanner
 from .file_lock import FileLock
 from .frontmatter_io import FrontmatterIO
 from .hashing import sha256_of_bytes, sha256_of_file
+from .image_hashes import claim_image_hash
 from .llm_client import LLMClient
 from .loaders import load_llm_endpoint, load_registry, load_vault_config
 from .logger import Logger, _ensure_utf8_stdout
@@ -44,6 +45,7 @@ from .defaults import (
     CANON_REPORT_DEFAULT,
     DEDUP_REPORT_DEFAULT,
     GENERATED_TOKENS_DEFAULT,
+    IMAGE_HASHES_DEFAULT,
     INBOX_QUEUE_DEFAULT,
     PROCESSED_IMAGES_DEFAULT,
     PROCESSED_NPCS_DEFAULT,
@@ -168,7 +170,7 @@ __all__ = [
     "AppConfig", "LLMConfig", "LoggingConfig", "get_config", "clear_config_cache",
     # Concrete implementations
     "EntityScanner", "FileLock", "FrontmatterIO", "LLMClient", "load_llm_endpoint", "load_registry", "load_vault_config",
-    "sha256_of_bytes", "sha256_of_file",
+    "sha256_of_bytes", "sha256_of_file", "claim_image_hash",
     "Logger", "_ensure_utf8_stdout", "QualityGate", "locked_update_queue_entry",
     "StateStore", "TextStateStore", "bootstrap_vault_state", "VaultGuard",
     # Slug utilities
@@ -226,7 +228,7 @@ __all__ = [
     "VaultHealthReport",
     # Defaults
     "AGENT_METRICS_DEFAULT", "CANON_REPORT_DEFAULT", "DEDUP_REPORT_DEFAULT",
-    "GENERATED_TOKENS_DEFAULT", "INBOX_QUEUE_DEFAULT",
+    "GENERATED_TOKENS_DEFAULT", "IMAGE_HASHES_DEFAULT", "INBOX_QUEUE_DEFAULT",
     "PROCESSED_IMAGES_DEFAULT", "PROCESSED_NPCS_DEFAULT",
     "RELATIONSHIP_GRAPH_DEFAULT", "REQUIRED_DIRS", "SCENARIOS_DEFAULT",
     "SEARCH_INDEX_DEFAULT", "STATE_FILE_DEFAULTS", "TASKS_STATE_DEFAULT",

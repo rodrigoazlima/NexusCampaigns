@@ -27,8 +27,10 @@ from nexus.shared import (
     AgentSlots,
     AgentSlotStatus,
     FileLock,
+    claim_image_hash,
     locked_update_queue_entry,
 )
+from nexus.shared.hashing import sha256_of_file
 from nexus.shared.logger import Logger
 from nexus.shared.loaders import _find_project_root
 from nexus.workers.base import (
@@ -49,6 +51,7 @@ _VAULT_ROOT   = _PROJECT_ROOT / ".knowledge-base"
 _INBOX        = _VAULT_ROOT / "00-Inbox"
 _SHARED_STATE = _PROJECT_ROOT / "system" / "state"
 _QUEUE_FILE   = _SHARED_STATE / "inbox-queue.json"
+_IMAGE_HASHES_FILE = _SHARED_STATE / "image-hashes.json"
 
 _REGISTRY_FILE = _AGENTS_DIR / "registry.yaml"
 
@@ -388,7 +391,7 @@ def _is_token_file(p: Path) -> bool:
     return stem.endswith("-token") or ".token" in stem
 
 
-def _register_file(path: Path, log: Logger) -> None:
+def _register_file(path: Path, log: Logger, *, img_hash: Optional[str] = None) -> None:
     rel = path.relative_to(_PROJECT_ROOT).as_posix()
     ft = _file_type(path)
     payload = {
@@ -396,13 +399,48 @@ def _register_file(path: Path, log: Logger) -> None:
         "type":       ft,
         "agents":     _make_slots(ft).model_dump(mode="json"),
     }
+    if img_hash:
+        payload["imageHash"] = img_hash
 
     def _apply(entry: dict) -> Optional[str]:
         entry.update(payload)
         return None
 
     locked_update_queue_entry(_QUEUE_FILE, rel, _apply)
-    log.info(f"Queued [{ft}]: {rel}")
+    hash_suffix = f" (hash {img_hash[:12]}…)" if img_hash else ""
+    log.info(f"Queued [{ft}]: {rel}{hash_suffix}")
+
+
+def _register_duplicate_image(path: Path, original: dict, img_hash: str, log: Logger) -> None:
+    """Register a content-identical image: the file itself is kept — 00-Inbox/
+    is never modified or deleted from (vault hard rule) — but every downstream
+    agent slot is skipped so vision/classification/lore/token never produce a
+    second draft for a picture that already has one.
+    """
+    rel = path.relative_to(_PROJECT_ROOT).as_posix()
+    skip = AgentSlotStatus.skip
+    payload = {
+        "ingestedAt": datetime.now(timezone.utc).isoformat(),
+        "type":       "image",
+        "agents":     AgentSlots(
+            ingestion=AgentSlotStatus.done, vision=skip, lore=skip,
+            classification=skip, wiki=skip, wikilink=skip, token=skip, review=skip,
+        ).model_dump(mode="json"),
+        "imageHash":       img_hash,
+        "duplicateOfPath": original.get("path"),
+    }
+
+    def _apply(entry: dict) -> Optional[str]:
+        entry.update(payload)
+        return None
+
+    locked_update_queue_entry(_QUEUE_FILE, rel, _apply)
+    log.warning(
+        f"Duplicate image ingested: {rel} is content-identical to "
+        f"{original.get('path')} (hash {img_hash[:12]}…, first seen "
+        f"{original.get('firstSeenAt', 'unknown')}) — queued but all "
+        f"downstream agent slots skipped"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -493,7 +531,22 @@ class IngestionWorker:
         # 3. Register queue entry — last step, so a crash before it re-picks
         #    the file next cycle
         if action == "ingest":
-            _register_file(path, log)
+            if _file_type(path) == "image":
+                # Content-hash dedup: this is the single queue producer every
+                # inbox file funnels through (dashboard upload or a raw
+                # filesystem drop alike), so this is the one place a check
+                # here catches every duplicate regardless of how it arrived —
+                # see nexus.shared.image_hashes for why the dashboard's own
+                # pre-write check alone isn't enough.
+                img_hash = sha256_of_file(path)
+                rel = path.relative_to(_PROJECT_ROOT).as_posix()
+                dup = claim_image_hash(_IMAGE_HASHES_FILE, img_hash, rel)
+                if dup is not None:
+                    _register_duplicate_image(path, dup, img_hash, log)
+                    return WorkResult("done", f"duplicate of {dup.get('path')}")
+                _register_file(path, log, img_hash=img_hash)
+            else:
+                _register_file(path, log)
             return WorkResult("done", f"registered {path.name}")
         return WorkResult("done", f"converted {path.name}")
 

@@ -694,7 +694,23 @@ def _write_draft(
     clf: VisionClassification,
     image_path: Path,
     sha256: Optional[str] = None,
-) -> None:
+    original_image_path: Optional[Path] = None,
+) -> str:
+    """Writes the draft entity. Returns the resolved entity_type (frontmatter
+    'type') so callers can log it distinctly from clf.type (the image's
+    structural portrait/body/battlemap/scene/token category) — the two are
+    decided by separate, uncoordinated LLM cycles in classify_image_full and
+    can disagree (e.g. a confirmed 'scene' image landing on entity_type
+    'creature'); logging only clf.type previously hid which value actually
+    became the note's type field.
+
+    `original_image_path` is the pre-rename path (_rename_image renames the
+    image in-place to its canonical slug before this is called) — when it
+    differs from `image_path`, the draft records both under `source`
+    (current path) and `originalSource` (as-dropped path/filename), so the
+    provenance trail survives the rename instead of only being reconstructable
+    after the fact from automation.log timestamps.
+    """
     today   = date.today().isoformat()
     slug    = path.stem
     rel_img = image_path.relative_to(_PROJECT_ROOT).as_posix()
@@ -737,6 +753,10 @@ def _write_draft(
     }
     if sha256:
         frontmatter["sha256"] = sha256
+    if original_image_path is not None:
+        orig_rel = original_image_path.relative_to(_PROJECT_ROOT).as_posix()
+        if orig_rel != rel_img:
+            frontmatter["originalSource"] = [orig_rel]
 
     t = clf.type.value
     if t == "battlemap":
@@ -749,6 +769,7 @@ def _write_draft(
         body = _portrait_body(clf)
 
     FrontmatterIO().write(path, frontmatter, body)
+    return entity_type
 
 
 # ---------------------------------------------------------------------------
@@ -1047,6 +1068,7 @@ def main() -> None:
     log.info(f"Batch: {len(batch)} of {len(candidates)} image(s)")
 
     for img_path in batch:
+        orig_img_path = img_path  # pre-rename Path — _rename_image reassigns img_path below
         orig_rel = img_path.relative_to(_PROJECT_ROOT).as_posix()
         is_tk    = _is_token(img_path)
 
@@ -1121,9 +1143,14 @@ def main() -> None:
         # --- Write draft (step 7) ---
         e_slug   = _entity_slug(clf)
         out_path = _resolve_entity_path(e_slug)
-        _write_draft(out_path, clf, img_path, sha256=sha)
+        entity_type = _write_draft(
+            out_path, clf, img_path, sha256=sha, original_image_path=orig_img_path,
+        )
 
-        log.info(f"Classified: {img_path.name} → {out_path.name} ({clf.type.value})")
+        log.info(
+            f"Classified: {img_path.name} → {out_path.name} "
+            f"(image_type={clf.type.value}, entity_type={entity_type})"
+        )
 
         # --- Update processed-images.json (step 9) ---
         state["images"][sha] = {

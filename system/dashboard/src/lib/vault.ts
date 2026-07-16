@@ -1363,11 +1363,97 @@ export function readVisionPathIndex(): Record<string, string> {
   return raw?.pathIndex ?? {}
 }
 
-/** Look up an already-ingested image by content hash (blake2b-32, see nexus.shared.hashing). */
+/**
+ * Look up an already-ingested image by content hash (blake2b-32, see
+ * nexus.shared.hashing) against agents/vision/state/processed-images.json.
+ *
+ * Kept only as a fallback for images vision already finished classifying
+ * before the image-hashes.json ledger existed — this file only gains an
+ * entry once vision *finishes* classifying an image (a batch/interval delay
+ * that can run minutes), so on its own it leaves a race window where a
+ * second upload of the same bytes sails through undetected. Prefer
+ * findImageHashClaim, which is populated at ingestion time instead.
+ */
 export function findImageByHash(hash: string): { path: string; originalName: string } | null {
   const entry = readVisionState()[hash]
   if (!entry) return null
   return { path: String(entry.path ?? ''), originalName: String(entry.originalName ?? '') }
+}
+
+const IMAGE_HASHES_PATH = path.join(SHARED_DIR, 'image-hashes.json')
+const IMAGE_HASHES_LOCK_STALE_MS = 60_000
+
+interface ImageHashEntry { path: string; firstSeenAt: string }
+
+function readImageHashes(): Record<string, ImageHashEntry> {
+  return readJson<Record<string, ImageHashEntry>>(IMAGE_HASHES_PATH) ?? {}
+}
+
+/**
+ * Look up a duplicate against the ingestion-time hash ledger
+ * (system/state/image-hashes.json, see nexus.shared.image_hashes). Populated
+ * the moment ingestion queues a file — dashboard upload or a raw filesystem
+ * drop alike — not after vision finishes classifying it, so this closes the
+ * race window findImageByHash alone leaves open.
+ */
+export function findImageHashClaim(hash: string): { path: string; originalName: string } | null {
+  const entry = readImageHashes()[hash]
+  if (!entry) return null
+  return { path: entry.path, originalName: path.basename(entry.path) }
+}
+
+function sleepSync(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
+}
+
+/**
+ * Atomically claim `hash` for `relPath` in the ingestion-time ledger,
+ * mirroring nexus.shared.image_hashes.claim_image_hash's lock scheme (same
+ * `<file>.lock` exclusive-create convention, same stale-lock override) so
+ * this route and the Python ingestion worker never clobber each other.
+ * Returns the existing claim if `hash` was already claimed by a different
+ * path (a concurrent upload/ingestion won the race); otherwise claims it and
+ * returns null.
+ */
+export function claimImageHash(hash: string, relPath: string): { path: string; originalName: string } | null {
+  // The lock file is created with the 'wx' flag (O_CREAT|O_EXCL), which still
+  // requires the parent directory to exist — create it before acquiring, not
+  // after (mirrors the same fix in nexus.shared.image_hashes.claim_image_hash).
+  fs.mkdirSync(path.dirname(IMAGE_HASHES_PATH), { recursive: true })
+  const lockPath = IMAGE_HASHES_PATH + '.lock'
+  const deadline = Date.now() + 10_000
+  for (;;) {
+    try {
+      fs.writeFileSync(lockPath, String(process.pid), { flag: 'wx' })
+      break
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err
+      try {
+        if (Date.now() - fs.statSync(lockPath).mtimeMs > IMAGE_HASHES_LOCK_STALE_MS) {
+          fs.rmSync(lockPath, { force: true })
+          continue
+        }
+      } catch {
+        continue // lock disappeared between the failed create and this stat — retry
+      }
+      if (Date.now() >= deadline) throw new Error(`Could not acquire lock ${lockPath}`)
+      sleepSync(50)
+    }
+  }
+  try {
+    const data = readImageHashes()
+    const existing = data[hash]
+    if (existing && existing.path !== relPath) {
+      return { path: existing.path, originalName: path.basename(existing.path) }
+    }
+    data[hash] = { path: relPath, firstSeenAt: new Date().toISOString() }
+    const tmp = IMAGE_HASHES_PATH + '.tmp'
+    fs.writeFileSync(tmp, JSON.stringify(data, null, 2))
+    fs.renameSync(tmp, IMAGE_HASHES_PATH)
+    return null
+  } finally {
+    fs.rmSync(lockPath, { force: true })
+  }
 }
 
 export function readGeneratedTokens(): Record<string, { sourcePath: string; tokenPath: string; generatedAt: string }> {

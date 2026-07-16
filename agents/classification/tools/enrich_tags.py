@@ -412,6 +412,11 @@ def _run_enrich_tags() -> tuple[int, int]:
         # (portrait→npc, battlemap→location) and human hasn't reviewed yet.
         is_vision_default = current_type in _VISION_DEFAULTS and not fm.get("reviewed")
         needs_type    = not current_type or is_vision_default
+        type_reason = (
+            "missing" if not current_type else
+            "vision_default" if is_vision_default else
+            "already_set"
+        )
         candidate_tags = _source_candidate_tags(fm, queue)
         needs_candidate_review = bool(candidate_tags)
 
@@ -505,13 +510,21 @@ def _run_enrich_tags() -> tuple[int, int]:
         if changed:
             ok = _write_with_retry(md_path, fm, body, fio)
             if ok:
-                log.info(f"Enriched: {md_path.name} tags={fm.get('tags')} type={fm.get('type')}")
+                type_note = (
+                    f" type: {current_type or 'none'} → {fm.get('type')} ({type_reason})"
+                    if fm.get("type") != current_type else ""
+                )
+                log.info(f"Enriched: {md_path.name} tags={fm.get('tags')}{type_note}")
                 _mark_queue_done(queue, rel)
                 count += 1
             else:
                 log.error(f"Write failed: {md_path.name}")
                 failed += 1
         else:
+            log.info(
+                f"Skipped (no changes needed): {md_path.name} "
+                f"tags={len(existing_tags)} type={current_type or 'none'} ({type_reason})"
+            )
             _mark_queue_done(queue, rel)
             count += 1
 
