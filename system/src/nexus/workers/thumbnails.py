@@ -14,6 +14,7 @@ import hashlib
 import json
 from pathlib import Path
 
+from nexus.shared.logging import image_tag
 from nexus.shared.loaders import _find_project_root
 from nexus.workers.base import WorkItem, WorkResult, make_worker_logger
 
@@ -121,7 +122,7 @@ class ThumbnailsWorker:
         except Exception as exc:
             # Corrupt/unreadable image: retrying cannot fix the source file,
             # and the dashboard falls back to the original — skip, not error.
-            log.warning(f"thumb failed for {item.key}: {exc}")
+            log.warning(f"thumb failed: {exc}{image_tag(path=item.key)}")
             return WorkResult("skip", f"unreadable image: {exc}")
 
 

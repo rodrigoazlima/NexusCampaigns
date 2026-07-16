@@ -32,6 +32,7 @@ from nexus.shared import (  # noqa: E402
     LLMResponseError,
     SignalEmitter,
     VisionClassification,
+    image_tag,
     locked_update_queue_entry,
     sha256_of_file,
     to_slug,
@@ -697,6 +698,7 @@ def _write_draft(
     image_path: Path,
     sha256: Optional[str] = None,
     original_image_path: Optional[Path] = None,
+    entity_uuid: Optional[str] = None,
 ) -> str:
     """Writes the draft entity. Returns the resolved entity_type (frontmatter
     'type') so callers can log it distinctly from clf.type (the image's
@@ -712,6 +714,12 @@ def _write_draft(
     (current path) and `originalSource` (as-dropped path/filename), so the
     provenance trail survives the rename instead of only being reconstructable
     after the fact from automation.log timestamps.
+
+    `entity_uuid`, when given, becomes the note's `uuid:` frontmatter instead
+    of a freshly minted one — callers pass the same uuid they're about to
+    (or already did) record against this image's sha256 in
+    processed-images.json, so the note (dashboard URL) and the state ledger
+    agree on one identifier instead of each minting their own.
     """
     today   = date.today().isoformat()
     slug    = path.stem
@@ -742,7 +750,7 @@ def _write_draft(
 
     frontmatter: dict[str, Any] = {
         "id":            slug,
-        "uuid":          str(_uuid.uuid4()),
+        "uuid":          entity_uuid or str(_uuid.uuid4()),
         "type":          entity_type,
         "status":        "draft",
         "quality":       0,
@@ -1109,10 +1117,11 @@ def main() -> None:
                     log.warning(f"LLM still offline for {img_path.name} — aborting batch")
                     break
             except (LLMResponseError, Exception) as exc:
-                log.error(f"Classification failed for {img_path.name}: {exc}")
-                sha_fail = _sha256(img_path)
+                sha_fail  = _sha256(img_path)
+                fail_uuid = str(_uuid.uuid4())
+                log.error(f"Classification failed for {img_path.name}: {exc}{image_tag(sha256=sha_fail, uuid=fail_uuid, path=orig_rel)}")
                 state["images"][f"path:{orig_rel}"] = {
-                    "uuid":          str(_uuid.uuid4()),
+                    "uuid":          fail_uuid,
                     "path":          orig_rel,
                     "processedAt":   datetime.now(timezone.utc).isoformat(),
                     "originalName":  img_path.name,
@@ -1137,26 +1146,33 @@ def main() -> None:
         try:
             img_path = _rename_image(img_path, clf)
         except Exception as exc:
-            log.warning(f"Could not rename {img_path.name}: {exc} — using original path")
+            log.warning(f"Could not rename {img_path.name}: {exc} — using original path{image_tag(path=orig_rel)}")
 
         new_rel = img_path.relative_to(_PROJECT_ROOT).as_posix()
         sha     = _sha256(img_path)
+        # Reuse the uuid already on record for this hash (e.g. a stale-token
+        # regeneration re-classifying the same source) instead of minting a
+        # second one — the note frontmatter and processed-images.json must
+        # agree on a single identifier for the same image.
+        entity_uuid = state.get("images", {}).get(sha, {}).get("uuid") or str(_uuid.uuid4())
 
         # --- Write draft (step 7) ---
         e_slug   = _entity_slug(clf)
         out_path = _resolve_entity_path(e_slug)
         entity_type = _write_draft(
             out_path, clf, img_path, sha256=sha, original_image_path=orig_img_path,
+            entity_uuid=entity_uuid,
         )
 
         log.info(
             f"Classified: {img_path.name} → {out_path.name} "
             f"(image_type={clf.type.value}, entity_type={entity_type})"
+            f"{image_tag(sha256=sha, uuid=entity_uuid, path=new_rel)}"
         )
 
         # --- Update processed-images.json (step 9) ---
         state["images"][sha] = {
-            "uuid":          state.get("images", {}).get(sha, {}).get("uuid") or str(_uuid.uuid4()),
+            "uuid":          entity_uuid,
             "path":          new_rel,
             "processedAt":   datetime.now(timezone.utc).isoformat(),
             "originalName":  img_path.name,

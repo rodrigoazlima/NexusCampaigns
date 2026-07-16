@@ -34,7 +34,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from nexus.shared import Logger, REQUIRED_DIRS, sha256_of_file
+from nexus.shared import Logger, REQUIRED_DIRS, image_tag, sha256_of_file
 from nexus.shared.loaders import _find_project_root
 from nexus.workers.base import (
     MASTER_LOG,
@@ -372,7 +372,7 @@ def _validate_image_refs(log: Logger) -> tuple[int, list[str]]:
             del images[key]
             invalid_refs.append(rel_path)
             removed += 1
-            log.info(f"Pruned missing image ref: {rel_path}")
+            log.info(f"Pruned missing image ref{image_tag(uuid=entry.get('uuid'), path=rel_path)}")
             continue
 
         # SHA256 identity check — skip pseudo-keys (path:...)
@@ -384,16 +384,19 @@ def _validate_image_refs(log: Logger) -> tuple[int, list[str]]:
             try:
                 actual_sha = _sha256_of_file(abs_path)
                 if actual_sha != stored_sha:
+                    # The path was reused for different bytes since this entry was
+                    # written (e.g. a slug-collision rename) — the ledger's identity
+                    # for this path is now wrong, not just out of date.
                     log.warning(
-                        f"SHA256 mismatch for {rel_path}: "
-                        f"stored={stored_sha[:8]}… actual={actual_sha[:8]}…"
+                        f"SHA256 mismatch: stored={stored_sha[:8]}… actual={actual_sha[:8]}…"
+                        f"{image_tag(uuid=entry.get('uuid'), path=rel_path)}"
                     )
                     invalid_refs.append(rel_path)
                     # Flag entry as failed rather than deleting — preserves audit trail
                     images[key]["status"] = "failed"
                     removed += 1
             except Exception as exc:
-                log.warning(f"Cannot hash {rel_path}: {exc}")
+                log.warning(f"Cannot hash image: {exc}{image_tag(uuid=entry.get('uuid'), path=rel_path)}")
 
     if removed:
         # Rebuild pathIndex from surviving ok/migrated entries

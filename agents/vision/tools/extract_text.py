@@ -22,7 +22,7 @@ _PROJECT_ROOT = _AGENTS_DIR.parent
 if str(_AGENTS_DIR) not in sys.path:
     sys.path.insert(0, str(_AGENTS_DIR))
 
-from nexus.shared import FrontmatterIO, LLMClient, Logger, LLMOfflineError  # noqa: E402
+from nexus.shared import FrontmatterIO, LLMClient, Logger, LLMOfflineError, image_tag  # noqa: E402
 from nexus.shared.config import LLMEndpointConfig  # noqa: E402
 from nexus.shared.loaders import load_llm_endpoint  # noqa: E402
 
@@ -150,13 +150,14 @@ def main() -> None:
 
     for sha, rel in batch:
         img_path = _PROJECT_ROOT / rel
+        tag = image_tag(sha256=sha, path=rel)
         try:
             result = client.vision_chat(img_path, _PROMPT, system=_SYSTEM, max_tokens=400)
         except LLMOfflineError:
-            log.warning(f"LLM offline while processing {img_path.name} — aborting batch")
+            log.warning(f"LLM offline while processing {img_path.name} — aborting batch{tag}")
             break
         except Exception as exc:
-            log.error(f"Text extraction failed for {img_path.name}: {exc}")
+            log.error(f"Text extraction failed for {img_path.name}: {exc}{tag}")
             failed += 1
             continue
 
@@ -165,11 +166,11 @@ def main() -> None:
             draft = _find_draft(rel)
             if draft is not None:
                 _append_text_section(draft, text)
-                log.info(f"Text found in {img_path.name} → appended to {draft.name}")
+                log.info(f"Text found in {img_path.name} → appended to {draft.name}{tag}")
             else:
-                log.warning(f"Text found in {img_path.name} but no matching draft in 01-Processing/")
+                log.warning(f"Text found in {img_path.name} but no matching draft in 01-Processing/{tag}")
         else:
-            log.info(f"No text found in {img_path.name}")
+            log.info(f"No text found in {img_path.name}{tag}")
 
         done[sha] = {"path": rel, "hasText": bool(text)}
         _save_state(_TEXT_STATE, done)

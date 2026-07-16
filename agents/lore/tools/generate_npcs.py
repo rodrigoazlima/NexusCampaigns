@@ -33,6 +33,7 @@ from nexus.shared import (  # noqa: E402
     LLMResponseError,
     NPCLLMOutput,
     QualityGate,
+    image_tag,
     locked_update_queue_entry,
 )
 from nexus.shared.config import LLMEndpointConfig  # noqa: E402
@@ -375,14 +376,17 @@ def _write_npc_draft(
     image_rel: str,
     scenario: dict,
     sha256: str = "",
-) -> None:
+) -> str:
+    """Writes the NPC draft. Returns its uuid so callers can log it against
+    the source image's own hash/uuid for end-to-end traceability."""
     today = date.today().isoformat()
     slug  = path.stem
     rels  = [f"[[{scenario['id']}]]"] + [r for r in npc.relationships if r != f"[[{scenario['id']}]]"]
+    npc_uuid = str(_uuid.uuid4())
 
     frontmatter: dict[str, Any] = {
         "id":          slug,
-        "uuid":        str(_uuid.uuid4()),
+        "uuid":        npc_uuid,
         "type":        "npc",
         "status":      "draft",
         "quality":     0,
@@ -433,6 +437,7 @@ def _write_npc_draft(
         )
 
     FrontmatterIO().write(path, frontmatter, body)
+    return npc_uuid
 
 
 # ---------------------------------------------------------------------------
@@ -487,9 +492,10 @@ def _run_batch_impl(log: "_Logger") -> tuple[int, int]:
     for composite_key, img_entry, scenario in batch:
         img_path = _PROJECT_ROOT / img_entry["path"]
         img_rel  = img_entry["path"]
+        img_tag  = image_tag(sha256=img_entry.get("sha256"), uuid=img_entry.get("uuid"), path=img_rel)
 
         if not img_path.exists():
-            log.warning(f"Image gone: {img_rel}")
+            log.warning(f"Image gone{img_tag}")
             proc_npcs[composite_key] = {
                 "imageKey":    img_entry.get("sha256", ""),
                 "scenarioId":  scenario["id"],
@@ -508,7 +514,7 @@ def _run_batch_impl(log: "_Logger") -> tuple[int, int]:
             log.warning("LLM offline — aborting batch")
             break
         except (LLMResponseError, Exception) as exc:
-            log.error(f"NPC generation failed ({img_path.name} × {scenario['id']}): {exc}")
+            log.error(f"NPC generation failed (× {scenario['id']}): {exc}{img_tag}")
             proc_npcs[composite_key] = {
                 "imageKey":    img_entry.get("sha256", ""),
                 "scenarioId":  scenario["id"],
@@ -535,7 +541,7 @@ def _run_batch_impl(log: "_Logger") -> tuple[int, int]:
         out_path = _unique_output(stem)
 
         try:
-            _write_npc_draft(out_path, npc, img_rel, scenario, sha256=img_entry.get("sha256", ""))
+            npc_uuid = _write_npc_draft(out_path, npc, img_rel, scenario, sha256=img_entry.get("sha256", ""))
         except Exception as exc:
             log.error(f"Write failed for {out_path.name}: {exc}")
             proc_npcs[composite_key] = {
@@ -566,7 +572,10 @@ def _run_batch_impl(log: "_Logger") -> tuple[int, int]:
 
             locked_update_queue_entry(_QUEUE_FILE, img_rel, _mark_lore_done)
 
-        log.info(f"Generated NPC: {out_path.name} ({scenario['name']})")
+        log.info(
+            f"Generated NPC: {out_path.name} ({scenario['name']})"
+            f"{image_tag(sha256=img_entry.get('sha256'), uuid=npc_uuid, path=out_rel)}"
+        )
         count += 1
 
     return count, failed

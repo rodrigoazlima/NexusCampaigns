@@ -13,6 +13,7 @@ from .file_lock import FileLock
 from .frontmatter_io import FrontmatterIO
 from .hashing import sha256_of_bytes, sha256_of_file
 from .image_hashes import claim_image_hash
+from .logging import image_tag, tag
 from .llm_client import LLMClient
 from .loaders import load_llm_endpoint, load_registry, load_vault_config
 from .logger import Logger, _ensure_utf8_stdout
@@ -170,7 +171,7 @@ __all__ = [
     "AppConfig", "LLMConfig", "LoggingConfig", "get_config", "clear_config_cache",
     # Concrete implementations
     "EntityScanner", "FileLock", "FrontmatterIO", "LLMClient", "load_llm_endpoint", "load_registry", "load_vault_config",
-    "sha256_of_bytes", "sha256_of_file", "claim_image_hash",
+    "sha256_of_bytes", "sha256_of_file", "claim_image_hash", "image_tag", "tag",
     "Logger", "_ensure_utf8_stdout", "QualityGate", "locked_update_queue_entry",
     "StateStore", "TextStateStore", "bootstrap_vault_state", "VaultGuard",
     # Slug utilities

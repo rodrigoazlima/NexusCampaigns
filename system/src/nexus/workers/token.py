@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from nexus.shared import locked_update_queue_entry
+from nexus.shared.logging import image_tag
 from nexus.shared.loaders import _find_project_root
 from nexus.shared.logger import Logger
 from nexus.workers.base import (
@@ -116,7 +117,7 @@ def _store_face(src_rel: str, face: dict | None, log: Logger) -> None:
     tmp = _VISION_STATE.with_suffix(".tmp")
     tmp.write_text(json.dumps(state, indent=2, default=str), encoding="utf-8")
     tmp.replace(_VISION_STATE)
-    log.info(f"Stored face for {src_rel.split('/')[-1]}: center=({face['cx']},{face['cy']})")
+    log.info(f"Stored face: center=({face['cx']},{face['cy']}){image_tag(sha256=sha, uuid=entry.get('uuid'), path=src_rel)}")
 
 
 def _load_gen_tokens() -> dict[str, Any]:
@@ -160,7 +161,7 @@ def _set_queue_token_slot(source_rel: str, status: str, log: Logger) -> bool:
 
     locked_update_queue_entry(_QUEUE_FILE, source_rel, _mark)
     if changed:
-        log.info(f"Queue token slot [{status}]: {source_rel.split('/')[-1]}")
+        log.info(f"Queue token slot [{status}]{image_tag(path=source_rel)}")
     return changed
 
 
@@ -428,7 +429,7 @@ def _make_token(img_path: Path, out_path: Path, cfg: dict, log: Logger,
         return True, face_meta
 
     except Exception as exc:
-        log.error(f"Token generation error for {img_path.name}: {exc}")
+        log.error(f"Token generation error: {exc}{image_tag(path=img_path.relative_to(_PROJECT_ROOT).as_posix())}")
         return False, None
 
 
@@ -524,7 +525,7 @@ class TokenWorker:
             entry = gen.pop(img_key, None)
             if entry:
                 _save_gen_tokens(gen)
-                log.info(f"Purged stale token entry: {entry['tokenPath']}")
+                log.info(f"Purged stale token entry{image_tag(path=entry['tokenPath'])}")
             return WorkResult("done", f"purged stale index entry {img_key}")
 
         if action == "skip-type":
@@ -536,7 +537,7 @@ class TokenWorker:
             return WorkResult("done", "reconciled existing token slot")
 
         if action == "skip-missing":
-            log.warning(f"Source gone, skipping permanently: {item.key}")
+            log.warning(f"Source gone, skipping permanently{image_tag(path=item.key)}")
             _set_queue_token_slot(item.key, "skip", log)
             return WorkResult("skip", f"source gone: {item.key}")
 
@@ -544,6 +545,7 @@ class TokenWorker:
         entry    = item.payload["entry"]
         src_rel  = item.key
         img_path = _PROJECT_ROOT / src_rel
+        img_sha  = img_key if not img_key.startswith("path:") else None
         if not img_path.exists():
             return WorkResult("skip", f"source gone: {src_rel}")
 
@@ -553,7 +555,7 @@ class TokenWorker:
 
         if out_path.exists() and not stale:
             ok, face, generated = True, None, False
-            log.info(f"Token already exists: {out_path.name}")
+            log.info(f"Token already exists: {out_path.name}{image_tag(sha256=img_sha, uuid=entry.get('uuid'), path=src_rel)}")
         else:
             ok, face = _make_token(img_path, out_path, self._cfg, log, moldura_path=moldura_path)
             generated = True
@@ -583,7 +585,7 @@ class TokenWorker:
         _save_gen_tokens(gen_tokens)
         _store_face(src_rel, face, log)
         _set_queue_token_slot(src_rel, "done", log)
-        log.info(f"Token created: {out_path.name}")
+        log.info(f"Token created: {out_path.name}{image_tag(sha256=img_sha, uuid=entry.get('uuid'), path=src_rel)}")
         return WorkResult("done", f"token: {out_path.name}")
 
 
@@ -606,10 +608,10 @@ def run_single(image_path: str, moldura_override: str | None = None,
     if not img_path.is_absolute():
         img_path = _PROJECT_ROOT / image_path
     if not img_path.exists():
-        log.error(f"Image not found: {img_path}")
+        log.error(f"Image not found{image_tag(path=image_path)}")
         return 1
     if _is_token_stem(img_path):
-        log.warning(f"Skipping token file as source: {img_path.name}")
+        log.warning(f"Skipping token file as source{image_tag(path=image_path)}")
         return 1
 
     # Resolve moldura: explicit override > type-based > default

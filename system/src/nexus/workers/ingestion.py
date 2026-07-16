@@ -28,6 +28,7 @@ from nexus.shared import (
     AgentSlotStatus,
     FileLock,
     claim_image_hash,
+    image_tag,
     locked_update_queue_entry,
 )
 from nexus.shared.hashing import sha256_of_file
@@ -407,8 +408,7 @@ def _register_file(path: Path, log: Logger, *, img_hash: Optional[str] = None) -
         return None
 
     locked_update_queue_entry(_QUEUE_FILE, rel, _apply)
-    hash_suffix = f" (hash {img_hash[:12]}…)" if img_hash else ""
-    log.info(f"Queued [{ft}]: {rel}{hash_suffix}")
+    log.info(f"Queued [{ft}]{image_tag(sha256=img_hash, path=rel)}")
 
 
 def _register_duplicate_image(path: Path, original: dict, img_hash: str, log: Logger) -> None:
@@ -436,10 +436,10 @@ def _register_duplicate_image(path: Path, original: dict, img_hash: str, log: Lo
 
     locked_update_queue_entry(_QUEUE_FILE, rel, _apply)
     log.warning(
-        f"Duplicate image ingested: {rel} is content-identical to "
-        f"{original.get('path')} (hash {img_hash[:12]}…, first seen "
+        f"Duplicate image ingested: content-identical to "
+        f"{original.get('path')} (first seen "
         f"{original.get('firstSeenAt', 'unknown')}) — queued but all "
-        f"downstream agent slots skipped"
+        f"downstream agent slots skipped{image_tag(sha256=img_hash, path=rel)}"
     )
 
 

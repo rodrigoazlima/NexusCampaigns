@@ -2,7 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import crypto from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
-import { PROJECT_ROOT, isTokenPath } from '@/lib/vault'
+import { PROJECT_ROOT } from '@/lib/vault'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,7 +17,24 @@ const MIME: Record<string, string> = {
 }
 
 const THUMBS_DIR = path.join(PROJECT_ROOT, 'system', 'state', 'thumbs')
-const IMMUTABLE = 'public, max-age=31536000, immutable'
+
+// Vault filenames aren't stable identities: the vision agent renames
+// uploads in place on slug collision (agents/vision/tools/classify_images.py
+// _resolve_image_target), so the same path can hold different bytes over a
+// vault's lifetime. `immutable`/long max-age caches by path and never
+// revalidates — that lied about content that does change, and caused
+// browsers to keep showing a stale image forever after a collision-rename.
+// Content hash as the ETag makes the browser revalidate cheaply (304) on
+// every request instead of trusting the path blindly.
+function respondWithEtag(req: NextRequest, buffer: Buffer, contentType: string): NextResponse {
+  const etag = `"${crypto.createHash('sha256').update(buffer).digest('hex')}"`
+  if (req.headers.get('if-none-match') === etag) {
+    return new NextResponse(null, { status: 304, headers: { ETag: etag, 'Cache-Control': 'no-cache' } })
+  }
+  return new NextResponse(new Uint8Array(buffer), {
+    headers: { 'Content-Type': contentType, ETag: etag, 'Cache-Control': 'no-cache' },
+  })
+}
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
@@ -34,9 +51,7 @@ export async function GET(req: NextRequest) {
     const thumbPath = path.join(THUMBS_DIR, `${key}.webp`)
     try {
       const buffer = fs.readFileSync(thumbPath)
-      return new NextResponse(buffer, {
-        headers: { 'Content-Type': 'image/webp', 'Cache-Control': IMMUTABLE },
-      })
+      return respondWithEtag(req, buffer, 'image/webp')
     } catch {
       // no thumb yet — serve the original below
     }
@@ -63,16 +78,7 @@ export async function GET(req: NextRequest) {
     const ext = path.extname(absolutePath).toLowerCase()
     const contentType = MIME[ext] ?? 'application/octet-stream'
     const buffer = fs.readFileSync(absolutePath)
-    // 00-Inbox is read-only by vault rules, so originals there never change;
-    // generated tokens (*-token.png) can be regenerated in place — keep those fresh.
-    const inInbox = normalized.replace(/\\/g, '/').includes('/00-Inbox/')
-    const cacheControl = inInbox && !isTokenPath(normalized) ? IMMUTABLE : 'no-cache'
-    return new NextResponse(buffer, {
-      headers: {
-        'Content-Type': contentType,
-        'Cache-Control': cacheControl,
-      },
-    })
+    return respondWithEtag(req, buffer, contentType)
   } catch {
     return new NextResponse('Not found', { status: 404 })
   }
