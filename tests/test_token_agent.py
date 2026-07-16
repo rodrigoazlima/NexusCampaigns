@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -219,6 +221,113 @@ class TestUpperCenterCrop:
         x, y, s, _ = mod._upper_center_crop(w, h, {})
         assert x >= 0 and x + s <= w
         assert y >= 0
+
+
+# ---------------------------------------------------------------------------
+# handle() must not lie about when a token was produced (QA finding #1):
+# the exists-shortcut branch skips _make_token() entirely, so generatedAt
+# must come from the file's own mtime, not datetime.now().
+# ---------------------------------------------------------------------------
+
+class TestHandleGeneratedAtIntegrity:
+    def test_skip_branch_uses_file_mtime_not_now(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(mod, "_PROJECT_ROOT", tmp_path)
+        monkeypatch.setattr(mod, "_GEN_TOKENS", tmp_path / "generated-tokens.json")
+        monkeypatch.setattr(mod, "_CONFIG_FILE", tmp_path / "10-generate-tokens.json")
+        monkeypatch.setattr(mod, "_QUEUE_FILE", tmp_path / "inbox-queue.json")
+        monkeypatch.setattr(mod, "_VISION_STATE", tmp_path / "processed-images.json")
+        monkeypatch.setattr(mod, "_LEGACY_STATE_DIRS", ())
+
+        img_path = tmp_path / "hero.png"
+        img_path.write_bytes(b"fake")
+        out_path = tmp_path / "hero-token.png"
+        out_path.write_bytes(b"fake-token")
+
+        old_ts = datetime(2026, 6, 1, tzinfo=timezone.utc).timestamp()
+        os.utime(out_path, (old_ts, old_ts))
+
+        worker = mod.TokenWorker()
+        item = mod.WorkItem("hero.png", {
+            "action": "generate",
+            "img_key": "abc123",
+            "entry": {"processedAt": "2026-07-01T00:00:00Z"},
+            "stale": False,
+        })
+
+        result = worker.handle(item)
+        assert result.status == "done"
+
+        entry = mod._load_gen_tokens()["abc123"]
+        assert entry["generatedAt"] == datetime.fromtimestamp(old_ts, tz=timezone.utc).isoformat()
+        assert "lastVerifiedAt" in entry
+        assert entry["sourceProcessedAt"] == "2026-07-01T00:00:00Z"
+
+
+# ---------------------------------------------------------------------------
+# pending() must invalidate a token when its source is reclassified after
+# generation (QA finding #3), but stay hands-off on a human-paused slot
+# (QA finding #4's pin mechanism).
+# ---------------------------------------------------------------------------
+
+class TestStaleTokenDetection:
+    _SRC_REL = "00-Inbox/images/hero.png"
+
+    def _vision_state(self) -> dict:
+        return {
+            "images": {
+                "abc123": {
+                    "path": self._SRC_REL,
+                    "processedAt": "2026-07-01T00:00:00Z",
+                    "type": "portrait",
+                    "isToken": False,
+                    "status": "ok",
+                }
+            },
+            "pathIndex": {self._SRC_REL: "abc123"},
+        }
+
+    def _gen_tokens_stale(self) -> dict:
+        return {
+            "abc123": {
+                "sourcePath": self._SRC_REL,
+                "tokenPath": "00-Inbox/images/hero-token.png",
+                "generatedAt": "2026-06-01T00:00:00Z",
+                "sourceProcessedAt": "2026-06-01T00:00:00Z",  # older than vision's processedAt above
+            }
+        }
+
+    def _worker(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, queue: dict) -> "mod.TokenWorker":
+        monkeypatch.setattr(mod, "_PROJECT_ROOT", tmp_path)
+        monkeypatch.setattr(mod, "_GEN_TOKENS", tmp_path / "generated-tokens.json")
+        monkeypatch.setattr(mod, "_CONFIG_FILE", tmp_path / "10-generate-tokens.json")
+        monkeypatch.setattr(mod, "_LEGACY_STATE_DIRS", ())
+        monkeypatch.setattr(mod, "_load_vision_state", lambda: self._vision_state())
+        monkeypatch.setattr(mod, "_load_gen_tokens", lambda: self._gen_tokens_stale())
+        monkeypatch.setattr(mod, "_load_queue", lambda: queue)
+
+        src = tmp_path / self._SRC_REL
+        src.parent.mkdir(parents=True, exist_ok=True)
+        src.write_bytes(b"fake")
+        # Existing token file so the unrelated "purge stale index entry" scan
+        # (tokenPath missing on disk) doesn't also fire here.
+        (tmp_path / "00-Inbox" / "images" / "hero-token.png").write_bytes(b"fake-token")
+
+        return mod.TokenWorker()
+
+    def test_flags_stale_as_generate(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        worker = self._worker(tmp_path, monkeypatch, queue={})
+        items = worker.pending()
+
+        generate_items = [i for i in items if i.payload.get("action") == "generate"]
+        assert len(generate_items) == 1
+        assert generate_items[0].payload["stale"] is True
+
+    def test_paused_slot_skips_stale_check(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        queue = {self._SRC_REL: {"agents": {"token": "paused"}}}
+        worker = self._worker(tmp_path, monkeypatch, queue=queue)
+        items = worker.pending()
+
+        assert items == []
 
 
 # ---------------------------------------------------------------------------

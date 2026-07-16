@@ -493,9 +493,14 @@ class TokenWorker:
                 continue
 
             if img_key in gen_tokens:
-                if slot == "pending":
-                    items.append(WorkItem(src_rel, {"action": "reconcile", "img_key": img_key}))
-                continue
+                stale = (entry.get("processedAt") is not None
+                          and gen_tokens[img_key].get("sourceProcessedAt") != entry.get("processedAt"))
+                if not stale:
+                    if slot == "pending":
+                        items.append(WorkItem(src_rel, {"action": "reconcile", "img_key": img_key}))
+                    continue
+                # else: fall through — source was reclassified since this token
+                # was built, regenerate it below
 
             if not (_PROJECT_ROOT / src_rel).exists():
                 if slot == "pending":
@@ -505,7 +510,7 @@ class TokenWorker:
             if reruns >= _MAX_RERUNS:
                 continue
             items.append(WorkItem(src_rel, {"action": "generate", "img_key": img_key,
-                                            "entry": entry}))
+                                            "entry": entry, "stale": img_key in gen_tokens}))
 
         return items
 
@@ -544,23 +549,37 @@ class TokenWorker:
 
         out_path     = img_path.with_name(f"{img_path.stem}-token.png")
         moldura_path = _pick_moldura(entry, self._cfg)
+        stale        = item.payload.get("stale", False)
 
-        if out_path.exists():
-            ok, face = True, None
+        if out_path.exists() and not stale:
+            ok, face, generated = True, None, False
             log.info(f"Token already exists: {out_path.name}")
         else:
             ok, face = _make_token(img_path, out_path, self._cfg, log, moldura_path=moldura_path)
+            generated = True
 
         if not ok:
             _set_queue_token_slot(src_rel, "error", log)
             return WorkResult("error", f"token generation failed: {src_rel}")
 
         gen_tokens = _load_gen_tokens()
-        gen_tokens[img_key] = {
-            "sourcePath":  src_rel,
-            "tokenPath":   out_path.relative_to(_PROJECT_ROOT).as_posix(),
-            "generatedAt": datetime.now(timezone.utc).isoformat(),
+        prior = gen_tokens.get(img_key, {})
+        new_entry = {
+            "sourcePath":        src_rel,
+            "tokenPath":         out_path.relative_to(_PROJECT_ROOT).as_posix(),
+            "sourceProcessedAt": entry.get("processedAt"),
         }
+        if generated:
+            new_entry["generatedAt"] = datetime.now(timezone.utc).isoformat()
+        else:
+            # Token file pre-existed with no matching index entry (e.g. a prior
+            # run crashed between writing the PNG and saving the index) — the
+            # file's own mtime is the only trustworthy record of when it was
+            # actually produced, not "now".
+            new_entry["generatedAt"] = prior.get("generatedAt") or datetime.fromtimestamp(
+                out_path.stat().st_mtime, tz=timezone.utc).isoformat()
+            new_entry["lastVerifiedAt"] = datetime.now(timezone.utc).isoformat()
+        gen_tokens[img_key] = new_entry
         _save_gen_tokens(gen_tokens)
         _store_face(src_rel, face, log)
         _set_queue_token_slot(src_rel, "done", log)
@@ -610,11 +629,13 @@ def run_single(image_path: str, moldura_override: str | None = None,
         vision_state = _load_vision_state()
         sha_key = vision_state.get("pathIndex", {}).get(rel, "")
         key = sha_key if sha_key and not sha_key.startswith("path:") else f"path:{rel}"
+        vision_entry = vision_state.get("images", {}).get(sha_key, {})
         tok_rel = out_path.relative_to(_PROJECT_ROOT).as_posix()
         gen[key] = {
             "sourcePath": rel,
             "tokenPath": tok_rel,
             "generatedAt": datetime.now(timezone.utc).isoformat(),
+            "sourceProcessedAt": vision_entry.get("processedAt"),
         }
         _save_gen_tokens(gen)
         _store_face(rel, face, log)

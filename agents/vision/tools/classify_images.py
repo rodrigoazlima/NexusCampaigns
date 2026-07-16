@@ -131,6 +131,8 @@ _LLM_CFG = load_llm_endpoint(
 # Hashing
 # ---------------------------------------------------------------------------
 
+# Despite the name (kept for on-disk field compatibility), this is blake2b,
+# not SHA-256 — see nexus.shared.hashing's module docstring.
 _sha256 = sha256_of_file
 
 

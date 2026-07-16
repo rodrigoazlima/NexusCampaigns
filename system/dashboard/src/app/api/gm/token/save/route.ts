@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { NextRequest, NextResponse } from 'next/server'
-import { PROJECT_ROOT, VAULT_ROOT, readGeneratedTokens } from '@/lib/vault'
+import { PROJECT_ROOT, VAULT_ROOT, readGeneratedTokens, GENERATED_TOKENS_PATH } from '@/lib/vault'
 
 export const dynamic = 'force-dynamic'
 
@@ -60,8 +60,10 @@ export async function POST(req: NextRequest) {
     const tokenPath = path.relative(PROJECT_ROOT, tokenAbsPath).replace(/\\/g, '/')
 
     // Update generated-tokens.json entry — reuse the same matched key so the
-    // index and the file on disk never point at two different tokens.
-    const genPath = path.join(PROJECT_ROOT, 'agents', 'token', 'state', 'generated-tokens.json')
+    // index and the file on disk never point at two different tokens. Writes
+    // to the same canonical path the token worker itself reads/writes
+    // (system/state/workers/token/generated-tokens.json) — a prior version of
+    // this route wrote to a legacy path nothing else reads.
     try {
       if (matchedKey) {
         genTokens[matchedKey] = { ...genTokens[matchedKey], tokenPath, generatedAt: new Date().toISOString() }
@@ -72,11 +74,29 @@ export async function POST(req: NextRequest) {
           generatedAt: new Date().toISOString(),
         }
       }
-      const tmp = genPath.replace('.json', '.tmp')
+      const tmp = GENERATED_TOKENS_PATH + '.tmp'
       fs.writeFileSync(tmp, JSON.stringify(genTokens, null, 2), 'utf-8')
-      fs.renameSync(tmp, genPath)
+      fs.renameSync(tmp, GENERATED_TOKENS_PATH)
     } catch {
       // non-fatal — PNG is saved, index update failed
+    }
+
+    // Pause the token worker's queue slot for this source so a future
+    // reclassification doesn't auto-regenerate over this manual crop fix.
+    const srcForPause = sourcePath || entry?.sourcePath
+    if (srcForPause) {
+      try {
+        const queuePath = path.join(PROJECT_ROOT, 'system', 'state', 'inbox-queue.json')
+        const queue = JSON.parse(fs.readFileSync(queuePath, 'utf-8'))
+        if (queue[srcForPause]?.agents) {
+          queue[srcForPause].agents.token = 'paused'
+          const tmp = queuePath + '.tmp'
+          fs.writeFileSync(tmp, JSON.stringify(queue, null, 2), 'utf-8')
+          fs.renameSync(tmp, queuePath)
+        }
+      } catch {
+        // non-fatal — PNG + index are saved, pause is best-effort
+      }
     }
 
     return NextResponse.json({

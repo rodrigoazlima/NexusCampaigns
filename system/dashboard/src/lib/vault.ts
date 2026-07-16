@@ -1456,9 +1456,10 @@ export function claimImageHash(hash: string, relPath: string): { path: string; o
   }
 }
 
+export const GENERATED_TOKENS_PATH = path.join(PROJECT_ROOT, 'system', 'state', 'workers', 'token', 'generated-tokens.json')
+
 export function readGeneratedTokens(): Record<string, { sourcePath: string; tokenPath: string; generatedAt: string }> {
-  const genPath = path.join(PROJECT_ROOT, 'system', 'state', 'workers', 'token', 'generated-tokens.json')
-  return readJson<Record<string, { sourcePath: string; tokenPath: string; generatedAt: string }>>(genPath) ?? {}
+  return readJson<Record<string, { sourcePath: string; tokenPath: string; generatedAt: string }>>(GENERATED_TOKENS_PATH) ?? {}
 }
 
 export function readTokenConfig(): TokenConfig {
