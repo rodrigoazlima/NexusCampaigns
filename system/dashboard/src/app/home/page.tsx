@@ -27,7 +27,7 @@ export default function HomePage() {
     <div className="p-4 md:p-6 space-y-8">
       {rows.length === 0 ? (
         <div className="panel p-12 text-center text-zinc-500 text-sm">
-          Nothing to show yet — drop sources in the <Link href="/gm/inbox" className="text-primary hover:underline">Inbox</Link>
+          Nothing to show yet - drop sources in the <Link href="/gm/inbox" className="text-primary hover:underline">Inbox</Link>
         </div>
       ) : (
         rows.map(({ pillar, items }) => <CarouselRow key={pillar.key} pillarKey={pillar.key} items={items} />)

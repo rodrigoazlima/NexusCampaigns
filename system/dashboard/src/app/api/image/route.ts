@@ -22,7 +22,7 @@ const THUMBS_DIR = path.join(PROJECT_ROOT, 'system', 'state', 'thumbs')
 // uploads in place on slug collision (agents/vision/tools/classify_images.py
 // _resolve_image_target), so the same path can hold different bytes over a
 // vault's lifetime. `immutable`/long max-age caches by path and never
-// revalidates — that lied about content that does change, and caused
+// revalidates - that lied about content that does change, and caused
 // browsers to keep showing a stale image forever after a collision-rename.
 // Content hash as the ETag makes the browser revalidate cheaply (304) on
 // every request instead of trusting the path blindly.
@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
       const buffer = fs.readFileSync(thumbPath)
       return respondWithEtag(req, buffer, 'image/webp')
     } catch {
-      // no thumb yet — serve the original below
+      // no thumb yet - serve the original below
     }
   }
 
@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
 
   // ponytail: some drafts have a `source:` path missing its leading dot
   // (`knowledge-base/...` instead of `.knowledge-base/...`) from a prior
-  // agent bug — retry with the dot before 404ing.
+  // agent bug - retry with the dot before 404ing.
   if (!fs.existsSync(absolutePath) && !path.isAbsolute(imagePath) && imagePath.startsWith('knowledge-base/')) {
     absolutePath = path.join(PROJECT_ROOT, `.${imagePath}`)
   }

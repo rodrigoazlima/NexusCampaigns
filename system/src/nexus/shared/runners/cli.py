@@ -1,4 +1,4 @@
-"""CliRunner — subprocess dispatch for cli agents."""
+"""CliRunner - subprocess dispatch for cli agents."""
 
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ class CliRunner:
             error     = f"Process timed out after {timeout_seconds}s"
         except FileNotFoundError as exc:
             exit_code = 1
-            error     = f"Command not found: {command!r} — {exc}"
+            error     = f"Command not found: {command!r} - {exc}"
         except Exception as exc:
             exit_code = 1
             error     = str(exc)

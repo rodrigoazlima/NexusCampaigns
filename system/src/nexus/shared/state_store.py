@@ -1,8 +1,8 @@
-"""Concrete StateStore implementations — satisfy IStateStore.
+"""Concrete StateStore implementations - satisfy IStateStore.
 
-StateStore     — atomic JSON reads/writes via tmp-rename pattern.
-TextStateStore — atomic newline-delimited plain-text state files (set[str]).
-bootstrap_vault_state — idempotent one-call startup helper.
+StateStore     - atomic JSON reads/writes via tmp-rename pattern.
+TextStateStore - atomic newline-delimited plain-text state files (set[str]).
+bootstrap_vault_state - idempotent one-call startup helper.
 
 BOM-stripping on read covers Windows PowerShell UTF-8-BOM output.
 """
@@ -98,7 +98,7 @@ class TextStateStore(IStateStore):
 def bootstrap_vault_state(project_root: Path) -> None:
     """Create all required state directories and initialize missing state files.
 
-    Idempotent — never overwrites existing files. Call once on runner/agent
+    Idempotent - never overwrites existing files. Call once on runner/agent
     startup to guarantee a consistent on-disk state before any agent runs.
 
     Covers:

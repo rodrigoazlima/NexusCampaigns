@@ -8,13 +8,13 @@ This directory is the agent layer of the Nexus Campaigns. Each subdirectory is a
 
 | Principle | Rule |
 |-----------|------|
-| Scripts are tools | Scripts never run standalone — they are owned and invoked by an agent |
+| Scripts are tools | Scripts never run standalone - they are owned and invoked by an agent |
 | State isolation | Each agent owns its state files under `{agent}/state/` |
 | Shared minimum | Code moves to `system/` only when used by 3+ agents |
 | No self-approval | Agents may never set `reviewed: true` or promote to `02-Library/` |
-| Human gate | Canon requires explicit human action — no automation bypasses it |
-| CLI-agnostic | Agents declare `allowed_clis` — orchestrator decides which to use |
-| Model-swappable | Agents declare `preferred_models` — swap without touching tool code |
+| Human gate | Canon requires explicit human action - no automation bypasses it |
+| CLI-agnostic | Agents declare `allowed_clis` - orchestrator decides which to use |
+| Model-swappable | Agents declare `preferred_models` - swap without touching tool code |
 
 ---
 
@@ -50,7 +50,7 @@ token
          │
          ▼
 ┌────────────────┐
-│    review      │  Vault health, quality scores, pending list — every 15 min
+│    review      │  Vault health, quality scores, pending list - every 15 min
 └────────────────┘
          │
          ▼
@@ -81,7 +81,7 @@ token
 
 | Agent | Depends On | Purpose |
 |-------|-----------|---------|
-| [canon](canon/AGENT.md) | — | Consistency validation across 02-Library/ |
+| [canon](canon/AGENT.md) | - | Consistency validation across 02-Library/ |
 | [relationship](relationship/AGENT.md) | canon | Wikilink graphs, faction/NPC networks → 04-Relationships/ |
 | [deduplication](deduplication/AGENT.md) | classification | Semantic dedup, merge candidate reports |
 | [curator](curator/AGENT.md) | review, classification | Promotion readiness scoring (never auto-promotes) |

@@ -34,7 +34,7 @@ Analyze the provided Python script and extract all relevant configuration settin
    - Put script-specific behavior (batch sizes, task-specific prompts, agent name, etc.) in **local**.
    - Make sure the JSONs contain good defaults so the script works even if the files are deleted.
    - Use clear, consistent naming.
-   - Do not include code — only configuration.
+   - Do not include code - only configuration.
 
 ---
 
@@ -123,7 +123,7 @@ class TestLoadVaultConfig:
         assert cfg.llm_endpoints["classification"].type == "text"
 
     def test_auto_detect_from_real_project(self):
-        # Auto-detect from this repo — knowledge-base/ exists
+        # Auto-detect from this repo - knowledge-base/ exists
         cfg = load_vault_config()
         assert cfg.vault_paths.vault_root.name == "knowledge-base"
         assert cfg.vault_paths.vault_root.exists()

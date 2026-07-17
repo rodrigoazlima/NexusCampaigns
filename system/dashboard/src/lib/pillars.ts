@@ -3,7 +3,7 @@ import { Map as MapIcon, Users, Flag, ScrollText, Skull, Gem } from 'lucide-reac
 
 // The six campaign-building pillars. Pure config (no fs) so both the server
 // page and the client view can import it. `target` is the count-based "build
-// first" goal used for the pillar progress bar — see campaign-setting-guide.md.
+// first" goal used for the pillar progress bar - see campaign-setting-guide.md.
 export interface Pillar {
   key: string
   label: string

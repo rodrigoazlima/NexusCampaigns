@@ -1,6 +1,6 @@
 #Requires -RunAsAdministrator
 # Removes vault-knowledge-factory Windows service (NSSM or Task Scheduler).
-# Vault content and state files are NOT removed — delete manually if desired.
+# Vault content and state files are NOT removed - delete manually if desired.
 # Run once from an elevated PowerShell prompt.
 
 param(

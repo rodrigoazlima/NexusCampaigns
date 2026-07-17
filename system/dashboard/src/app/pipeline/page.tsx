@@ -90,7 +90,7 @@ export default async function PipelinePage() {
         <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-4">Workflow</div>
         <div className="space-y-3">
           {[
-            { step: '1', desc: 'Drop sources into 00-Inbox — treat as read-only', status: 'manual' },
+            { step: '1', desc: 'Drop sources into 00-Inbox - treat as read-only', status: 'manual' },
             { step: '2', desc: 'Automation agents process 00-Inbox and write drafts to 01-Processing', status: 'auto' },
             { step: '3', desc: 'Human reviews drafts, sets status: approved + quality: N', status: 'manual' },
             { step: '4', desc: 'Approved content promoted to 02-Library (or 03-Campaigns, 05-Assets)', status: 'auto' },

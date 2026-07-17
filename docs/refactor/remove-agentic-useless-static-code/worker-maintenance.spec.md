@@ -15,17 +15,17 @@ Self-healing for the pipeline that remains:
 |--------|------|
 | ParseErrorPatterns (scan automation.log 24h) | keep |
 | RemoveStaleLock (runner.lock > 30 min) | keep |
-| CreateMissingDirs (`REQUIRED_DIRS`) | keep — list shrinks to runtime state, worker state dirs, LLM agent state |
+| CreateMissingDirs (`REQUIRED_DIRS`) | keep - list shrinks to runtime state, worker state dirs, LLM agent state |
 | ValidateImageRefs (processed-images.json SHA256) | keep |
 | ValidateInboxQueue (prune entries whose file is gone) | keep + extend: reset `error` slots whose `reruns < 3` when the underlying cause (missing file, missing dep) is resolved |
 | DetectOverdueAgents | keep, generalized: LLM agents by agent.json interval, workers by registry `interval_seconds` (reads `worker:<name>` lastRun keys) |
 | Dashboard health probe | keep |
 | WriteRepairReport | keep → `system/state/workers/maintenance/reports/` |
-| GenerateMissingAgentConfigs (`_AGENT_JSON_SPECS`) | **shrinks to LLM agents only** — static entries die with their agent.json |
-| EnsureAgentRelationLinks (junction table) | **shrinks to LLM agents only** — static rows dropped |
+| GenerateMissingAgentConfigs (`_AGENT_JSON_SPECS`) | **shrinks to LLM agents only** - static entries die with their agent.json |
+| EnsureAgentRelationLinks (junction table) | **shrinks to LLM agents only** - static rows dropped |
 | Agent scaffold (prompts/state dirs) | **LLM agents only** |
 
-New responsibility (from contract §Errors): **poison-pill report** — list
+New responsibility (from contract §Errors): **poison-pill report** - list
 queue slots stuck at `error` with `reruns >= 3` in the repair report so
 humans see them on the dashboard.
 
@@ -46,7 +46,7 @@ def handle(item) -> WorkResult:
 Signal trigger: the runner already consumes `state/signals/`; a
 `worker-error` signal emitted by the worker loop (contract §Runner loop, on
 any `error` result) marks maintenance due on the next cycle regardless of
-interval — replaces "repair always runs" with "repair runs daily or when
+interval - replaces "repair always runs" with "repair runs daily or when
 something actually failed".
 
 ## State
@@ -54,7 +54,7 @@ something actually failed".
 | Now | Target |
 |-----|--------|
 | `agents/repair/state/` | `system/state/workers/maintenance/` |
-| report → `agents/review/state/reports/repair-*.json` | `system/state/workers/maintenance/reports/` — dashboard repair endpoint re-pointed in same commit |
+| report → `agents/review/state/reports/repair-*.json` | `system/state/workers/maintenance/reports/` - dashboard repair endpoint re-pointed in same commit |
 
 ## Config
 

@@ -22,11 +22,11 @@ already-classified images:
 - `run_batch` renames images in 00-Inbox/images/ to canonical slug format (this is expected)
 - Write drafts to 01-Processing/ with status: draft, reviewed: false
 - Draft bodies are type-specific: battlemap → Atmosphere + Tactical Notes + Encounter Hooks; scene → Atmosphere + Story Hooks + DM Notes; token → Visual Notes + Suggested Roles + VTT Usage; portrait/body → Visual Classification + Lore Status; scene/battlemap whose entity_type is really an object (item, artifact, creature, ...) → Visual Details + DM Notes instead (see AGENT.md)
-- If the local LLM (localhost:1234) is offline, log WARN and stop — do not fail permanently
+- If the local LLM (localhost:1234) is offline, log WARN and stop - do not fail permanently
 - Tokens (transparent PNG with circular mask) get type: token in their draft
 - Draft filenames use the slug format: {type}-{ancestry}-{class}-{element}.md
 - Update processed-images.json after each classified image
 - Text extraction only runs against images already present in processed-images.json;
   it never classifies or renames an image itself
 - Call `request_human_review` for images the LLM repeatedly fails to classify
-- Never write to 02-Library/ — only 01-Processing/ receives draft output
+- Never write to 02-Library/ - only 01-Processing/ receives draft output

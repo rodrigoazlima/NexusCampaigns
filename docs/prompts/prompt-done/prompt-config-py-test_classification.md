@@ -34,7 +34,7 @@ Analyze the provided Python script and extract all relevant configuration settin
    - Put script-specific behavior (batch sizes, task-specific prompts, agent name, etc.) in **local**.
    - Make sure the JSONs contain good defaults so the script works even if the files are deleted.
    - Use clear, consistent naming.
-   - Do not include code — only configuration.
+   - Do not include code - only configuration.
 
 ---
 
@@ -123,7 +123,7 @@ class TestAllowedSets:
             assert t in _mod._ALLOWED_TYPES
 
     def test_approved_not_in_types(self):
-        # 'approved' is a status, not a type — must not be mistakenly accepted
+        # 'approved' is a status, not a type - must not be mistakenly accepted
         assert "approved" not in _mod._ALLOWED_TYPES
 
 
@@ -286,7 +286,7 @@ class TestRunInferType:
             client.chat.return_value = '{"type": "location"}'
             count, _ = _mod._run_infer_type()
 
-        # file had type — should not have been processed
+        # file had type - should not have been processed
         assert count == 0
 
     def test_infers_type_for_missing_field(self, patch_roots, vault):

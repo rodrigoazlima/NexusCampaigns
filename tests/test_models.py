@@ -1,4 +1,4 @@
-"""Tests for shared.models — Pydantic data contracts."""
+"""Tests for shared.models - Pydantic data contracts."""
 
 import pytest
 from datetime import date, datetime, timezone

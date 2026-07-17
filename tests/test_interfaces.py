@@ -1,4 +1,4 @@
-"""Tests for shared.interfaces — abstract contracts and exceptions."""
+"""Tests for shared.interfaces - abstract contracts and exceptions."""
 
 import pytest
 from pathlib import Path
@@ -64,7 +64,7 @@ class TestExceptions:
 
 
 # ---------------------------------------------------------------------------
-# BaseAgent — ABC contract
+# BaseAgent - ABC contract
 # ---------------------------------------------------------------------------
 
 class TestBaseAgent:
@@ -124,7 +124,7 @@ class TestBaseAgent:
 
 
 # ---------------------------------------------------------------------------
-# BaseAgent — default execute() lifecycle
+# BaseAgent - default execute() lifecycle
 # ---------------------------------------------------------------------------
 
 @pytest.fixture
@@ -213,7 +213,7 @@ class TestBaseAgentDefaultExecute:
 
 
 # ---------------------------------------------------------------------------
-# IAgent protocol — structural check
+# IAgent protocol - structural check
 # ---------------------------------------------------------------------------
 
 class TestIAgentProtocol:
@@ -242,7 +242,7 @@ class TestIAgentProtocol:
 
 
 # ---------------------------------------------------------------------------
-# Abstract interface — must raise NotImplementedError
+# Abstract interface - must raise NotImplementedError
 # ---------------------------------------------------------------------------
 
 class TestAbstractInterfaces:

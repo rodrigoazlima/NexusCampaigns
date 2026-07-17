@@ -17,7 +17,7 @@ export default function ComingSoon({ icon, title, subtitle }: ComingSoonProps) {
         <Hammer size={24} className="mx-auto text-zinc-600 mb-3" />
         <div className="text-zinc-400 text-sm">Coming soon</div>
         <div className="text-xs text-zinc-600 mt-1">
-          This pillar is scaffolded — the page lands in a later phase.
+          This pillar is scaffolded - the page lands in a later phase.
         </div>
       </div>
     </div>

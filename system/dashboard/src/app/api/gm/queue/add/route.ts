@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     try {
       queue = JSON.parse(fs.readFileSync(QUEUE_FILE, 'utf-8'))
     } catch {
-      // queue file missing — start fresh
+      // queue file missing - start fresh
     }
 
     if (normalized in queue) {

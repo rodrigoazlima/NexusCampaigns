@@ -356,7 +356,7 @@ export interface ImageClassification {
 export interface ItemDetail extends ReviewItem {
   imageClassification: ImageClassification | null
   tokenPath: string | null
-  tokenUpdatedAt: string | null   // cache-bust key — bumped whenever the token PNG is regenerated
+  tokenUpdatedAt: string | null   // cache-bust key - bumped whenever the token PNG is regenerated
   tokenEligible: boolean   // true when imageClassification.type is portrait or body
   activeAgents: AgentInfo[]
   sourceAbsolute: string[]   // source[] resolved to absolute filesystem paths

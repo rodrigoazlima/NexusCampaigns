@@ -1,4 +1,4 @@
-"""shared.agent_tools — self-management tools available to every agent.
+"""shared.agent_tools - self-management tools available to every agent.
 
 Every agent's call_tool() dispatcher should delegate to call_self_management_tool()
 before handling domain-specific tools.
@@ -305,7 +305,7 @@ def _git_commit(message: str, context: dict, task_id: str) -> str:
 
 def _update_tool(function_name: str, new_code: str, module_file: Optional[Path]) -> str:
     if module_file is None:
-        return "ERROR: module_file not provided — cannot locate tools file"
+        return "ERROR: module_file not provided - cannot locate tools file"
 
     try:
         ast.parse(new_code)
@@ -350,7 +350,7 @@ def _create_tool(
     module_file: Optional[Path],
 ) -> str:
     if module_file is None:
-        return "ERROR: module_file not provided — cannot locate tools file"
+        return "ERROR: module_file not provided - cannot locate tools file"
 
     try:
         ast.parse(function_code)
@@ -374,7 +374,7 @@ def _create_tool(
     )
 
     # Find the closing bracket of TOOLS list and insert before it
-    # Locate `]\n` that closes TOOLS = [...] — find by scanning after "TOOLS = ["
+    # Locate `]\n` that closes TOOLS = [...] - find by scanning after "TOOLS = ["
     tools_start = source.find("TOOLS = [")
     if tools_start == -1:
         tools_start = source.find("TOOLS: list")

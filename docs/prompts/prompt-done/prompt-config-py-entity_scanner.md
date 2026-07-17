@@ -34,14 +34,14 @@ Analyze the provided Python script and extract all relevant configuration settin
    - Put script-specific behavior (batch sizes, task-specific prompts, agent name, etc.) in **local**.
    - Make sure the JSONs contain good defaults so the script works even if the files are deleted.
    - Use clear, consistent naming.
-   - Do not include code — only configuration.
+   - Do not include code - only configuration.
 
 ---
 
 **Script to analyze:**
 
 # shared\entity_scanner.py
-"""Entity scanner — enumerate vault entities with parsed frontmatter.
+"""Entity scanner - enumerate vault entities with parsed frontmatter.
 
 Shared by review, curator, canon, relationship, search, and deduplication agents.
 All scanning is read-only.
@@ -70,7 +70,7 @@ class EntityScanner:
         """Yield (path, frontmatter, body) for every parseable .md file.
 
         Files whose frontmatter cannot be validated as EntityFrontmatter are
-        silently skipped — callers get only well-formed records.
+        silently skipped - callers get only well-formed records.
 
         Args:
             *dirs: One or more vault directories to scan.

@@ -1,4 +1,4 @@
-"""shared — public surface of the vault pipeline's shared layer.
+"""shared - public surface of the vault pipeline's shared layer.
 
 Consumers import from here; never from sub-modules directly.
 """
@@ -165,9 +165,9 @@ from .models import (
 )
 
 __all__ = [
-    # Config — Layer 1 (dataclasses)
+    # Config - Layer 1 (dataclasses)
     "LLMEndpointConfig", "SystemPaths", "VaultConfig", "VaultPaths",
-    # Config — Layer 2 (JSON / AppConfig)
+    # Config - Layer 2 (JSON / AppConfig)
     "AppConfig", "LLMConfig", "LoggingConfig", "get_config", "clear_config_cache",
     # Concrete implementations
     "EntityScanner", "FileLock", "FrontmatterIO", "LLMClient", "load_llm_endpoint", "load_registry", "load_vault_config",
@@ -193,35 +193,35 @@ __all__ = [
     "SignalEmitter", "SignalConsumer",
     # Runners
     "get_runner",
-    # Models — enums
+    # Models - enums
     "AgentSlotStatus", "CanonViolationType", "DedupMatchReason", "Element",
     "EntityStatus", "EntityType", "Environment", "ImageProcessStatus",
     "ImageType", "NPCProcessStatus",
-    # Models — PF2e vocabulary
+    # Models - PF2e vocabulary
     "PF2E_ANCESTRIES", "PF2E_CLASSES", "PF2E_CREATURE_TYPES",
-    # Models — entities
+    # Models - entities
     "EntityFrontmatter", "NPCFrontmatter",
-    # Models — LLM contracts
+    # Models - LLM contracts
     "NPCLLMOutput", "TagEnrichmentOutput", "VisionClassification",
-    # Models — queue / state
+    # Models - queue / state
     "AgentSlots", "InboxQueue", "InboxQueueEntry",
     "ProcessedImageEntry", "ProcessedImagesState",
     "ProcessedNPCEntry", "ProcessedNPCs",
     "GeneratedTokenEntry", "GeneratedTokens",
     "ScenarioEntry",
     "WikilinkProcessedEntry", "WikilinkProcessedState",
-    # Models — dispatch config
+    # Models - dispatch config
     "AgentDispatchConfig", "AgentFolderConfig", "CliDispatchConfig",
     "ClaudeApiConfig", "ClaudeCodeConfig", "GeminiApiConfig", "OpenAIApiConfig", "OpenRouterApiConfig",
     "RunResult", "TaskDispatchEntry",
-    # Models — runtime
+    # Models - runtime
     "TasksState", "TaskStateEntry",
-    # Models — metrics
+    # Models - metrics
     "RunMetrics", "AgentMetricsEntry", "AgentMetrics",
-    # Models — registry
+    # Models - registry
     "AgentRegistryEntry", "AgentSharedStateSpec", "LLMEndpointSpec",
     "RegistryConfig", "SharedStateFileSpec",
-    # Models — reports
+    # Models - reports
     "AgentLogSummary", "CanonReport", "CanonViolation", "CleanupReport",
     "CuratorReport", "CuratorSuggestion", "DailyReport", "DedupCandidate",
     "DedupReport", "RelationshipEdge", "RelationshipGraph", "RepairReport",

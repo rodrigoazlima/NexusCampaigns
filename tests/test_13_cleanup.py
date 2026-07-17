@@ -3,20 +3,20 @@ Tests for .automation/13-cleanup.ps1
 
 Strategy: patch $VaultRoot in script text, write to tmp_path, invoke via subprocess.
 All assertions check filesystem state (files deleted/kept, log content, JSON content).
-No image processing involved — this is a log/report/metrics retention script.
+No image processing involved - this is a log/report/metrics retention script.
 
 Behaviors under test:
-  1.  cleanupDays config      — default 90d; custom value from tasks.json
-  2.  Per-task log cleanup    — *.log (not automation.log) older than cutoff deleted
-  3.  Daily report cleanup    — report-*.json older than cutoff deleted
-  4.  Repair report cleanup   — repair-*.json older than cutoff deleted
-  5.  automation.log trimming — old lines removed; recent lines kept
-  6.  agent-metrics.json trim — old runs removed per agent; recent runs kept
-  7.  Vault protection        — 00-Inbox/, 01-Processing/, 02-Library/ never touched
-  8.  Directory creation      — logs/ and reports/ created when missing
-  9.  Logging                 — automation.log + per-task log with START/DONE markers
- 10.  Idempotency             — double run exits 0 and is safe
- 11.  DONE summary            — correct deleted/freed/log-lines-trimmed/metrics-trimmed
+  1.  cleanupDays config      - default 90d; custom value from tasks.json
+  2.  Per-task log cleanup    - *.log (not automation.log) older than cutoff deleted
+  3.  Daily report cleanup    - report-*.json older than cutoff deleted
+  4.  Repair report cleanup   - repair-*.json older than cutoff deleted
+  5.  automation.log trimming - old lines removed; recent lines kept
+  6.  agent-metrics.json trim - old runs removed per agent; recent runs kept
+  7.  Vault protection        - 00-Inbox/, 01-Processing/, 02-Library/ never touched
+  8.  Directory creation      - logs/ and reports/ created when missing
+  9.  Logging                 - automation.log + per-task log with START/DONE markers
+ 10.  Idempotency             - double run exits 0 and is safe
+ 11.  DONE summary            - correct deleted/freed/log-lines-trimmed/metrics-trimmed
 """
 
 from __future__ import annotations
@@ -161,7 +161,7 @@ class TestCleanupDaysConfig:
         assert result.returncode == 0, result.stderr
 
     def test_file_within_default_window_kept(self, vault: Path) -> None:
-        """File 40 days old is inside the 90d default window — not deleted."""
+        """File 40 days old is inside the 90d default window - not deleted."""
         log = _logs_dir(vault) / "task-x_2025-01-01.log"
         log.write_text("recent enough", encoding="utf-8")
         _age_file(log, 40)

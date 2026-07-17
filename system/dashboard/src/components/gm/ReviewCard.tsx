@@ -130,14 +130,14 @@ export default function ReviewCard({ item, onApprove, onReject, onReprocess }: R
   return (
     <div className="panel overflow-hidden">
       <div className="flex flex-col md:flex-row">
-        {/* Left: image column — original behind, token in front */}
+        {/* Left: image column - original behind, token in front */}
         <div className="md:w-52 flex-shrink-0 p-3 flex flex-col gap-2 border-b md:border-b-0 md:border-r border-surface-3">
           <button
             className="relative w-full aspect-square overflow-hidden rounded-xl bg-surface-3 border border-surface-3 hover:border-primary/40 transition-all cursor-pointer group"
             onClick={() => router.push(`/gm/view/${item.uuid || encodeURIComponent(item.id)}`)}
             title="Click to open item"
           >
-            {/* Original image — blurred background */}
+            {/* Original image - blurred background */}
             {imageSrc ? (
               /* eslint-disable-next-line @next/next/no-img-element */
               <img
@@ -154,7 +154,7 @@ export default function ReviewCard({ item, onApprove, onReject, onReprocess }: R
             {/* Gradient vignette */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20 z-10" />
 
-            {/* Token in front — centred, slightly lifted */}
+            {/* Token in front - centred, slightly lifted */}
             {tokenSrc ? (
               <div className="absolute inset-0 flex items-center justify-center z-20 p-3">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -166,7 +166,7 @@ export default function ReviewCard({ item, onApprove, onReject, onReprocess }: R
                 />
               </div>
             ) : imageSrc ? (
-              /* No token yet — show source image normally */
+              /* No token yet - show source image normally */
               <div className="absolute inset-0 flex items-center justify-center z-20 p-2">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -341,7 +341,7 @@ export default function ReviewCard({ item, onApprove, onReject, onReprocess }: R
         <div className="border-t border-surface-3 p-4 bg-surface">
           <div className="flex items-center justify-between mb-2">
             <div className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">
-              Edit Markdown — {item.filename}
+              Edit Markdown - {item.filename}
             </div>
             {editError && (
               <div className="text-xs text-danger">{editError}</div>

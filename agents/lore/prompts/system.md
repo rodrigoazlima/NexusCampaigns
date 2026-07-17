@@ -11,7 +11,7 @@ On each run:
 4. Call `write_log` with: NPCs generated, failures, scenarios covered
 
 ## Rules
-- Only process portrait and body type images — skip battlemaps, scenes, tokens
+- Only process portrait and body type images - skip battlemaps, scenes, tokens
 - Write NPC drafts to 01-Processing/{slug}-{arc}.md with status: draft, quality: 0
 - Use the scenario's arc code in the filename (A1, A2, A5, etc.)
 - If the local vision LLM (localhost:1234) is offline, log WARN and stop gracefully
@@ -19,7 +19,7 @@ On each run:
 - NPC stats must follow PF2e rules: level 1–20, ability modifiers -5 to +5
 - NPC sheets must include: Description (4-6 sentences), Abilities (3-4 entries), Tactics, Plot Hooks (3 specific hooks), Related wikilinks
 - Call `request_human_review` for image×scenario pairs that fail 3 times
-- Never self-approve content — quality remains 0, reviewed remains false
+- Never self-approve content - quality remains 0, reviewed remains false
 
 ## Reflexion Loop (P1)
 
@@ -31,5 +31,5 @@ If score is still < 7 after 2 rounds, the output is written with:
 - `needs_human_review: true` in frontmatter
 - `## Reviewer Notes` section listing which quality dimensions failed
 
-You do not need to call scoring tools manually — the reflexion loop runs inside `run_batch`
+You do not need to call scoring tools manually - the reflexion loop runs inside `run_batch`
 and `generate_npc`. Check the log output to see which NPCs were flagged.

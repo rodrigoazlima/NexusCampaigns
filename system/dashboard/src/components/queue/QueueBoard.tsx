@@ -35,7 +35,7 @@ export default function QueueBoard({ items, agentStats, byType }: Props) {
     })
   }
 
-  // Search + type filtered, before the status narrowing — this is also what
+  // Search + type filtered, before the status narrowing - this is also what
   // status chip counts are computed against.
   const searched = useMemo(() => {
     const q = search.trim().toLowerCase()

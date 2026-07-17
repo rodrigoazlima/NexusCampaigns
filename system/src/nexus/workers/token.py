@@ -1,4 +1,4 @@
-"""nexus.workers.token — VTT token generator (queue consumer).
+"""nexus.workers.token - VTT token generator (queue consumer).
 
 Generates 512×512 circular portrait tokens from vision-classified images.
 Face detection: MTCNN (robust on stylized art) → OpenCV Haar (topmost) →
@@ -43,7 +43,7 @@ _GEN_TOKENS   = _WORKER_STATE / "generated-tokens.json"
 _CONFIG_FILE  = _WORKER_STATE / "10-generate-tokens.json"
 
 # Legacy homes (nexus.tasks.generate_tokens wrote system/state/token; the
-# deployed pipeline wrote agents/token/state) — adopted once, then unused
+# deployed pipeline wrote agents/token/state) - adopted once, then unused
 _LEGACY_STATE_DIRS = (
     _STATE_ROOT / "token",
     _PROJECT_ROOT / "agents" / "token" / "state",
@@ -102,7 +102,7 @@ def _store_face(src_rel: str, face: dict | None, log: Logger) -> None:
     processed-images.json, so re-generation and the manual token editor can
     reuse it. No-op when no face or the image isn't indexed.
 
-    ponytail: read-modify-write of the shared vision state — last writer wins. The
+    ponytail: read-modify-write of the shared vision state - last writer wins. The
     vision agent runs hourly and rarely overlaps a manual token gen; if contention
     ever matters, gate both on a lock file.
     """
@@ -294,13 +294,13 @@ def _detect_ring_radii(frame_arr: Any) -> tuple[int, int]:
 def _make_token(img_path: Path, out_path: Path, cfg: dict, log: Logger,
                 moldura_path: Path | None = None) -> tuple[bool, dict | None]:
     """Returns (ok, face) where face is the detected face position in SOURCE
-    pixels — {cx, cy, w, h, img_w, img_h} — or None when no face was found
+    pixels - {cx, cy, w, h, img_w, img_h} - or None when no face was found
     (upper-center fallback was used)."""
     try:
         from PIL import Image, ImageDraw
         import numpy as np
     except ImportError:
-        log.error("Pillow not installed — cannot generate tokens")
+        log.error("Pillow not installed - cannot generate tokens")
         return False, None
 
     try:
@@ -338,7 +338,7 @@ def _make_token(img_path: Path, out_path: Path, cfg: dict, log: Logger,
         w, h  = img.size
         arr   = np.array(img.convert("RGB"))
         IH, IW = arr.shape[:2]
-        SRC_H, SRC_W = IH, IW  # original dims — IH/IW get mutated by padding below
+        SRC_H, SRC_W = IH, IW  # original dims - IH/IW get mutated by padding below
 
         # Detect face (center-point form). MTCNN primary (handles stylized art),
         # Haar topmost fallback.
@@ -366,7 +366,7 @@ def _make_token(img_path: Path, out_path: Path, cfg: dict, log: Logger,
             log.info(f"Face detected: center=({fcx},{fcy}) size={fw}x{fh} "
                      f"head_top={head_top} body_bot={body_bot} crop={crop_size}px")
         else:
-            log.info("No face detected — upper-center fallback")
+            log.info("No face detected - upper-center fallback")
             crop_x, crop_y, crop_size, _ = _upper_center_crop(IW, IH, cfg)
             crop_cx = crop_x + crop_size // 2
             crop_cy = crop_y + crop_size // 2
@@ -451,7 +451,7 @@ class TokenWorker:
             from PIL import Image  # noqa: F401
         except ImportError:
             if not _warned_no_pillow:
-                make_worker_logger(self.name).warning("Pillow not installed — token generation disabled")
+                make_worker_logger(self.name).warning("Pillow not installed - token generation disabled")
                 _warned_no_pillow = True
             return []
 
@@ -480,7 +480,7 @@ class TokenWorker:
             if slot == "error":
                 continue
 
-            # Human paused this source's token generation — leave it alone
+            # Human paused this source's token generation - leave it alone
             if slot == "paused":
                 continue
 
@@ -500,7 +500,7 @@ class TokenWorker:
                     if slot == "pending":
                         items.append(WorkItem(src_rel, {"action": "reconcile", "img_key": img_key}))
                     continue
-                # else: fall through — source was reclassified since this token
+                # else: fall through - source was reclassified since this token
                 # was built, regenerate it below
 
             if not (_PROJECT_ROOT / src_rel).exists():
@@ -575,7 +575,7 @@ class TokenWorker:
             new_entry["generatedAt"] = datetime.now(timezone.utc).isoformat()
         else:
             # Token file pre-existed with no matching index entry (e.g. a prior
-            # run crashed between writing the PNG and saving the index) — the
+            # run crashed between writing the PNG and saving the index) - the
             # file's own mtime is the only trustworthy record of when it was
             # actually produced, not "now".
             new_entry["generatedAt"] = prior.get("generatedAt") or datetime.fromtimestamp(

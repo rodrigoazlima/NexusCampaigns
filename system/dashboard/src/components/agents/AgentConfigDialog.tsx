@@ -328,7 +328,7 @@ function CliFields({ cfg, onChange, scripts }: { cfg: Record<string, unknown>; o
         ) : (
           <TextInput value={script} onChange={(v) => setScript(v || null)} placeholder="agents/name/tools/script.py" mono />
         )}
-        <p className="text-[10px] text-zinc-600 mt-1">First arg — path relative to project root</p>
+        <p className="text-[10px] text-zinc-600 mt-1">First arg - path relative to project root</p>
       </FieldRow>
       <FieldRow label="Extra Args">
         <TextareaInput
@@ -402,7 +402,7 @@ function ClaudeCodeFields({ cfg, onChange, prompts }: { cfg: Record<string, unkn
           rows={3}
           mono
         />
-        <p className="text-[10px] text-zinc-600 mt-1">One arg per line — include --dangerously-skip-permissions to bypass permission prompts</p>
+        <p className="text-[10px] text-zinc-600 mt-1">One arg per line - include --dangerously-skip-permissions to bypass permission prompts</p>
       </FieldRow>
       <FieldRow label="CWD">
         <SelectInput
@@ -654,11 +654,11 @@ function LmStudioFields({ cfg, onChange, prompts }: { cfg: Record<string, unknow
           </button>
         </div>
         {fetchStatus === 'error' && !currentModel && (
-          <p className="text-[10px] text-red-500/70 mt-1">LM Studio not reachable — enter model ID manually</p>
+          <p className="text-[10px] text-red-500/70 mt-1">LM Studio not reachable - enter model ID manually</p>
         )}
       </FieldRow>
 
-      {/* Model properties — read-only, set at load time */}
+      {/* Model properties - read-only, set at load time */}
       {currentModel && (
         <div className={`rounded border px-3 py-2.5 space-y-1.5 transition-opacity ${
           infoLoading ? 'opacity-50' : 'opacity-100'
@@ -673,7 +673,7 @@ function LmStudioFields({ cfg, onChange, prompts }: { cfg: Record<string, unknow
           {!hasAnyInfo && !infoLoading && (
             <p className="text-[11px] text-zinc-600">
               {modelInfo?.found === false
-                ? 'Model not found in LM Studio — properties unavailable'
+                ? 'Model not found in LM Studio - properties unavailable'
                 : 'Fetching metadata…'}
             </p>
           )}
@@ -681,7 +681,7 @@ function LmStudioFields({ cfg, onChange, prompts }: { cfg: Record<string, unknow
           {contextLength != null && (
             <div className="flex items-center justify-between">
               <span className="text-[11px] text-zinc-500 flex items-center gap-1.5">
-                <span title="Set at load time — cannot be changed via API">🔒</span>
+                <span title="Set at load time - cannot be changed via API">🔒</span>
                 Context window
               </span>
               <span className="text-[11px] font-mono text-zinc-300">{contextLength.toLocaleString()} tokens</span>
@@ -716,7 +716,7 @@ function LmStudioFields({ cfg, onChange, prompts }: { cfg: Record<string, unknow
 
           {hasAnyInfo && (
             <p className="text-[10px] text-zinc-600 border-t border-surface-3/50 pt-1.5 mt-1">
-              🔒 set when model loads in LM Studio — cannot be changed via API
+              🔒 set when model loads in LM Studio - cannot be changed via API
             </p>
           )}
         </div>
@@ -1228,7 +1228,7 @@ function RuntimeForm({ config, onChange }: { config: RuntimeConfig; onChange: (f
       <div className="space-y-3">
         <FieldRow label="Poll Interval (s)">
           <NumberInput value={config.intervalSec} onChange={(v) => onChange('intervalSec', v)} min={10} />
-          <p className="text-[10px] text-zinc-600 mt-1">How often the daemon runs a scheduler cycle — {intervalLabel(config.intervalSec)}</p>
+          <p className="text-[10px] text-zinc-600 mt-1">How often the daemon runs a scheduler cycle - {intervalLabel(config.intervalSec)}</p>
         </FieldRow>
         <FieldRow label="Python Executable">
           <TextInput value={config.python} onChange={(v) => onChange('python', v)} mono />
@@ -1349,7 +1349,7 @@ function CapabilityWarnings({ providerType, required }: { providerType: string; 
           <span>
             <span className="font-semibold">{CAPABILITY_LABELS[cap]}</span>
             {uncertain
-              ? ` support depends on the specific model loaded — verify before use.`
+              ? ` support depends on the specific model loaded - verify before use.`
               : ` is required but not supported by this provider.`}
           </span>
         </div>
@@ -1382,7 +1382,7 @@ function IntelligenceFields({ intelligence, onChange, requiredCapabilities, agen
 }
 
 // ---------------------------------------------------------------------------
-// Agent form — tabs per task when multiple tasks exist
+// Agent form - tabs per task when multiple tasks exist
 // ---------------------------------------------------------------------------
 
 function AgentForm({
@@ -1452,7 +1452,7 @@ function AgentForm({
 }
 
 // ---------------------------------------------------------------------------
-// Task form — tabs: General | Dispatch | Fallback
+// Task form - tabs: General | Dispatch | Fallback
 // ---------------------------------------------------------------------------
 
 function getIntelligencePromptFile(intelligence: IntelligenceConfig): string | null {
@@ -1545,7 +1545,7 @@ function TaskForm({
             <p className="text-xs text-zinc-500">
               {fb
                 ? 'Tried automatically if primary intelligence exits non-zero.'
-                : 'No fallback configured — failed runs stay failed.'}
+                : 'No fallback configured - failed runs stay failed.'}
             </p>
             {fb ? (
               <button

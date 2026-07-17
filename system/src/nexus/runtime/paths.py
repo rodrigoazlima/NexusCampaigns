@@ -1,4 +1,4 @@
-"""nexus.runtime.paths — every filesystem path and static constant the
+"""nexus.runtime.paths - every filesystem path and static constant the
 runtime touches. No behavior, so every other module can import from here
 without pulling in unrelated logic.
 """

@@ -34,18 +34,18 @@ Analyze the provided Python script and extract all relevant configuration settin
    - Put script-specific behavior (batch sizes, task-specific prompts, agent name, etc.) in **local**.
    - Make sure the JSONs contain good defaults so the script works even if the files are deleted.
    - Use clear, consistent naming.
-   - Do not include code — only configuration.
+   - Do not include code - only configuration.
 
 ---
 
 **Script to analyze:**
 
 # shared\state_store.py
-"""Concrete StateStore implementations — satisfy IStateStore.
+"""Concrete StateStore implementations - satisfy IStateStore.
 
-StateStore     — atomic JSON reads/writes via tmp-rename pattern.
-TextStateStore — atomic newline-delimited plain-text state files (set[str]).
-bootstrap_vault_state — idempotent one-call startup helper.
+StateStore     - atomic JSON reads/writes via tmp-rename pattern.
+TextStateStore - atomic newline-delimited plain-text state files (set[str]).
+bootstrap_vault_state - idempotent one-call startup helper.
 
 BOM-stripping on read covers Windows PowerShell UTF-8-BOM output.
 """
@@ -141,7 +141,7 @@ class TextStateStore(IStateStore):
 def bootstrap_vault_state(project_root: Path) -> None:
     """Create all required state directories and initialize missing state files.
 
-    Idempotent — never overwrites existing files. Call once on runner/agent
+    Idempotent - never overwrites existing files. Call once on runner/agent
     startup to guarantee a consistent on-disk state before any agent runs.
 
     Covers:

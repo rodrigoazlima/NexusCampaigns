@@ -9,7 +9,7 @@
 
 ## Problem
 
-Agents poll on fixed intervals (typically 3600s). A Vision Agent that classifies an image at 08:00 does not trigger the Lore Agent until Lore's 1-hour interval fires — potentially 59 minutes later. The classified image is immediately ready for NPC generation. The 59-minute gap is pure scheduling lag, not work.
+Agents poll on fixed intervals (typically 3600s). A Vision Agent that classifies an image at 08:00 does not trigger the Lore Agent until Lore's 1-hour interval fires - potentially 59 minutes later. The classified image is immediately ready for NPC generation. The 59-minute gap is pure scheduling lag, not work.
 
 More broadly: inter-agent data dependencies are implicit (shared filesystem) and invisible to the runtime. The scheduler has no way to know "vision-agent completed a classification that lore-agent needs."
 
@@ -17,7 +17,7 @@ More broadly: inter-agent data dependencies are implicit (shared filesystem) and
 
 ## Goal
 
-Agents can emit typed signals after completing work. The runtime checks for pending signals at each scheduler cycle and immediately dispatches dependent agents whose signal dependency is satisfied — without waiting for their interval.
+Agents can emit typed signals after completing work. The runtime checks for pending signals at each scheduler cycle and immediately dispatches dependent agents whose signal dependency is satisfied - without waiting for their interval.
 
 Signals are:
 - **Fire-and-forget:** emitting agent has no knowledge of whether signal was consumed
@@ -29,25 +29,25 @@ Signals are:
 
 ## Design Principles
 
-1. Simplest possible implementation — file drop in a watched directory
+1. Simplest possible implementation - file drop in a watched directory
 2. No new dependencies (no Redis, no Kafka, no SQLite queue)
-3. Signal loss is acceptable — dependent agent will run on its next interval anyway (signals accelerate, not enable)
-4. Signals do not carry large payloads — only metadata (type, emitter, timestamp, optional ref)
-5. The runtime is the only consumer of signals — agents never read signal files
+3. Signal loss is acceptable - dependent agent will run on its next interval anyway (signals accelerate, not enable)
+4. Signals do not carry large payloads - only metadata (type, emitter, timestamp, optional ref)
+5. The runtime is the only consumer of signals - agents never read signal files
 
 ---
 
 ## Scope
 
 Files to create:
-- `agents/runtime/state/signals/` — signal drop directory (created at runtime startup)
-- `agents/shared/signal_bus.py` — `SignalEmitter` and `SignalConsumer` classes
+- `agents/runtime/state/signals/` - signal drop directory (created at runtime startup)
+- `agents/shared/signal_bus.py` - `SignalEmitter` and `SignalConsumer` classes
 - `agents/tests/test_signal_bus.py`
 
 Files to modify:
-- `agents/runtime/tools/runner.py` — call `_check_signals()` at start of each cycle
-- `agents/shared/interfaces.py` — `ISignalEmitter` protocol
-- `agent.json` schema — add optional `signal_triggers` array to task config
+- `agents/runtime/tools/runner.py` - call `_check_signals()` at start of each cycle
+- `agents/shared/interfaces.py` - `ISignalEmitter` protocol
+- `agent.json` schema - add optional `signal_triggers` array to task config
 
 ---
 
@@ -66,11 +66,11 @@ Files to modify:
 }
 ```
 
-- `id` — UUID4, used as filename; guarantees no collision
-- `type` — string; consuming agents declare which types trigger them
-- `emitter` — task_id of the emitting agent
-- `ref` — optional reference (image path, slug, etc.) for logging
-- `payload` — optional small metadata dict (max 1KB enforced by emitter)
+- `id` - UUID4, used as filename; guarantees no collision
+- `type` - string; consuming agents declare which types trigger them
+- `emitter` - task_id of the emitting agent
+- `ref` - optional reference (image path, slug, etc.) for logging
+- `payload` - optional small metadata dict (max 1KB enforced by emitter)
 
 ---
 
@@ -106,14 +106,14 @@ And optional `emits_signals` array (for documentation and dependency graph):
 }
 ```
 
-`emits_signals` is documentation only — agents emit signals via code, not config. `signal_triggers` is functional — the runtime reads it.
+`emits_signals` is documentation only - agents emit signals via code, not config. `signal_triggers` is functional - the runtime reads it.
 
 ---
 
 ## `shared/signal_bus.py`
 
 ```python
-"""signal_bus.py — lightweight file-based inter-agent signal bus."""
+"""signal_bus.py - lightweight file-based inter-agent signal bus."""
 
 from __future__ import annotations
 import json
@@ -180,7 +180,7 @@ class SignalConsumer:
                 if signal_type is None or data.get("type") == signal_type:
                     signals.append(data)
             except Exception:
-                f.unlink(missing_ok=True)  # corrupted signal — discard
+                f.unlink(missing_ok=True)  # corrupted signal - discard
         return signals
 
     def consume(self, signal_id: str) -> None:
@@ -225,7 +225,7 @@ def _check_signals(
             pending = consumer.pending(signal_type)
             if pending:
                 log.info(
-                    f"Signal '{signal_type}' pending ({len(pending)} items) — "
+                    f"Signal '{signal_type}' pending ({len(pending)} items) - "
                     f"triggering {task_id} immediately"
                 )
                 triggered.add(task_id)
@@ -250,7 +250,7 @@ def run_cycle(self, task_filter: Optional[str] = None) -> None:
         signalled = task_id in signal_triggered
 
         if not due and not signalled:
-            self._log.info(f"Skip {task_id} — not due, no signal")
+            self._log.info(f"Skip {task_id} - not due, no signal")
             continue
 
         reason = "signalled" if signalled and not due else "due"
@@ -303,8 +303,8 @@ class TaskDispatchEntry(BaseModel):
     intervalSeconds: int
     description: str
     dispatch: AgentDispatchConfig
-    signal_triggers: list[str] = []  # NEW — signal types that trigger immediate dispatch
-    emits_signals:   list[str] = []  # NEW — documentation only
+    signal_triggers: list[str] = []  # NEW - signal types that trigger immediate dispatch
+    emits_signals:   list[str] = []  # NEW - documentation only
 ```
 
 Both fields are optional with empty-list defaults. No existing `agent.json` breaks.
@@ -313,7 +313,7 @@ Both fields are optional with empty-list defaults. No existing `agent.json` brea
 
 ## Signal Accumulation Safety
 
-If the Vision Agent runs hourly but Lore Agent fails every run, signal files accumulate. After 24 hours: 24 signal files. This is harmless — signal files are tiny JSON. But add to cleanup scope:
+If the Vision Agent runs hourly but Lore Agent fails every run, signal files accumulate. After 24 hours: 24 signal files. This is harmless - signal files are tiny JSON. But add to cleanup scope:
 
 In `cleanup/tools/cleanup_agent.py`:
 ```python
@@ -376,6 +376,6 @@ def test_signal_triggers_immediate_dispatch(tmp_path, monkeypatch):
 - Lore Agent dispatches within one runner cycle (≤60s) of signal emission, not 1 hour later.
 - Signal files are deleted after consumption.
 - Corrupted signal files are silently discarded.
-- Signal accumulation (failed Lore) does not cause errors — signals pile up, await next successful run.
+- Signal accumulation (failed Lore) does not cause errors - signals pile up, await next successful run.
 - No agent.json breaks (new fields are optional with empty defaults).
 - Cleanup agent purges stale signals (> 7 days old).

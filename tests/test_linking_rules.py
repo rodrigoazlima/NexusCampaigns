@@ -57,7 +57,7 @@ class TestIsOrphan:
 
 
 # ---------------------------------------------------------------------------
-# missing_required_groups — npc
+# missing_required_groups - npc
 # ---------------------------------------------------------------------------
 
 class TestMissingRequiredGroupsNPC:
@@ -93,7 +93,7 @@ class TestMissingRequiredGroupsNPC:
 
 
 # ---------------------------------------------------------------------------
-# missing_required_groups — quest
+# missing_required_groups - quest
 # ---------------------------------------------------------------------------
 
 class TestMissingRequiredGroupsQuest:
@@ -126,7 +126,7 @@ class TestMissingRequiredGroupsQuest:
 
 
 # ---------------------------------------------------------------------------
-# missing_required_groups — location
+# missing_required_groups - location
 # ---------------------------------------------------------------------------
 
 class TestMissingRequiredGroupsLocation:
@@ -158,7 +158,7 @@ class TestMissingRequiredGroupsLocation:
 
 
 # ---------------------------------------------------------------------------
-# missing_required_groups — faction
+# missing_required_groups - faction
 # ---------------------------------------------------------------------------
 
 class TestMissingRequiredGroupsFaction:
@@ -179,7 +179,7 @@ class TestMissingRequiredGroupsFaction:
 
 
 # ---------------------------------------------------------------------------
-# missing_required_groups — item / artifact
+# missing_required_groups - item / artifact
 # ---------------------------------------------------------------------------
 
 class TestMissingRequiredGroupsItem:
@@ -200,7 +200,7 @@ class TestMissingRequiredGroupsItem:
 
 
 # ---------------------------------------------------------------------------
-# missing_required_groups — encounter
+# missing_required_groups - encounter
 # ---------------------------------------------------------------------------
 
 class TestMissingRequiredGroupsEncounter:
@@ -220,7 +220,7 @@ class TestMissingRequiredGroupsEncounter:
 
 
 # ---------------------------------------------------------------------------
-# missing_required_groups — unregistered type
+# missing_required_groups - unregistered type
 # ---------------------------------------------------------------------------
 
 class TestMissingRequiredGroupsUnknown:
@@ -303,7 +303,7 @@ class TestRequiredTypeBoost:
         assert boost == 0
 
     def test_no_boost_for_irrelevant_candidate(self):
-        # npc needs location/faction/quest — item candidate should give 0
+        # npc needs location/faction/quest - item candidate should give 0
         boost = required_type_boost("npc", [], "item-magic-sword")
         assert boost == 0
 
@@ -313,7 +313,7 @@ class TestRequiredTypeBoost:
         assert boost == 5
 
     def test_quest_missing_npc_no_boost_for_location(self):
-        # quest has location but missing npc — location candidate doesn't help
+        # quest has location but missing npc - location candidate doesn't help
         boost = required_type_boost("quest", ["location-dungeon"], "location-cave")
         assert boost == 0
 
@@ -335,7 +335,7 @@ class TestRequiredTypeBoost:
 
 
 # ---------------------------------------------------------------------------
-# REQUIRED_LINK_GROUPS coverage — all spec-mandated types present
+# REQUIRED_LINK_GROUPS coverage - all spec-mandated types present
 # ---------------------------------------------------------------------------
 
 class TestRequiredLinkGroupsCoverage:

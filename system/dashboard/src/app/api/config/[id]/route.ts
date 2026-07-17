@@ -113,7 +113,7 @@ function validateDispatch(dispatch: DispatchConfig, agentId: string): string | n
 }
 
 // ---------------------------------------------------------------------------
-// PUT — save agent.json with validation
+// PUT - save agent.json with validation
 // ---------------------------------------------------------------------------
 
 export async function PUT(

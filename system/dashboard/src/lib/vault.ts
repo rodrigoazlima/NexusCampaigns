@@ -46,7 +46,7 @@ const REGISTRY_PATH = path.join(PROJECT_ROOT, 'agents', 'registry.yaml')
 // ---------------------------------------------------------------------------
 
 // gray-matter (js-yaml) auto-parses unquoted YAML date scalars (created: 2026-07-15)
-// into JS Date objects, not strings — coerce back to the vault's ISO YYYY-MM-DD.
+// into JS Date objects, not strings - coerce back to the vault's ISO YYYY-MM-DD.
 function frontmatterDate(v: unknown): string {
   if (v instanceof Date) return v.toISOString().slice(0, 10)
   return typeof v === 'string' ? v : ''
@@ -235,18 +235,18 @@ interface Registry {
 }
 
 const WORKER_DESCRIPTIONS: Record<string, string> = {
-  ingestion: 'Vault ingestion — emoji-strip filenames, convert DOCX, register inbox queue.',
+  ingestion: 'Vault ingestion - emoji-strip filenames, convert DOCX, register inbox queue.',
   thumbnails: 'Pre-generate 320px webp thumbnails for inbox images.',
   token: 'Generate 512×512 VTT tokens from classified portrait images.',
   wikilink: 'Link 02-Library entities via wikilinks.',
   shortfiles: 'Flag drafts under 10 body lines for reprocessing.',
   report: 'Pipeline health + pending-review report.',
   cleanup: 'Prune old logs/reports, trim agent-metrics history.',
-  maintenance: 'Pipeline self-healing — stale locks, missing dirs, queue validation.',
+  maintenance: 'Pipeline self-healing - stale locks, missing dirs, queue validation.',
 }
 
 // Worker metrics rows use {at, processed, failed, durationMs} (worker
-// contract §Metrics) — normalize to the AgentRun shape the UI renders.
+// contract §Metrics) - normalize to the AgentRun shape the UI renders.
 function normalizeRuns(runs: Array<Record<string, unknown>>): AgentRun[] {
   return runs.map((r) => ({
     startedAt: (r.startedAt ?? r.at ?? '') as string,
@@ -268,7 +268,7 @@ function readRuntimeStatus(): AgentStatus {
     const ageSeconds = (Date.now() - new Date(data.startedAt).getTime()) / 1000
     if (ageSeconds < LOCK_STALE_SECONDS) return 'running'
   } catch {
-    // no lock file — normal between cycles
+    // no lock file - normal between cycles
   }
 
   // Windows service check
@@ -373,7 +373,7 @@ export function readAgents(): AgentInfo[] {
     })
   }
 
-  // Static workers (registry.yaml workers: block) — in-process, no agent.json.
+  // Static workers (registry.yaml workers: block) - in-process, no agent.json.
   // kind: 'worker' on the metrics entry; lastRun lives under worker:<name>.
   for (const [key, w] of Object.entries(registry?.workers ?? {})) {
     const stateKey = `worker:${key}`
@@ -504,7 +504,7 @@ type RawDraft = ReviewItem & { _keyCount: number; _hasName: boolean }
 
 /**
  * Read every md draft in 01-Processing as an ungrouped ReviewItem.
- * Drafts whose source is itself a token file are excluded — only source
+ * Drafts whose source is itself a token file are excluded - only source
  * images get review items; tokens are associated to their source elsewhere.
  */
 function readRawDrafts(): RawDraft[] {
@@ -853,7 +853,7 @@ export function createDraft(opts: {
 }
 
 // ---------------------------------------------------------------------------
-// Campaign setting frame (03-Campaigns/, type: campaign) — campaign.md §3
+// Campaign setting frame (03-Campaigns/, type: campaign) - campaign.md §3
 // ---------------------------------------------------------------------------
 
 const CAMPAIGNS_DIR = path.join(VAULT_ROOT, '03-Campaigns')
@@ -894,7 +894,7 @@ export function readActiveCampaign(): CampaignFrame | null {
   return first
 }
 
-/** Upsert the active campaign frame. ponytail: single active setting — multi-
+/** Upsert the active campaign frame. ponytail: single active setting - multi-
  * campaign switching is deferred (campaign.md §3 "Switch setting ▾"). */
 export function writeCampaign(frame: Omit<CampaignFrame, 'active'> & { id?: string }): CampaignFrame {
   const today = new Date().toISOString().split('T')[0]
@@ -958,7 +958,7 @@ const PRESSURE_TAGS = ['brute', 'swarm', 'social', 'puzzle']
  * Bestiary heuristics (bestiary.md Deltas 4–6). `pressure`/`signature` come from
  * tags; `hasTerrain`/`hasNonCombat` scan the body so encounters missing those
  * sections can be flagged "flat" / "forced".
- * ponytail: same heading-scan + non-placeholder rule as parseWantSecret — a `>`
+ * ponytail: same heading-scan + non-placeholder rule as parseWantSecret - a `>`
  * blockquote (the skeleton's seed) counts as empty, so the GM must fill plain text.
  */
 export function parseBestiary(filepath: string, tags: string[]): {
@@ -1112,7 +1112,7 @@ const QUEST_SHAPES = ['job', 'mystery', 'moral']
  * first non-placeholder `[[wikilink]]` in their sections; `shape` + `openingHook`
  * come from tags / frontmatter; `branches` counts filled Path lines so a quest
  * with <2 is flagged a "rail". ponytail: same heading-scan + non-placeholder rule
- * as parseFaction/parsePlace — `>` blockquotes and bare `label:` lines count empty.
+ * as parseFaction/parsePlace - `>` blockquotes and bare `label:` lines count empty.
  */
 export function parseQuest(filepath: string, tags: string[]): {
   shape: string | null
@@ -1185,7 +1185,7 @@ export function parseQuest(filepath: string, tags: string[]): {
  * first non-placeholder `[[wikilink]]` in Desire, `hasHook` the Hook section
  * filled. Lore: `question`/`answer` are the filled Q/A sections, `hasReveal` a
  * non-placeholder link under "How it's discovered". `signature` comes from tags.
- * ponytail: same heading-scan + non-placeholder rule as parseQuest/parseFaction —
+ * ponytail: same heading-scan + non-placeholder rule as parseQuest/parseFaction -
  * `>` blockquotes and bare `label:` lines count as empty.
  */
 export function parseTreasure(filepath: string, tags: string[]): {
@@ -1368,7 +1368,7 @@ export function readVisionPathIndex(): Record<string, string> {
  * nexus.shared.hashing) against agents/vision/state/processed-images.json.
  *
  * Kept only as a fallback for images vision already finished classifying
- * before the image-hashes.json ledger existed — this file only gains an
+ * before the image-hashes.json ledger existed - this file only gains an
  * entry once vision *finishes* classifying an image (a batch/interval delay
  * that can run minutes), so on its own it leaves a race window where a
  * second upload of the same bytes sails through undetected. Prefer
@@ -1392,8 +1392,8 @@ function readImageHashes(): Record<string, ImageHashEntry> {
 /**
  * Look up a duplicate against the ingestion-time hash ledger
  * (system/state/image-hashes.json, see nexus.shared.image_hashes). Populated
- * the moment ingestion queues a file — dashboard upload or a raw filesystem
- * drop alike — not after vision finishes classifying it, so this closes the
+ * the moment ingestion queues a file - dashboard upload or a raw filesystem
+ * drop alike - not after vision finishes classifying it, so this closes the
  * race window findImageByHash alone leaves open.
  */
 export function findImageHashClaim(hash: string): { path: string; originalName: string } | null {
@@ -1417,7 +1417,7 @@ function sleepSync(ms: number): void {
  */
 export function claimImageHash(hash: string, relPath: string): { path: string; originalName: string } | null {
   // The lock file is created with the 'wx' flag (O_CREAT|O_EXCL), which still
-  // requires the parent directory to exist — create it before acquiring, not
+  // requires the parent directory to exist - create it before acquiring, not
   // after (mirrors the same fix in nexus.shared.image_hashes.claim_image_hash).
   fs.mkdirSync(path.dirname(IMAGE_HASHES_PATH), { recursive: true })
   const lockPath = IMAGE_HASHES_PATH + '.lock'
@@ -1434,7 +1434,7 @@ export function claimImageHash(hash: string, relPath: string): { path: string; o
           continue
         }
       } catch {
-        continue // lock disappeared between the failed create and this stat — retry
+        continue // lock disappeared between the failed create and this stat - retry
       }
       if (Date.now() >= deadline) throw new Error(`Could not acquire lock ${lockPath}`)
       sleepSync(50)
@@ -1474,8 +1474,8 @@ export function writeTokenConfig(cfg: TokenConfig): void {
 }
 
 export function readReviewItemById(id: string): ReviewItem | null {
-  // Resolve against every draft (not just group primaries) so any md id — e.g.
-  // both `body-dragon-fire` and `npc-dragon-fire-body-a0` — opens its detail view.
+  // Resolve against every draft (not just group primaries) so any md id - e.g.
+  // both `body-dragon-fire` and `npc-dragon-fire-body-a0` - opens its detail view.
   // UUID takes priority so stable URLs survive slug/filename renames.
   const drafts = readRawDrafts()
   const match = drafts.find((d) => d.uuid === id) ?? drafts.find((d) => d.id === id)
@@ -1488,7 +1488,7 @@ export function readReviewItemById(id: string): ReviewItem | null {
     return stripRaw(match, siblings.map(toDraftRef))
   }
 
-  // Not a draft — fall back to canon (02-Library) so gm/view also opens approved entities.
+  // Not a draft - fall back to canon (02-Library) so gm/view also opens approved entities.
   const library = readLibraryItems()
   return library.find((d) => d.uuid === id) ?? library.find((d) => d.id === id) ?? null
 }
@@ -1548,7 +1548,7 @@ export function readItemDetail(id: string): ItemDetail | null {
       try {
         tokenUpdatedAt = String(fs.statSync(path.join(PROJECT_ROOT, tokenPath)).mtimeMs)
       } catch {
-        // file may not exist yet — leave unset
+        // file may not exist yet - leave unset
       }
     }
   }

@@ -1,4 +1,4 @@
-# Agent Spec — Wikilink
+# Agent Spec - Wikilink
 
 **Trigger:** hourly  
 **Input:** `02-Library/**/*.md`, `agents/wikilink/state/wikilink-state.json`  

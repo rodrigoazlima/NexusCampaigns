@@ -21,7 +21,7 @@ const unlinkIfExists = (p: string) => {
 /**
  * Delete button for /queue: removes a queue item's source file, its
  * generated token image, its cached thumbnail, and the queue entry itself.
- * Leaves any 01-Processing draft untouched — that's reviewable content, not
+ * Leaves any 01-Processing draft untouched - that's reviewable content, not
  * a generated pipeline artifact.
  */
 export async function POST(req: NextRequest) {

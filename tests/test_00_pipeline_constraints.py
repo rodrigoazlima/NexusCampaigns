@@ -1,5 +1,5 @@
 """
-NexusCampaigns pipeline constraint tests — AGENTS.md compliance.
+NexusCampaigns pipeline constraint tests - AGENTS.md compliance.
 I am testing file changes.
 
 Validates AGENTS.md rules using shared agent modules:
@@ -52,7 +52,7 @@ def gate() -> QualityGate:
 
 
 # ===========================================================================
-# 1. VaultGuard — write-protection rules (AGENTS.md: 02-Library, 00-Inbox)
+# 1. VaultGuard - write-protection rules (AGENTS.md: 02-Library, 00-Inbox)
 # ===========================================================================
 
 
@@ -132,7 +132,7 @@ class TestVaultGuardSelfApproval:
 
 
 # ===========================================================================
-# 2. QualityGate — library promotion (AGENTS.md: quality >= 7)
+# 2. QualityGate - library promotion (AGENTS.md: quality >= 7)
 # ===========================================================================
 
 
@@ -221,7 +221,7 @@ class TestQualityGateLibraryReadiness:
 
 
 # ===========================================================================
-# 3. Slug utilities — naming convention (AGENTS.md: {type}-{descriptors})
+# 3. Slug utilities - naming convention (AGENTS.md: {type}-{descriptors})
 # ===========================================================================
 
 
@@ -302,7 +302,7 @@ class TestWikilinkFormat:
 
 
 # ===========================================================================
-# 4. Linking rules — no orphans (AGENTS.md: every entity links to ≥1 other)
+# 4. Linking rules - no orphans (AGENTS.md: every entity links to ≥1 other)
 # ===========================================================================
 
 

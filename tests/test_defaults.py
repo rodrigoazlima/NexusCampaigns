@@ -1,4 +1,4 @@
-"""Tests for shared.defaults — default state structures."""
+"""Tests for shared.defaults - default state structures."""
 
 from nexus.shared.defaults import (
     AGENT_METRICS_DEFAULT,

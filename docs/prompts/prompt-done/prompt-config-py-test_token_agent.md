@@ -34,14 +34,14 @@ Analyze the provided Python script and extract all relevant configuration settin
    - Put script-specific behavior (batch sizes, task-specific prompts, agent name, etc.) in **local**.
    - Make sure the JSONs contain good defaults so the script works even if the files are deleted.
    - Use clear, consistent naming.
-   - Do not include code — only configuration.
+   - Do not include code - only configuration.
 
 ---
 
 **Script to analyze:**
 
 # tests\test_token_agent.py
-"""Tests for token.tools.generate_tokens — agent-token.spec.md compliance."""
+"""Tests for token.tools.generate_tokens - agent-token.spec.md compliance."""
 
 from __future__ import annotations
 
@@ -55,7 +55,7 @@ import pytest
 
 # ---------------------------------------------------------------------------
 # sys.path is bootstrapped by conftest.py
-# "token" collides with stdlib token module — import via file path
+# "token" collides with stdlib token module - import via file path
 # ---------------------------------------------------------------------------
 
 _AGENTS_DIR = Path(__file__).resolve().parents[1]
@@ -250,7 +250,7 @@ class TestEligibleFilter:
 
 
 # ---------------------------------------------------------------------------
-# call_tool — list_pending_portraits
+# call_tool - list_pending_portraits
 # ---------------------------------------------------------------------------
 
 class TestCallToolListPendingPortraits:
@@ -290,7 +290,7 @@ class TestCallToolListPendingPortraits:
 
 
 # ---------------------------------------------------------------------------
-# call_tool — generate_token (SHA256 key lookup)
+# call_tool - generate_token (SHA256 key lookup)
 # ---------------------------------------------------------------------------
 
 class TestCallToolGenerateToken:
@@ -392,7 +392,7 @@ class TestUpperCenterCrop:
 
 
 # ---------------------------------------------------------------------------
-# Logger integration — DONE line uses "generated" keyword
+# Logger integration - DONE line uses "generated" keyword
 # ---------------------------------------------------------------------------
 
 class TestLoggerDoneFormat:

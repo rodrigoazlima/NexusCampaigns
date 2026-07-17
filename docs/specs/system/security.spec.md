@@ -1,14 +1,14 @@
-# Spec — Security Constraints
+# Spec - Security Constraints
 
 ---
 
 ## Rules
 
-- No agent may self-approve content (`reviewed: true` — human-only).
+- No agent may self-approve content (`reviewed: true` - human-only).
 - No agent may write to `02-Library/` without `reviewed: true` already set by human.
 - No agent may delete files from `00-Inbox/` (source preservation).
 - Breaking canon requires explicit human `git commit` with reason in message.
-- API keys are stored in environment variables only — never in `agent.json`, `registry.yaml`, or any committed file.
+- API keys are stored in environment variables only - never in `agent.json`, `registry.yaml`, or any committed file.
 
 ---
 
@@ -39,7 +39,7 @@ LLM provider keys are read from environment variables at dispatch time. Never st
 
 Local endpoints (LM Studio, LocalRouter) require `OPENAI_API_KEY` set to any non-empty value (e.g. `"lm-studio"`).
 
-LLM endpoint URLs and model identifiers are configured in `registry.yaml` `llm_endpoints` — not env vars.
+LLM endpoint URLs and model identifiers are configured in `registry.yaml` `llm_endpoints` - not env vars.
 
 ---
 

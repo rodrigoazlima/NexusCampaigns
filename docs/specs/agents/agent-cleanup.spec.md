@@ -1,4 +1,4 @@
-# Agent Spec — Cleanup
+# Agent Spec - Cleanup
 
 **Trigger:** daily  
 **Input:** `agents/runtime/state/logs/`, `agents/review/state/reports/`, `agents/runtime/state/agent-metrics.json`  

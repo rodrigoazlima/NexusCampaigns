@@ -23,7 +23,7 @@ export default async function QueuePage() {
       <PageHeader
         icon={Inbox}
         title="Queue"
-        subtitle="inbox-queue.json state — pending, done, and stuck items"
+        subtitle="inbox-queue.json state - pending, done, and stuck items"
       />
 
       {/* KPIs */}

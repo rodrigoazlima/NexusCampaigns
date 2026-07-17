@@ -34,7 +34,7 @@ Analyze the provided Python script and extract all relevant configuration settin
    - Put script-specific behavior (batch sizes, task-specific prompts, agent name, etc.) in **local**.
    - Make sure the JSONs contain good defaults so the script works even if the files are deleted.
    - Use clear, consistent naming.
-   - Do not include code — only configuration.
+   - Do not include code - only configuration.
 
 ---
 
@@ -43,7 +43,7 @@ Analyze the provided Python script and extract all relevant configuration settin
 # tests\test_integration_shared.py
 """Integration tests for shared module.
 
-Tests real interactions between components — no mocking of shared internals.
+Tests real interactions between components - no mocking of shared internals.
 Uses a real temp-dir vault structure to verify end-to-end workflows.
 """
 
@@ -256,7 +256,7 @@ class TestDraftWritingPipeline:
         source.write_bytes(b"fake image data")
         with pytest.raises(VaultWriteError):
             guard.assert_not_inbox_delete(source)
-        # File still exists — guard blocked the delete
+        # File still exists - guard blocked the delete
         assert source.exists()
 
     def test_write_then_update_frontmatter(self, cfg, guard, fmio):
@@ -538,7 +538,7 @@ class TestBootstrapAllDefaults:
         store = StateStore(path, default=INBOX_QUEUE_DEFAULT)
         store.init_defaults()
         store.save({"existing-file.png": {"type": "image"}})
-        store.init_defaults()   # second call — must not overwrite
+        store.init_defaults()   # second call - must not overwrite
         assert "existing-file.png" in store.load()
 
 

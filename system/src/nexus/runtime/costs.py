@@ -1,4 +1,4 @@
-"""nexus.runtime.costs — per-run token/cost tracking (state/costs/*.json).
+"""nexus.runtime.costs - per-run token/cost tracking (state/costs/*.json).
 Agent runs only; workers never record a cost entry (worker-contract.spec.md)."""
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ def record_cost(
 ) -> None:
     """Append per-run token usage to the daily cost file (atomic write)."""
     if not model and not input_tokens and not output_tokens:
-        return  # non-Claude runner — nothing to record
+        return  # non-Claude runner - nothing to record
 
     today = started_at.strftime("%Y-%m-%d")
     COSTS_DIR.mkdir(parents=True, exist_ok=True)

@@ -53,13 +53,13 @@ export async function POST(req: NextRequest) {
     // De-dup against the ingestion-time hash ledger (system/state/image-hashes.json,
     // populated the moment a file is queued) with a fallback to the older
     // processed-images.json (vision-time) lookup for images ingested before
-    // that ledger existed. Fail open — a hashing error must not block uploads.
+    // that ledger existed. Fail open - a hashing error must not block uploads.
     let hash: string | null = null
     try {
       hash = await hashBuffer(buffer)
       const existing = findImageHashClaim(hash) ?? findImageByHash(hash)
       if (existing) {
-        console.log(`upload-image: rejected duplicate ${file.name} — identical to ${existing.path} (hash ${hash.slice(0, 12)}…)`)
+        console.log(`upload-image: rejected duplicate ${file.name} - identical to ${existing.path} (hash ${hash.slice(0, 12)}…)`)
         return NextResponse.json({ ok: true, duplicate: true, path: existing.path, originalName: existing.originalName })
       }
     } catch (hashErr) {
@@ -78,14 +78,14 @@ export async function POST(req: NextRequest) {
       try {
         const raced = claimImageHash(hash, relPath)
         if (raced) {
-          console.warn(`upload-image: lost dedup race writing ${relPath} — ${raced.path} claimed hash ${hash.slice(0, 12)}… first; both files kept (00-Inbox is never deleted from), ingestion will skip this one downstream`)
+          console.warn(`upload-image: lost dedup race writing ${relPath} - ${raced.path} claimed hash ${hash.slice(0, 12)}… first; both files kept (00-Inbox is never deleted from), ingestion will skip this one downstream`)
         }
       } catch (claimErr) {
         console.error(`upload-image: hash claim failed for ${relPath} (file was still written):`, claimErr)
       }
     }
 
-    console.log(`upload-image: wrote ${relPath}${hash ? ` (hash ${hash.slice(0, 12)}…)` : ' (no hash — dedup check failed)'}`)
+    console.log(`upload-image: wrote ${relPath}${hash ? ` (hash ${hash.slice(0, 12)}…)` : ' (no hash - dedup check failed)'}`)
     return NextResponse.json({ ok: true, path: relPath })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })

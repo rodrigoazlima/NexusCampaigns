@@ -1,6 +1,6 @@
 """Integration tests for shared module.
 
-Tests real interactions between components — no mocking of shared internals.
+Tests real interactions between components - no mocking of shared internals.
 Uses a real temp-dir vault structure to verify end-to-end workflows.
 """
 
@@ -214,7 +214,7 @@ class TestDraftWritingPipeline:
         source.write_bytes(b"fake image data")
         with pytest.raises(VaultWriteError):
             guard.assert_not_inbox_delete(source)
-        # File still exists — guard blocked the delete
+        # File still exists - guard blocked the delete
         assert source.exists()
 
     def test_write_then_update_frontmatter(self, cfg, guard, fmio):
@@ -313,7 +313,7 @@ class TestInboxQueueLifecycle:
 
 
 # ---------------------------------------------------------------------------
-# 4b. Image-hash ledger (ingestion-time dedup — see nexus.shared.image_hashes)
+# 4b. Image-hash ledger (ingestion-time dedup - see nexus.shared.image_hashes)
 # ---------------------------------------------------------------------------
 
 class TestImageHashLedger:
@@ -334,7 +334,7 @@ class TestImageHashLedger:
 
     def test_same_hash_different_path_is_flagged_duplicate(self, vault):
         """The actual bug this closes: two different filenames, byte-identical
-        content, both landing in 00-Inbox/ — the second claim must return the
+        content, both landing in 00-Inbox/ - the second claim must return the
         first's entry instead of silently registering a second copy."""
         ledger = self._ledger(vault)
         claim_image_hash(ledger, "hash-a", "00-Inbox/images/scene-mountain.jpg")
@@ -536,7 +536,7 @@ class TestBootstrapAllDefaults:
         store = StateStore(path, default=INBOX_QUEUE_DEFAULT)
         store.init_defaults()
         store.save({"existing-file.png": {"type": "image"}})
-        store.init_defaults()   # second call — must not overwrite
+        store.init_defaults()   # second call - must not overwrite
         assert "existing-file.png" in store.load()
 
 

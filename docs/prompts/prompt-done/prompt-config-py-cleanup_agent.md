@@ -34,7 +34,7 @@ Analyze the provided Python script and extract all relevant configuration settin
    - Put script-specific behavior (batch sizes, task-specific prompts, agent name, etc.) in **local**.
    - Make sure the JSONs contain good defaults so the script works even if the files are deleted.
    - Use clear, consistent naming.
-   - Do not include code — only configuration.
+   - Do not include code - only configuration.
 
 ---
 
@@ -43,7 +43,7 @@ Analyze the provided Python script and extract all relevant configuration settin
 # cleanup\tools\cleanup_agent.py
 """cleanup.tools.cleanup_agent
 
-Cleanup Agent — log/report rotation and metrics trimming.
+Cleanup Agent - log/report rotation and metrics trimming.
   - Purge log files older than cleanupDays (read from agent.json, default 90)
   - Purge report files older than cleanupDays
   - Trim agent-metrics.json run history to last 100 entries per agent

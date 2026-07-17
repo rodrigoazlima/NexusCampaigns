@@ -34,7 +34,7 @@ Analyze the provided Python script and extract all relevant configuration settin
    - Put script-specific behavior (batch sizes, task-specific prompts, agent name, etc.) in **local**.
    - Make sure the JSONs contain good defaults so the script works even if the files are deleted.
    - Use clear, consistent naming.
-   - Do not include code — only configuration.
+   - Do not include code - only configuration.
 
 ---
 
@@ -324,7 +324,7 @@ class TestStateHelpers:
 
 
 # ---------------------------------------------------------------------------
-# main() — no library
+# main() - no library
 # ---------------------------------------------------------------------------
 
 class TestMainNoLibrary:
@@ -337,7 +337,7 @@ class TestMainNoLibrary:
 
 
 # ---------------------------------------------------------------------------
-# main() — happy path
+# main() - happy path
 # ---------------------------------------------------------------------------
 
 class TestMainHappyPath:
@@ -368,7 +368,7 @@ class TestMainHappyPath:
 
         mtime_before = path_a.stat().st_mtime
 
-        # Run again — both already processed, no changes expected
+        # Run again - both already processed, no changes expected
         with pytest.raises(SystemExit):
             _mod.main()
 

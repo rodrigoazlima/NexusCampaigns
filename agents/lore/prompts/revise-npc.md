@@ -5,4 +5,4 @@ CRITIQUE:
 
 Produce a revised NPC sheet that fixes all listed issues.
 Preserve any correct stat blocks, names, and lore from the original.
-Return the same JSON structure as before — ONLY valid JSON, no explanation, no markdown fences.
+Return the same JSON structure as before - ONLY valid JSON, no explanation, no markdown fences.

@@ -1,4 +1,4 @@
-"""CodexCliRunner — dispatch via OpenAI Codex CLI (`codex ...`)."""
+"""CodexCliRunner - dispatch via OpenAI Codex CLI (`codex ...`)."""
 
 from __future__ import annotations
 
@@ -74,7 +74,7 @@ class CodexCliRunner:
             error     = f"codex CLI timed out after {timeout_seconds}s"
         except FileNotFoundError:
             exit_code = 1
-            error     = "codex CLI not found — ensure @openai/codex is installed and on PATH"
+            error     = "codex CLI not found - ensure @openai/codex is installed and on PATH"
         except Exception as exc:
             exit_code = 1
             error     = str(exc)

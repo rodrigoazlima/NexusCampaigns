@@ -1,4 +1,4 @@
-# Spec — Agent Dispatch
+# Spec - Agent Dispatch
 
 ---
 
@@ -6,7 +6,7 @@
 
 the runtime dispatches **agents**, not scripts. Each agent folder contains an `agent.json`
 that declares how the runtime must invoke it. Dispatch type and provider config are isolated
-per agent — the runtime never hardcodes invocation details.
+per agent - the runtime never hardcodes invocation details.
 
 ---
 
@@ -77,7 +77,7 @@ any shell-accessible binary.
 
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `command` | string | yes | — | Executable name or absolute path |
+| `command` | string | yes | - | Executable name or absolute path |
 | `args` | string[] | yes | `[]` | Argument list; relative paths are relative to `cwd` |
 | `cwd` | `"project_root"` \| `"agent_dir"` | no | `"project_root"` | Working directory anchor |
 | `timeout_seconds` | int | no | 300 | Kill process after N seconds |
@@ -119,10 +119,10 @@ OpenAI REST API **or** any OpenAI-compatible endpoint (LM Studio, Ollama, LocalR
 
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `base_url` | string | yes | — | API base URL. Use `http://localhost:1234/v1` for LM Studio |
-| `model` | string | yes | — | Model identifier |
-| `prompt_file` | string | no | — | Path to user prompt `.md` file (relative to project root) |
-| `system_file` | string | no | — | Path to system prompt `.md` file |
+| `base_url` | string | yes | - | API base URL. Use `http://localhost:1234/v1` for LM Studio |
+| `model` | string | yes | - | Model identifier |
+| `prompt_file` | string | no | - | Path to user prompt `.md` file (relative to project root) |
+| `system_file` | string | no | - | Path to system prompt `.md` file |
 | `max_tokens` | int | no | 1024 | Max completion tokens |
 | `temperature` | float | no | 0 | Sampling temperature |
 | `timeout_seconds` | int | no | 120 | HTTP request timeout |
@@ -135,7 +135,7 @@ Auth: `OPENAI_API_KEY` env var. For local endpoints set to any non-empty string 
 
 Anthropic Claude API. Supports two patterns:
 
-**Tool-use pattern** (primary — all active agents): Claude operates as an AI agent that calls tools defined in `tools_module`. The runtime runs a loop until the agent signals completion or `max_tool_rounds` is reached.
+**Tool-use pattern** (primary - all active agents): Claude operates as an AI agent that calls tools defined in `tools_module`. The runtime runs a loop until the agent signals completion or `max_tool_rounds` is reached.
 
 **Prompt pattern** (simple): Claude receives a prompt and returns a single text response. Used for one-shot generation tasks.
 
@@ -177,12 +177,12 @@ Anthropic Claude API. Supports two patterns:
 
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `model` | string | yes | — | Model ID (e.g. `claude-haiku-4-5-20251001`, `claude-sonnet-4-6`) |
-| `system_file` | string | no | — | System prompt `.md` path, relative to agent dir (e.g. `prompts/system.md`) |
-| `tools_module` | string | no | — | Python module path providing agent tools (e.g. `ingestion.tools.ingestion_agent`). Enables tool-use loop. |
-| `history_file` | string | no | — | JSON file for conversation history, relative to agent state dir. Only used with `tools_module`. |
+| `model` | string | yes | - | Model ID (e.g. `claude-haiku-4-5-20251001`, `claude-sonnet-4-6`) |
+| `system_file` | string | no | - | System prompt `.md` path, relative to agent dir (e.g. `prompts/system.md`) |
+| `tools_module` | string | no | - | Python module path providing agent tools (e.g. `ingestion.tools.ingestion_agent`). Enables tool-use loop. |
+| `history_file` | string | no | - | JSON file for conversation history, relative to agent state dir. Only used with `tools_module`. |
 | `max_tool_rounds` | int | no | 20 | Max agent loop iterations before forced stop. Only used with `tools_module`. |
-| `prompt_file` | string | no | — | User prompt `.md` path, relative to agent dir. Used in prompt pattern only (no `tools_module`). |
+| `prompt_file` | string | no | - | User prompt `.md` path, relative to agent dir. Used in prompt pattern only (no `tools_module`). |
 | `max_tokens` | int | no | 4096 | Max completion tokens |
 | `temperature` | float | no | 0 | Sampling temperature |
 | `timeout_seconds` | int | no | 120 | HTTP request timeout |
@@ -213,9 +213,9 @@ Google Gemini API.
 
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `model` | string | yes | — | Model ID (e.g. `gemini-2.5-flash`, `gemini-2.5-pro`) |
-| `prompt_file` | string | no | — | Path to user prompt `.md` |
-| `system_file` | string | no | — | Path to system prompt `.md` |
+| `model` | string | yes | - | Model ID (e.g. `gemini-2.5-flash`, `gemini-2.5-pro`) |
+| `prompt_file` | string | no | - | Path to user prompt `.md` |
+| `system_file` | string | no | - | Path to system prompt `.md` |
 | `max_tokens` | int | no | 2048 | Max output tokens |
 | `temperature` | float | no | 0 | Sampling temperature |
 | `timeout_seconds` | int | no | 120 | HTTP request timeout |
@@ -226,7 +226,7 @@ Auth: `GEMINI_API_KEY` env var.
 
 ### `openrouter-api`
 
-OpenRouter unified gateway — any model available via OpenRouter.
+OpenRouter unified gateway - any model available via OpenRouter.
 
 ```json
 {
@@ -246,9 +246,9 @@ OpenRouter unified gateway — any model available via OpenRouter.
 
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `model` | string | yes | — | OpenRouter model slug (e.g. `anthropic/claude-sonnet-4-6`, `google/gemini-2.5-flash`) |
-| `prompt_file` | string | no | — | Path to user prompt `.md` |
-| `system_file` | string | no | — | Path to system prompt `.md` |
+| `model` | string | yes | - | OpenRouter model slug (e.g. `anthropic/claude-sonnet-4-6`, `google/gemini-2.5-flash`) |
+| `prompt_file` | string | no | - | Path to user prompt `.md` |
+| `system_file` | string | no | - | Path to system prompt `.md` |
 | `max_tokens` | int | no | 4096 | Max completion tokens |
 | `temperature` | float | no | 0 | Sampling temperature |
 | `timeout_seconds` | int | no | 180 | HTTP request timeout |
@@ -320,7 +320,7 @@ Local endpoints require `OPENAI_API_KEY` set to any non-empty value (e.g. `"lm-s
 
 `prompt_file` and `system_file` paths in API dispatch configs are relative to the **agent directory** (e.g. `prompts/system.md` resolves to `agents/{name}/prompts/system.md`).
 
-- Files are plain Markdown (`.md`). Read fresh at dispatch time — not cached.
+- Files are plain Markdown (`.md`). Read fresh at dispatch time - not cached.
 - `prompt_file` absent → runner sends empty user message.
 - Prompt files may use `{{variable}}` placeholders resolved from the `context` dict.
 

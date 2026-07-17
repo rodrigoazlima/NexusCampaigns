@@ -19,7 +19,7 @@ name = "shortfiles"; kind = "queue"
 def pending() -> list[WorkItem]:
     # today's _processing_has_files sharpened: 01-Processing .md files
     # not yet flagged and not previously measured-OK at current mtime
-    # (tracked in worker state — today the task rescans everything).
+    # (tracked in worker state - today the task rescans everything).
     ...
 
 def handle(item) -> WorkResult:
@@ -34,7 +34,7 @@ def handle(item) -> WorkResult:
 
 - Never writes `02-Library/`.
 - May write `01-Processing/` frontmatter fields `needs_reprocessing`,
-  `suggestedQuality` **only** — never `status`, `reviewed`, `quality`
+  `suggestedQuality` **only** - never `status`, `reviewed`, `quality`
   (vault-guard human-only fields).
 
 ## State
@@ -42,7 +42,7 @@ def handle(item) -> WorkResult:
 | Now | Target |
 |-----|--------|
 | logs `system/state/review/logs/` | `system/state/workers/shortfiles/logs/` |
-| (no scan state today — full rescan) | `system/state/workers/shortfiles/seen.json` (path → {mtime, verdict}) |
+| (no scan state today - full rescan) | `system/state/workers/shortfiles/seen.json` (path → {mtime, verdict}) |
 
 `seen.json` is the one behavior improvement: today every run re-reads every
 draft; the worker skips unchanged files.
@@ -65,7 +65,7 @@ workers:
 
 ## Deletions when migrated
 
-- `agents/review/` — **only after worker-report also migrates** (folder is
+- `agents/review/` - **only after worker-report also migrates** (folder is
   shared by both review tasks). Until then: remove only the
   `review-agent-short-files` entry from its agent.json.
 - `runner._PRECONDITIONS["review-agent-short-files"]` + `_processing_has_files`.

@@ -2,7 +2,7 @@
 name: vision
 purpose: >
   Classifies RPG images in 00-Inbox/images/ using Qwen3-VL vision model via LM Studio,
-  via a bounded multi-cycle conversation (classify_image_full — up to 10 messages: clean
+  via a bounded multi-cycle conversation (classify_image_full - up to 10 messages: clean
   classification, image-type confirmation, entity-type inference, tag-library refinement).
   Detects image type (portrait/body/battlemap/scene/token) and entity type, renames files
   to canonical slug format, writes AGENTS.md-compliant draft entities to 01-Processing/,
@@ -38,24 +38,24 @@ responsibilities:
   - Call Qwen3-VL with base64-encoded image (resize to max 1024px on longest side, JPEG 85%)
   - Validate LLM JSON response against PF2e vocabulary (see models.py PF2E_* constants)
   - Harvest visual_analysis arrays (equipment/clothing/fantasy_features/environment_details)
-    into candidate_tags — free-form (never validated against a vocabulary), but every
+    into candidate_tags - free-form (never validated against a vocabulary), but every
     appended tag must pass _is_concrete_tag (1-6 words) so a full sentence can't land
     in tags: as if it were one tag
-  - classify_image_full() (public — importable by other agents/system code) runs three
+  - classify_image_full() (public - importable by other agents/system code) runs three
     more follow-up turns in the SAME conversation (image stays in context, ≤10 messages
     total): confirm image type + more tags, infer entity type (18-value taxonomy, same
     as classification agent's) + more tags, then refine_tags_with_library() (also public,
     independently callable) aligns the running tag list against classification agent's
     state/tag-library.json (read-only here) before finalizing. Target: >=6 tags + both
     categories set; a cycle whose response fails to parse keeps the prior cycle's values
-    rather than spending a message on a retry — no budget for corrective turns
+    rather than spending a message on a retry - no budget for corrective turns
   - Final tags (candidate_tags) and entity_type land directly in the note's frontmatter
-    via _write_draft — no longer state-only once the multi-cycle conversation finishes
+    via _write_draft - no longer state-only once the multi-cycle conversation finishes
   - Build target filename slug; bump existing same-named file to counter suffix (e.g. -01, -02).
     Scene/battlemap images whose entity_type resolves to item or artifact (never legitimately
-    the scene itself — unlike creature/npc, which can genuinely appear within one) slug off
+    the scene itself - unlike creature/npc, which can genuinely appear within one) slug off
     entity_type + a content tag instead of {type}-{environment}, and get an item-style draft
-    body — otherwise unrelated object photos collapse into one generic scene-interior-NN name
+    body - otherwise unrelated object photos collapse into one generic scene-interior-NN name
     family (see _is_object_in_scene_bucket)
   - Write AGENTS.md-compliant draft to 01-Processing/ (status: draft, quality: 0, reviewed: false)
   - Append row to Images Index.md
@@ -75,7 +75,7 @@ restrictions:
   - Must not modify 02-Library/
   - Must not mark images as failed on connection-error (only on repeated API errors)
   - Max 3 LLM retries per image with 3s backoff
-  - extract_text.py must not classify, rename, or re-write frontmatter fields — body append only
+  - extract_text.py must not classify, rename, or re-write frontmatter fields - body append only
 state_files:
   - state/processed-images.json
   - state/token-links.json

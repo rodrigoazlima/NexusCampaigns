@@ -31,7 +31,7 @@ export default function InboxImageCard({ item }: InboxImageCardProps) {
         if (item.entityId) router.push(`/gm/view/${encodeURIComponent(item.entityId)}`)
       }}
     >
-      {/* Image thumbnail — shrink-wrapped to the image's own box (w-fit) so the
+      {/* Image thumbnail - shrink-wrapped to the image's own box (w-fit) so the
           Stuck/Token badges below anchor to the image corners, not empty column space.
           max-w-full + h-auto on the img: never upscaled past its source size. */}
       <button

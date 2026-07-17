@@ -1,4 +1,4 @@
-# Agent Spec — Token
+# Agent Spec - Token
 
 **Trigger:** hourly  
 **Input:** classified character images (`portrait`, `body`) in `agents/vision/state/processed-images.json` not yet in `agents/token/state/generated-tokens.json`  

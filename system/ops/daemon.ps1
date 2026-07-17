@@ -1,7 +1,7 @@
-# Vault Nexus Campaigns daemon — calls the nexus.runner scheduler every $IntervalSec seconds.
+# Vault Nexus Campaigns daemon - calls the nexus.runner scheduler every $IntervalSec seconds.
 #
 # Auth strategy (priority order):
-#   1. ANTHROPIC_API_KEY already in environment (permanent API key — preferred)
+#   1. ANTHROPIC_API_KEY already in environment (permanent API key - preferred)
 #   2. ANTHROPIC_AUTH_TOKEN already in environment (OAuth token set externally)
 #   3. Auto-load OAuth token from %USERPROFILE%\.claude\.credentials.json
 #
@@ -16,7 +16,7 @@ param(
 )
 
 # ---------------------------------------------------------------------------
-# Auth bootstrap — set ANTHROPIC_AUTH_TOKEN from Claude credentials if needed
+# Auth bootstrap - set ANTHROPIC_AUTH_TOKEN from Claude credentials if needed
 # ---------------------------------------------------------------------------
 function Load-AnthropicAuth {
     if ($env:ANTHROPIC_API_KEY) { return }   # permanent key takes priority
@@ -35,7 +35,7 @@ function Load-AnthropicAuth {
         # Check if token is still valid (with 5-minute buffer)
         $nowMs = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
         if ($expiresAt -and ($nowMs -gt ($expiresAt - 300000))) {
-            Write-Host "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] [daemon] WARN: OAuth token expired or expiring soon — set ANTHROPIC_API_KEY for uninterrupted service"
+            Write-Host "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] [daemon] WARN: OAuth token expired or expiring soon - set ANTHROPIC_API_KEY for uninterrupted service"
             return
         }
 
@@ -53,7 +53,7 @@ if (-not $env:GIT_AUTHOR_NAME)  { $env:GIT_AUTHOR_NAME  = "Vault Bot" }
 if (-not $env:GIT_AUTHOR_EMAIL) { $env:GIT_AUTHOR_EMAIL = "bot@localhost" }
 
 # ---------------------------------------------------------------------------
-# Startup git sync — fetch + pull ProjectRoot before starting the loop.
+# Startup git sync - fetch + pull ProjectRoot before starting the loop.
 # 3 attempts, 30s apart; if all fail, log a warning and start anyway.
 # ---------------------------------------------------------------------------
 # Runs a git command with a hard timeout. A hung network op (fetch/pull) would
@@ -73,7 +73,7 @@ function Invoke-GitWithTimeout {
 
     $proc = [System.Diagnostics.Process]::Start($psi)
     if (-not $proc.WaitForExit($TimeoutSec * 1000)) {
-        Write-Host "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] [daemon] WARN: git $($GitArgs -join ' ') timed out after ${TimeoutSec}s — killing process"
+        Write-Host "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] [daemon] WARN: git $($GitArgs -join ' ') timed out after ${TimeoutSec}s - killing process"
         Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
         $lockFile = Join-Path $RepoPath ".git\index.lock"
         if (Test-Path $lockFile) {
@@ -92,13 +92,13 @@ function Sync-ProjectRepo {
     param([string]$RepoPath, [int]$MaxAttempts = 3, [int]$RetryDelaySec = 30, [int]$GitTimeoutSec = 60)
 
     # A leftover index.lock with no owning git process is stale (e.g. daemon was
-    # killed mid-fetch) — clear it before attempting sync so we don't fail on
+    # killed mid-fetch) - clear it before attempting sync so we don't fail on
     # someone else's crash instead of our own.
     $lockFile = Join-Path $RepoPath ".git\index.lock"
     if (Test-Path $lockFile) {
         $gitProcs = Get-Process git -ErrorAction SilentlyContinue
         if (-not $gitProcs) {
-            Write-Host "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] [daemon] WARN: stale $lockFile found with no running git process — removing"
+            Write-Host "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] [daemon] WARN: stale $lockFile found with no running git process - removing"
             Remove-Item $lockFile -Force -ErrorAction SilentlyContinue
         }
     }
@@ -118,7 +118,7 @@ function Sync-ProjectRepo {
         if ($attempt -lt $MaxAttempts) { Start-Sleep -Seconds $RetryDelaySec }
     }
 
-    Write-Host "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] [daemon] WARN: git sync failed after $MaxAttempts attempts — starting service without update."
+    Write-Host "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] [daemon] WARN: git sync failed after $MaxAttempts attempts - starting service without update."
     return $false
 }
 

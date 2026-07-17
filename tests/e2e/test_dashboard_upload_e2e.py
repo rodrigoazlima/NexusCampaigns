@@ -42,7 +42,7 @@ _QUEUE_FILE   = _PROJECT_ROOT / "system" / "state" / "inbox-queue.json"
 _DASHBOARD_BASE = "http://localhost:48080"
 IMAGE_NAME      = "e2e-upload-test.png"
 
-# 1x1 PNG — smallest valid image, no network download needed.
+# 1x1 PNG - smallest valid image, no network download needed.
 _PNG_BYTES = bytes.fromhex(
     "89504e470d0a1a0a0000000d4948445200000001000000010802000000907753"
     "de0000000c4944415478da6360606060000000050001a5f645400000000049454e44ae426082"

@@ -37,7 +37,7 @@ export default function LoadingOverlay() {
     )
   }
 
-  // Initial page load — wait for assets, then reveal.
+  // Initial page load - wait for assets, then reveal.
   useEffect(() => {
     if (document.readyState === 'complete') {
       hide()
@@ -49,7 +49,7 @@ export default function LoadingOverlay() {
     return undefined
   }, [])
 
-  // Route change finished (pathname committed) — reveal shortly after.
+  // Route change finished (pathname committed) - reveal shortly after.
   useEffect(() => {
     if (firstLoad.current) {
       firstLoad.current = false
@@ -58,7 +58,7 @@ export default function LoadingOverlay() {
     hide(150)
   }, [pathname])
 
-  // Route change started — lock immediately on internal link clicks / back-forward.
+  // Route change started - lock immediately on internal link clicks / back-forward.
   useEffect(() => {
     // Capture phase: must run before Next's <Link> bubble handler calls
     // preventDefault() for client-side routing, or defaultPrevented is

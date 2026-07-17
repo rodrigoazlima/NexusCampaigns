@@ -1,7 +1,7 @@
 You are an expert Playwright + TypeScript test automation engineer specializing in Obsidian vaults and AI-powered knowledge base pipelines.
 
 ### Project Context
-Project: **Nexus Campaigns** — AI-powered Obsidian vault for Dungeon Masters.
+Project: **Nexus Campaigns** - AI-powered Obsidian vault for Dungeon Masters.
 - It ingests raw images/documents from `00-Inbox/` and turns them into high-quality, linked, metadata-rich knowledge assets.
 - Core flow for images: 
   1. Image dropped into `00-Inbox/images/` (often with random/ugly name).
@@ -47,15 +47,15 @@ Create a **high-quality initial Playwright test suite** that verifies the end-to
 ### Deliverables
 Generate the complete test suite:
 
-1. `tests/image-processing.spec.ts` — main test file with core scenario.
-2. `tests/fixtures/test-images/` — mention where to place sample images (sword, etc.).
-3. `tests/helpers/vault-utils.ts` — reusable functions:
+1. `tests/image-processing.spec.ts` - main test file with core scenario.
+2. `tests/fixtures/test-images/` - mention where to place sample images (sword, etc.).
+3. `tests/helpers/vault-utils.ts` - reusable functions:
    - Copy image with random name
    - Generate slug
    - Poll for file appearance / rename / content
    - Read and assert frontmatter + markdown content
    - Cleanup helpers
-4. `tests/helpers/obsidian-ui.ts` — UI interactions (open note, check explorer, etc.).
+4. `tests/helpers/obsidian-ui.ts` - UI interactions (open note, check explorer, etc.).
 
 ### Core Test Example (Must Implement)
 ```ts

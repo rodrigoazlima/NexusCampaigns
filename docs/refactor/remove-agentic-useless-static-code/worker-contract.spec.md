@@ -38,7 +38,7 @@ Rules:
   when due; the runner's due-check happens first, so `pending()` may just
   `return [WorkItem("", {})]`.
 - No worker imports another worker. Shared logic goes to `nexus.shared`.
-- No LLM client imports anywhere under `nexus.workers` — that is the
+- No LLM client imports anywhere under `nexus.workers` - that is the
   boundary this refactor exists to enforce. CI check: grep for
   `llm_client|anthropic|openai` under `nexus/workers/` must be empty.
 
@@ -58,14 +58,14 @@ for worker in registry.workers (declared order):
 ```
 
 - All in-process. A worker exception marks that item `error`, logs the
-  traceback, and continues with the next item — it never kills the cycle.
+  traceback, and continues with the next item - it never kills the cycle.
 - `lastRun` per worker persists in `agents/runtime/state/tasks-state.json`
   under key `worker:<name>` (same file the dashboard already reads).
 
 ## Queue slot lifecycle (queue workers)
 
 Source of truth: `system/state/inbox-queue.json`, entry field
-`agents.<slot>`. All writes through `locked_update_queue_entry` — one item
+`agents.<slot>`. All writes through `locked_update_queue_entry` - one item
 per lock acquisition, never batch-buffered.
 
 ```
@@ -81,13 +81,13 @@ error ──rerun requested──► pending          (reruns.<slot> += 1)
   leave them `error` (poison-pill guard). The maintenance worker reports
   them; humans decide.
 - Workers that track work outside the inbox queue (wikilink: mtime state;
-  shortfiles: scan) define their pending-set derivation in their own spec —
+  shortfiles: scan) define their pending-set derivation in their own spec -
   same lifecycle semantics apply to their own state files.
 
 ## Configuration
 
 Single block in `agents/registry.yaml` (git-tracked; replaces per-agent
-`agent.json` for static tasks — nothing machine-local left to regenerate):
+`agent.json` for static tasks - nothing machine-local left to regenerate):
 
 ```yaml
 workers_enabled: true          # global kill switch (Phase 1 ships false)
@@ -141,7 +141,7 @@ Same `agent-metrics.json` the dashboard reads, one entry per worker run:
 
 - `kind: "worker"` lets the dashboard render worker cards without a schema
   break (absent field ⇒ legacy agent).
-- **No cost entry is written** — workers never touch `state/costs/`.
+- **No cost entry is written** - workers never touch `state/costs/`.
 
 ## Commits
 
@@ -158,7 +158,7 @@ says so explicitly (only wikilink's does).
 | `pending()` raises | log WARN, treat as empty list, continue cycle |
 | `handle()` raises | item → `error`, traceback to worker log, next item |
 | queue file corrupt | worker skips cycle, maintenance worker flags it |
-| runner crash mid-item | slot still `pending` (or `error` if worker marked it first) — re-picked next cycle; handle() must be idempotent per item |
+| runner crash mid-item | slot still `pending` (or `error` if worker marked it first) - re-picked next cycle; handle() must be idempotent per item |
 
 Idempotency requirement: `handle()` re-run on the same item must be safe
 (check-before-write on outputs; all current task code already behaves this

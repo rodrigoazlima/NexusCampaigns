@@ -1,4 +1,4 @@
-# Characters & NPCs — Page Spec
+# Characters & NPCs - Page Spec
 
 **Route:** `/gm/npcs` · **Icon:** `Users` · **Accent:** blue
 **Archetype:** Entity Collection ([README.md](README.md#the-entity-collection-page-archetype))
@@ -12,27 +12,27 @@ actions, create/promote/archive flow) is inherited from the archetype.
 
 ---
 
-## Delta 1 — Types & chips
+## Delta 1 - Types & chips
 
 `npc`, `character`. Both render blue (`bg-blue-500/10 text-blue-400`). `+ New ▾`
 offers: **NPC** (minor/recurring) and **Character** (major/PC-adjacent).
 
-## Delta 2 — Build guidance strip (§2)
+## Delta 2 - Build guidance strip (§2)
 
 Collapsible checklist shown above the filter bar; each item is a live count
 where measurable:
 
-- [ ] A **quest-giver / patron** — points the party at trouble
+- [ ] A **quest-giver / patron** - points the party at trouble
 - [ ] An **antagonist** with a goal (wins if the party does nothing)
 - [ ] **2–3 neutral locals** the party will actually talk to
 - [ ] Give each a **WANT** · the important ones a **SECRET**
 - [ ] One **distinctive trait** each (the "limping notary")
-- [ ] **Relationships between NPCs** — who hates/owes whom
+- [ ] **Relationships between NPCs** - who hates/owes whom
 
 A small "✓ patron · ✗ antagonist · 2/3 locals" rollup mirrors the readiness
 inputs on the Campaign page.
 
-## Delta 3 — Vital-info field set
+## Delta 3 - Vital-info field set
 
 Drives both the **create skeleton** (`POST /api/gm/create`) and the structured
 form sections in the editor. NPC body skeleton:
@@ -44,7 +44,7 @@ form sections in the editor. NPC body skeleton:
 - **Voice / mannerism:**
 
 ## Want
-> What they want from the party or the world — the engine of every scene.
+> What they want from the party or the world - the engine of every scene.
 
 ## Secret
 > Something the party can discover that changes how they see them.
@@ -65,23 +65,23 @@ The editor surfaces **Want** and **Secret** as first-class, highlighted blocks
 on). An NPC with an empty **Want** shows an amber "needs a want" chip on its
 card and in the table's Status column.
 
-## Delta 4 — NPC-specific card
+## Delta 4 - NPC-specific card
 
 Cards lead with the **token portrait** (this pillar is the main token consumer).
 Card face adds: a **want** one-liner (italic, truncated) under the id, and a
 small lock icon if a **secret** is present (not its content). Quick action
 **Generate token** is always visible here (portrait/body eligible).
 
-## Delta 5 — NPC-specific filters & views
+## Delta 5 - NPC-specific filters & views
 
 - Extra quick toggles: **No want**, **No secret**, **No token**, **Patron**,
   **Antagonist** (derived from a `role`/tag heuristic).
-- Extra view: **Relationship lens** — a compact who-knows-whom mini-map for the
+- Extra view: **Relationship lens** - a compact who-knows-whom mini-map for the
   filtered NPCs (reuses the wiki graph component scoped to cast). Surfaces the
-  guide's "triangles, not lists" — three NPCs each wanting something from the
+  guide's "triangles, not lists" - three NPCs each wanting something from the
   other two. Read-only; "Open in Wiki →" for the full graph.
 
-## Delta 6 — Generate-with-AI seed
+## Delta 6 - Generate-with-AI seed
 
 The header **Generate with AI** opens the `lore` agent pre-seeded:
 

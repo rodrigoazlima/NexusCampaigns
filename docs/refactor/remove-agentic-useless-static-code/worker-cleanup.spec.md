@@ -7,7 +7,7 @@ Current code: `nexus/tasks/cleanup_agent.py`
 
 Housekeeping: purge log files older than `CLEANUP_DAYS` (90), purge old
 report files, trim `agent-metrics.json` run history to last 100 per entry,
-write a CleanupReport JSON. Lowest-risk worker — first to migrate (Phase 2
+write a CleanupReport JSON. Lowest-risk worker - first to migrate (Phase 2
 order), proving the contract end to end.
 
 ## Worker mapping
@@ -36,7 +36,7 @@ Log/report purge roots become:
 - `agents/*/state/logs/` (remaining LLM agents)
 - `system/state/review/reports/`, `system/state/workers/*/reports/`
 
-The list lives in the worker module, not config — it tracks the state
+The list lives in the worker module, not config - it tracks the state
 layout, which is code's business.
 
 ## State
@@ -83,7 +83,7 @@ under `.knowledge-base/`.
    extend scan roots for `system/state/workers/`.
 2. Enable in registry; delete agent folder, precondition, spec entry.
 3. Tests: `tests/test_cleanup_agent.py` re-points imports (purge/trim/report
-   tests unchanged — pure functions).
+   tests unchanged - pure functions).
 
 ## Acceptance
 

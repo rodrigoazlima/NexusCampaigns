@@ -3,13 +3,13 @@
 **Scope:** Interactive editor surfaces in the Game Master area
 (`/gm/view/[id]`, `/gm/view/[id]/token`, and future editors).
 **Audience:** Any agent building or modifying GM editor UI.
-**Goal:** Keep editors consistent — canvas-first, mouse-driven, low-chrome,
+**Goal:** Keep editors consistent - canvas-first, mouse-driven, low-chrome,
 every control self-documenting via tooltip.
 
 Reference implementations:
-- `src/components/gm/TokenEditorCanvas.tsx` — token editor
-- `src/components/gm/ItemDetailView.tsx` — item detail
-- `src/components/gm/Tip.tsx` — shared tooltip
+- `src/components/gm/TokenEditorCanvas.tsx` - token editor
+- `src/components/gm/ItemDetailView.tsx` - item detail
+- `src/components/gm/Tip.tsx` - shared tooltip
 
 ---
 
@@ -35,7 +35,7 @@ Reference implementations:
 
 ## 2. Color tokens
 
-Use Tailwind theme tokens — never raw hex in components.
+Use Tailwind theme tokens - never raw hex in components.
 
 | Token | Use |
 |-------|-----|
@@ -53,7 +53,7 @@ text-<token> hover:bg-<token>/20`.
 
 ## 3. Reusable components
 
-### `<Tip>` — tooltip (`src/components/gm/Tip.tsx`)
+### `<Tip>` - tooltip (`src/components/gm/Tip.tsx`)
 
 Wrap any control. Hover-only, no JS state, `group/tip` driven.
 
@@ -65,11 +65,11 @@ Wrap any control. Hover-only, no JS state, `group/tip` driven.
 
 - `side`: `top | bottom | left | right` (default `top`). Use `bottom` for
   top-bar controls, `left` for controls on a right edge.
-- `shortcut`: optional — renders a `<kbd>` chip after the label.
+- `shortcut`: optional - renders a `<kbd>` chip after the label.
 
 ### Icon button
 
-Both editors define a local icon button (`IconBtn` / `ActionBtn`) — a 32×32
+Both editors define a local icon button (`IconBtn` / `ActionBtn`) - a 32×32
 (`w-8 h-8`) rounded-lg bordered button wrapped in `<Tip>`, with color variants
 and a `busy` spinner state. Pattern:
 
@@ -83,7 +83,7 @@ Variants: `ghost` (default), `primary`, `success`, `danger`, `warning`,
 `star`. If you build a third editor, lift the shared parts rather than copying
 a third time.
 
-### `<BadgeSelect>` — inline editable badge (`ItemDetailView.tsx`)
+### `<BadgeSelect>` - inline editable badge (`ItemDetailView.tsx`)
 
 A native `<select>` styled as a colored badge with a `ChevronDown`. Use for
 enum metadata edited in place (type, status) instead of a labeled dropdown in a
@@ -107,7 +107,7 @@ scrollable views.
 ### Floating control strip
 
 For canvas editors, group transform controls in a single pill floating above the
-canvas — not in a side panel:
+canvas - not in a side panel:
 
 `bg-zinc-900/70 border border-zinc-800/80 backdrop-blur-sm rounded-xl px-2.5 py-1.5 shadow-xl`
 
@@ -142,7 +142,7 @@ companion) stay visible.
 | In-flight | Swap the control's icon for `<Loader2 className="animate-spin" />` (size 14) or a CSS spinner; disable the control. |
 | Disabled | `opacity-30 cursor-not-allowed`; keep the tooltip working. |
 
-One toast at a time — replace, don't stack. Clear its timer on each new message.
+One toast at a time - replace, don't stack. Clear its timer on each new message.
 
 ---
 
@@ -181,5 +181,5 @@ One toast at a time — replace, don't stack. Clear its timer on each new messag
 - Stack permanent status text where a toast belongs.
 - Rebuild a side-panel form when inline editing fits.
 - Hardcode hex colors or pixel sidebars into an editor view.
-- Trigger native `alert`/`confirm` in new flows — prefer inline confirm
+- Trigger native `alert`/`confirm` in new flows - prefer inline confirm
   (existing `confirm()` calls are legacy; don't add more).

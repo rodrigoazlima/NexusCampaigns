@@ -45,7 +45,7 @@ export default function QueueTable({ items, agentStats }: Props) {
   const [anchorIndex, setAnchorIndex] = useState<number | null>(null)
   const confirmTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
-  // Filters upstream (QueueBoard) change the `items` array reference — jump
+  // Filters upstream (QueueBoard) change the `items` array reference - jump
   // back to page 1 so the user isn't stranded on a now out-of-range page.
   // Adjusted during render (not an effect) per React's guidance for state
   // that depends on a prop change: https://react.dev/learn/you-might-not-need-an-effect
@@ -135,7 +135,7 @@ export default function QueueTable({ items, agentStats }: Props) {
   //  - plain / ctrl+/cmd+click: toggle just this row (checkboxes are already
   //    additive, so ctrl doesn't need to behave differently from a plain click)
   //  - shift+click: select the contiguous range from the last-clicked row
-  //    (within the current page) through this one, adding to — not replacing —
+  //    (within the current page) through this one, adding to - not replacing -
   //    whatever else is already selected
   const handleRowSelectClick = (e: React.MouseEvent, index: number) => {
     const item = pageItems[index]
@@ -244,7 +244,7 @@ export default function QueueTable({ items, agentStats }: Props) {
               type="button"
               onClick={() => handleDeleteClick('bulk', [...selected])}
               disabled={[...selected].some((p) => busy.has(p))}
-              title="Delete the selected items — source, generated token, and thumbnail"
+              title="Delete the selected items - source, generated token, and thumbnail"
               className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded bg-danger/10 text-danger border border-danger/30 hover:bg-danger/20 transition-colors disabled:opacity-50"
             >
               <Trash2 size={11} /> {confirming.has('bulk') ? `Confirm delete ${selected.size}?` : `Delete ${selected.size}`}
@@ -349,7 +349,7 @@ export default function QueueTable({ items, agentStats }: Props) {
                           )}
                           <button
                             type="button"
-                            title={confirming.has(item.path) ? 'Click again to permanently delete' : 'Delete this item — source, generated token, and thumbnail'}
+                            title={confirming.has(item.path) ? 'Click again to permanently delete' : 'Delete this item - source, generated token, and thumbnail'}
                             onClick={() => handleDeleteClick(item.path, [item.path])}
                             disabled={busy.has(item.path)}
                             className={`flex items-center justify-center h-6 px-1.5 rounded transition-colors disabled:opacity-50 ${

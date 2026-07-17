@@ -1,4 +1,4 @@
-"""nexus.workers.wikilink — cross-link approved canon (queue consumer, derived pending set).
+"""nexus.workers.wikilink - cross-link approved canon (queue consumer, derived pending set).
 
 Scores entity pairs across 02-Library/**/*.md and inserts ## Related
 wikilink sections in-place. Replaces nexus.tasks.wikilink_library.
@@ -48,7 +48,7 @@ _VAULT_ROOT  = _PROJECT_ROOT / ".knowledge-base"
 _LIBRARY     = _VAULT_ROOT / "02-Library"
 
 # Legacy homes (nexus.tasks.wikilink_library wrote system/state/wikilink; the
-# deployed pipeline wrote agents/wikilink/state) — adopted once, then unused
+# deployed pipeline wrote agents/wikilink/state) - adopted once, then unused
 _LEGACY_STATE_FILES = (
     _PROJECT_ROOT / "system" / "state" / "wikilink" / "wikilink-state.json",
     _PROJECT_ROOT / "agents" / "wikilink" / "state" / "wikilink-state.json",
@@ -110,7 +110,7 @@ def _splice_related(body: str, new_slugs: list[str]) -> tuple[str, int]:
     new_body = _SECTION_RE.sub(replacer, body)
 
     if inserted_count == 0 and not _RELATED_HEADER_RE.search(body):
-        # Section was absent — create it
+        # Section was absent - create it
         new_body = body.rstrip("\n") + "\n\n## Related\n" + "\n".join(
             f"[[{s}]]" for s in new_slugs
         ) + "\n"
@@ -142,7 +142,7 @@ def _atomic_write(path: Path, new_body: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# WikilinkResolver — implements IWikilinkResolver
+# WikilinkResolver - implements IWikilinkResolver
 # ---------------------------------------------------------------------------
 
 class WikilinkResolver(IWikilinkResolver):
@@ -213,7 +213,7 @@ class WikilinkResolver(IWikilinkResolver):
         score += min(len(src_kw & tgt_kw), 2)
 
         # Required-link type boost: +5 if candidate fills a missing required link group
-        # (linking-rules.spec.md — per-type enforcement)
+        # (linking-rules.spec.md - per-type enforcement)
         src_linked = (
             slugs_from_relationships(source_fm.get("relationships") or [])
             + extract_wikilinks(source_body)

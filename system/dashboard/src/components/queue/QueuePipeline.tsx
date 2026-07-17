@@ -73,7 +73,7 @@ export default function QueuePipeline({ item, agentStats }: Props) {
             <button
               type="button"
               onClick={(e) => toggle(agent, e.currentTarget)}
-              title={`${agentDisplayName(agent)} — ${status} (click for re-run options)`}
+              title={`${agentDisplayName(agent)} - ${status} (click for re-run options)`}
               className="relative flex items-center justify-center"
             >
               <span className={`w-5 h-5 rounded-full border flex items-center justify-center transition-shadow ${NODE_STYLE[status] ?? NODE_STYLE.skip} ${pop?.agent === agent ? 'ring-2 ring-primary/60' : ''} ${status === 'pending' ? 'animate-pulse' : ''}`}>

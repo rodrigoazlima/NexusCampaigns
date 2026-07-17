@@ -32,10 +32,10 @@ relationships:
 ```
 
 ## Required body sections:
-- `## Description` — 2–4 sentences describing the entity
-- `## Details` — bullet points with key facts, traits, or history
-- `## Hooks` — 2–3 DM adventure/plot hooks involving this entity
-- `## Related` — [[wikilinks]] to related entities
+- `## Description` - 2–4 sentences describing the entity
+- `## Details` - bullet points with key facts, traits, or history
+- `## Hooks` - 2–3 DM adventure/plot hooks involving this entity
+- `## Related` - [[wikilinks]] to related entities
 
 ## Rules:
 - id must be slug format: lowercase, hyphens only, no spaces

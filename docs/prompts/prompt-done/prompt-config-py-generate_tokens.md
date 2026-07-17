@@ -34,7 +34,7 @@ Analyze the provided Python script and extract all relevant configuration settin
    - Put script-specific behavior (batch sizes, task-specific prompts, agent name, etc.) in **local**.
    - Make sure the JSONs contain good defaults so the script works even if the files are deleted.
    - Use clear, consistent naming.
-   - Do not include code — only configuration.
+   - Do not include code - only configuration.
 
 ---
 
@@ -199,7 +199,7 @@ def _make_token(img_path: Path, out_path: Path, cfg: dict, log: Logger) -> bool:
         from PIL import Image, ImageDraw
         import numpy as np
     except ImportError:
-        log.error("Pillow not installed — cannot generate tokens")
+        log.error("Pillow not installed - cannot generate tokens")
         return False
 
     try:
@@ -270,7 +270,7 @@ def main() -> None:
     try:
         from PIL import Image  # noqa: F401
     except ImportError:
-        log.error("Pillow not installed — install: pip install Pillow")
+        log.error("Pillow not installed - install: pip install Pillow")
         log.done(t0, key="generated", count=0, failed=0)
         sys.exit(1)
 

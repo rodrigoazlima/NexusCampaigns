@@ -130,7 +130,7 @@ def main() -> None:
 
     client = LLMClient(_LLM_CFG)
     if not client.is_available():
-        log.warning("Qwen3-VL (localhost:1234) offline — skipping batch")
+        log.warning("Qwen3-VL (localhost:1234) offline - skipping batch")
         log.done(t0, key="extracted", count=0, failed=0)
         sys.exit(0)
 
@@ -154,7 +154,7 @@ def main() -> None:
         try:
             result = client.vision_chat(img_path, _PROMPT, system=_SYSTEM, max_tokens=400)
         except LLMOfflineError:
-            log.warning(f"LLM offline while processing {img_path.name} — aborting batch{tag}")
+            log.warning(f"LLM offline while processing {img_path.name} - aborting batch{tag}")
             break
         except Exception as exc:
             log.error(f"Text extraction failed for {img_path.name}: {exc}{tag}")

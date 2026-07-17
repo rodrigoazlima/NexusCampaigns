@@ -198,7 +198,7 @@ while ($true) {
                 $timeSince = ($now - [datetime]$prompt.LastRun).TotalSeconds
                 if ($timeSince -lt $RetryDelaySeconds) {
                     $waitRemaining = [math]::Ceiling($RetryDelaySeconds - $timeSince)
-                    Write-Status "Cooldown: $(Format-PromptName $prompt.Path) — $waitRemaining s remaining" -Color Yellow
+                    Write-Status "Cooldown: $(Format-PromptName $prompt.Path) - $waitRemaining s remaining" -Color Yellow
                     $waitedAny = $true
                 }
             }

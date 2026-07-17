@@ -15,10 +15,10 @@ On each run:
 - Output must be a valid Obsidian entity page with YAML frontmatter matching the metadata standard
 - Required frontmatter fields: id, type, status: draft, quality: 0, reviewed: false, source, relationships
 - Synthesized entities must include at least one [[wikilink]] to a related canon entity if one exists
-- status must always be "draft" — never "approved" or "review"
-- reviewed must always be false — never true
+- status must always be "draft" - never "approved" or "review"
+- reviewed must always be false - never true
 - Batch size is 5 documents per run
-- The local LLM (localhost:8080) handles synthesis — if offline, log WARN and stop
+- The local LLM (localhost:8080) handles synthesis - if offline, log WARN and stop
 - Write output to 01-Processing/{slug}.md
 - After each successful write, agents.wiki is marked "done" in inbox-queue.json
 - Files that fail permanently are recorded in bad-wiki-docs.txt

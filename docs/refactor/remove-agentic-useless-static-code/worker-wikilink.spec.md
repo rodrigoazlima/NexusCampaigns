@@ -6,7 +6,7 @@ Current code: `nexus/tasks/wikilink_library.py`
 ## Role
 
 Cross-link approved canon: score entity pairs across `02-Library/**/*.md`
-and insert `## Related` wikilink sections in-place (body only — **never
+and insert `## Related` wikilink sections in-place (body only - **never
 frontmatter**). The only worker allowed to write `02-Library/`.
 
 ## Worker mapping
@@ -27,12 +27,12 @@ def handle(item) -> WorkResult:
     ...
 ```
 
-Pending set is **derived** (mtime vs own state), not an inbox-queue slot —
+Pending set is **derived** (mtime vs own state), not an inbox-queue slot -
 library files aren't inbox entries. Lifecycle semantics still apply: a file
 whose handle() raises is recorded in worker state as `error` with its mtime,
 re-eligible after rerun reset per contract.
 
-## Hard invariants (carried over — the vault-guard rules)
+## Hard invariants (carried over - the vault-guard rules)
 
 - Body-only edits. Frontmatter is read, never written, by this worker.
 - No writes outside `02-Library/`.
@@ -53,7 +53,7 @@ workers:
   wikilink:
     kind: queue
     batch_size: 20
-    interval_seconds: 3600      # min poll gap — library churn is slow
+    interval_seconds: 3600      # min poll gap - library churn is slow
     commit_scope: [".knowledge-base/02-Library"]
 ```
 
@@ -62,7 +62,7 @@ workers:
 - Unparseable frontmatter → `skip` + detail (file needs human fix; retrying
   is useless). Never blocks other files.
 - State file corrupt → treat all as unprocessed (current behavior),
-  WARN — self-heals by rebuilding processedAt entries.
+  WARN - self-heals by rebuilding processedAt entries.
 
 ## Deletions when migrated
 

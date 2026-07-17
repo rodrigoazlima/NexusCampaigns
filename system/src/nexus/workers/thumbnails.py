@@ -1,4 +1,4 @@
-"""nexus.workers.thumbnails — dashboard thumbnail cache warmer (queue consumer).
+"""nexus.workers.thumbnails - dashboard thumbnail cache warmer (queue consumer).
 
 Pre-generates 320px-wide webp thumbnails for every image entry in the inbox
 queue into system/state/thumbs/<sha1(queue-key)>.webp; prunes thumbs whose
@@ -26,7 +26,7 @@ _THUMBS_DIR  = _STATE_ROOT / "thumbs"
 
 THUMB_WIDTH  = 320
 WEBP_QUALITY = 80
-# Pillow-readable raster formats only (.svg is vector — served as-is by the dashboard)
+# Pillow-readable raster formats only (.svg is vector - served as-is by the dashboard)
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"}
 
 _warned_no_pillow = False
@@ -77,7 +77,7 @@ class ThumbnailsWorker:
             from PIL import Image  # noqa: F401
         except ImportError:
             if not _warned_no_pillow:
-                make_worker_logger(self.name).warning("Pillow not installed — thumbnails disabled")
+                make_worker_logger(self.name).warning("Pillow not installed - thumbnails disabled")
                 _warned_no_pillow = True
             return []
 
@@ -91,7 +91,7 @@ class ThumbnailsWorker:
             if dest.exists():
                 continue
             if not (_PROJECT_ROOT / queue_path).exists():
-                continue  # queue entry for a deleted file — nothing to thumbnail
+                continue  # queue entry for a deleted file - nothing to thumbnail
             items.append(WorkItem(queue_path, {"action": "generate", "thumb": f"{key}.webp"}))
 
         if _THUMBS_DIR.exists():
@@ -121,7 +121,7 @@ class ThumbnailsWorker:
             return WorkResult("done", f"thumb for {item.key}")
         except Exception as exc:
             # Corrupt/unreadable image: retrying cannot fix the source file,
-            # and the dashboard falls back to the original — skip, not error.
+            # and the dashboard falls back to the original - skip, not error.
             log.warning(f"thumb failed: {exc}{image_tag(path=item.key)}")
             return WorkResult("skip", f"unreadable image: {exc}")
 

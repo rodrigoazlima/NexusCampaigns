@@ -1,4 +1,4 @@
-# Agent Spec — Review
+# Agent Spec - Review
 
 **Trigger:** every 15 minutes  
 **Input:** `01-Processing/*.md`, `02-Library/*.md`, `system/state/inbox-queue.json`, `agents/runtime/state/logs/automation.log` (last 24h)  

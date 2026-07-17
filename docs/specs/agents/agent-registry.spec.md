@@ -1,4 +1,4 @@
-# Spec — Agent Registry
+# Spec - Agent Registry
 
 `registry.yaml` is the single source of truth for all agents, LLM endpoints, execution order, and shared state ownership. Location: `agents/registry.yaml`.
 
@@ -75,7 +75,7 @@ agents:
 
 | Name | Depends On | Purpose |
 |------|-----------|---------|
-| canon | — | Consistency validation across `02-Library/` |
+| canon | - | Consistency validation across `02-Library/` |
 | relationship | canon | Wikilink graphs, faction/NPC networks → `04-Relationships/` |
 | deduplication | classification | Semantic dedup, merge candidate reports |
 | curator | review, classification | Promotion readiness scoring (never auto-promotes) |

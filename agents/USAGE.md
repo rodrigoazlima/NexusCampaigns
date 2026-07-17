@@ -48,10 +48,10 @@ pwsh agents/runtime/tools/runner.ps1
 
 | File | Purpose |
 |------|---------|
-| `state/agent.json` | Agent registry — ids, script paths, intervals |
+| `state/agent.json` | Agent registry - ids, script paths, intervals |
 | `state/tasks-state.json` | Last-run timestamps per agent |
 | `state/settings.json` | Task Scheduler config (task name, interval minutes) |
-| `state/logs/automation.log` | Master log — all agents, all runs |
+| `state/logs/automation.log` | Master log - all agents, all runs |
 | `state/logs/runner_YYYY-MM-DD.log` | Daily runner log |
 
 ### Add / remove an agent from schedule
@@ -84,7 +84,7 @@ Add matching entry to `state/tasks-state.json`:
 | Symptom | Check |
 |---------|-------|
 | Runner not firing | Task Scheduler → `pathway-kb-runner` → Last Run Result |
-| Agent skipped | `state/tasks-state.json` — lastRun too recent vs intervalSeconds |
+| Agent skipped | `state/tasks-state.json` - lastRun too recent vs intervalSeconds |
 | Lock stuck | Delete `state/runner.lock` if older than 30 min |
 | Git push failing | Check remote auth; runner pushes after every agent run |
 
@@ -102,13 +102,13 @@ Add matching entry to `state/tasks-state.json`:
 
 ### Prerequisites
 
-- **Pandoc** — auto-installed via `winget` if missing
+- **Pandoc** - auto-installed via `winget` if missing
 
 ### State files
 
 | File | Purpose |
 |------|---------|
-| `state/processed-docx.txt` | Skip list — DOCX files already converted |
+| `state/processed-docx.txt` | Skip list - DOCX files already converted |
 | `system/state/inbox-queue.json` | Per-file agent pipeline status (owned by ingestion) |
 
 ### inbox-queue.json schema
@@ -138,7 +138,7 @@ Remove the file path from `state/processed-docx.txt`, then run the agent.
 | Symptom | Check |
 |---------|-------|
 | DOCX not converted | Pandoc installed? `pandoc --version` |
-| File not appearing in queue | Must be inside `00-Inbox/` — agent only scans that dir |
+| File not appearing in queue | Must be inside `00-Inbox/` - agent only scans that dir |
 | Emoji not stripped | File may have already-clean name; check log for "already clean" |
 
 ---
@@ -154,7 +154,7 @@ Remove the file path from `state/processed-docx.txt`, then run the agent.
 
 ### What it does each run
 
-1. Pre-flight checks LM Studio — skips batch if offline
+1. Pre-flight checks LM Studio - skips batch if offline
 2. Processes up to 10 unclassified images per run
 3. Detects transparent PNGs as tokens; runs face-match via `06-match-token.py`
 4. Calls Qwen3-VL with base64 image (max 1024px) → race, class, element, environment
@@ -181,7 +181,7 @@ Remove the image's entry from `state/processed-images.json`, then run the agent.
 | "LM Studio offline" in log | Start LM Studio, load `qwen3-vl-4b-instruct` |
 | Image skipped silently | Already in `processed-images.json` with `status: ok` |
 | Bad JSON from LLM | Check log for raw LLM response; usually retry fixes it |
-| Token not linked to portrait | `face_recognition` not installed — fallback to `imagehash` |
+| Token not linked to portrait | `face_recognition` not installed - fallback to `imagehash` |
 
 ---
 
@@ -237,7 +237,7 @@ Remove the `{relPath}|{scenarioId}` key from `state/processed-npcs.json`, then r
 | Symptom | Check |
 |---------|-------|
 | No NPCs generated | Vision agent run yet? Check `processed-images.json` |
-| NPC has wrong stats | quality: 0 by design — human review required |
+| NPC has wrong stats | quality: 0 by design - human review required |
 | LLM returns invalid JSON | Check log for raw response; 3 retries then marks as `error-llm` |
 
 ---
@@ -254,7 +254,7 @@ Remove the `{relPath}|{scenarioId}` key from `state/processed-npcs.json`, then r
 
 ### What it does each run
 
-1. Reads vision's `processed-images.json` — filters to characters (not battlemaps/scenes), not already tokens
+1. Reads vision's `processed-images.json` - filters to characters (not battlemaps/scenes), not already tokens
 2. For each image: detects face → crops → applies circle mask → composites with moldura
 3. Outputs `{source-stem}-token.png` alongside source image in `00-Inbox/images/`
 
@@ -309,7 +309,7 @@ python agents/token/tools/10-generate-tokens.py --force --vault-root ".knowledge
 
 ### What it does each run
 
-1. Pre-flight checks LocalRouter — aborts batch if offline (no permanent skip)
+1. Pre-flight checks LocalRouter - aborts batch if offline (no permanent skip)
 2. Loads up to 50 canon entities from `02-Library/` as context
 3. Scans `00-Inbox/` for unprocessed `.md` files (not in `state/processed.txt`)
 4. Strips HTML, truncates to 6000 chars
@@ -334,7 +334,7 @@ Remove the path from `state/bad-wiki-docs.txt`, then run the agent.
 | "LocalRouter offline" | Start LocalRouter at :8080 |
 | Draft has wrong entity type | Edit frontmatter manually; classification agent will not override |
 | File stuck in processed.txt | Remove line from file to force reprocess |
-| No wikilinks in draft | Canon `02-Library/` is empty — links injected from existing canon |
+| No wikilinks in draft | Canon `02-Library/` is empty - links injected from existing canon |
 
 ---
 
@@ -352,7 +352,7 @@ Remove the path from `state/bad-wiki-docs.txt`, then run the agent.
 2. Skips files with >5 existing tags (already enriched) and files in `state/bad-docs.txt`
 3. Calls LLM to assign 4–8 tags from the allowed 29-tag list
 4. Calls LLM to infer entity type if missing
-5. Checks slug against `02-Library/` filenames — injects `duplicate_of` warning if match found
+5. Checks slug against `02-Library/` filenames - injects `duplicate_of` warning if match found
 6. Rewrites frontmatter in-place
 
 ### Allowed tags
@@ -377,9 +377,9 @@ Remove path from `state/bad-docs.txt`, then run the agent.
 
 | Symptom | Check |
 |---------|-------|
-| File not getting tags | Already has >5 tags — threshold is 5 |
+| File not getting tags | Already has >5 tags - threshold is 5 |
 | Wrong type inferred | Edit frontmatter manually; agent skips files with existing type |
-| duplicate_of injected incorrectly | Slug collision in `02-Library/` — rename one of the files |
+| duplicate_of injected incorrectly | Slug collision in `02-Library/` - rename one of the files |
 
 ---
 
@@ -389,7 +389,7 @@ Remove path from `state/bad-docs.txt`, then run the agent.
 
 ### What it does each run
 
-1. Parses last 24h of `automation.log` — counts runs/errors/warnings per agent
+1. Parses last 24h of `automation.log` - counts runs/errors/warnings per agent
 2. Scans `01-Processing/` for:
    - **Pending review:** `reviewed: false` or `status: draft`
    - **Orphans:** no `[[wikilink]]` in content
@@ -428,9 +428,9 @@ $report.vaultHealth.pendingReview | Select-Object file, suggestedQuality
 
 | Symptom | Check |
 |---------|-------|
-| Report not updating | Review agent interval is 900s (15 min) — may not have fired yet |
-| All quality scores = 0 | `suggestedQuality` is computed suggestion only — `quality` field is human-set |
-| Dashboard shows no data | `reports-data.js` rebuild failed — check log for write errors |
+| Report not updating | Review agent interval is 900s (15 min) - may not have fired yet |
+| All quality scores = 0 | `suggestedQuality` is computed suggestion only - `quality` field is human-set |
+| Dashboard shows no data | `reports-data.js` rebuild failed - check log for write errors |
 
 ---
 
@@ -462,7 +462,7 @@ Edit `registry.yaml` `llm_endpoints` section. All agents that reference the alia
 pwsh agents/{agent}/tools/{tool-script}.ps1
 ```
 
-Or update `runtime/state/tasks-state.json` to set `lastRun` to epoch time for that agent — runner will fire it on next tick.
+Or update `runtime/state/tasks-state.json` to set `lastRun` to epoch time for that agent - runner will fire it on next tick.
 
 ### View logs
 

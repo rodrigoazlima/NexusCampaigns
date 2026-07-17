@@ -91,7 +91,7 @@
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
-Nexus Campaigns is an AI-powered vault that transforms raw campaign inspiration — images, documents, and notes — into reusable, linked, quality-gated knowledge assets for Dungeon Masters.
+Nexus Campaigns is an AI-powered vault that transforms raw campaign inspiration - images, documents, and notes - into reusable, linked, quality-gated knowledge assets for Dungeon Masters.
 
 A pipeline of scheduled agents ingests source material, classifies it with vision and language models, generates NPC sheets and circular tokens, enriches metadata, and weaves `[[wikilinks]]` between entities. A human reviews every draft and is the only one who can promote content to canon.
 
@@ -134,7 +134,7 @@ A pipeline of scheduled agents ingests source material, classifies it with visio
 │                    [Wiki Agent]                                      │
 │          │                                                           │
 │          ▼                                                           │
-│  (human review — sets status: approved, quality: N)                  │
+│  (human review - sets status: approved, quality: N)                  │
 │          ▼                                                           │
 │    02-Library/ (canon) ──► wikilink worker → [[links]]               │
 │                                                                      │
@@ -143,7 +143,7 @@ A pipeline of scheduled agents ingests source material, classifies it with visio
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-LLM agents dispatch via `agent.json` (subprocess); static workers run **in-process** — no per-task interpreter spawn, no agent scaffolding.
+LLM agents dispatch via `agent.json` (subprocess); static workers run **in-process** - no per-task interpreter spawn, no agent scaffolding.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -154,7 +154,7 @@ LLM agents dispatch via `agent.json` (subprocess); static workers run **in-proce
 
 ### Quick Install (one command)
 
-> **Requires Administrator.** Installs everything — Python dependencies, the agent pipeline service, and the dashboard (built and served on **port 48080**) — registers both to auto-start at boot, and starts them immediately.
+> **Requires Administrator.** Installs everything - Python dependencies, the agent pipeline service, and the dashboard (built and served on **port 48080**) - registers both to auto-start at boot, and starts them immediately.
 
 ```powershell
 # 1. Clone the repo
@@ -174,17 +174,17 @@ When it finishes, the dashboard is live at **http://localhost:48080**.
 | Clean install | `pwsh -File system\ops\setup-service.ps1 -CleanInstall` |
 | Options | `-NoDashboard` to skip dashboard · `-DashboardPort 9000` for custom port · `-RunPreFlight` to run agent test cycle first (~60s) |
 
-Generates default settings at `system\.env.local` (`PROJECT_ROOT`, `VAULT_ROOT`, `PORT`, `HOSTNAME`) derived from `system\.shared\config\global.json` — change the port once in `global.json` (`ports.dashboard`). Previous installs are automatically removed before each fresh install.
+Generates default settings at `system\.env.local` (`PROJECT_ROOT`, `VAULT_ROOT`, `PORT`, `HOSTNAME`) derived from `system\.shared\config\global.json` - change the port once in `global.json` (`ports.dashboard`). Previous installs are automatically removed before each fresh install.
 
-Without Administrator the installer falls back to a per-user (at-logon) install via the HKCU Run key. NSSM + Admin is recommended for an always-on Windows service — `winget install NSSM.NSSM`.
+Without Administrator the installer falls back to a per-user (at-logon) install via the HKCU Run key. NSSM + Admin is recommended for an always-on Windows service - `winget install NSSM.NSSM`.
 
 ### Prerequisites
 
 * [PowerShell 7+](https://learn.microsoft.com/powershell/) (`pwsh`)
-* [Python 3.11+](https://www.python.org/) — agent runtime
-* [Node.js 18+](https://nodejs.org/) — dashboard
-* [NSSM](https://nssm.cc/) (optional) — `winget install NSSM.NSSM`, for the always-on Windows service
-* A locally-hosted LLM endpoint (e.g. `qwen3-vl-4b-instruct`) for vision/lore agents — no external API keys required
+* [Python 3.11+](https://www.python.org/) - agent runtime
+* [Node.js 18+](https://nodejs.org/) - dashboard
+* [NSSM](https://nssm.cc/) (optional) - `winget install NSSM.NSSM`, for the always-on Windows service
+* A locally-hosted LLM endpoint (e.g. `qwen3-vl-4b-instruct`) for vision/lore agents - no external API keys required
 
 ### Manual Installation
 
@@ -209,13 +209,13 @@ Prefer to run the pieces by hand instead of the one-command installer?
    | `ports.dashboard` | `system\.shared\config\global.json` | `48080` |
    | `ports.host` | `system\.shared\config\global.json` | `0.0.0.0` |
    | `VAULT_ROOT` | `system\.env.local` (or `NEXUS_VAULT_ROOT`) | `<repo>\.knowledge-base` |
-4. Start the agent daemon and dashboard — see [Usage](#usage).
+4. Start the agent daemon and dashboard - see [Usage](#usage).
 
 ### Installing at a Custom Location
 
 Cloning to a non-default path (e.g. an OneDrive-synced folder), or keeping the
 vault in a separate repo/drive from the app repo? Pass `-ProjectRoot` and
-`-VaultRoot` explicitly — both accept any path, on any drive:
+`-VaultRoot` explicitly - both accept any path, on any drive:
 
 ```powershell
 pwsh -ExecutionPolicy Bypass -File system\ops\setup-service.ps1 `
@@ -224,19 +224,19 @@ pwsh -ExecutionPolicy Bypass -File system\ops\setup-service.ps1 `
 ```
 
 * `-ProjectRoot` defaults to the app repo root (two levels above `system\ops`)
-  — only needed if the script is invoked from somewhere else, or wrapped by another script.
-* `-VaultRoot` defaults to `<ProjectRoot>\.knowledge-base` — set it to point at a
+  - only needed if the script is invoked from somewhere else, or wrapped by another script.
+* `-VaultRoot` defaults to `<ProjectRoot>\.knowledge-base` - set it to point at a
   separately-cloned vault repo. The script creates the directory if missing and
   links `<ProjectRoot>\.knowledge-base` to it via an NTFS junction.
 * If `-VaultRoot` already has its own `.git` (e.g. cloned from a separate vault
-  repo), do **not** pass `-VaultGitInit` — that flag is only for turning a plain
+  repo), do **not** pass `-VaultGitInit` - that flag is only for turning a plain
   folder into a new git repo, and will error/misinit against an existing one.
 * Splitting the vault into its own repo entirely? See
   [`docs/specs/guides/vault-repo-split-tutorial.md`](docs/specs/guides/vault-repo-split-tutorial.md).
 * Elevation: the installer needs Administrator for the NSSM service install. If
   your account has UAC set to "Elevate without prompting"
   (`HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\ConsentPromptBehaviorAdmin = 0`),
-  `Start-Process pwsh -Verb RunAs` elevates silently — no password/dialog needed.
+  `Start-Process pwsh -Verb RunAs` elevates silently - no password/dialog needed.
   Otherwise expect a UAC prompt.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
@@ -255,7 +255,7 @@ cd system\dashboard
 npm run dev
 ```
 
-Binds `0.0.0.0:48080` — accessible on local LAN:
+Binds `0.0.0.0:48080` - accessible on local LAN:
 - Local: http://localhost:48080
 - LAN: http://`<your-ip>`:48080
 
@@ -284,7 +284,7 @@ pwsh -File 'system\ops\setup-service.ps1' -Status
 # Uninstall
 pwsh -File 'system\ops\setup-service.ps1' -Uninstall
 
-# Clean install — wipes all generated state, indexes, configs, and build artifacts
+# Clean install - wipes all generated state, indexes, configs, and build artifacts
 # Preserves 00-Inbox (source), 02-Library, 03-Campaigns, 05-Assets, 99-Archive
 # Requires typing 'yes' to confirm
 pwsh -File 'system\ops\setup-service.ps1' -CleanInstall
@@ -323,7 +323,7 @@ pwsh -File 'system\ops\setup-service.ps1' -CleanInstall
                                                    05-Assets
 ```
 
-1. Drop sources into `00-Inbox/` — treat as read-only
+1. Drop sources into `00-Inbox/` - treat as read-only
 2. Automation agents process `00-Inbox/` → write drafts to `01-Processing/`
 3. Human reviews drafts, sets `status: approved` + `quality: N`
 4. Approved content promoted to `02-Library/` (or `03-Campaigns/`, `05-Assets/`)
@@ -343,7 +343,7 @@ No agent may write these fields as `true` / `approved`.
 | Classification | Tag enrichment and type inference for sparse notes |
 | Wiki | Synthesizes entity pages from markdown notes |
 
-**Static workers** (in-process `nexus.workers.*`, configured in `agents/registry.yaml` `workers:` block — queue workers poll every cycle, scheduled workers run on an interval):
+**Static workers** (in-process `nexus.workers.*`, configured in `agents/registry.yaml` `workers:` block - queue workers poll every cycle, scheduled workers run on an interval):
 
 | Worker | Kind | Role |
 |--------|------|------|
@@ -417,7 +417,7 @@ relationships:
 
 | Score | Meaning |
 |-------|---------|
-| 1–3 | Low quality — reject |
+| 1–3 | Low quality - reject |
 | 4–6 | Needs review |
 | 7–8 | Good |
 | 9–10 | Library candidate |
@@ -437,7 +437,7 @@ Forbidden: `final_v2`, `new`, `cool`, `Untitled`, uppercase, spaces (except arc 
 
 ### Wikilinks & Linking Rules
 
-Use `[[slug-name]]` — match exact filename without extension. Every entity must link to ≥1 other. No orphans.
+Use `[[slug-name]]` - match exact filename without extension. Every entity must link to ≥1 other. No orphans.
 
 | Entity | Required links |
 |--------|---------------|
@@ -464,7 +464,7 @@ Every script emits `--- START ---` and `--- DONE ---`. `--- DONE ---` format:
 
 ### Security Constraints
 
-- No agent may self-approve content (`reviewed: true` — human-only)
+- No agent may self-approve content (`reviewed: true` - human-only)
 - No agent may write to `02-Library/` without `reviewed: true` already set by human
 - No agent may delete files from `00-Inbox/`
 - Breaking canon requires explicit human git commit with reason in message

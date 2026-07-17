@@ -1,9 +1,9 @@
-"""nexus.shared.logging — structured tag suffixes for any log line.
+"""nexus.shared.logging - structured tag suffixes for any log line.
 
 Every pipeline stage used to format its own ad hoc mix of identifiers in log
-messages — some logged a truncated hash, most logged only a filename, none
+messages - some logged a truncated hash, most logged only a filename, none
 logged uuid, no two stages agreed on a format. That made anything (an image,
-an NPC, a scenario) nearly impossible to trace by grep alone — see
+an NPC, a scenario) nearly impossible to trace by grep alone - see
 docs/investigate for a case that only got explained by manually re-hashing
 files by hand instead of grepping automation.log.
 
@@ -46,7 +46,7 @@ def image_tag(
 ) -> str:
     """`tag()` for the image pipeline's common fields.
 
-    Hash is truncated to HASH_DISPLAY_LEN hex chars — enough to grep for; the
+    Hash is truncated to HASH_DISPLAY_LEN hex chars - enough to grep for; the
     full hash is always recoverable from frontmatter/state for exact
     verification. Extra keyword fields (e.g. scenario=...) pass through to
     tag() and are appended after hash/uuid/path.

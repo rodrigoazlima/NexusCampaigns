@@ -34,14 +34,14 @@ Analyze the provided Python script and extract all relevant configuration settin
    - Put script-specific behavior (batch sizes, task-specific prompts, agent name, etc.) in **local**.
    - Make sure the JSONs contain good defaults so the script works even if the files are deleted.
    - Use clear, consistent naming.
-   - Do not include code — only configuration.
+   - Do not include code - only configuration.
 
 ---
 
 **Script to analyze:**
 
 # shared\config.py
-"""Vault configuration — two layers.
+"""Vault configuration - two layers.
 
 Layer 1 (dataclasses): VaultConfig / VaultPaths / SystemPaths / LLMEndpointConfig
   Pure structure, no I/O. Loader lives in shared.loaders.
@@ -65,7 +65,7 @@ from pydantic import BaseModel, Field, field_validator
 
 
 # ---------------------------------------------------------------------------
-# Layer 1 — Dataclass-based vault config (unchanged public surface)
+# Layer 1 - Dataclass-based vault config (unchanged public surface)
 # ---------------------------------------------------------------------------
 
 @dataclass(frozen=True)
@@ -143,10 +143,10 @@ class VaultConfig:
 
 
 # ---------------------------------------------------------------------------
-# Layer 2 — Pydantic AppConfig + JSON loader
+# Layer 2 - Pydantic AppConfig + JSON loader
 # ---------------------------------------------------------------------------
 
-# Embedded defaults — application works even with no JSON files on disk.
+# Embedded defaults - application works even with no JSON files on disk.
 _GLOBAL_DEFAULTS: dict[str, Any] = {
     "vault_root": "knowledge-base",
     "llm": {

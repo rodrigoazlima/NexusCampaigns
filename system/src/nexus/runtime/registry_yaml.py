@@ -1,8 +1,8 @@
-"""nexus.runtime.registry_yaml — reads registry.yaml as a raw dict (execution
+"""nexus.runtime.registry_yaml - reads registry.yaml as a raw dict (execution
 order, pipeline mode, workers block, agent.json synthesis defaults).
 
 Distinct from nexus.shared.loaders.load_registry, which parses the same file
-into a validated RegistryConfig for dispatch fallback — this one stays a
+into a validated RegistryConfig for dispatch fallback - this one stays a
 permissive dict read since callers here only need a few loosely-typed blocks.
 """
 
@@ -96,4 +96,4 @@ def ensure_agent_jsons(log: Logger) -> None:
             continue
         agent_json.parent.mkdir(parents=True, exist_ok=True)
         agent_json.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-        log.warning(f"agent.json missing for '{agent_name}' — synthesized from registry.yaml defaults: {agent_json}")
+        log.warning(f"agent.json missing for '{agent_name}' - synthesized from registry.yaml defaults: {agent_json}")

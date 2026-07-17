@@ -1,4 +1,4 @@
-# Agent Spec — Repair
+# Agent Spec - Repair
 
 **Trigger:** every 15 minutes  
 **Input:** `agents/runtime/state/logs/automation.log` (last 24h), `agents/*/agent.json`, `agents/runtime/state/tasks-state.json`, `agents/runtime/state/runner.lock`, `agents/runtime/state/agent-metrics.json`  

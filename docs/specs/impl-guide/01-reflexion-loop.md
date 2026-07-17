@@ -1,4 +1,4 @@
-# Impl: Reflexion Loop — Lore Agent
+# Impl: Reflexion Loop - Lore Agent
 
 **Phase:** P1  
 **Priority:** High  
@@ -22,19 +22,19 @@ After generation, the Lore Agent scores its own output using `QualityGate`. If s
 ## Scope
 
 Files to modify:
-- `agents/lore/tools/generate_npcs.py` — add reflexion loop in `run_batch()`
-- `agents/lore/prompts/system.md` — add revision instruction section
-- `agents/shared/interfaces.py` — add `IReflexionContext` protocol (optional, if warranted)
+- `agents/lore/tools/generate_npcs.py` - add reflexion loop in `run_batch()`
+- `agents/lore/prompts/system.md` - add revision instruction section
+- `agents/shared/interfaces.py` - add `IReflexionContext` protocol (optional, if warranted)
 
 Files to create:
-- `agents/lore/prompts/revise-npc.md` — revision prompt template
-- `agents/tests/test_reflexion.py` — unit tests for loop logic
+- `agents/lore/prompts/revise-npc.md` - revision prompt template
+- `agents/tests/test_reflexion.py` - unit tests for loop logic
 
 ---
 
 ## Implementation
 
-### Step 1 — Score immediately after generation
+### Step 1 - Score immediately after generation
 
 In `generate_npcs.py`, inside `run_batch()`, after calling `self._generator.generate(...)`:
 
@@ -75,7 +75,7 @@ def _score_and_revise(
     return current
 ```
 
-### Step 2 — Build critique from gate dimensions
+### Step 2 - Build critique from gate dimensions
 
 ```python
 def _build_critique(fm: dict, body: str, score: int) -> str:
@@ -99,7 +99,7 @@ def _build_critique(fm: dict, body: str, score: int) -> str:
     )
 ```
 
-### Step 3 — `generate_with_critique` on INPCGenerator
+### Step 3 - `generate_with_critique` on INPCGenerator
 
 Add to `shared/interfaces.py`:
 
@@ -121,7 +121,7 @@ class INPCGenerator(ABC):
 
 The concrete implementation in `lore/tools/` appends the critique as a `user` message after the previous failed output in the message history, then calls the LLM again.
 
-### Step 4 — Flag unresolved outputs
+### Step 4 - Flag unresolved outputs
 
 ```python
 def _flag_for_human_review(output: NPCLLMOutput, score: int) -> NPCLLMOutput:

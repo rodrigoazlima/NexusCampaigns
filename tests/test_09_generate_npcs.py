@@ -1,22 +1,22 @@
 """
-Tests for .automation/09-generate-npcs.py — Lore Agent
+Tests for .automation/09-generate-npcs.py - Lore Agent
 
 Strategy: import Python functions directly via importlib; no HTTP calls.
-call_vision_llm is excluded — it requires a live LM Studio instance.
+call_vision_llm is excluded - it requires a live LM Studio instance.
 All assertions target pure logic: JSON parsing, markdown generation,
 image resizing, and filesystem state.
 
 Behaviors under test:
-  1.  fmt_mod                   — +N / -N / +0 modifier formatting
-  2.  make_index_key            — sha256|scenario_id composite key
-  3.  load_index                — missing file; valid file; corrupted; v1 migration
-  4.  save_index                — round-trip; UTF-8; unicode; pretty-printed
-  5.  build_markdown happy path — full NPC → valid YAML frontmatter + body sections
-  6.  build_markdown edge cases — padded abilities; optional sha256; rel cap; bad types
-  7.  load_library_context      — missing dir; no frontmatter; valid entities; cap
-  8.  update_queue_lore         — missing file; rel in queue; rel absent; corrupt
-  9.  load_classified_chars     — missing; v1/v2 format; type filter; status filter
- 10.  resize_and_encode         — small unchanged; large resized; aspect preserved
+  1.  fmt_mod                   - +N / -N / +0 modifier formatting
+  2.  make_index_key            - sha256|scenario_id composite key
+  3.  load_index                - missing file; valid file; corrupted; v1 migration
+  4.  save_index                - round-trip; UTF-8; unicode; pretty-printed
+  5.  build_markdown happy path - full NPC → valid YAML frontmatter + body sections
+  6.  build_markdown edge cases - padded abilities; optional sha256; rel cap; bad types
+  7.  load_library_context      - missing dir; no frontmatter; valid entities; cap
+  8.  update_queue_lore         - missing file; rel in queue; rel absent; corrupt
+  9.  load_classified_chars     - missing; v1/v2 format; type filter; status filter
+ 10.  resize_and_encode         - small unchanged; large resized; aspect preserved
 """
 
 from __future__ import annotations
@@ -78,7 +78,7 @@ _API_REQUIRED = (
 _MISSING_API = [fn for fn in _API_REQUIRED if not hasattr(_mod, fn)]
 if _MISSING_API:
     pytest.skip(
-        f"generate_npcs.py API changed — functions not found: {_MISSING_API}. "
+        f"generate_npcs.py API changed - functions not found: {_MISSING_API}. "
         "Refactored module uses _output_to_frontmatter/_output_to_body/etc. "
         "Next step: rewrite these tests against agents/lore/tools/generate_npcs.py API "
         "or extend agents/tests/test_classification.py.",
@@ -342,7 +342,7 @@ class TestSaveIndex:
 
 
 # ---------------------------------------------------------------------------
-# 5. build_markdown — happy path
+# 5. build_markdown - happy path
 # ---------------------------------------------------------------------------
 
 
@@ -444,7 +444,7 @@ class TestBuildMarkdownHappyPath:
 
 
 # ---------------------------------------------------------------------------
-# 6. build_markdown — edge cases
+# 6. build_markdown - edge cases
 # ---------------------------------------------------------------------------
 
 
@@ -756,7 +756,7 @@ class TestResizeAndEncode:
         assert abs(actual - expected) < 0.06, f"Ratio drift: expected ~{expected:.2f}, got {actual:.2f}"
 
     def test_output_mode_is_rgb(self, tmp_path: Path) -> None:
-        """JPEG output must be RGB — RGBA is not supported by JPEG."""
+        """JPEG output must be RGB - RGBA is not supported by JPEG."""
         b64 = resize_and_encode(make_rgb_png(tmp_path / "src.png", 128, 128))
         assert decode_b64_jpeg(b64).mode == "RGB"
 

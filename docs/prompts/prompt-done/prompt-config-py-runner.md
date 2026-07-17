@@ -34,7 +34,7 @@ Analyze the provided Python script and extract all relevant configuration settin
    - Put script-specific behavior (batch sizes, task-specific prompts, agent name, etc.) in **local**.
    - Make sure the JSONs contain good defaults so the script works even if the files are deleted.
    - Use clear, consistent naming.
-   - Do not include code — only configuration.
+   - Do not include code - only configuration.
 
 ---
 
@@ -43,7 +43,7 @@ Analyze the provided Python script and extract all relevant configuration settin
 # runtime\tools\runner.py
 """runtime.tools.runner
 
-Python runtime — the only static code in the agent pipeline.
+Python runtime - the only static code in the agent pipeline.
 Discovers agents from agent.json files, checks intervals, dispatches Claude agents.
 
 CLI: python runner.py [--once] [--task TASK_ID] [--interval SECONDS]
@@ -264,7 +264,7 @@ def _record_cost(
 ) -> None:
     """Append per-run token usage to the daily cost file (atomic write)."""
     if not model and not input_tokens and not output_tokens:
-        return  # non-Claude runner — nothing to record
+        return  # non-Claude runner - nothing to record
 
     today = started_at.strftime("%Y-%m-%d")
     _COSTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -308,7 +308,7 @@ def _check_signals(
             pending = consumer.pending(signal_type)
             if pending:
                 log.info(
-                    f"Signal '{signal_type}' pending ({len(pending)} item(s)) — "
+                    f"Signal '{signal_type}' pending ({len(pending)} item(s)) - "
                     f"triggering {task_id} immediately"
                 )
                 triggered.add(task_id)
@@ -318,7 +318,7 @@ def _check_signals(
 
 
 # ---------------------------------------------------------------------------
-# Task discovery — reads agent.json files, respects execution_order
+# Task discovery - reads agent.json files, respects execution_order
 # ---------------------------------------------------------------------------
 
 def _load_execution_order() -> list[str]:
@@ -413,19 +413,19 @@ def _load_agent_dispatch(task_id: str, log: _Logger) -> Optional[AgentDispatchCo
     agent_json = _AGENTS_DIR / agent_name / "agent.json"
 
     if not agent_json.exists():
-        log.error(f"agent.json not found: {agent_json} — skipping {task_id}")
+        log.error(f"agent.json not found: {agent_json} - skipping {task_id}")
         return None
 
     try:
         raw = json.loads(agent_json.read_text(encoding="utf-8"))
         folder_cfg = AgentFolderConfig.model_validate(raw)
     except Exception as exc:
-        log.error(f"Failed to parse {agent_json}: {exc} — skipping {task_id}")
+        log.error(f"Failed to parse {agent_json}: {exc} - skipping {task_id}")
         return None
 
     entry: Optional[TaskDispatchEntry] = folder_cfg.tasks.get(task_id)
     if entry is None:
-        log.error(f"Task ID {task_id!r} not found in {agent_json} — skipping")
+        log.error(f"Task ID {task_id!r} not found in {agent_json} - skipping")
         return None
 
     return entry.dispatch
@@ -537,7 +537,7 @@ class Runtime(IOrchestrator):
         scope = _read_agent_commit_scope(task_id)
         if not scope:
             self._log.warning(
-                f"No commit_scope declared for {task_id} — skipping git commit"
+                f"No commit_scope declared for {task_id} - skipping git commit"
             )
             return
 
@@ -593,7 +593,7 @@ class Runtime(IOrchestrator):
             signalled = task_id in signal_triggered
 
             if not due and not signalled:
-                self._log.info(f"Skip {task_id} — not due, no signal")
+                self._log.info(f"Skip {task_id} - not due, no signal")
                 continue
 
             # Pre-check: if agent.json is missing, skip without updating lastRun
@@ -634,7 +634,7 @@ class Runtime(IOrchestrator):
                 except Exception as exc:
                     self._log.warning(f"Git commit failed for {task_id}: {exc}")
             else:
-                self._log.warning(f"Task {task_id} exited with code {exit_code} — skipping git commit")
+                self._log.warning(f"Task {task_id} exited with code {exit_code} - skipping git commit")
 
         # Consume processed signals AFTER all dispatches in this cycle
         consumer = SignalConsumer(_SIGNALS_DIR)
@@ -657,7 +657,7 @@ class Runtime(IOrchestrator):
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Vault Nexus Campaigns — agent runtime",
+        description="Vault Nexus Campaigns - agent runtime",
     )
     parser.add_argument("--once", action="store_true", help="Run one scheduling cycle then exit")
     parser.add_argument("--task", metavar="TASK_ID", default=None, help="Run only this specific task")

@@ -2,7 +2,7 @@
 
 Derived from each `agents/<name>/AGENT.md` (inputs/outputs/state_files/commit_scope/restrictions). Paths capped at depth 2. Excludes `agents/tests`.
 
-Every agent below also links to `agents/shared` (shared runtime library) and `system/state` (own `system` link if already present covers this) — omitted from each row for brevity. Every agent also owns a real (non-linked) `prompts/`, `state/`, `tools/` dir.
+Every agent below also links to `agents/shared` (shared runtime library) and `system/state` (own `system` link if already present covers this) - omitted from each row for brevity. Every agent also owns a real (non-linked) `prompts/`, `state/`, `tools/` dir.
 
 | Agent | Related Paths |
 |---|---|

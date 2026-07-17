@@ -1,4 +1,4 @@
-"""E2E conftest — sys.path bootstrap and shared cleanup fixture."""
+"""E2E conftest - sys.path bootstrap and shared cleanup fixture."""
 import json
 import sys
 from pathlib import Path
@@ -27,7 +27,7 @@ def _do_cleanup(root: Path) -> None:
         try:
             inbox_dir.rmdir()
         except OSError:
-            pass  # not empty — leave it
+            pass  # not empty - leave it
 
     # Remove inbox-queue.json entries in e2e-test/
     queue_file = root / "system" / "state" / "inbox-queue.json"
@@ -148,6 +148,6 @@ def cleanup_e2e_artifacts():
     _do_cleanup(_PROJECT_ROOT)  # always pre-clean for a fresh run
     yield
     if os.environ.get("E2E_KEEP_ARTIFACTS") == "1":
-        print("\n[e2e] E2E_KEEP_ARTIFACTS=1 — artifacts preserved for dashboard inspection")
+        print("\n[e2e] E2E_KEEP_ARTIFACTS=1 - artifacts preserved for dashboard inspection")
         return
     _do_cleanup(_PROJECT_ROOT)

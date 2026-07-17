@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
       fs.writeFileSync(tmp, JSON.stringify(genTokens, null, 2), 'utf-8')
       fs.renameSync(tmp, genPath)
     } catch {
-      // non-fatal — token still generated
+      // non-fatal - token still generated
     }
 
     return NextResponse.json({ ok: true, tokenPath, basePath: path.relative(PROJECT_ROOT, absBase).replace(/\\/g, '/') })

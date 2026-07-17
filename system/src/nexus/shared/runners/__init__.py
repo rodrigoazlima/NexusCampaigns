@@ -1,4 +1,4 @@
-"""shared.runners — dispatch runner factory.
+"""shared.runners - dispatch runner factory.
 
 get_runner(dispatch_type) → IRunner
 _resolve_placeholders(text, context) → str

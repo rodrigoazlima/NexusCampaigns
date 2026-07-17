@@ -1,4 +1,4 @@
-# Nexus Campaigns Dashboard — Product Specification
+# Nexus Campaigns Dashboard - Product Specification
 
 ## 1. Purpose
 
@@ -51,23 +51,23 @@ CONTENT
 Answers: "What is the current state of the entire factory in 30 seconds?"
 
 KPI cards (row 1):
-- Library Entities — total approved entities in 02-Library
-- Pending Review — unreviewed drafts in 01-Processing
-- Inbox Files — total files in 00-Inbox
-- Processing — total drafts in 01-Processing
-- Errors 24h — summed agent error count
-- Stuck Items — queue items blocked > 2h
+- Library Entities - total approved entities in 02-Library
+- Pending Review - unreviewed drafts in 01-Processing
+- Inbox Files - total files in 00-Inbox
+- Processing - total drafts in 01-Processing
+- Errors 24h - summed agent error count
+- Stuck Items - queue items blocked > 2h
 
 KPI cards (row 2):
 - Images Classified + tokens generated
 - NPCs Generated across scenarios
-- Orphan Entities — no relationships
+- Orphan Entities - no relationships
 - Campaign Files
 
 Panel row:
-- Pipeline Flow — horizontal bar per stage with counts
-- Queue Health — total/pending/done/stuck counts
-- Last Report — 24h run summary
+- Pipeline Flow - horizontal bar per stage with counts
+- Queue Health - total/pending/done/stuck counts
+- Last Report - 24h run summary
 
 Agent Health grid: compact AgentCard per agent (status dot + stats + schedule)
 
@@ -187,7 +187,7 @@ All routes use `force-dynamic` (no build-time caching).
 | GET | `/api/logs?limit&severity&task` | LogLine[] |
 | GET | `/api/reports/latest` | DailyReport |
 
-All JSON. No auth (local-only app). No WebSocket — pages use 30s meta-refresh
+All JSON. No auth (local-only app). No WebSocket - pages use 30s meta-refresh
 or client-side polling via SWR.
 
 ---
@@ -214,16 +214,16 @@ Based on Dashboard skill design system:
 
 **Colors (Tailwind tokens)**
 ```
-surface DEFAULT: #09090b  — base background
-surface-1: #111113        — card background
-surface-2: #18181b        — hover states
-surface-3: #27272a        — borders
-surface-4: #3f3f46        — disabled/muted borders
-primary:   #0C5CAB        — interactive blue
-success:   #10b981        — approved/healthy/good
-warning:   #f59e0b        — draft/pending/caution
-danger:    #ef4444        — error/stuck/orphan
-neutral:   #6b7280        — secondary text
+surface DEFAULT: #09090b  - base background
+surface-1: #111113        - card background
+surface-2: #18181b        - hover states
+surface-3: #27272a        - borders
+surface-4: #3f3f46        - disabled/muted borders
+primary:   #0C5CAB        - interactive blue
+success:   #10b981        - approved/healthy/good
+warning:   #f59e0b        - draft/pending/caution
+danger:    #ef4444        - error/stuck/orphan
+neutral:   #6b7280        - secondary text
 ```
 
 **Status mapping**
@@ -246,12 +246,12 @@ neutral:   #6b7280        — secondary text
 - Code/paths: IBM Plex Mono
 
 **Component library (custom)**
-- KPICard — metric with label, value, trend, accent color
-- AgentCard — status dot, stats grid, schedule footer
-- ActivityFeed — log viewer with severity coloring
-- PageHeader — icon + title + subtitle + action slot
-- QualityBar — 0-10 bar with color zones
-- StatusBadge — colored pill with border
+- KPICard - metric with label, value, trend, accent color
+- AgentCard - status dot, stats grid, schedule footer
+- ActivityFeed - log viewer with severity coloring
+- PageHeader - icon + title + subtitle + action slot
+- QualityBar - 0-10 bar with color zones
+- StatusBadge - colored pill with border
 
 ---
 
@@ -277,7 +277,7 @@ neutral:   #6b7280        — secondary text
 
 ## 11. Real-Time Strategy
 
-Pages use Next.js `force-dynamic` — every request reads fresh data.
+Pages use Next.js `force-dynamic` - every request reads fresh data.
 Sidebar shows "Live · 30s refresh" indicator.
 
 For live updates, add to any client page:
@@ -317,8 +317,8 @@ Future WebSocket: add `wss://` endpoint in Next.js Route Handler using
 
 ### Phase 2
 - [ ] Client-side 30s auto-refresh (useEffect + router.refresh)
-- [ ] Campaign Dashboard (`/campaigns`) — reads 03-Campaigns/
-- [ ] Knowledge Graph (`/graph`) — React Flow + 02-Library relationship data
+- [ ] Campaign Dashboard (`/campaigns`) - reads 03-Campaigns/
+- [ ] Knowledge Graph (`/graph`) - React Flow + 02-Library relationship data
 - [ ] Search across all entities
 - [ ] Inline review actions (approve/reject via API writing to vault files)
 

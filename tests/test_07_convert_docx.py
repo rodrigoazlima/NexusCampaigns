@@ -3,27 +3,27 @@ Tests for .automation/legacy/07-convert-docx.ps1
 
 Strategy: patch $VaultRoot in the script text, inject a fake pandoc command +
 stub overrides before the main block, write the patched copy to tmp_path,
-invoke via subprocess.  All assertions check filesystem state — which files
+invoke via subprocess.  All assertions check filesystem state - which files
 exist, their content, and what was written to logs / processed-docx.txt.
 
-Pandoc does NOT need to be installed — a fake pandoc.bat is injected into PATH.
+Pandoc does NOT need to be installed - a fake pandoc.bat is injected into PATH.
 
 Behaviors under test:
-  1.  No DOCX files      — exits 0, logs "No unprocessed"
-  2.  Conversion         — DOCX → .md created, processed list updated
-  3.  Get-Slug           — slug generation (lower, hyphens, strip non-alnum)
-  4.  Processed tracking — already-processed DOCX skipped on second run
-  5.  Image extraction   — images moved from mediaDir/media/ to mediaDir/
-  6.  Media subdir clean — media/ subdir removed after image move
-  7.  Path rewriting     — image paths in .md updated to flattened location
-  8.  Image collision    — duplicate filename gets counter suffix (-1, -2…)
-  9.  Pandoc failure     — failed conversion logged, still marked processed
-  10. Batch limit        — only 10 files per run
-  11. Git exclusion      — .git/ DOCX files not processed
-  12. Automation excl.   — .automation/ DOCX files not processed
-  13. Logging            — START/DONE markers, timestamps, task prefix
-  14. Idempotency        — second run processes 0 files
-  15. Parametrized slugs — various name → slug transformations
+  1.  No DOCX files      - exits 0, logs "No unprocessed"
+  2.  Conversion         - DOCX → .md created, processed list updated
+  3.  Get-Slug           - slug generation (lower, hyphens, strip non-alnum)
+  4.  Processed tracking - already-processed DOCX skipped on second run
+  5.  Image extraction   - images moved from mediaDir/media/ to mediaDir/
+  6.  Media subdir clean - media/ subdir removed after image move
+  7.  Path rewriting     - image paths in .md updated to flattened location
+  8.  Image collision    - duplicate filename gets counter suffix (-1, -2…)
+  9.  Pandoc failure     - failed conversion logged, still marked processed
+  10. Batch limit        - only 10 files per run
+  11. Git exclusion      - .git/ DOCX files not processed
+  12. Automation excl.   - .automation/ DOCX files not processed
+  13. Logging            - START/DONE markers, timestamps, task prefix
+  14. Idempotency        - second run processes 0 files
+  15. Parametrized slugs - various name → slug transformations
 """
 
 from __future__ import annotations
@@ -77,7 +77,7 @@ _PNG_1X1 = (
 )
 
 # ---------------------------------------------------------------------------
-# Fake pandoc — PowerShell script + Windows batch wrapper
+# Fake pandoc - PowerShell script + Windows batch wrapper
 # ---------------------------------------------------------------------------
 
 # Simulates pandoc:
@@ -138,7 +138,7 @@ def assert_images_similar(
         from PIL import Image
         from skimage.metrics import structural_similarity as ssim  # type: ignore
     except ImportError:
-        pytest.skip("scikit-image / Pillow not installed — skipping SSIM check")
+        pytest.skip("scikit-image / Pillow not installed - skipping SSIM check")
 
     img_a = np.array(Image.open(path_a).convert("L"))
     img_b = np.array(Image.open(path_b).convert("L"))
@@ -213,7 +213,7 @@ def _processed_entries(vault: Path) -> list[str]:
 
 
 def _make_docx(path: Path) -> None:
-    """Write a placeholder .docx (fake bytes — pandoc is mocked, never reads it)."""
+    """Write a placeholder .docx (fake bytes - pandoc is mocked, never reads it)."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(b"PK\x03\x04" + b"\x00" * 26)  # ZIP local-file header signature
 
@@ -266,7 +266,7 @@ class TestNoDocxFiles:
 
 
 # ---------------------------------------------------------------------------
-# 2. Happy path — DOCX conversion
+# 2. Happy path - DOCX conversion
 # ---------------------------------------------------------------------------
 
 

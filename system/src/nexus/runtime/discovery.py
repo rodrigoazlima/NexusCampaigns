@@ -1,4 +1,4 @@
-"""nexus.runtime.discovery — scans agents/*/agent.json into the ordered task
+"""nexus.runtime.discovery - scans agents/*/agent.json into the ordered task
 list the scheduler dispatches from."""
 
 from __future__ import annotations

@@ -1,7 +1,7 @@
-# GM Workspace Refactor — Page Specs
+# GM Workspace Refactor - Page Specs
 
 **Purpose:** split the single `/gm` "Campaign Workshop" hub into a set of
-focused, fully managed pages — one per campaign-building domain — so a Game
+focused, fully managed pages - one per campaign-building domain - so a Game
 Master can run an entire campaign setting end to end without leaving the
 dashboard. Each page spec below is UI/UX-level (ideas, buttons, actions, lists,
 tables, filters, states), grounded in the existing pipeline, agents, and APIs.
@@ -16,7 +16,7 @@ where it does not it is tagged **NEW**.
 
 | Route | Page | Entity `type`s | Spec |
 |-------|------|----------------|------|
-| `/gm` | Campaign Setting (replaces the hub) | — (cross-cutting) | [campaign.md](campaign.md) |
+| `/gm` | Campaign Setting (replaces the hub) | - (cross-cutting) | [campaign.md](campaign.md) |
 | `/gm/npcs` | Characters & NPCs | `npc` `character` | [npcs.md](npcs.md) |
 | `/gm/places` | World & Places | `location` `city` `village` `dungeon` | [places.md](places.md) |
 | `/gm/factions` | Factions & Powers | `faction` `organization` `religion` | [factions.md](factions.md) |
@@ -58,8 +58,8 @@ field set, its pillar-specific actions). Read this section first.
 
 ### Concept
 
-One screen to manage every entity in a pillar — drafts (`01-Processing`) and
-canon (`02-Library`) side by side — create new ones from scratch or from an
+One screen to manage every entity in a pillar - drafts (`01-Processing`) and
+canon (`02-Library`) side by side - create new ones from scratch or from an
 agent, edit inline, and promote to canon. It is the pillar's slice of the vault
 made directly actionable.
 
@@ -73,7 +73,7 @@ made directly actionable.
 ├ Filter bar ───────────────────────────────────────────────────────────────┤
 │  [type ▾] [origin ▾] [status ▾] [⚲ search]            [grid|table] [sort ▾]│
 ├ Collection ───────────────────────────────────────────────────────────────┤
-│  card grid (default) OR table — see below                                  │
+│  card grid (default) OR table - see below                                  │
 └────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -128,13 +128,13 @@ Updated (default) · Quality · Name · Status · Most-linked.
 
 ### Primary actions (header)
 
-1. **`+ New ▾`** — **NEW** `POST /api/gm/create`. Dropdown of the pillar's
+1. **`+ New ▾`** - **NEW** `POST /api/gm/create`. Dropdown of the pillar's
    `type`s. Creates a blank draft in `01-Processing` with standard frontmatter
    (`status: draft`, `quality: 0`, `reviewed: false`, today's `created`/
    `updated`, empty `tags`/`source`/`relationships`) and a **body skeleton
    pre-filled from the pillar's "Vital info" list** in
    `campaign-setting-guide.md`. Routes straight into `/gm/view/{id}`.
-2. **`Generate with AI`** — opens the `lore` agent (existing `/api/gm/chat`,
+2. **`Generate with AI`** - opens the `lore` agent (existing `/api/gm/chat`,
    `save: true`) seeded with a pillar-appropriate prompt; the saved draft lands
    in `01-Processing` and appears in the collection.
 
@@ -155,9 +155,9 @@ Bulk (table selection): Promote, Flag, Archive, Add tag, Add relationship.
 
 ### States
 
-- **Empty (no entities):** centered prompt — "No {pillar} yet" + two CTAs:
+- **Empty (no entities):** centered prompt - "No {pillar} yet" + two CTAs:
   `+ New` and "Drop sources in the Inbox →" (`/gm/inbox`).
-- **Empty (filtered out):** "No entities match — clear filters".
+- **Empty (filtered out):** "No entities match - clear filters".
 - **Loading:** spinner panel (matches `/gm/review`).
 - **Error:** toast, bottom-center, auto-dismiss ~3s (`gm-ui-guidelines.md` §5).
 
@@ -173,13 +173,13 @@ Bulk (table selection): Promote, Flag, Archive, Add tag, Add relationship.
 
 ## Shared conventions (all pages)
 
-- **Theme tokens only** — `surface`/`surface-1..4`, `primary`, `success`,
+- **Theme tokens only** - `surface`/`surface-1..4`, `primary`, `success`,
   `danger`, `warning`, `zinc-*`. No raw hex. (`gm-ui-guidelines.md` §2.)
 - **Components to reuse:** `PageHeader`, `Tip`, `QualityBar`, `QualityPicker`,
   `TagEditor`, `RelationshipEditor`, `BadgeSelect`, `ReviewCard`, `AutoRefresh`,
   the `ActionBtn` icon-button pattern.
 - **Editor:** all "edit one entity" deep-links go to the existing
-  `/gm/view/{id}` (`ItemDetailView`) — pages do not re-implement editing.
+  `/gm/view/{id}` (`ItemDetailView`) - pages do not re-implement editing.
 - **Feedback:** transient toasts, not sticky status. One toast at a time.
 - **Type → color** (existing map): cast=blue, world=green, powers=purple,
   story=yellow, bestiary=red, treasures=orange/teal.

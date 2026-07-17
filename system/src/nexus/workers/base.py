@@ -1,13 +1,13 @@
-"""nexus.workers.base — the worker contract (worker-contract.spec.md).
+"""nexus.workers.base - the worker contract (worker-contract.spec.md).
 
 A worker is a plain in-process module: `pending()` (cheap poll, no side
 effects) + `handle(item)` (one unit of work, persists its own progress).
 No subprocess, no LLM clients anywhere under nexus.workers.
 
 Kinds:
-  queue      — polled every runner cycle; `pending()` derives work items
+  queue      - polled every runner cycle; `pending()` derives work items
                (inbox-queue slots, mtime scans, missing outputs).
-  scheduled  — cron-like; the runner's due-check on `interval_seconds`
+  scheduled  - cron-like; the runner's due-check on `interval_seconds`
                is the only trigger. Queue workers have NO interval.
 """
 
@@ -105,7 +105,7 @@ def make_worker_logger(name: str) -> Logger:
 def adopt_legacy_file(legacy: Path, target: Path) -> None:
     """One-time state migration: copy an old state file to its worker home.
 
-    No-op when the target already exists or the legacy file is gone — the
+    No-op when the target already exists or the legacy file is gone - the
     legacy dir is deleted with its agent folder, after which this never fires.
     """
     if target.exists() or not legacy.exists():

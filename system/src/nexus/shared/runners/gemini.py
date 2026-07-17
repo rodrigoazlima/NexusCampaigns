@@ -1,12 +1,12 @@
-"""GeminiRunner — Google Gemini API.
+"""GeminiRunner - Google Gemini API.
 
 Dispatch config keys (from GeminiApiConfig):
-  model            str   — model ID, e.g. gemini-2.5-flash
-  system_file      str?  — path to system prompt, relative to agent_dir
-  prompt_file      str?  — path to user prompt, relative to agent_dir
-  max_tokens       int   — default 2048
-  temperature      float — default 0.0
-  timeout_seconds  int   — default 120 (accepted; SDK timeout via request_options)
+  model            str   - model ID, e.g. gemini-2.5-flash
+  system_file      str?  - path to system prompt, relative to agent_dir
+  prompt_file      str?  - path to user prompt, relative to agent_dir
+  max_tokens       int   - default 2048
+  temperature      float - default 0.0
+  timeout_seconds  int   - default 120 (accepted; SDK timeout via request_options)
 
 Auth: GEMINI_API_KEY env var.
 
@@ -33,7 +33,7 @@ class GeminiRunner:
         except ImportError:
             return RunResult(
                 exit_code=1,
-                error="google-generativeai package not installed — run: pip install google-generativeai",
+                error="google-generativeai package not installed - run: pip install google-generativeai",
             )
 
         api_key = os.environ.get("GEMINI_API_KEY")

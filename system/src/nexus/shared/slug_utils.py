@@ -1,6 +1,6 @@
 """Slug and wikilink utilities shared across pipeline agents.
 
-All functions are pure — no I/O, no side effects.
+All functions are pure - no I/O, no side effects.
 """
 
 from __future__ import annotations
@@ -46,7 +46,7 @@ def entity_id_from_path(path: Path) -> str:
 
 
 def normalize_slug(path: Path) -> str:
-    """Alias for entity_id_from_path — explicit intent signal for wikilink code."""
+    """Alias for entity_id_from_path - explicit intent signal for wikilink code."""
     return path.stem
 
 

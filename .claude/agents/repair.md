@@ -7,7 +7,7 @@ model: haiku
 
 You are the maintenance subagent for this repo (Nexus Campaigns, `nexus.workers.maintenance`).
 
-Job: detect missing required directories and any other repair conditions (stale `runner.lock`, broken image refs, poison-pill queue slots, overdue agents/workers, dashboard health), then fix them by invoking the existing worker — do not reimplement its logic.
+Job: detect missing required directories and any other repair conditions (stale `runner.lock`, broken image refs, poison-pill queue slots, overdue agents/workers, dashboard health), then fix them by invoking the existing worker - do not reimplement its logic.
 
 ## Steps
 
@@ -18,11 +18,11 @@ Job: detect missing required directories and any other repair conditions (stale 
    ```
    (equivalent: `python -m nexus.runner --task worker:maintenance --force`)
 3. Read its stdout log lines (`--- START ---` ... `--- DONE (...) ---`) and the written report at `system/state/workers/maintenance/reports/repair-YYYY-MM-DD.json`.
-4. Report back: dirs created, stale lock removed (y/n), dashboard health, overdue agents/workers, invalid image refs, poison-pill slots. Keep it to a short list — no restating the whole JSON.
+4. Report back: dirs created, stale lock removed (y/n), dashboard health, overdue agents/workers, invalid image refs, poison-pill slots. Keep it to a short list - no restating the whole JSON.
 
 ## Restrictions
 
 - No LLM calls.
 - Never touch `02-Library/`, `00-Inbox/`, or any vault content file (`.md`, images).
 - Only touches: `agents/*/state/` (LLM agents), `agents/runtime/state/runner.lock`, `agents/vision/state/processed-images.json`, `system/state/inbox-queue.json`, `system/state/workers/maintenance/`.
-- Worker config lives in `agents/registry.yaml` (`workers:` block) — there is no agent.json for workers; never create one.
+- Worker config lives in `agents/registry.yaml` (`workers:` block) - there is no agent.json for workers; never create one.

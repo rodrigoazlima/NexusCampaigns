@@ -68,7 +68,7 @@ workers:
   moves into `pending()`).
 - `_AGENT_JSON_SPECS["ingestion"]` in maintenance code.
 - `nexus/tasks/ingestion_agent.py` (module moves to `nexus/workers/ingestion.py`).
-- `BaseAgent` inheritance — worker uses the plain contract, drops the unused
+- `BaseAgent` inheritance - worker uses the plain contract, drops the unused
   agentic lifecycle wrapper.
 
 ## Migration steps

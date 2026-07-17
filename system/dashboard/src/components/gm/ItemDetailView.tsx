@@ -25,7 +25,7 @@ const MDEditor = dynamic(() => import('@uiw/react-md-editor'), { ssr: false })
 const MarkdownPreview = dynamic(() => import('@uiw/react-markdown-preview'), { ssr: false })
 
 // Split a vault md file into its YAML frontmatter block and the body below it.
-// Tolerant of CRLF — vault files are written on Windows.
+// Tolerant of CRLF - vault files are written on Windows.
 function splitFrontmatter(raw: string): { fm: string; body: string } {
   const m = raw.match(/^(---\r?\n[\s\S]*?\r?\n---\r?\n?)([\s\S]*)$/)
   return m ? { fm: m[1], body: m[2] } : { fm: '', body: raw }
@@ -139,7 +139,7 @@ function PathRow({
       </span>
       <button
         onClick={copy}
-        title={`${path} — click to copy`}
+        title={`${path} - click to copy`}
         className="font-mono text-[11px] text-zinc-500 truncate flex-1 text-left"
       >
         {path}
@@ -199,7 +199,7 @@ export default function ItemDetailView({ item: initial }: Props) {
   const headerRef = useRef<HTMLElement>(null)
 
   // Header height varies with viewport width (badges/actions wrap onto a second
-  // row on narrow screens) — publish it as a CSS var so the chat panel below can
+  // row on narrow screens) - publish it as a CSS var so the chat panel below can
   // size its scroll area against the space actually left, not a fixed guess.
   useEffect(() => {
     const el = headerRef.current
@@ -602,7 +602,7 @@ export default function ItemDetailView({ item: initial }: Props) {
         {/* LEFT: integrated media */}
         <div data-component="ItemDetailView.MediaColumn" className="space-y-4">
 
-          {/* Hero — source image with token integrated */}
+          {/* Hero - source image with token integrated */}
           <div data-component="ItemDetailView.HeroImage" className="relative group rounded-2xl overflow-hidden bg-surface-2 border border-surface-3 flex items-center justify-center" style={{ minHeight: 720 }}>
             {imageSrc ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -727,7 +727,7 @@ export default function ItemDetailView({ item: initial }: Props) {
                   <Pencil size={13} /> Edit
                 </Link>
 
-                {/* hover dropdown — soft fade + rise, no layout shift */}
+                {/* hover dropdown - soft fade + rise, no layout shift */}
                 <div
                   className="absolute left-0 top-full mt-2 z-40 w-48 origin-top-left rounded-lg border border-surface-3 bg-surface-2 shadow-2xl p-2
                              opacity-0 scale-95 translate-y-1 pointer-events-none
@@ -778,7 +778,7 @@ export default function ItemDetailView({ item: initial }: Props) {
           </div>
         </div>
 
-        {/* RIGHT: content editor — narrative body (history, lore, location, gods, …) */}
+        {/* RIGHT: content editor - narrative body (history, lore, location, gods, …) */}
         {mdContent !== null && (
           <div data-component="ItemDetailView.ContentColumn" className="space-y-4">
             <div className="panel p-4">
@@ -826,7 +826,7 @@ export default function ItemDetailView({ item: initial }: Props) {
                       onDoubleClick={() => setContentEditMode(true)}
                       className="min-h-[720px] px-1 cursor-text"
                     >
-                      <MarkdownPreview source={body || '*No content yet — double click to edit*'} />
+                      <MarkdownPreview source={body || '*No content yet - double click to edit*'} />
                     </div>
                   )}
                 </div>
@@ -880,7 +880,7 @@ export default function ItemDetailView({ item: initial }: Props) {
         <ItemChatPanel item={item} agents={item.activeAgents} />
       </div>
 
-      {/* metadata rail — full width */}
+      {/* metadata rail - full width */}
       <div data-component="ItemDetailView.MetadataRail" className="px-4 md:px-6 pb-6">
         <div className="panel p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>

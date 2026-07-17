@@ -12,7 +12,7 @@ const QUEUE_FILE = path.join(PROJECT_ROOT, 'system', 'state', 'inbox-queue.json'
  * queue entries to 'paused'. Runner precondition checks and each agent's own
  * batch-selection query only ever pick up slots literally equal to
  * 'pending' (agents/runtime/tools/runner.py::_inbox_has_slot and friends),
- * so this alone removes the item from active processing — no Python-side
+ * so this alone removes the item from active processing - no Python-side
  * change needed. Reprocessing an agent (existing per-agent button) sets the
  * slot back to 'pending', which doubles as resume.
  */
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
       if (!entry?.agents) continue
       let touched = false
       // When `agent` is given (e.g. an agent detail page), only that slot is
-      // touched — the other agents on this queue entry keep processing.
+      // touched - the other agents on this queue entry keep processing.
       const slots = body.agent ? [body.agent] : Object.keys(entry.agents)
       for (const agent of slots) {
         if (entry.agents[agent] === 'pending') {

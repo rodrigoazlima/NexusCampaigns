@@ -283,7 +283,7 @@ export default function AgentQueueTable({ items, agent, byType }: Props) {
                 type="button"
                 onClick={() => handleDeleteClick('bulk', [...selected])}
                 disabled={[...selected].some((p) => busy.has(p))}
-                title="Delete the selected items — source, generated token, and thumbnail"
+                title="Delete the selected items - source, generated token, and thumbnail"
                 className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded bg-danger/10 text-danger border border-danger/30 hover:bg-danger/20 transition-colors disabled:opacity-50"
               >
                 <Trash2 size={11} /> {confirming.has('bulk') ? `Confirm delete ${selected.size}?` : `Delete ${selected.size}`}
@@ -336,7 +336,7 @@ export default function AgentQueueTable({ items, agent, byType }: Props) {
                         </td>
                         <td className="px-4 py-2 text-zinc-400">{formatRelative(item.ingestedAt)}</td>
                         <td className="px-4 py-2 text-zinc-400">{formatRelative(item.updatedAt)}</td>
-                        <td className="px-4 py-2 text-right text-zinc-500 font-mono">{reruns || '—'}</td>
+                        <td className="px-4 py-2 text-right text-zinc-500 font-mono">{reruns || '-'}</td>
                         <td className="px-4 py-2">
                           <div className="flex items-center gap-1">
                             {(status === 'pending' || status === 'stuck') && (
@@ -374,7 +374,7 @@ export default function AgentQueueTable({ items, agent, byType }: Props) {
                             )}
                             <button
                               type="button"
-                              title={confirming.has(item.path) ? 'Click again to permanently delete' : 'Delete this item — source, generated token, and thumbnail'}
+                              title={confirming.has(item.path) ? 'Click again to permanently delete' : 'Delete this item - source, generated token, and thumbnail'}
                               onClick={() => handleDeleteClick(item.path, [item.path])}
                               disabled={busy.has(item.path)}
                               className={`flex items-center justify-center h-6 px-1.5 rounded transition-colors disabled:opacity-50 ${

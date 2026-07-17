@@ -5,7 +5,7 @@ import { PILLARS, pillarOf } from './pillars'
 
 // Server-side campaign readiness + progress computation. All the heuristics
 // (which section counts as a "want" / a "clock") live here, not the UI, so they
-// stay tunable — per campaign.md §5. ponytail: computed inline in the server
+// stay tunable - per campaign.md §5. ponytail: computed inline in the server
 // page (no /api/gm/readiness endpoint); the page is force-dynamic + auto-refreshed.
 
 export type Entry = ReviewItem & { origin: 'draft' | 'canon' }
@@ -46,7 +46,7 @@ interface Flags {
   wantFilled: boolean
 }
 
-// A `## heading` section counts as "filled" only with real content — not empty
+// A `## heading` section counts as "filled" only with real content - not empty
 // and not a `>` blockquote (the create skeletons seed prompts as blockquotes).
 // Same rule as vault.parseWantSecret / parseBestiary.
 function sectionFilled(body: string, heading: string): boolean {

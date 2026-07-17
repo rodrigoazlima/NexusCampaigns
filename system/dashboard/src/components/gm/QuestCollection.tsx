@@ -3,7 +3,7 @@
 // ponytail: clone of FactionCollection specialized to the quests pillar (its
 // types, guidance, shape/hook/clock/branches deltas). When the shared shell
 // (filter bar, grid/table, ActionBtn, toast) hits a fourth copy, lift it into one
-// CollectionView. Skipped Delta 5 (timeline-lane drag canvas) — add when the
+// CollectionView. Skipped Delta 5 (timeline-lane drag canvas) - add when the
 // event/timeline redate API lands; grid + table cover the quest deltas now.
 
 import { useState } from 'react'
@@ -47,8 +47,8 @@ const GUIDANCE = [
   'An opening hook dropping the party into trouble in the first 15 min',
   '3+ quest threads of different shapes: a clear job · a mystery · a moral choice',
   'Stakes the party cares about (the innkeeper, not "the world")',
-  'A ticking clock — a deadline / advancing threat',
-  'Branches, not rails — ≥2 ways each quest can go',
+  'A ticking clock - a deadline / advancing threat',
+  'Branches, not rails - ≥2 ways each quest can go',
   'A campaign timeline of events that happen regardless of the party',
 ]
 
@@ -82,7 +82,7 @@ function ActionBtn({
 
 // Small shape badge (job/mystery/moral). Null shape → amber "no shape" hint.
 function ShapeChip({ shape }: { shape: string | null }) {
-  if (!shape) return <span className="text-[9px] px-1 py-0.5 rounded bg-warning/15 text-warning" title="no shape — job/mystery/moral">no shape</span>
+  if (!shape) return <span className="text-[9px] px-1 py-0.5 rounded bg-warning/15 text-warning" title="no shape - job/mystery/moral">no shape</span>
   const Icon = SHAPE_ICON[shape]
   return (
     <span className={`inline-flex items-center gap-1 text-[9px] px-1 py-0.5 rounded font-semibold uppercase ${TYPE_CHIP}`}>
@@ -125,8 +125,8 @@ export default function QuestCollection({ items }: { items: QuestItem[] }) {
   const withClock = quests.filter((i) => i.deadline).length
   const statuses = Array.from(new Set(items.map((i) => i.status))).filter(Boolean).sort()
 
-  // Delta 2 rollup — which shapes are present among quests (— for a missing one).
-  const shapeRollup = SHAPES.map((s) => (quests.some((i) => i.shape === s) ? s : '—')).join('/')
+  // Delta 2 rollup - which shapes are present among quests (- for a missing one).
+  const shapeRollup = SHAPES.map((s) => (quests.some((i) => i.shape === s) ? s : '-')).join('/')
 
   const act = async (endpoint: string, filename: string, okMsg: string) => {
     setBusy(filename)
@@ -185,7 +185,7 @@ export default function QuestCollection({ items }: { items: QuestItem[] }) {
       i.tags.some((t) => t.toLowerCase().includes(q))
     )
     .sort((a, b) => {
-      // Opening hook always pins to the top — the campaign's starting point.
+      // Opening hook always pins to the top - the campaign's starting point.
       if (a.openingHook !== b.openingHook) return a.openingHook ? -1 : 1
       if (sortBy === 'quality') return b.quality - a.quality
       if (sortBy === 'name') return a.id.localeCompare(b.id)
@@ -207,7 +207,7 @@ export default function QuestCollection({ items }: { items: QuestItem[] }) {
       <PageHeader
         icon={ScrollText}
         title="Quests & Story"
-        subtitle={`${items.length} entities · hook ${hasHook ? '✓' : '—'} · threads ${shapeRollup} · ${withClock} clocks · ${drafts} drafts · ${canon} canon`}
+        subtitle={`${items.length} entities · hook ${hasHook ? '✓' : '-'} · threads ${shapeRollup} · ${withClock} clocks · ${drafts} drafts · ${canon} canon`}
         actions={
           <div className="flex items-center gap-2">
             <div className="relative">
@@ -236,7 +236,7 @@ export default function QuestCollection({ items }: { items: QuestItem[] }) {
                 </>
               )}
             </div>
-            <Tip label="Generate with AI — coming soon">
+            <Tip label="Generate with AI - coming soon">
               <Link
                 href="/gm/chat"
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-surface-3 text-zinc-400 hover:text-zinc-200 border border-surface-3 transition-colors"
@@ -255,8 +255,8 @@ export default function QuestCollection({ items }: { items: QuestItem[] }) {
           className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-zinc-300 hover:text-white transition-colors"
         >
           {guideOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-          Build guidance — the story checklist
-          <span className="ml-auto font-normal text-zinc-500">hook {hasHook ? '✓' : '—'} · threads {shapeRollup} · {withClock} clock</span>
+          Build guidance - the story checklist
+          <span className="ml-auto font-normal text-zinc-500">hook {hasHook ? '✓' : '-'} · threads {shapeRollup} · {withClock} clock</span>
         </button>
         {guideOpen && (
           <ul className="px-4 pb-3 space-y-1.5 border-t border-surface-3/60 pt-3">
@@ -359,7 +359,7 @@ export default function QuestCollection({ items }: { items: QuestItem[] }) {
           </div>
         </div>
       ) : filtered.length === 0 ? (
-        <div className="panel p-12 text-center text-zinc-500 text-sm">No entities match — clear filters</div>
+        <div className="panel p-12 text-center text-zinc-500 text-sm">No entities match - clear filters</div>
       ) : view === 'grid' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {filtered.map((i) => {
@@ -379,7 +379,7 @@ export default function QuestCollection({ items }: { items: QuestItem[] }) {
                       {i.openingHook && <Star size={11} className="text-yellow-400 flex-shrink-0" />}
                       <span className="text-xs font-mono text-zinc-100 truncate group-hover:text-yellow-400">{i.id}</span>
                     </div>
-                    {/* patron · place — amber when the quest→NPC/location link is missing */}
+                    {/* patron · place - amber when the quest→NPC/location link is missing */}
                     {isQuest && (
                       <div className="flex items-center gap-2 mt-1 text-[10px]">
                         {i.patron ? (
@@ -404,16 +404,16 @@ export default function QuestCollection({ items }: { items: QuestItem[] }) {
                       <span className="text-[9px] font-mono text-zinc-500">Q{i.quality}</span>
                       {isQuest && (i.deadline
                         ? <span className="inline-flex items-center gap-1 text-[9px] px-1 py-0.5 rounded bg-yellow-500/10 text-yellow-400" title={`deadline: ${i.deadline}`}><Clock size={9} /> clock</span>
-                        : <span className="inline-flex items-center gap-1 text-[9px] px-1 py-0.5 rounded bg-warning/15 text-warning" title="no clock — a chore, not urgent"><Clock size={9} /> no clock</span>
+                        : <span className="inline-flex items-center gap-1 text-[9px] px-1 py-0.5 rounded bg-warning/15 text-warning" title="no clock - a chore, not urgent"><Clock size={9} /> no clock</span>
                       )}
-                      {isQuest && i.branches < 2 && <span className="inline-flex items-center gap-1 text-[9px] px-1 py-0.5 rounded bg-warning/15 text-warning" title="rail — single path, no branches"><GitBranch size={9} /> rail</span>}
+                      {isQuest && i.branches < 2 && <span className="inline-flex items-center gap-1 text-[9px] px-1 py-0.5 rounded bg-warning/15 text-warning" title="rail - single path, no branches"><GitBranch size={9} /> rail</span>}
                       {i.reward && <span className="inline-flex items-center gap-1 text-[9px] text-zinc-500 truncate" title={`reward: ${i.reward}`}><Gift size={9} />{i.reward}</span>}
-                      {i.relationships.length === 0 && <span className="text-[9px] text-warning" title="orphan — no relationships">⚠</span>}
+                      {i.relationships.length === 0 && <span className="text-[9px] text-warning" title="orphan - no relationships">⚠</span>}
                       {i.origin === 'draft' && !i.reviewed && <span className="text-[9px] px-1 py-0.5 rounded bg-warning/15 text-warning">new</span>}
                     </div>
                   </div>
                 </Link>
-                {/* Quick actions — drafts only (action endpoints operate on 01-Processing) */}
+                {/* Quick actions - drafts only (action endpoints operate on 01-Processing) */}
                 {i.origin === 'draft' && (
                   <div className="flex items-center gap-1.5 px-3 py-2 border-t border-surface-3/60 opacity-0 group-hover:opacity-100 transition-opacity">
                     <ActionBtn label="Promote to canon" variant="success" busy={busy === i.filename} onClick={() => act('approve', i.filename, 'Promoted to Library')}><Check size={14} /></ActionBtn>
@@ -459,14 +459,14 @@ export default function QuestCollection({ items }: { items: QuestItem[] }) {
                         {isQuest && i.branches < 2 && <GitBranch size={10} className="text-warning" />}
                       </Link>
                     </td>
-                    <td className="p-2">{isQuest ? <ShapeChip shape={i.shape} /> : <span className="text-zinc-600">—</span>}</td>
-                    <td className="p-2">{!isQuest ? <span className="text-zinc-600">—</span> : i.patron ? <span className="text-zinc-400">{i.patron}</span> : <span className="text-warning">⚠ none</span>}</td>
-                    <td className="p-2">{!isQuest ? <span className="text-zinc-600">—</span> : i.place ? <span className="text-zinc-400">{i.place}</span> : <span className="text-warning">⚠ none</span>}</td>
-                    <td className="p-2">{!isQuest ? <span className="text-zinc-600">—</span> : i.deadline ? <span className="inline-flex items-center gap-1 text-yellow-400"><Clock size={11} />{i.deadline}</span> : <span className="text-warning">⚠ none</span>}</td>
+                    <td className="p-2">{isQuest ? <ShapeChip shape={i.shape} /> : <span className="text-zinc-600">-</span>}</td>
+                    <td className="p-2">{!isQuest ? <span className="text-zinc-600">-</span> : i.patron ? <span className="text-zinc-400">{i.patron}</span> : <span className="text-warning">⚠ none</span>}</td>
+                    <td className="p-2">{!isQuest ? <span className="text-zinc-600">-</span> : i.place ? <span className="text-zinc-400">{i.place}</span> : <span className="text-warning">⚠ none</span>}</td>
+                    <td className="p-2">{!isQuest ? <span className="text-zinc-600">-</span> : i.deadline ? <span className="inline-flex items-center gap-1 text-yellow-400"><Clock size={11} />{i.deadline}</span> : <span className="text-warning">⚠ none</span>}</td>
                     <td className="p-2"><span className={`px-1 py-0.5 rounded text-[10px] ${i.origin === 'canon' ? 'bg-success/10 text-success' : 'bg-surface-3 text-zinc-400'}`}>{i.origin}</span></td>
                     <td className="p-2"><QualityBar score={i.quality} showLabel={false} /></td>
                     <td className="p-2">{i.relationships.length === 0 ? <span className="text-warning">⚠ 0</span> : i.relationships.length}</td>
-                    <td className="p-2 text-zinc-500">{i.updated || '—'}</td>
+                    <td className="p-2 text-zinc-500">{i.updated || '-'}</td>
                     <td className="p-2">
                       <div className="flex items-center gap-1 justify-end">
                         {i.origin === 'draft' && (

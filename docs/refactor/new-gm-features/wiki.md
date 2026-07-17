@@ -1,4 +1,4 @@
-# Knowledge Wiki — Page Spec
+# Knowledge Wiki - Page Spec
 
 **Route:** `/gm/wiki` (index) · `/gm/wiki/{id}` (entity read view)
 **Icon:** `BookOpen` · **Nav:** GAME MASTER → Wiki
@@ -15,14 +15,14 @@ backlinks, and visualize the relationship web. It is the canon-facing twin of
 ## 1. Concept
 
 Three things the pillar pages don't give you:
-1. **One search across all types** — "find anything by name, tag, or text".
-2. **A reading view** — canon rendered as a wiki page with working links and
+1. **One search across all types** - "find anything by name, tag, or text".
+2. **A reading view** - canon rendered as a wiki page with working links and
    backlinks, not an editor.
-3. **The graph** — the §7 "relationship web" made visible and walkable.
+3. **The graph** - the §7 "relationship web" made visible and walkable.
 
 ## 2. Routes & layout
 
-### `/gm/wiki` — index
+### `/gm/wiki` - index
 
 ```
 ┌ PageHeader: BookOpen · "Knowledge Wiki" · "{N} entities · {E} links · {O} orphans" ┐
@@ -35,14 +35,14 @@ Three things the pillar pages don't give you:
 └─────────────────────────────────┴─────────────────────────────────────────────────┘
 ```
 
-### `/gm/wiki/{id}` — entity read view
+### `/gm/wiki/{id}` - entity read view
 
 ```
 ┌ Breadcrumb: Wiki / {pillar} / {id}        [Edit →] [Graph ◎] [Promote] (if draft)│
 ├ Hero: token/image (if any) · type badge · quality · tags ────────────────────────┤
 ├ Rendered markdown body (GFM, wikilinks clickable) ───────────────────────────────┤
 ├ Relationships ── outgoing [[links]] as chips ────────────────────────────────────┤
-├ Backlinks ── "Linked from" — every entity that [[links]] here ───────────────────┤
+├ Backlinks ── "Linked from" - every entity that [[links]] here ───────────────────┤
 └───────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -73,17 +73,17 @@ The §7 relationship web. **NEW** `GET /api/gm/graph` returns
 - Force-directed graph; node color = pillar, size = degree.
 - Click a node → opens its read view; hover → highlights its neighbors.
 - Filter the graph by pillar facet and by canon/draft.
-- **Orphan ring:** unconnected nodes parked at the edge — the visual form of the
+- **Orphan ring:** unconnected nodes parked at the edge - the visual form of the
   "no orphans" rule. Selecting one offers **Auto-link (Wiki agent)**.
 - **Triangle finder:** highlights 3-node cycles (the guide's "triangles, not
-  lists") — clusters that generate scenes.
+  lists") - clusters that generate scenes.
 
 ## 6. Backlinks & link health
 
 - Read view's **Backlinks** panel lists every entity whose `relationships`
-  contain this id — computed by scanning all files (cheap; the vault is small).
+  contain this id - computed by scanning all files (cheap; the vault is small).
 - **Broken link** detector: a `[[slug]]` whose target file doesn't exist renders
-  red with a **Create it** action (→ `POST /api/gm/create` pre-named) — turns a
+  red with a **Create it** action (→ `POST /api/gm/create` pre-named) - turns a
   dangling link into a draft, the way wikilinks should seed new entities.
 
 ## 7. Buttons & actions
@@ -102,16 +102,16 @@ The §7 relationship web. **NEW** `GET /api/gm/graph` returns
 | `Auto-link` | orphan/graph | dispatch `wikilink` agent on selection |
 | `Re-synthesize` | read view | dispatch `wiki` agent to rebuild the page body |
 
-The Wiki is **read + navigate + link**; it never edits bodies inline — that's
+The Wiki is **read + navigate + link**; it never edits bodies inline - that's
 the `/gm/view/{id}` editor's job. The two AI actions (`wiki` re-synthesize,
 `wikilink` auto-link) write only to `01-Processing` / `02-Library` `## Related`
 sections, per the agents' existing contracts.
 
 ## 8. States
 
-- **Empty vault:** "Nothing in the Library yet — build entities in the pillar
+- **Empty vault:** "Nothing in the Library yet - build entities in the pillar
   pages, then promote them here."
-- **No search results:** "No match — try a tag or a different term."
+- **No search results:** "No match - try a tag or a different term."
 - **Entity not found (`/gm/wiki/{id}`):** 404 with "Open in editor" if it exists
   as a draft.
 - **Graph with one node:** prompt to add relationships.
@@ -123,4 +123,4 @@ sections, per the agents' existing contracts.
 - **NEW:** `GET /api/gm/graph` (nodes+edges+backlinks), the read view route
   `/gm/wiki/{id}`, the force-directed graph component, broken-link detection.
 - Existing roadmap tie-in: "Relationship map auto-rendering in `04-Relationships/`"
-  — the graph view is its interactive front end.
+  - the graph view is its interactive front end.

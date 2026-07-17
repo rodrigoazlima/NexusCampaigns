@@ -27,7 +27,7 @@ class TestStateStoreLoad:
         s = StateStore(tmp_path / "s.json", default=default)
         result = s.load()
         result["b"] = 2
-        # Second load must return a fresh copy — not the mutated result
+        # Second load must return a fresh copy - not the mutated result
         assert s.load() == {"a": 1}
 
     def test_list_default_returns_copy(self, list_store):

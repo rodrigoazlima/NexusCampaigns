@@ -13,7 +13,7 @@ ingestion_options:
 
 # timeout_seconds: per-request LLM read timeout (default 120). An agent can
 # override it for its own calls via agent.json tasks.<task-id>.llm.timeout_seconds
-# (and, since load_llm_endpoint's model_key param, the model itself too —
+# (and, since load_llm_endpoint's model_key param, the model itself too -
 # e.g. classification's tasks.classification-agent.llm.text_model/vision_model).
 llm_endpoints:
   vision_llm:
@@ -28,7 +28,7 @@ llm_endpoints:
     type: text
     provider: local-router
     timeout_seconds: 120
-  # Classification agent's text-only calls — LM Studio directly rather than
+  # Classification agent's text-only calls - LM Studio directly rather than
   # LocalRouter's multi-provider catalog: a known-good, already-verified-local
   # model beats router-picked "auto" for assertive/predictable behavior.
   # wiki agent still uses local_router above; this alias is classification-only.
@@ -50,9 +50,9 @@ default_dispatch:
   system_file: "prompts/system.md"
 
 # How runner.py dispatches due/signalled tasks within one scheduling cycle:
-#   sync  — one agent at a time, in execution_order (default; safest, matches
+#   sync  - one agent at a time, in execution_order (default; safest, matches
 #           the pipeline's stage dependencies)
-#   async — all due agents for the cycle are dispatched concurrently
+#   async - all due agents for the cycle are dispatched concurrently
 #           (threads); queue/state writes are still serialized via
 #           agents/shared/file_lock.py so this is safe, just faster wall-clock
 pipeline_mode: sync
@@ -65,13 +65,13 @@ execution_order:
   - classification
 
 # ---------------------------------------------------------------------------
-# Static workers (no LLM) — run in-process inside nexus.runner each cycle.
+# Static workers (no LLM) - run in-process inside nexus.runner each cycle.
 # See docs/refactor/remove-agentic-useless-static-code/worker-contract.spec.md.
 # Declared order = execution order.
 #
-# kind: queue     — polled every cycle; pending() derives the work items.
+# kind: queue     - polled every cycle; pending() derives the work items.
 #                   Queue workers have NO interval.
-# kind: scheduled — cron-like; interval_seconds is the only trigger
+# kind: scheduled - cron-like; interval_seconds is the only trigger
 #                   (maintenance also fires on a worker-error signal).
 #
 # Defaults when a key is absent: enabled: true, batch_size: 10,
@@ -120,7 +120,7 @@ shared_state_files:
   inbox-queue.json:
     path: system/state/inbox-queue.json
     # Produced by the in-process ingestion worker, which lives inside the
-    # runtime — owner must name an entry in agents:.
+    # runtime - owner must name an entry in agents:.
     owner: runtime
     updaters:
       - vision
@@ -130,7 +130,7 @@ shared_state_files:
 agents:
   runtime:
     status: active
-    description: "Python scheduler, worker loop, and dispatch runtime — the only static code. Not an AI agent."
+    description: "Python scheduler, worker loop, and dispatch runtime - the only static code. Not an AI agent."
     interval_seconds: 60
     llm: none
     tools:

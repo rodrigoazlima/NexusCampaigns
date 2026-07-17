@@ -34,14 +34,14 @@ Analyze the provided Python script and extract all relevant configuration settin
    - Put script-specific behavior (batch sizes, task-specific prompts, agent name, etc.) in **local**.
    - Make sure the JSONs contain good defaults so the script works even if the files are deleted.
    - Use clear, consistent naming.
-   - Do not include code — only configuration.
+   - Do not include code - only configuration.
 
 ---
 
 **Script to analyze:**
 
 # shared\frontmatter_io.py
-"""Concrete FrontmatterIO — implements IFrontmatterIO.
+"""Concrete FrontmatterIO - implements IFrontmatterIO.
 
 Reads and writes YAML frontmatter in Markdown files.
 Uses ruamel.yaml for round-trip fidelity when available; falls back to PyYAML.
@@ -66,7 +66,7 @@ _FENCE_RE = re.compile(r"^---[ \t]*\r?\n(.*?)\r?\n---[ \t]*\r?\n?", re.DOTALL)
 
 
 # ---------------------------------------------------------------------------
-# YAML helpers — ruamel first, PyYAML fallback
+# YAML helpers - ruamel first, PyYAML fallback
 # ---------------------------------------------------------------------------
 
 def _load_yaml(text: str) -> dict[str, Any]:

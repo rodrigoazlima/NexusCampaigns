@@ -1,7 +1,7 @@
-"""nexus.workers — in-process static workers (no LLM, no subprocess).
+"""nexus.workers - in-process static workers (no LLM, no subprocess).
 
 Public surface: the contract types in base. Worker modules are imported
-lazily by name via base.create_worker — never import one worker from another.
+lazily by name via base.create_worker - never import one worker from another.
 """
 
 from .base import (

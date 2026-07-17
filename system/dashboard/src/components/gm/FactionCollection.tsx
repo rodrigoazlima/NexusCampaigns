@@ -37,8 +37,8 @@ const TYPES = ['faction', 'organization', 'religion'] as const
 const GUIDANCE = [
   '2–4 factions with clashing goals (overlap → friction → plot)',
   'Each needs: goal · method · leader (NPC) · stronghold (location) · a resource',
-  'A faction clock — what it does over coming weeks if uninterrupted',
-  'Where the party fits — who courts them, who they threaten',
+  'A faction clock - what it does over coming weeks if uninterrupted',
+  'Where the party fits - who courts them, who they threaten',
   'A religion / belief system if it matters',
 ]
 
@@ -75,7 +75,7 @@ function ActionBtn({
 function ClockPips({ steps, step, size = 'sm' }: { steps: number; step: number; size?: 'sm' | 'lg' }) {
   if (steps === 0) {
     return (
-      <span className="inline-flex items-center gap-1 text-[9px] px-1 py-0.5 rounded bg-warning/15 text-warning" title="no clock — won't act">
+      <span className="inline-flex items-center gap-1 text-[9px] px-1 py-0.5 rounded bg-warning/15 text-warning" title="no clock - won't act">
         static
       </span>
     )
@@ -140,7 +140,7 @@ export default function FactionCollection({ items }: { items: FactionItem[] }) {
     }
   }
 
-  // Advance/rewind the clock — persists clock_step to frontmatter (drafts only,
+  // Advance/rewind the clock - persists clock_step to frontmatter (drafts only,
   // since /api/gm/edit operates on 01-Processing).
   const setClock = async (i: FactionItem, next: number) => {
     setBusy(i.filename)
@@ -246,7 +246,7 @@ export default function FactionCollection({ items }: { items: FactionItem[] }) {
                 </>
               )}
             </div>
-            <Tip label="Generate with AI — coming soon">
+            <Tip label="Generate with AI - coming soon">
               <Link
                 href="/gm/chat"
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-surface-3 text-zinc-400 hover:text-zinc-200 border border-surface-3 transition-colors"
@@ -265,7 +265,7 @@ export default function FactionCollection({ items }: { items: FactionItem[] }) {
           className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-zinc-300 hover:text-white transition-colors"
         >
           {guideOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-          Build guidance — the factions checklist
+          Build guidance - the factions checklist
         </button>
         {guideOpen && (
           <ul className="px-4 pb-3 space-y-1.5 border-t border-surface-3/60 pt-3">
@@ -339,7 +339,7 @@ export default function FactionCollection({ items }: { items: FactionItem[] }) {
               className={`p-1.5 ${view === 'table' ? 'bg-primary/15 text-primary' : 'text-zinc-500 hover:text-zinc-300'}`}
               aria-label="Table view"
             ><TableIcon size={14} /></button>
-            <Tip label="Clocks board — advance several between sessions" side="bottom">
+            <Tip label="Clocks board - advance several between sessions" side="bottom">
               <button
                 onClick={() => setView('board')}
                 className={`p-1.5 ${view === 'board' ? 'bg-primary/15 text-primary' : 'text-zinc-500 hover:text-zinc-300'}`}
@@ -370,9 +370,9 @@ export default function FactionCollection({ items }: { items: FactionItem[] }) {
           </div>
         </div>
       ) : filtered.length === 0 ? (
-        <div className="panel p-12 text-center text-zinc-500 text-sm">No entities match — clear filters</div>
+        <div className="panel p-12 text-center text-zinc-500 text-sm">No entities match - clear filters</div>
       ) : view === 'board' ? (
-        /* Clocks board — every faction's clock stacked as a horizontal track */
+        /* Clocks board - every faction's clock stacked as a horizontal track */
         <div className="panel divide-y divide-surface-3/40">
           {filtered.map((i) => {
             const steps = i.clockSteps.length
@@ -382,7 +382,7 @@ export default function FactionCollection({ items }: { items: FactionItem[] }) {
               <div key={i.id} className="flex items-center gap-3 px-4 py-3">
                 <Link href={cardHref(i)} className="font-mono text-xs text-zinc-200 hover:text-purple-400 w-48 truncate">{i.id}</Link>
                 {steps === 0 ? (
-                  <span className="text-[11px] text-warning flex-1">static — no clock, won&apos;t act</span>
+                  <span className="text-[11px] text-warning flex-1">static - no clock, won&apos;t act</span>
                 ) : (
                   <>
                     <div className="flex items-center gap-1.5 flex-1 min-w-0">
@@ -426,7 +426,7 @@ export default function FactionCollection({ items }: { items: FactionItem[] }) {
                     <div className="flex items-center gap-1.5">
                       <span className="text-xs font-mono text-zinc-100 truncate group-hover:text-purple-400">{i.id}</span>
                     </div>
-                    {/* leader · stronghold — amber when the faction→NPC/location link is missing */}
+                    {/* leader · stronghold - amber when the faction→NPC/location link is missing */}
                     <div className="flex items-center gap-2 mt-1 text-[10px]">
                       {i.leader ? (
                         <span className="inline-flex items-center gap-1 text-zinc-400 truncate"><User size={9} className="flex-shrink-0" />{i.leader}</span>
@@ -445,12 +445,12 @@ export default function FactionCollection({ items }: { items: FactionItem[] }) {
                       <span className="text-[9px] font-mono text-zinc-500">Q{i.quality}</span>
                       <ClockPips steps={i.clockSteps.length} step={i.clockStep} />
                       {i.rival && <span className="inline-flex items-center gap-1 text-[9px] px-1 py-0.5 rounded bg-danger/10 text-danger" title={`at war with ${i.rival}`}><Swords size={9} /> war</span>}
-                      {i.relationships.length === 0 && <span className="text-[9px] text-warning" title="orphan — no relationships">⚠</span>}
+                      {i.relationships.length === 0 && <span className="text-[9px] text-warning" title="orphan - no relationships">⚠</span>}
                       {i.origin === 'draft' && !i.reviewed && <span className="text-[9px] px-1 py-0.5 rounded bg-warning/15 text-warning">new</span>}
                     </div>
                   </div>
                 </Link>
-                {/* Quick actions — drafts only (action endpoints operate on 01-Processing) */}
+                {/* Quick actions - drafts only (action endpoints operate on 01-Processing) */}
                 {i.origin === 'draft' && (
                   <div className="flex items-center gap-1.5 px-3 py-2 border-t border-surface-3/60 opacity-0 group-hover:opacity-100 transition-opacity">
                     {i.clockSteps.length > 0 && (
@@ -518,7 +518,7 @@ export default function FactionCollection({ items }: { items: FactionItem[] }) {
                     <td className="p-2"><span className={`px-1 py-0.5 rounded text-[10px] ${i.origin === 'canon' ? 'bg-success/10 text-success' : 'bg-surface-3 text-zinc-400'}`}>{i.origin}</span></td>
                     <td className="p-2"><QualityBar score={i.quality} showLabel={false} /></td>
                     <td className="p-2">{i.relationships.length === 0 ? <span className="text-warning">⚠ 0</span> : i.relationships.length}</td>
-                    <td className="p-2 text-zinc-500">{i.updated || '—'}</td>
+                    <td className="p-2 text-zinc-500">{i.updated || '-'}</td>
                     <td className="p-2">
                       <div className="flex items-center gap-1 justify-end">
                         {i.origin === 'draft' && (

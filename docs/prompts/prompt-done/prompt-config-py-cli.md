@@ -34,14 +34,14 @@ Analyze the provided Python script and extract all relevant configuration settin
    - Put script-specific behavior (batch sizes, task-specific prompts, agent name, etc.) in **local**.
    - Make sure the JSONs contain good defaults so the script works even if the files are deleted.
    - Use clear, consistent naming.
-   - Do not include code — only configuration.
+   - Do not include code - only configuration.
 
 ---
 
 **Script to analyze:**
 
 # shared\runners\cli.py
-"""CliRunner — subprocess dispatch for cli agents."""
+"""CliRunner - subprocess dispatch for cli agents."""
 
 from __future__ import annotations
 
@@ -93,7 +93,7 @@ class CliRunner:
             error     = f"Process timed out after {timeout_seconds}s"
         except FileNotFoundError as exc:
             exit_code = 1
-            error     = f"Command not found: {command!r} — {exc}"
+            error     = f"Command not found: {command!r} - {exc}"
         except Exception as exc:
             exit_code = 1
             error     = str(exc)

@@ -1,4 +1,4 @@
-"""Vault configuration — two layers.
+"""Vault configuration - two layers.
 
 Layer 1 (dataclasses): VaultConfig / VaultPaths / SystemPaths / LLMEndpointConfig
   Pure structure, no I/O. Loader lives in shared.loaders.
@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field, field_validator
 
 
 # ---------------------------------------------------------------------------
-# Layer 1 — Dataclass-based vault config (unchanged public surface)
+# Layer 1 - Dataclass-based vault config (unchanged public surface)
 # ---------------------------------------------------------------------------
 
 @dataclass(frozen=True)
@@ -101,10 +101,10 @@ class VaultConfig:
 
 
 # ---------------------------------------------------------------------------
-# Layer 2 — Pydantic AppConfig + JSON loader
+# Layer 2 - Pydantic AppConfig + JSON loader
 # ---------------------------------------------------------------------------
 
-# Embedded defaults — application works even with no JSON files on disk.
+# Embedded defaults - application works even with no JSON files on disk.
 _GLOBAL_DEFAULTS: dict[str, Any] = {
     "vault_root": ".knowledge-base",
     "llm": {

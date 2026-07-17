@@ -1,24 +1,24 @@
-"""nexus.workers.maintenance — pipeline self-healing (scheduled + signal-triggered).
+"""nexus.workers.maintenance - pipeline self-healing (scheduled + signal-triggered).
 
 Replaces nexus.tasks.repair_agent. Runs daily, or immediately after any
 worker item errors (worker-error signal, consumed by the runner loop).
 
-Actions (each isolated — a failure never blocks the others):
-  GitUpdate                  — git fetch + pull --ff-only
-  ParseErrorPatterns         — scan automation.log (last 24h) for fixable patterns
-  RemoveStaleLock            — delete runner.lock if age > 30 min
-  GenerateMissingAgentConfigs— scaffold agent.json for LLM agents only
-  CreateMissingDirs          — ensure REQUIRED_DIRS exist
-  EnsureAgentScaffold        — prompts/ + state/ dirs for LLM agents only
-  EnsureAgentRelationLinks   — junctions for LLM/planned agents only
-  ValidateImageRefs          — verify processed-images.json refs by SHA256
-  ValidateInboxQueue         — prune gone-file entries, backfill missing slots,
+Actions (each isolated - a failure never blocks the others):
+  GitUpdate                  - git fetch + pull --ff-only
+  ParseErrorPatterns         - scan automation.log (last 24h) for fixable patterns
+  RemoveStaleLock            - delete runner.lock if age > 30 min
+  GenerateMissingAgentConfigs- scaffold agent.json for LLM agents only
+  CreateMissingDirs          - ensure REQUIRED_DIRS exist
+  EnsureAgentScaffold        - prompts/ + state/ dirs for LLM agents only
+  EnsureAgentRelationLinks   - junctions for LLM/planned agents only
+  ValidateImageRefs          - verify processed-images.json refs by SHA256
+  ValidateInboxQueue         - prune gone-file entries, backfill missing slots,
                                reset resolvable error slots (reruns < 3),
                                report poison pills (error slots, reruns >= 3)
-  DetectOverdueAgents        — LLM agents by agent.json interval,
+  DetectOverdueAgents        - LLM agents by agent.json interval,
                                workers by registry workers: interval
-  CheckDashboardHealth       — TCP + HTTP probe
-  WriteRepairReport          — system/state/workers/maintenance/reports/
+  CheckDashboardHealth       - TCP + HTTP probe
+  WriteRepairReport          - system/state/workers/maintenance/reports/
 """
 
 from __future__ import annotations
@@ -153,17 +153,17 @@ def _remove_stale_lock(log: Logger) -> int:
             _LOCK_FILE.unlink()
             log.info(f"Removed stale lock (age={age:.0f}s pid={data.get('pid')})")
             return 1
-        log.info(f"Lock is fresh (age={age:.0f}s) — skipping")
+        log.info(f"Lock is fresh (age={age:.0f}s) - skipping")
     except Exception as exc:
         log.warning(f"Cannot inspect lock file: {exc}")
     return 0
 
 
 # ---------------------------------------------------------------------------
-# GenerateMissingAgentConfigs — LLM agents only. agent.json is gitignored
+# GenerateMissingAgentConfigs - LLM agents only. agent.json is gitignored
 # (machine-local dispatch config); a fresh clone has none, so runner.py's
 # agents/*/agent.json glob discovers zero LLM tasks. Static tasks are
-# workers now — configured in registry.yaml, nothing to regenerate.
+# workers now - configured in registry.yaml, nothing to regenerate.
 # ---------------------------------------------------------------------------
 
 _AGENT_JSON_SPECS: dict[str, list[dict]] = {
@@ -240,7 +240,7 @@ def _create_missing_dirs(log: Logger) -> int:
 
 def _ensure_agent_scaffold(log: Logger) -> int:
     """LLM agents get a real prompts/ and state/ dir. Creates only what's
-    missing — never touches an existing one."""
+    missing - never touches an existing one."""
     created = 0
     for agent_name in _AGENT_JSON_SPECS:
         agent_root = _AGENTS_DIR / agent_name
@@ -256,10 +256,10 @@ def _ensure_agent_scaffold(log: Logger) -> int:
 
 
 # ---------------------------------------------------------------------------
-# EnsureAgentRelationLinks — mirrors setup-service.ps1's Ensure-AgentRelationLinks
-# (see docs/specs/agents/agent-relationships.md). LLM + planned agents only —
+# EnsureAgentRelationLinks - mirrors setup-service.ps1's Ensure-AgentRelationLinks
+# (see docs/specs/agents/agent-relationships.md). LLM + planned agents only -
 # static agents are workers now and have no folders. Only creates a junction
-# where the path is completely absent (a destroyed link) — never touches a
+# where the path is completely absent (a destroyed link) - never touches a
 # path that already exists.
 #
 # Every generated mount's top path segment is dot-prefixed by convention
@@ -296,7 +296,7 @@ def _ensure_agent_relation_links(log: Logger) -> int:
             continue
 
         # Every agent also gets system/state regardless of its table entry
-        # ("system" already covers state/ — skip the overlap).
+        # ("system" already covers state/ - skip the overlap).
         extra = ["system/state"] if "system" not in rels else []
         for rel in extra + rels:
             targets = (
@@ -316,7 +316,7 @@ def _ensure_agent_relation_links(log: Logger) -> int:
                 link_path = agent_root / link_rel
 
                 if link_path.exists():
-                    continue  # intact link, real dir, or file — never touch it
+                    continue  # intact link, real dir, or file - never touch it
                 if not target_path.exists():
                     continue  # nothing to link to (yet)
 
@@ -337,7 +337,7 @@ def _ensure_agent_relation_links(log: Logger) -> int:
 
 
 # ---------------------------------------------------------------------------
-# ValidateImageRefs — SHA256 identity check
+# ValidateImageRefs - SHA256 identity check
 # ---------------------------------------------------------------------------
 
 _sha256_of_file = sha256_of_file
@@ -368,14 +368,14 @@ def _validate_image_refs(log: Logger) -> tuple[int, list[str]]:
         abs_path = _PROJECT_ROOT / rel_path
 
         if not abs_path.exists():
-            # File missing — prune entry
+            # File missing - prune entry
             del images[key]
             invalid_refs.append(rel_path)
             removed += 1
             log.info(f"Pruned missing image ref{image_tag(uuid=entry.get('uuid'), path=rel_path)}")
             continue
 
-        # SHA256 identity check — skip pseudo-keys (path:...)
+        # SHA256 identity check - skip pseudo-keys (path:...)
         if key.startswith("path:"):
             continue
 
@@ -385,14 +385,14 @@ def _validate_image_refs(log: Logger) -> tuple[int, list[str]]:
                 actual_sha = _sha256_of_file(abs_path)
                 if actual_sha != stored_sha:
                     # The path was reused for different bytes since this entry was
-                    # written (e.g. a slug-collision rename) — the ledger's identity
+                    # written (e.g. a slug-collision rename) - the ledger's identity
                     # for this path is now wrong, not just out of date.
                     log.warning(
                         f"SHA256 mismatch: stored={stored_sha[:8]}… actual={actual_sha[:8]}…"
                         f"{image_tag(uuid=entry.get('uuid'), path=rel_path)}"
                     )
                     invalid_refs.append(rel_path)
-                    # Flag entry as failed rather than deleting — preserves audit trail
+                    # Flag entry as failed rather than deleting - preserves audit trail
                     images[key]["status"] = "failed"
                     removed += 1
             except Exception as exc:
@@ -414,7 +414,7 @@ def _validate_image_refs(log: Logger) -> tuple[int, list[str]]:
 
 
 # ---------------------------------------------------------------------------
-# ValidateInboxQueue — prune gone files, backfill slots, reset resolvable
+# ValidateInboxQueue - prune gone files, backfill slots, reset resolvable
 # error slots, collect poison pills
 # ---------------------------------------------------------------------------
 
@@ -424,10 +424,10 @@ def _validate_inbox_queue(log: Logger) -> tuple[int, list[str], list[dict]]:
     - Prunes entries whose file no longer exists on disk (nothing else ever
       shrinks the queue back to reality).
     - Backfills missing agent slots through AgentSlots defaults (schema
-      evolution — moved here from the old ingestion batch task).
+      evolution - moved here from the old ingestion batch task).
     - Resets slots stuck at 'error' with reruns < 3 back to 'pending' and
       increments reruns.<slot> (the underlying file exists, so the cause may
-      be resolved — worth a retry).
+      be resolved - worth a retry).
     - Collects poison pills: error slots with reruns >= 3, for the report.
 
     Returns (repairs_applied, pruned_paths, poison_pills).
@@ -501,7 +501,7 @@ def _validate_inbox_queue(log: Logger) -> tuple[int, list[str], list[dict]]:
 
 
 # ---------------------------------------------------------------------------
-# DetectOverdueAgents — LLM agents (agent.json) + workers (registry.yaml)
+# DetectOverdueAgents - LLM agents (agent.json) + workers (registry.yaml)
 # ---------------------------------------------------------------------------
 
 def _load_registry_raw() -> dict:
@@ -539,7 +539,7 @@ def _detect_overdue_agents(log: Logger) -> list[str]:
             log.warning(f"Cannot parse {agent_json}: {exc}")
 
     # Scheduled workers: interval_seconds from registry.yaml workers: block.
-    # Queue workers poll every cycle and have no interval — not checked here.
+    # Queue workers poll every cycle and have no interval - not checked here.
     for name, raw in (_load_registry_raw().get("workers") or {}).items():
         raw = raw or {}
         if raw.get("kind") == "scheduled" and raw.get("enabled", True):
@@ -658,13 +658,13 @@ def _write_repair_report(
 # ---------------------------------------------------------------------------
 
 def _run_step(log: Logger, name: str, fn, default):
-    """Run one repair step in isolation — a failure here must never block the
+    """Run one repair step in isolation - a failure here must never block the
     other steps (in particular CreateMissingDirs, downstream of several
     steps that touch the filesystem/network/git and can raise)."""
     try:
         return fn()
     except Exception as exc:
-        log.error(f"Repair step {name!r} failed — continuing with other steps: {exc}")
+        log.error(f"Repair step {name!r} failed - continuing with other steps: {exc}")
         return default
 
 

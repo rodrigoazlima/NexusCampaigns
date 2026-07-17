@@ -34,14 +34,14 @@ Analyze the provided Python script and extract all relevant configuration settin
    - Put script-specific behavior (batch sizes, task-specific prompts, agent name, etc.) in **local**.
    - Make sure the JSONs contain good defaults so the script works even if the files are deleted.
    - Use clear, consistent naming.
-   - Do not include code — only configuration.
+   - Do not include code - only configuration.
 
 ---
 
 **Script to analyze:**
 
 # shared\loaders.py
-"""Config loader — builds VaultConfig and RegistryConfig from project root.
+"""Config loader - builds VaultConfig and RegistryConfig from project root.
 
 config.py declares the VaultConfig structure; this module resolves it from disk.
 registry.yaml (agent-registry.spec.md) is the single source of truth for

@@ -1,4 +1,4 @@
-"""nexus.runtime.scheduler — Runtime, the IOrchestrator implementation.
+"""nexus.runtime.scheduler - Runtime, the IOrchestrator implementation.
 
 Discovers agents from agent.json files and runs one scheduling cycle: checks
 due-time/signals/preconditions, dispatches agents (sync or concurrently per
@@ -104,7 +104,7 @@ class Runtime(IOrchestrator):
             log.error(f"Unexpected dispatch error: {exc}")
 
         if exit_code != 0 and entry.fallback_dispatch is not None:
-            log.info(f"Primary failed (exit {exit_code}) — trying fallback dispatch ({entry.fallback_dispatch.type})")
+            log.info(f"Primary failed (exit {exit_code}) - trying fallback dispatch ({entry.fallback_dispatch.type})")
             try:
                 fb_sub    = dispatch_config.extract_dispatch_sub(entry.fallback_dispatch)
                 fb_runner = get_runner(entry.fallback_dispatch.type)
@@ -123,7 +123,7 @@ class Runtime(IOrchestrator):
         scope = dispatch_config.read_agent_commit_scope(task_id)
         if not scope:
             self._log.warning(
-                f"No commit_scope declared for {task_id} — skipping git commit"
+                f"No commit_scope declared for {task_id} - skipping git commit"
             )
             return
         commit_scoped(task_id, scope, self._log)
@@ -181,14 +181,14 @@ class Runtime(IOrchestrator):
             except Exception as exc:
                 self._log.warning(f"Git commit failed for {task_id}: {exc}")
         else:
-            self._log.warning(f"Task {task_id} exited with code {exit_code} — skipping git commit")
+            self._log.warning(f"Task {task_id} exited with code {exit_code} - skipping git commit")
 
     def run_cycle(self, task_filter: Optional[str] = None, force: bool = False) -> None:
         """One scheduling cycle: check all tasks, dispatch due and signal-triggered ones.
 
         pipeline_mode (registry.yaml) controls dispatch order:
-          sync  — one agent at a time, in execution_order (default)
-          async — all due/signalled agents for this cycle run concurrently
+          sync  - one agent at a time, in execution_order (default)
+          async - all due/signalled agents for this cycle run concurrently
 
         task_filter "worker:<name>" runs only that worker (no agent dispatch).
         """
@@ -214,7 +214,7 @@ class Runtime(IOrchestrator):
                 signalled = task_id in signal_triggered
 
                 if not due and not signalled:
-                    self._log.info(f"Skip {task_id} — not due, no signal")
+                    self._log.info(f"Skip {task_id} - not due, no signal")
                     continue
 
                 # Precondition: skip if agent has no pending work (saves tokens)
@@ -232,7 +232,7 @@ class Runtime(IOrchestrator):
 
         pipeline_mode = load_pipeline_mode()
         if pipeline_mode == "async" and len(to_run) > 1:
-            self._log.info(f"pipeline_mode=async — dispatching {len(to_run)} task(s) concurrently")
+            self._log.info(f"pipeline_mode=async - dispatching {len(to_run)} task(s) concurrently")
             from concurrent.futures import ThreadPoolExecutor  # noqa: PLC0415
             with ThreadPoolExecutor(max_workers=len(to_run)) as pool:
                 futures = [pool.submit(self._run_one, tid, e, r) for tid, e, r in to_run]
@@ -256,7 +256,7 @@ class Runtime(IOrchestrator):
                         f"Consumed {len(consumed)} '{signal_type}' signal(s) for {task_id}"
                     )
 
-        # Worker loop — in-process static workers (worker-contract.spec.md).
+        # Worker loop - in-process static workers (worker-contract.spec.md).
         # Skipped when a specific agent task was requested via --task.
         if task_filter is None or worker_filter is not None:
             assert self._state is not None

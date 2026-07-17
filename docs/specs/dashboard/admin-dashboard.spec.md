@@ -1,4 +1,4 @@
-# Admin Dashboard — Implementation Spec
+# Admin Dashboard - Implementation Spec
 
 **Version:** 2.1  
 **Date:** 2026-06-13  
@@ -9,7 +9,7 @@
 
 ## Purpose
 
-Next.js dashboard for the Nexus Campaigns. Reads live vault and agent state from the filesystem. No database — vault is the single source of truth.
+Next.js dashboard for the Nexus Campaigns. Reads live vault and agent state from the filesystem. No database - vault is the single source of truth.
 
 **Location:** `system/dashboard/` (project root)  
 **Run:** `cd system/dashboard && npm run dev` → http://localhost:3131
@@ -23,11 +23,11 @@ Next.js dashboard for the Nexus Campaigns. Reads live vault and agent state from
 | Next.js | 16 App Router | SSR, API routes, `force-dynamic` |
 | TypeScript | 5 | Type safety for vault data shapes |
 | Tailwind CSS | 3 | Design tokens, dark theme |
-| IBM Plex Sans / Mono | — | Operations-center typography |
+| IBM Plex Sans / Mono | - | Operations-center typography |
 | gray-matter | 4 | Parse YAML frontmatter from vault .md files |
 | yaml | 2 | Parse registry.yaml for agent config |
 | date-fns | 4 | Relative time, formatting |
-| lucide-react | — | Icons |
+| lucide-react | - | Icons |
 | Recharts | 2 | Charts (quality histogram, trends) |
 | ReactFlow | 11 | Knowledge graph (Phase 2) |
 | SWR | 2 | Client-side polling (Phase 2) |
@@ -154,8 +154,8 @@ All use `export const dynamic = 'force-dynamic'`.
 
 | Method | Route | Body | Action |
 |--------|-------|------|--------|
-| GET | `/api/gm/inbox` | — | InboxImage[] |
-| GET | `/api/gm/tokens` | — | TokenFile[] |
+| GET | `/api/gm/inbox` | - | InboxImage[] |
+| GET | `/api/gm/tokens` | - | TokenFile[] |
 | POST | `/api/gm/approve` | `{filename, quality}` | Merge frontmatter, copy to 02-Library/ |
 | POST | `/api/gm/reject` | `{filename}` | Set status:rejected, quality:1 |
 | POST | `/api/gm/flag` | `{filename}` | Set needs_reprocessing:true |
@@ -208,8 +208,8 @@ Quality: 1-3→danger, 4-6→warning, 7-10→success
 ## Phase 3 Backlog
 
 - [ ] Client-side 30s auto-refresh via `AutoRefresh` component (already built)
-- [ ] Knowledge Graph `/graph` — ReactFlow, 02-Library relationship edges
-- [ ] Growth trend charts — Recharts LineChart, daily snapshot data
-- [ ] Campaign Dashboard `/campaigns` — 03-Campaigns/ content
+- [ ] Knowledge Graph `/graph` - ReactFlow, 02-Library relationship edges
+- [ ] Growth trend charts - Recharts LineChart, daily snapshot data
+- [ ] Campaign Dashboard `/campaigns` - 03-Campaigns/ content
 - [ ] Bulk approve (all drafts with quality ≥ 7 in one click)
 - [ ] WebSocket live updates via `chokidar` file watcher

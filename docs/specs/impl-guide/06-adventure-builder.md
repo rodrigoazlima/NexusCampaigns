@@ -17,16 +17,16 @@ This agent is the highest-value output of the entire system. Every entity in the
 
 ## Goal
 
-The Adventure Builder reads a seed file specifying arc parameters (arc code, tone, hooks, key NPCs, required locations), scans `02-Library/` for matching entities, traverses the relationship graph, and produces a structured adventure module in `03-Campaigns/{arc}/`. The output is a draft — it never becomes canon and is never promoted to `02-Library/`.
+The Adventure Builder reads a seed file specifying arc parameters (arc code, tone, hooks, key NPCs, required locations), scans `02-Library/` for matching entities, traverses the relationship graph, and produces a structured adventure module in `03-Campaigns/{arc}/`. The output is a draft - it never becomes canon and is never promoted to `02-Library/`.
 
 ---
 
 ## Inputs
 
-1. **Arc seed file:** `03-Campaigns/{arc}/seed.yaml` — human-authored parameters (see format below)
-2. **Canon entities:** `02-Library/` — NPCs, locations, factions, quests, items with status: approved
-3. **Relationship graph:** `04-Relationships/` — pre-computed entity adjacency (if Relationship agent has run)
-4. **Existing sessions:** `03-Campaigns/{arc}/sessions/` — past session notes to avoid repetition
+1. **Arc seed file:** `03-Campaigns/{arc}/seed.yaml` - human-authored parameters (see format below)
+2. **Canon entities:** `02-Library/` - NPCs, locations, factions, quests, items with status: approved
+3. **Relationship graph:** `04-Relationships/` - pre-computed entity adjacency (if Relationship agent has run)
+4. **Existing sessions:** `03-Campaigns/{arc}/sessions/` - past session notes to avoid repetition
 
 ---
 
@@ -74,29 +74,29 @@ quality: 0
 reviewed: false
 ---
 
-# The Fall of Annûn — Adventure Module
+# The Fall of Annûn - Adventure Module
 
 ## Overview
 [2-3 paragraph arc summary]
 
 ## Key Entities
 ### NPCs
-- [[npc-elder-annun]] — role in arc, motivations
-- [[npc-blacksmith-cirit]] — role in arc, how they connect to hooks
+- [[npc-elder-annun]] - role in arc, motivations
+- [[npc-blacksmith-cirit]] - role in arc, how they connect to hooks
 
 ### Locations
-- [[location-city-annun]] — opening location, description for DM
-- [[location-cursed-forest]] — Act 2 centerpiece
+- [[location-city-annun]] - opening location, description for DM
+- [[location-cursed-forest]] - Act 2 centerpiece
 
 ### Factions
-- [[faction-city-guard]] — opposition force
+- [[faction-city-guard]] - opposition force
 
 ## Act Structure
 
 ### Act 1: Arrival
 **Hook:** [from seed.yaml hook 1]
 **Scenes:**
-1. Scene name — brief DM description, key choices
+1. Scene name - brief DM description, key choices
 2. ...
 
 ### Act 2: Complication
@@ -106,7 +106,7 @@ reviewed: false
 ...
 
 ## Encounter Seeds
-- Encounter concept 1 — location, participants, stakes
+- Encounter concept 1 - location, participants, stakes
 - Encounter concept 2
 
 ## Open Threads
@@ -128,7 +128,7 @@ Files to create:
 - `agents/tests/test_adventure_builder.py`
 
 Files to modify:
-- `agents/adventure-builder/AGENT.md` — fill in empty stub
+- `agents/adventure-builder/AGENT.md` - fill in empty stub
 
 ---
 
@@ -167,7 +167,7 @@ Higher `max_tokens` (8192) and longer `timeout_seconds` (900) because adventure 
 
 Scans `03-Campaigns/*/seed.yaml`. Returns parsed seeds for arcs that:
 - Have `seed.yaml` present
-- Do NOT already have `adventure-module.md` with `status != "draft"` (i.e., human has approved it — don't regenerate)
+- Do NOT already have `adventure-module.md` with `status != "draft"` (i.e., human has approved it - don't regenerate)
 - All `required_npcs` and `required_locations` exist in `02-Library/`
 
 ```python
@@ -199,7 +199,7 @@ class EntityContent:
 
 Reads `04-Relationships/` index files (if they exist) to find entities connected to `slug` within `depth` hops. Falls back to scanning `read_entity(slug).wikilinks` if relationship index absent.
 
-Used to discover relevant entities beyond the seed's required list — e.g., if the seed requires `npc-elder-annun`, neighbors might surface `faction-council-annun` and `location-elder-hall`.
+Used to discover relevant entities beyond the seed's required list - e.g., if the seed requires `npc-elder-annun`, neighbors might surface `faction-council-annun` and `location-elder-hall`.
 
 ### `list_existing_sessions(arc: str) → list[str]`
 
@@ -227,7 +227,7 @@ Your role: synthesise approved canon entities into a structured adventure module
 
 ## Workflow
 
-1. Call `list_arc_seeds` — find arcs with seed.yaml that need a module
+1. Call `list_arc_seeds` - find arcs with seed.yaml that need a module
 2. For each arc:
    a. Call `read_entity` for each required NPC, location, faction in the seed
    b. Call `get_neighbors` on key entities to discover connected canon
@@ -239,10 +239,10 @@ Your role: synthesise approved canon entities into a structured adventure module
 ## Rules
 
 - Only use entities from 02-Library/ with status: approved
-- Never invent entities not in the library — reference what exists
-- Respect forbidden_entities from seed — they must not appear
-- Sessions already played must not be repeated — check list_existing_sessions
-- Output is a draft (status: draft, reviewed: false) — never canon
+- Never invent entities not in the library - reference what exists
+- Respect forbidden_entities from seed - they must not appear
+- Sessions already played must not be repeated - check list_existing_sessions
+- Output is a draft (status: draft, reviewed: false) - never canon
 - Structure output per the adventure module format spec
 - If required entities are missing from 02-Library/, skip the arc and log a warning
 - Arc tone must match the `tone` field from seed.yaml
@@ -255,7 +255,7 @@ Your role: synthesise approved canon entities into a structured adventure module
 
 Adventure modules do NOT go through QualityGate (which is for entity metadata). They go directly to `03-Campaigns/` as drafts. Human DM reviews and uses them directly, or promotes to `03-Campaigns/{arc}/approved-module.md`.
 
-The Curator agent does NOT process `03-Campaigns/` — Curator only handles `01-Processing/ → 02-Library/`.
+The Curator agent does NOT process `03-Campaigns/` - Curator only handles `01-Processing/ → 02-Library/`.
 
 ---
 
@@ -296,9 +296,9 @@ def test_write_adventure_module_draft_metadata(tmp_path):
 ## Success Criteria
 
 - Adventure module generated for each arc that has `seed.yaml` and complete required entities in library.
-- Module uses only approved canon entities — no invented content.
+- Module uses only approved canon entities - no invented content.
 - Forbidden entities from seed never appear in output.
 - Previously played sessions are not repeated in new module.
-- Output is always `status: draft`, `reviewed: false` — never canon.
+- Output is always `status: draft`, `reviewed: false` - never canon.
 - Approved existing modules are never overwritten.
 - Agent handles missing `04-Relationships/` gracefully (fallback to wikilink traversal).

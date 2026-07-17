@@ -128,7 +128,7 @@ class _Logger:
 
 
 # ---------------------------------------------------------------------------
-# NPC generator — implements INPCGenerator
+# NPC generator - implements INPCGenerator
 # ---------------------------------------------------------------------------
 
 class _NPCGeneratorImpl:
@@ -451,7 +451,7 @@ def _run_batch_impl(log: "_Logger") -> tuple[int, int]:
     """
     client = LLMClient(_LLM_CFG)
     if not client.is_available():
-        log.warning("Qwen3-VL (localhost:1234) offline — skipping batch")
+        log.warning("Qwen3-VL (localhost:1234) offline - skipping batch")
         return 0, 0
 
     prompt_tpl = (
@@ -511,7 +511,7 @@ def _run_batch_impl(log: "_Logger") -> tuple[int, int]:
         try:
             first_output = generator.generate(img_path, scenario, canon_ctx)
         except LLMOfflineError:
-            log.warning("LLM offline — aborting batch")
+            log.warning("LLM offline - aborting batch")
             break
         except (LLMResponseError, Exception) as exc:
             log.error(f"NPC generation failed (× {scenario['id']}): {exc}{img_tag}")

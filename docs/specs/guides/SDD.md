@@ -1,4 +1,4 @@
-# Software Design Document — Pathway Nexus Campaigns
+# Software Design Document - Pathway Nexus Campaigns
 
 **Version:** 1.3  
 **Date:** 2026-06-10  
@@ -37,7 +37,7 @@ Audience: contributors, automation developers, Claude Code agents.
 │                    ↓                                                │
 │             [Classification Agent] → enriched frontmatter           │
 │                    ↓                                                │
-│             (human review — sets status: approved, quality: N)      │
+│             (human review - sets status: approved, quality: N)      │
 │                    ↓                                                │
 │               02-Library/ (canon)                                   │
 │                    ↓                                                │
@@ -58,7 +58,7 @@ Audience: contributors, automation developers, Claude Code agents.
 
 ## Agent Definitions
 
-Agents are defined by their **actions** — discrete, named operations each agent may perform. Implementation language and script names are out of scope for this document.
+Agents are defined by their **actions** - discrete, named operations each agent may perform. Implementation language and script names are out of scope for this document.
 
 ### Ingestion
 
@@ -215,9 +215,9 @@ Agents are defined by their **actions** — discrete, named operations each agen
 
 | # | Item | Status |
 |---|------|--------|
-| 1 | Wiki Agent cross-link generation for `04-Relationships/` — implementation scope partial | Open |
-| 2 | Classification/Wiki Agent use LocalRouter port 8080 — these are configured in `registry.yaml` `llm_endpoints`; `agent.json` dispatch still references legacy path | Partially Resolved |
-| 3 | Face matching — no formal spec for distance threshold or match method | Open |
-| 4 | Dashboard API (`/review/<sha256>` routes) — not documented | Open |
-| 5 | `scenarios.json` schema — now documented in [state-files.spec.md](specs/state-files.spec.md); default scenario in `agents/lore/state/scenarios.json` | Resolved |
-| 7 | Planned agents (canon, relationship, deduplication, curator, search, adventure-builder, session-builder, encounter-builder) — all `status: planned` in registry.yaml | Tracking |
+| 1 | Wiki Agent cross-link generation for `04-Relationships/` - implementation scope partial | Open |
+| 2 | Classification/Wiki Agent use LocalRouter port 8080 - these are configured in `registry.yaml` `llm_endpoints`; `agent.json` dispatch still references legacy path | Partially Resolved |
+| 3 | Face matching - no formal spec for distance threshold or match method | Open |
+| 4 | Dashboard API (`/review/<sha256>` routes) - not documented | Open |
+| 5 | `scenarios.json` schema - now documented in [state-files.spec.md](specs/state-files.spec.md); default scenario in `agents/lore/state/scenarios.json` | Resolved |
+| 7 | Planned agents (canon, relationship, deduplication, curator, search, adventure-builder, session-builder, encounter-builder) - all `status: planned` in registry.yaml | Tracking |

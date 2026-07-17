@@ -2,27 +2,27 @@
 Tests for .automation/legacy/05-remove-emoji-filenames.ps1
 
 Strategy: patch $VaultRoot in the script text, write the patched copy to
-tmp_path, invoke via subprocess.  All assertions check filesystem state —
+tmp_path, invoke via subprocess.  All assertions check filesystem state -
 which files exist and what names they have after the script runs.
 
 No LLM or external services needed.
 
 Behaviors under test:
-   1.  Emoji prefix      — leading emoji stripped; file renamed
-   2.  Emoji suffix      — trailing emoji stripped
-   3.  Emoji in middle   — inline emoji stripped; double-space collapsed
-   4.  Multiple emoji    — every emoji in one name stripped in one pass
-   5.  Clean name        — file without emoji not renamed (idempotent)
-   6.  Empty stem        — emoji-only filenames (e.g. "🎃.md") are skipped
-   7.  Collision         — if clean name already exists, timestamp suffix added
-   8.  Git excluded      — files inside .git/ are never renamed
-   9.  Nested subdirs    — files in subdirectories are also renamed
-  10.  Non-md extensions — .png/.jpg/.txt files with emoji names renamed too
-  11.  Empty vault       — no files → exits 0 with "no emoji" log message
-  12.  Logging           — automation.log created with START/DONE markers
-  13.  Idempotency       — second run on already-clean vault renames nothing
-  14.  Content preserved — byte content of renamed files is unchanged
-  15.  Parametrized      — multiple emoji/name combos covered via parametrize
+   1.  Emoji prefix      - leading emoji stripped; file renamed
+   2.  Emoji suffix      - trailing emoji stripped
+   3.  Emoji in middle   - inline emoji stripped; double-space collapsed
+   4.  Multiple emoji    - every emoji in one name stripped in one pass
+   5.  Clean name        - file without emoji not renamed (idempotent)
+   6.  Empty stem        - emoji-only filenames (e.g. "🎃.md") are skipped
+   7.  Collision         - if clean name already exists, timestamp suffix added
+   8.  Git excluded      - files inside .git/ are never renamed
+   9.  Nested subdirs    - files in subdirectories are also renamed
+  10.  Non-md extensions - .png/.jpg/.txt files with emoji names renamed too
+  11.  Empty vault       - no files → exits 0 with "no emoji" log message
+  12.  Logging           - automation.log created with START/DONE markers
+  13.  Idempotency       - second run on already-clean vault renames nothing
+  14.  Content preserved - byte content of renamed files is unchanged
+  15.  Parametrized      - multiple emoji/name combos covered via parametrize
 """
 
 from __future__ import annotations
@@ -108,7 +108,7 @@ def vault(tmp_path: Path) -> Path:
 
 
 # ---------------------------------------------------------------------------
-# 1–4. Core emoji stripping — happy path
+# 1–4. Core emoji stripping - happy path
 # ---------------------------------------------------------------------------
 
 
@@ -193,7 +193,7 @@ class TestEmojiStripping:
 
 
 # ---------------------------------------------------------------------------
-# 5. Clean names — not renamed
+# 5. Clean names - not renamed
 # ---------------------------------------------------------------------------
 
 
@@ -580,7 +580,7 @@ class TestContentPreserved:
         assert (vault / "portrait.png").read_bytes() == png_bytes
 
     def test_unicode_content_unchanged_after_rename(self, vault: Path) -> None:
-        content = "# Ñoño Mágico\n\náéíóú ãõ ç — em dash\n"
+        content = "# Ñoño Mágico\n\náéíóú ãõ ç - em dash\n"
         (vault / "🔥 unicode-note.md").write_text(content, encoding="utf-8")
 
         run_remove_emoji(vault)

@@ -215,18 +215,18 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# Automation runtime — generated state (initialised on first run, not committed)
+# Automation runtime - generated state (initialised on first run, not committed)
 *.lock
 *.lock.lock
 
-# Lockfiles (npm) — not committed, generated
+# Lockfiles (npm) - not committed, generated
 **/package-lock.json
 
 # Runtime state
 agents/runtime/state/tasks-state.json
 agents/runtime/state/logs/
 
-# Shared runtime state — inbox queue, worker state (system/state/workers/),
+# Shared runtime state - inbox queue, worker state (system/state/workers/),
 # thumbs cache, review reports. Nothing under system/state/ is committed.
 system/state/
 
@@ -242,14 +242,14 @@ system/tasks-state.json
 system/logs/
 system/reports/report-*.json
 
-# Dashboard (Next.js) — un-ignore src/lib/ caught by Python lib/ rule above
+# Dashboard (Next.js) - un-ignore src/lib/ caught by Python lib/ rule above
 !**/src/lib/
 **/node_modules/
 **/.next/
 **/.env.local
 **/*.tsbuildinfo
 
-# Playwright governance tests (system/tests) — generated artifacts
+# Playwright governance tests (system/tests) - generated artifacts
 **/test-results/
 **/playwright-report/
 system/tests/.last-run.json
@@ -267,11 +267,11 @@ system/tests/.last-run.json
 # particular form a real cycle on disk (agents/repair/.agents/cleanup <->
 # agents/cleanup/.agents/repair <-> ...); a reparse-point-unaware directory
 # walk (git status, backup, indexers) recurses into that forever unless the
-# mount dir itself is pruned before descent — which is what a gitignore'd
+# mount dir itself is pruned before descent - which is what a gitignore'd
 # directory name achieves. See Ensure-Junction / Ensure-AgentRelationLinks in
 # system/ops/setup-service.ps1 and its mirror in
 # system/src/nexus/workers/maintenance.py. Keep every new junction dot-prefixed
-# and listed here — don't invent a differently-named mount.
+# and listed here - don't invent a differently-named mount.
 .knowledge-base
 .knowledge-base/
 **/.knowledge-base/

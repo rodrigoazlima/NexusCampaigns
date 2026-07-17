@@ -44,7 +44,7 @@ Carried-over safeguards (must survive verbatim):
 | moldura frames `05-Assets/tokens/frames/` | unchanged |
 
 The maintenance worker's image-ref validation and the runner's old
-`_token_has_pending` both read `generated-tokens.json` — update both paths
+`_token_has_pending` both read `generated-tokens.json` - update both paths
 in the same commit.
 
 ## Config
@@ -64,15 +64,15 @@ workers:
 
 ## Errors / retries
 
-- Face detection failure is NOT an error — fallback chain ends in
+- Face detection failure is NOT an error - fallback chain ends in
   upper-center crop (current behavior). `error` only for I/O failures.
-- deepface/tf-keras import failure → `pending()` returns `[]`, WARN once —
+- deepface/tf-keras import failure → `pending()` returns `[]`, WARN once -
   heavyweight deps stay optional exactly as today.
 - Poison-pill guard per contract; `reruns.token` already exists in entries.
 
 ## Deletions when migrated
 
-- `agents/token/` (agent.json, AGENT.md, prompts/, state/, assets/ — move
+- `agents/token/` (agent.json, AGENT.md, prompts/, state/, assets/ - move
   `assets/frame.png` reference check to 05-Assets path first).
 - `runner._PRECONDITIONS["token-agent"]` + `_token_has_pending`.
 - `_AGENT_JSON_SPECS["token"]`.

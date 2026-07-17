@@ -13,7 +13,7 @@ export interface UploadImageResult {
   ok: boolean
   /** Server-relative path of the saved file (on success), or of the pre-existing match (on duplicate) */
   path?: string
-  /** True if an identical image (by content hash) already exists in the vault — nothing was written */
+  /** True if an identical image (by content hash) already exists in the vault - nothing was written */
   duplicate?: boolean
   /** Error message (on failure) */
   error?: string

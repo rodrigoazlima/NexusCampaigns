@@ -85,7 +85,7 @@ export default async function VisionAgentPage() {
         <div className="panel p-4">
           <div className="text-xs text-zinc-500 mb-1 uppercase tracking-wide">Avg Duration</div>
           <div className="text-2xl font-mono font-semibold text-zinc-100">
-            {agent.avgDurationMs > 0 ? formatDuration(agent.avgDurationMs) : '—'}
+            {agent.avgDurationMs > 0 ? formatDuration(agent.avgDurationMs) : '-'}
           </div>
         </div>
         <div className="panel p-4">
@@ -119,7 +119,7 @@ export default async function VisionAgentPage() {
                 </div>
                 <div className="flex justify-between gap-3">
                   <dt className="text-zinc-500">Timeout</dt>
-                  <dd className="font-mono text-zinc-300">{cli.timeout_seconds ?? '—'}s</dd>
+                  <dd className="font-mono text-zinc-300">{cli.timeout_seconds ?? '-'}s</dd>
                 </div>
               </>
             )}
@@ -164,15 +164,15 @@ export default async function VisionAgentPage() {
               {doc.state_files.map((f) => <li key={f}>{f}</li>)}
             </ul>
           ) : (
-            <p className="text-xs text-zinc-600">—</p>
+            <p className="text-xs text-zinc-600">-</p>
           )}
         </div>
       </div>
 
-      {/* Queue items — vision-slot status only, with pause/continue/reprocess/delete actions */}
+      {/* Queue items - vision-slot status only, with pause/continue/reprocess/delete actions */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-3">
-          <div className="text-sm font-semibold text-zinc-200">Queue Items — vision step</div>
+          <div className="text-sm font-semibold text-zinc-200">Queue Items - vision step</div>
           <Link href="/queue" className="text-xs text-primary hover:underline">Full queue →</Link>
         </div>
         <AgentQueueTable items={queueItems} agent="vision" byType={byType} />
@@ -213,7 +213,7 @@ export default async function VisionAgentPage() {
                   </td>
                   <td className="px-4 py-2 text-zinc-400">{img.type}</td>
                   <td className="px-4 py-2 text-zinc-500">
-                    {[img.ancestry, img.class].filter((v) => v && v !== 'none').join(' · ') || '—'}
+                    {[img.ancestry, img.class].filter((v) => v && v !== 'none').join(' · ') || '-'}
                   </td>
                   <td className="px-4 py-2">
                     <span className={img.status === 'ok' ? 'text-success' : 'text-danger'}>{img.status}</span>

@@ -1,4 +1,4 @@
-# Spec — Automation System
+# Spec - Automation System
 
 ---
 
@@ -6,7 +6,7 @@
 
 ```
 OS Service Supervisor (NSSM / systemd / launchd)
-  └─ runner.py                   # persistent loop — sole static process
+  └─ runner.py                   # persistent loop - sole static process
        └─ every 60s: foreach task in agent.json
             if (now - lastRun) >= intervalSeconds OR signal pending:
                 load agents/{name}/agent.json
@@ -17,14 +17,14 @@ OS Service Supervisor (NSSM / systemd / launchd)
                 git commit (scoped to commit_scope) if changes exist
 ```
 
-**Lock file:** `agents/runtime/state/runner.lock` — prevents concurrent runner instances.
+**Lock file:** `agents/runtime/state/runner.lock` - prevents concurrent runner instances.
 Auto-cleared after 30 minutes (stale lock recovery handled by Repair Agent).
 
 ---
 
 ## Task Configuration
 
-**`agent.json`** — static task registry (`agent.json` does not hold script paths;
+**`agent.json`** - static task registry (`agent.json` does not hold script paths;
 dispatch config lives in each agent's `agent.json`):
 
 ```json
@@ -40,7 +40,7 @@ dispatch config lives in each agent's `agent.json`):
 }
 ```
 
-**`tasks-state.json`** — mutable run state:
+**`tasks-state.json`** - mutable run state:
 
 ```json
 {
@@ -84,7 +84,7 @@ See [agent-dispatch.spec.md](agent-dispatch.spec.md) for the full `agent.json` s
 
 ## Metrics
 
-**`agent-metrics.json`** — keyed by `task-id`, last 100 runs per agent:
+**`agent-metrics.json`** - keyed by `task-id`, last 100 runs per agent:
 
 ```json
 {

@@ -34,14 +34,14 @@ Analyze the provided Python script and extract all relevant configuration settin
    - Put script-specific behavior (batch sizes, task-specific prompts, agent name, etc.) in **local**.
    - Make sure the JSONs contain good defaults so the script works even if the files are deleted.
    - Use clear, consistent naming.
-   - Do not include code — only configuration.
+   - Do not include code - only configuration.
 
 ---
 
 **Script to analyze:**
 
 # tests\test_interfaces.py
-"""Tests for shared.interfaces — abstract contracts and exceptions."""
+"""Tests for shared.interfaces - abstract contracts and exceptions."""
 
 import pytest
 from pathlib import Path
@@ -107,7 +107,7 @@ class TestExceptions:
 
 
 # ---------------------------------------------------------------------------
-# BaseAgent — ABC contract
+# BaseAgent - ABC contract
 # ---------------------------------------------------------------------------
 
 class TestBaseAgent:
@@ -167,7 +167,7 @@ class TestBaseAgent:
 
 
 # ---------------------------------------------------------------------------
-# BaseAgent — default execute() lifecycle
+# BaseAgent - default execute() lifecycle
 # ---------------------------------------------------------------------------
 
 @pytest.fixture
@@ -256,7 +256,7 @@ class TestBaseAgentDefaultExecute:
 
 
 # ---------------------------------------------------------------------------
-# IAgent protocol — structural check
+# IAgent protocol - structural check
 # ---------------------------------------------------------------------------
 
 class TestIAgentProtocol:
@@ -285,7 +285,7 @@ class TestIAgentProtocol:
 
 
 # ---------------------------------------------------------------------------
-# Abstract interface — must raise NotImplementedError
+# Abstract interface - must raise NotImplementedError
 # ---------------------------------------------------------------------------
 
 class TestAbstractInterfaces:

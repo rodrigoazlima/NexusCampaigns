@@ -94,7 +94,7 @@ export default function CampaignView({ data, frame }: { data: CampaignData; fram
       <PageHeader
         icon={Dices}
         title="Campaign Setting"
-        subtitle={frame?.pitch || 'Untitled setting — is it ready to run?'}
+        subtitle={frame?.pitch || 'Untitled setting - is it ready to run?'}
         actions={
           <div className="flex items-center gap-2">
             <button
@@ -103,9 +103,9 @@ export default function CampaignView({ data, frame }: { data: CampaignData; fram
             >
               <Pencil size={13} /> Edit frame
             </button>
-            <Tip label={allReady ? 'Session-zero summary — coming soon' : `Pass all ${total} checks to run`}>
+            <Tip label={allReady ? 'Session-zero summary - coming soon' : `Pass all ${total} checks to run`}>
               <button
-                onClick={() => allReady ? showToast('Session-zero summary — coming soon', 'success') : undefined}
+                onClick={() => allReady ? showToast('Session-zero summary - coming soon', 'success') : undefined}
                 disabled={!allReady}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
                   allReady
@@ -146,38 +146,38 @@ export default function CampaignView({ data, frame }: { data: CampaignData; fram
           </div>
           <div className="space-y-3">
             <div>
-              <label className="text-[11px] text-zinc-500 mb-1 block">Pitch — say it in one line</label>
+              <label className="text-[11px] text-zinc-500 mb-1 block">Pitch - say it in one line</label>
               <input value={form.pitch} onChange={set('pitch')} placeholder="Frontier town bought out by a death cult that pays in gold" className={INPUT_CLS} />
             </div>
             <div className="flex flex-wrap gap-3">
               <div>
                 <label className="text-[11px] text-zinc-500 mb-1 block">Primary tone</label>
                 <select value={form.tone_primary} onChange={set('tone_primary')} className={SELECT_CLS}>
-                  <option value="">—</option>
+                  <option value="">-</option>
                   {TONES.map((t) => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
               <div>
                 <label className="text-[11px] text-zinc-500 mb-1 block">Secondary tone</label>
                 <select value={form.tone_secondary} onChange={set('tone_secondary')} className={SELECT_CLS}>
-                  <option value="">—</option>
+                  <option value="">-</option>
                   {TONES.map((t) => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
               <div>
                 <label className="text-[11px] text-zinc-500 mb-1 block">Scale</label>
                 <select value={form.scale} onChange={set('scale')} className={SELECT_CLS}>
-                  <option value="">—</option>
+                  <option value="">-</option>
                   {SCALES.map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
             </div>
             <div>
-              <label className="text-[11px] text-zinc-500 mb-1 block">Central tension — what is wrong in this world right now</label>
+              <label className="text-[11px] text-zinc-500 mb-1 block">Central tension - what is wrong in this world right now</label>
               <textarea value={form.central_tension} onChange={set('central_tension')} rows={2} className={INPUT_CLS} />
             </div>
             <div>
-              <label className="text-[11px] text-zinc-500 mb-1 block">Player buy-in — what characters this setting invites</label>
+              <label className="text-[11px] text-zinc-500 mb-1 block">Player buy-in - what characters this setting invites</label>
               <textarea value={form.player_buyin} onChange={set('player_buyin')} rows={2} className={INPUT_CLS} />
             </div>
             <div className="flex justify-end">
@@ -207,7 +207,7 @@ export default function CampaignView({ data, frame }: { data: CampaignData; fram
           ) : (
             <div className="text-center py-4">
               <div className="text-sm text-zinc-300 mb-1">Start your setting</div>
-              <p className="text-xs text-zinc-500 mb-3">Say it in one line — the pitch constrains every choice after.</p>
+              <p className="text-xs text-zinc-500 mb-3">Say it in one line - the pitch constrains every choice after.</p>
               <button onClick={openEditor} className="text-xs px-3 py-1.5 rounded bg-primary/15 text-primary border border-primary/30 hover:bg-primary/25 transition-colors">
                 + Set the frame
               </button>
@@ -264,7 +264,7 @@ export default function CampaignView({ data, frame }: { data: CampaignData; fram
       {/* Readiness checklist */}
       <div className="panel mb-5">
         <div className="px-4 py-2.5 border-b border-surface-3/60 text-xs font-semibold text-zinc-300">
-          Readiness — ready to run when all seven pass
+          Readiness - ready to run when all seven pass
         </div>
         {data.checks.map((c) => (
           <div key={c.id} className="flex items-center gap-3 px-4 py-2.5 border-b border-surface-3/40 last:border-0">
@@ -305,7 +305,7 @@ export default function CampaignView({ data, frame }: { data: CampaignData; fram
           <div className="flex items-center gap-2 text-xs text-zinc-400 mb-1">
             <Link2 size={14} className="text-primary" /> One thread
           </div>
-          <div className="text-xs font-mono text-zinc-200 truncate mt-1">{data.wiring.thread ?? '—'}</div>
+          <div className="text-xs font-mono text-zinc-200 truncate mt-1">{data.wiring.thread ?? '-'}</div>
           <p className="text-[11px] text-zinc-600 mt-0.5">
             {data.wiring.thread ? 'links across 3+ pillars' : 'no thread spans 3+ pillars yet'}
           </p>

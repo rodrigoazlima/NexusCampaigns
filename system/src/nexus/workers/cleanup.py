@@ -1,4 +1,4 @@
-"""nexus.workers.cleanup — scheduled housekeeping worker.
+"""nexus.workers.cleanup - scheduled housekeeping worker.
 
 Purges log/report files older than retention_days, trims agent-metrics.json
 run history, writes a CleanupReport. Replaces nexus.tasks.cleanup_agent.
@@ -29,7 +29,7 @@ _REPORTS_DIR  = WORKERS_STATE_ROOT / "cleanup" / "reports"
 def _scan_dirs(sub: str) -> list[Path]:
     """All log/report directories across runtime, LLM agents, and workers.
 
-    Tracks the state layout, which is code's business — not config.
+    Tracks the state layout, which is code's business - not config.
     """
     return [
         *_AGENTS_DIR.glob(f"*/state/{sub}"),      # LLM agents + runtime

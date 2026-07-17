@@ -1,4 +1,4 @@
-"""nexus.runtime.worker_loop — runs the in-process static workers
+"""nexus.runtime.worker_loop - runs the in-process static workers
 (worker-contract.spec.md) after each agent-dispatch cycle: queue workers
 poll every cycle, scheduled workers respect their own interval_seconds."""
 
@@ -69,7 +69,7 @@ def run_workers(
         try:
             items = worker.pending()[: cfg.batch_size]
         except Exception as exc:
-            log.warning(f"Worker '{cfg.name}' pending() failed: {exc} — treating as empty")
+            log.warning(f"Worker '{cfg.name}' pending() failed: {exc} - treating as empty")
             items = []
         if not items:
             continue

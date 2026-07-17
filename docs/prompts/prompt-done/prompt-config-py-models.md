@@ -34,7 +34,7 @@ Analyze the provided Python script and extract all relevant configuration settin
    - Put script-specific behavior (batch sizes, task-specific prompts, agent name, etc.) in **local**.
    - Make sure the JSONs contain good defaults so the script works even if the files are deleted.
    - Use clear, consistent naming.
-   - Do not include code — only configuration.
+   - Do not include code - only configuration.
 
 ---
 
@@ -43,7 +43,7 @@ Analyze the provided Python script and extract all relevant configuration settin
 # shared\models.py
 """Data contracts for the Vault Nexus Campaigns pipeline.
 
-Pydantic v2 models only — no logic, no I/O, no side effects.
+Pydantic v2 models only - no logic, no I/O, no side effects.
 All validation is declarative (field constraints + allowed enums).
 """
 
@@ -96,7 +96,7 @@ class ImageType(str, Enum):
     token     = "token"
 
 
-# Race/CharClass removed as strict enums — PF2e has hundreds of ancestries and
+# Race/CharClass removed as strict enums - PF2e has hundreds of ancestries and
 # classes. Open strings are used in VisionClassification instead, validated
 # against PF2e vocabulary constants defined below.
 
@@ -205,7 +205,7 @@ class VisionClassification(BaseModel):
 
     ancestry / char_class / creature_type are open strings against PF2e vocabulary
     (PF2E_ANCESTRIES / PF2E_CLASSES / PF2E_CREATURE_TYPES).
-    Strict enum validation removed — PF2e has too many options to enumerate.
+    Strict enum validation removed - PF2e has too many options to enumerate.
     """
     type:          ImageType
     ancestry:      str       = "none"   # PF2E_ANCESTRIES
@@ -240,7 +240,7 @@ class NPCLLMOutput(BaseModel):
     role:       str         = ""
     relationships: list[str] = Field(default_factory=list)
     description:   str      = ""
-    # Reflexion loop metadata — never comes from LLM; set by _flag_for_human_review
+    # Reflexion loop metadata - never comes from LLM; set by _flag_for_human_review
     needs_human_review: bool = False
     review_notes:       str  = ""
 
@@ -317,7 +317,7 @@ class InboxQueueEntry(BaseModel):
     agents:     AgentSlots
 
 
-# Type alias — the full queue is a str→entry dict
+# Type alias - the full queue is a str→entry dict
 InboxQueue = dict[str, InboxQueueEntry]
 
 
@@ -457,7 +457,7 @@ class TaskDispatchEntry(BaseModel):
 
 
 class AgentFolderConfig(BaseModel):
-    """Root schema for agent.json — keyed by task ID."""
+    """Root schema for agent.json - keyed by task ID."""
     cleanupDays: int = 90
     tasks: dict[str, TaskDispatchEntry]
 
@@ -560,7 +560,7 @@ class RepairReport(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Review agent — ReviewItem
+# Review agent - ReviewItem
 # ---------------------------------------------------------------------------
 
 class ReviewItem(BaseModel):
@@ -704,7 +704,7 @@ class SearchIndexState(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Registry — agent-registry.spec.md
+# Registry - agent-registry.spec.md
 # ---------------------------------------------------------------------------
 
 class LLMEndpointSpec(BaseModel):

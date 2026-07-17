@@ -3,19 +3,19 @@
 **Phase:** P5  
 **Priority:** Low  
 **Effort:** 3 days  
-**Depends on:** Canon Validator (P2) — builds on same scan infrastructure
+**Depends on:** Canon Validator (P2) - builds on same scan infrastructure
 
 ---
 
 ## Problem
 
 As multiple campaign arcs run in parallel and different images produce NPCs from the same archetypes (e.g., two different portrait images that both look like "wise elder mages"), the Library accumulates near-duplicate entities:
-- `npc-elder-mage-annun.md` and `npc-old-wizard-annun.md` — same character, two drafts
-- `location-market-cirit.md` and `location-city-market.md` — same place, two names
+- `npc-elder-mage-annun.md` and `npc-old-wizard-annun.md` - same character, two drafts
+- `location-market-cirit.md` and `location-city-market.md` - same place, two names
 
 The `IDedupAnalyzer` interface exists in `shared/interfaces.py:539`. Nothing implements it.
 
-Deduplication is complex (merging canon requires human decision) so this agent ONLY detects and flags — it never merges.
+Deduplication is complex (merging canon requires human decision) so this agent ONLY detects and flags - it never merges.
 
 ---
 
@@ -33,7 +33,7 @@ No vector database needed at vault scale (typically < 1000 entities). Use TF-IDF
 2. Build TF-IDF vectors for all entities
 3. Compute pairwise cosine similarity
 4. Pairs with similarity > 0.75 are flagged as candidates
-5. Same-type entities only (NPC vs NPC, location vs location) — cross-type comparison skipped
+5. Same-type entities only (NPC vs NPC, location vs location) - cross-type comparison skipped
 
 Threshold 0.75 chosen empirically. Exposed as `similarity_threshold` in `agent.json` config for easy tuning.
 
@@ -50,8 +50,8 @@ Files to create:
 - `agents/tests/test_dedup_agent.py`
 
 Files to modify:
-- `agents/deduplication/AGENT.md` — fill stub
-- `agents/shared/interfaces.py` — verify `IDedupAnalyzer` and `DedupCandidate` models complete
+- `agents/deduplication/AGENT.md` - fill stub
+- `agents/shared/interfaces.py` - verify `IDedupAnalyzer` and `DedupCandidate` models complete
 
 ---
 
@@ -80,7 +80,7 @@ Files to modify:
 }
 ```
 
-Haiku is sufficient — this is mostly tool orchestration with light reasoning.
+Haiku is sufficient - this is mostly tool orchestration with light reasoning.
 
 ---
 
@@ -154,7 +154,7 @@ def _cosine_similarity(a: dict[str, float], b: dict[str, float]) -> float:
     return dot / (mag_a * mag_b)
 ```
 
-Pure Python, no dependencies. O(n²) pairwise comparison is acceptable for vault scale (< 1000 entities). At 500 entities: 124,750 comparisons — runs in < 1 second.
+Pure Python, no dependencies. O(n²) pairwise comparison is acceptable for vault scale (< 1000 entities). At 500 entities: 124,750 comparisons - runs in < 1 second.
 
 ---
 
@@ -189,8 +189,8 @@ Reason string auto-generated:
 
 Writes two outputs:
 
-1. **JSON:** `agents/review/state/reports/dedup-{date}.json` — machine-readable
-2. **Markdown:** `01-Processing/dedup-review.md` — human-readable review queue
+1. **JSON:** `agents/review/state/reports/dedup-{date}.json` - machine-readable
+2. **Markdown:** `01-Processing/dedup-review.md` - human-readable review queue
 
 `dedup-review.md` format:
 
@@ -201,13 +201,13 @@ type: dedup-review
 status: pending
 ---
 
-# Deduplication Review — 2026-06-10
+# Deduplication Review - 2026-06-10
 
 > {N} candidate pairs found. Review each pair and decide: merge, archive one, or keep both.
 
 ## High Severity (similarity > 0.90)
 
-### Pair 1 — npc-elder-mage-annun vs npc-old-wizard-annun (0.94)
+### Pair 1 - npc-elder-mage-annun vs npc-old-wizard-annun (0.94)
 - **Location A:** 01-Processing/npc-elder-mage-annun.md
 - **Location B:** 02-Library/npc-old-wizard-annun.md
 - **Reason:** High content overlap. Both describe an elder mage figure in Annûn.
@@ -215,7 +215,7 @@ status: pending
 
 ## Medium Severity (0.75–0.90)
 
-### Pair 2 — location-market-cirit vs location-city-market (0.81)
+### Pair 2 - location-market-cirit vs location-city-market (0.81)
 ...
 ```
 
@@ -244,7 +244,7 @@ Your role: detect near-duplicate entities and flag them for human review. Never 
 
 - Never modify any entity file
 - Never delete any entity
-- Never merge entities — only flag
+- Never merge entities - only flag
 - If no candidates found: write empty report (candidates: []) and log "No duplicates found"
 - High severity = similarity >= 0.90
 - Medium severity = 0.75 <= similarity < 0.90
@@ -302,5 +302,5 @@ def test_empty_report_on_no_candidates(tmp_path):
 - JSON report written to review state directory.
 - Cross-type comparisons skipped (NPC never compared to location).
 - High-severity pairs (> 0.90) separated from medium in report.
-- No external dependencies — pure Python TF-IDF implementation.
+- No external dependencies - pure Python TF-IDF implementation.
 - Runtime < 5 seconds for vaults up to 1000 entities.

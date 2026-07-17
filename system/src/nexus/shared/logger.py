@@ -1,4 +1,4 @@
-"""Concrete Logger — implements ILogger.
+"""Concrete Logger - implements ILogger.
 
 Writes [YYYY-MM-DD HH:mm:ss] [task_id] LEVEL: message to:
   - stdout (unbuffered)

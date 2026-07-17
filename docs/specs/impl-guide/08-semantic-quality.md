@@ -3,7 +3,7 @@
 **Phase:** P5  
 **Priority:** Medium  
 **Effort:** 2 days  
-**Depends on:** Cost tracking (P1) — HARD GATE. Do not implement without per-task cost logging.
+**Depends on:** Cost tracking (P1) - HARD GATE. Do not implement without per-task cost logging.
 
 ---
 
@@ -24,9 +24,9 @@ The structural gate is fast, deterministic, and free. It should remain the prima
 
 ## Goal
 
-An optional second scoring pass — `SemanticQualityJudge` — uses an LLM to evaluate content quality on a 1–10 scale with a structured critique. It runs ONLY on entities that:
+An optional second scoring pass - `SemanticQualityJudge` - uses an LLM to evaluate content quality on a 1–10 scale with a structured critique. It runs ONLY on entities that:
 1. Pass structural QualityGate with score ≥ 6
-2. Are in the Curator pipeline (not in the reflexion loop — that has its own budget)
+2. Are in the Curator pipeline (not in the reflexion loop - that has its own budget)
 3. Have a per-task `enable_semantic_scoring: true` flag in `agent.json`
 
 Cost gate: `max_tokens_per_run` must be set in `agent.json` before enabling.
@@ -36,13 +36,13 @@ Cost gate: `max_tokens_per_run` must be set in `agent.json` before enabling.
 ## Scope
 
 Files to create:
-- `agents/shared/semantic_judge.py` — `SemanticQualityJudge` class
-- `agents/shared/interfaces.py` — `ISemanticJudge` protocol (add)
+- `agents/shared/semantic_judge.py` - `SemanticQualityJudge` class
+- `agents/shared/interfaces.py` - `ISemanticJudge` protocol (add)
 - `agents/tests/test_semantic_judge.py`
 
 Files to modify:
-- `agents/curator/tools/curator_agent.py` — optionally call judge in `score_draft()`
-- `agents/curator/agent.json` — add `enable_semantic_scoring` flag
+- `agents/curator/tools/curator_agent.py` - optionally call judge in `score_draft()`
+- `agents/curator/agent.json` - add `enable_semantic_scoring` flag
 
 ---
 
@@ -154,7 +154,7 @@ def score_draft(self, path: str) -> ScoringResult:
             combined_score = round(struct_score * 0.6 + semantic.score * 0.4)
             is_promotable  = combined_score >= 7
         except LLMOfflineError:
-            # Semantic judge unavailable — fall back to structural only
+            # Semantic judge unavailable - fall back to structural only
             pass
 
     return ScoringResult(
@@ -271,7 +271,7 @@ def test_disabled_by_default():
 
 - Semantic judge never runs unless `enable_semantic_scoring: true` AND `max_tokens_per_run` is set.
 - Structural QualityGate always runs first (fast, free).
-- LLM offline or bad response degrades gracefully to structural-only — no blocked promotions.
+- LLM offline or bad response degrades gracefully to structural-only - no blocked promotions.
 - Combined score uses 60/40 weighted average.
 - Curator notes include semantic critique when judge runs.
 - Cost per entity tracked in cost log alongside structural curator work.

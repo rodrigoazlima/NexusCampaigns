@@ -34,18 +34,18 @@ Analyze the provided Python script and extract all relevant configuration settin
    - Put script-specific behavior (batch sizes, task-specific prompts, agent name, etc.) in **local**.
    - Make sure the JSONs contain good defaults so the script works even if the files are deleted.
    - Use clear, consistent naming.
-   - Do not include code — only configuration.
+   - Do not include code - only configuration.
 
 ---
 
 **Script to analyze:**
 
 # shared\runners\claude.py
-"""ClaudeRunner — Anthropic Claude API dispatch runner.
+"""ClaudeRunner - Anthropic Claude API dispatch runner.
 
 Two dispatch patterns (per agent-dispatch.spec.md):
 
-  Tool-use pattern (primary — all active agents)
+  Tool-use pattern (primary - all active agents)
     Requires: tools_module
     Behaviour: agentic loop calling tools until end_turn or max_tool_rounds.
 
@@ -54,19 +54,19 @@ Two dispatch patterns (per agent-dispatch.spec.md):
     Behaviour: single non-agentic API call, returns text response.
 
 Dispatch config keys (from ClaudeApiConfig):
-  model            str   — Claude model ID
-  system_file      str?  — path to system prompt, relative to agent_dir
-  tools_module     str?  — dotted import path for agent's tool module
-  prompt_file      str?  — user prompt .md, relative to agent_dir; prompt pattern only
-  history_file     str?  — filename for persistent chat history, under agent state/
-  max_tokens       int   — default 4096
-  temperature      float — default 0
-  timeout_seconds  int   — default 120 (per API call)
-  max_tool_rounds  int   — agentic loop cap, default 20
+  model            str   - Claude model ID
+  system_file      str?  - path to system prompt, relative to agent_dir
+  tools_module     str?  - dotted import path for agent's tool module
+  prompt_file      str?  - user prompt .md, relative to agent_dir; prompt pattern only
+  history_file     str?  - filename for persistent chat history, under agent state/
+  max_tokens       int   - default 4096
+  temperature      float - default 0
+  timeout_seconds  int   - default 120 (per API call)
+  max_tool_rounds  int   - agentic loop cap, default 20
 
 Tools module must expose:
-  TOOLS: list[dict]                        — Anthropic tool definitions
-  call_tool(name, args, context) -> str    — tool dispatcher
+  TOOLS: list[dict]                        - Anthropic tool definitions
+  call_tool(name, args, context) -> str    - tool dispatcher
 
 Retry policy (spec: agent-dispatch.spec.md):
   - API 5xx: retry up to 3× with 3s backoff
@@ -97,7 +97,7 @@ class ClaudeRunner:
         except ImportError:
             return RunResult(
                 exit_code=1,
-                error="anthropic package not installed — run: pip install anthropic",
+                error="anthropic package not installed - run: pip install anthropic",
             )
 
         cfg          = dispatch_config
@@ -135,7 +135,7 @@ class ClaudeRunner:
             )
 
     # ---------------------------------------------------------------------- #
-    # Prompt pattern — single non-agentic call
+    # Prompt pattern - single non-agentic call
     # ---------------------------------------------------------------------- #
 
     def _run_prompt(
@@ -223,7 +223,7 @@ class ClaudeRunner:
         )
 
     # ---------------------------------------------------------------------- #
-    # Tool-use pattern — agentic loop
+    # Tool-use pattern - agentic loop
     # ---------------------------------------------------------------------- #
 
     def _run_tool_use(
@@ -312,7 +312,7 @@ class ClaudeRunner:
                 resp = _create_with_retry(client, create_kwargs)
                 if resp is None:
                     exit_code  = 1
-                    last_error = "Claude API 5xx — max retries exhausted mid-loop"
+                    last_error = "Claude API 5xx - max retries exhausted mid-loop"
                     break
 
                 if hasattr(resp, "usage") and resp.usage:
@@ -394,7 +394,7 @@ def _create_with_retry(client: Any, kwargs: dict) -> Any:
                 anthropic.APITimeoutError):
             raise  # propagate non-retryable errors immediately
         except anthropic.InternalServerError:
-            pass  # 5xx — retry
+            pass  # 5xx - retry
         except Exception:
             raise
 

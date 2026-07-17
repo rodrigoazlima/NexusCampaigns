@@ -1,4 +1,4 @@
-"""nexus.runtime.log — wires up the shared Logger for the runtime.
+"""nexus.runtime.log - wires up the shared Logger for the runtime.
 
 The runtime's log format is identical to every other agent's (same class,
 `nexus.shared.Logger`); this module only supplies the runtime's own

@@ -1,7 +1,7 @@
-"""nexus.runtime.preconditions — cheap "does this agent have work?" checks
+"""nexus.runtime.preconditions - cheap "does this agent have work?" checks
 that let the scheduler skip a dispatch (and its LLM tokens) up front.
 
-LLM agents only — a skipped dispatch burns no tokens. Static work has no
+LLM agents only - a skipped dispatch burns no tokens. Static work has no
 preconditions: workers derive their own pending sets in pending().
 """
 
@@ -25,7 +25,7 @@ def read_inbox_queue() -> dict:
 
 
 # vision only ever reads raw inbox files by extension (classify_images.py's
-# own _IMAGE_EXTS — duplicated here per this codebase's existing manual-sync
+# own _IMAGE_EXTS - duplicated here per this codebase's existing manual-sync
 # convention for cross-module constants, see vision CLAUDE.md's PF2E_* note).
 # lore/classification/wiki slots legitimately point at non-image (document)
 # entries too per state-files.spec.md's inbox-queue schema, so this filter
@@ -45,7 +45,7 @@ def inbox_has_slot(slot: str) -> bool:
 
     For vision specifically, also skip entries whose file isn't a recognized
     image extension (a mislabeled/misrouted queue entry) or is zero bytes (a
-    placeholder mid-write) — dispatching the vision LLM against either wastes
+    placeholder mid-write) - dispatching the vision LLM against either wastes
     a cycle at best, and at worst feeds it bytes that aren't a decodable
     image, which is its own source of garbage/misinterpreted output.
     """
@@ -82,8 +82,8 @@ def check_preconditions(task_id: str, log: Logger) -> bool:
     try:
         result = check()
         if not result:
-            log.info(f"Skip {task_id} — precondition: no pending work")
+            log.info(f"Skip {task_id} - precondition: no pending work")
         return result
     except Exception as exc:
-        log.warning(f"Precondition check failed for {task_id}: {exc} — running anyway")
+        log.warning(f"Precondition check failed for {task_id}: {exc} - running anyway")
         return True

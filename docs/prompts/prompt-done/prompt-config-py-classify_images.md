@@ -34,7 +34,7 @@ Analyze the provided Python script and extract all relevant configuration settin
    - Put script-specific behavior (batch sizes, task-specific prompts, agent name, etc.) in **local**.
    - Make sure the JSONs contain good defaults so the script works even if the files are deleted.
    - Use clear, consistent naming.
-   - Do not include code — only configuration.
+   - Do not include code - only configuration.
 
 ---
 
@@ -130,7 +130,7 @@ def _sha256(path: Path) -> str:
 # ---------------------------------------------------------------------------
 
 def _is_token(path: Path) -> bool:
-    """Return True if PNG has ≥2 transparent corners — canonical token detection."""
+    """Return True if PNG has ≥2 transparent corners - canonical token detection."""
     if path.suffix.lower() != ".png":
         return False
     try:
@@ -250,7 +250,7 @@ def _get_folder_candidates(folder: Path, state: dict) -> list[Path]:
 def _try_face_match(token_path: Path, candidates: list[Path]) -> Optional[Path]:
     """Match a token to its source portrait via center-crop pixel similarity.
 
-    Uses PIL + numpy only — no heavy dependencies. Falls back to None if
+    Uses PIL + numpy only - no heavy dependencies. Falls back to None if
     either dep is missing or any image fails to load.
     Returns the best match above _FACE_SIMILARITY_THRESHOLD, or None.
     """
@@ -299,7 +299,7 @@ def _try_face_match(token_path: Path, candidates: list[Path]) -> Optional[Path]:
 def _inherit_clf_from_state(entry: dict) -> VisionClassification:
     """Rebuild a VisionClassification from a processed-images.json entry.
 
-    Overrides type to `token` — the token inherits all other metadata from
+    Overrides type to `token` - the token inherits all other metadata from
     its matched source portrait.
     """
     return VisionClassification(
@@ -520,7 +520,7 @@ def main() -> None:
 
     client = LLMClient(_LLM_CFG)
     if not client.is_available():
-        log.warning("Qwen3-VL (localhost:1234) offline — skipping batch")
+        log.warning("Qwen3-VL (localhost:1234) offline - skipping batch")
         log.done(t0, key="classified", count=0, failed=0)
         sys.exit(0)
 
@@ -568,7 +568,7 @@ def main() -> None:
             try:
                 clf = _classify_one(img_path, client, prompt, is_tk)
             except LLMOfflineError:
-                log.warning(f"LLM offline while processing {img_path.name} — aborting batch")
+                log.warning(f"LLM offline while processing {img_path.name} - aborting batch")
                 break
             except (LLMResponseError, Exception) as exc:
                 log.error(f"Classification failed for {img_path.name}: {exc}")
@@ -597,7 +597,7 @@ def main() -> None:
         try:
             img_path = _rename_image(img_path, clf)
         except Exception as exc:
-            log.warning(f"Could not rename {img_path.name}: {exc} — using original path")
+            log.warning(f"Could not rename {img_path.name}: {exc} - using original path")
 
         new_rel = img_path.relative_to(_PROJECT_ROOT).as_posix()
         sha     = _sha256(img_path)

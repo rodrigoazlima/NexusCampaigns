@@ -75,7 +75,7 @@ class TestAllowedSets:
             assert t in _mod._ALLOWED_TYPES
 
     def test_approved_not_in_types(self):
-        # 'approved' is a status, not a type — must not be mistakenly accepted
+        # 'approved' is a status, not a type - must not be mistakenly accepted
         assert "approved" not in _mod._ALLOWED_TYPES
 
 
@@ -181,7 +181,7 @@ class TestTagPrefixRatio:
     def test_shared_stem_inflection(self):
         # The exact case _TAG_FOLD_THRESHOLD exists for: "elven" is an
         # inflection of "elf" but scores only 0.5 under character-overlap
-        # difflib ratio — prefix ratio catches it (2 of 3 chars shared).
+        # difflib ratio - prefix ratio catches it (2 of 3 chars shared).
         assert _mod._tag_prefix_ratio("elf", "elven") >= _mod._TAG_FOLD_THRESHOLD
 
     def test_no_shared_prefix(self):
@@ -312,7 +312,7 @@ class TestRunInferType:
             client.chat.return_value = '{"type": "location"}'
             count, _ = _mod._run_infer_type()
 
-        # file had type — should not have been processed
+        # file had type - should not have been processed
         assert count == 0
 
     def test_infers_type_for_missing_field(self, patch_roots, vault):
@@ -481,7 +481,7 @@ class TestQueueIntegration:
             MockClient.return_value.is_available.return_value = True
             count, failed = _mod._run_enrich_tags()
 
-        # file was skipped — LLM chat never called
+        # file was skipped - LLM chat never called
         MockClient.return_value.chat.assert_not_called()
         assert count == 0
         assert failed == 0

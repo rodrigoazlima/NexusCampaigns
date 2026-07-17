@@ -87,7 +87,7 @@ class TestLoadVaultConfig:
         assert cfg.llm_endpoints["classification"].type == "text"
 
     def test_auto_detect_from_real_project(self):
-        # Auto-detect from this repo — .knowledge-base/ exists
+        # Auto-detect from this repo - .knowledge-base/ exists
         cfg = load_vault_config()
         assert cfg.vault_paths.vault_root.name == ".knowledge-base"
         assert cfg.vault_paths.vault_root.exists()

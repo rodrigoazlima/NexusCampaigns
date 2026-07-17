@@ -117,7 +117,7 @@ export default async function ErrorsPage() {
         <div className="panel mb-6 overflow-hidden">
           <div className="px-4 py-3 border-b border-surface-3">
             <div className="text-sm font-semibold text-zinc-200">
-              Today&apos;s Report — {latestReport.date}
+              Today&apos;s Report - {latestReport.date}
             </div>
           </div>
           <div className="overflow-x-auto">

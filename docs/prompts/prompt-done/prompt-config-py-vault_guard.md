@@ -34,21 +34,21 @@ Analyze the provided Python script and extract all relevant configuration settin
    - Put script-specific behavior (batch sizes, task-specific prompts, agent name, etc.) in **local**.
    - Make sure the JSONs contain good defaults so the script works even if the files are deleted.
    - Use clear, consistent naming.
-   - Do not include code — only configuration.
+   - Do not include code - only configuration.
 
 ---
 
 **Script to analyze:**
 
 # shared\vault_guard.py
-"""Concrete VaultGuard — implements IVaultGuard.
+"""Concrete VaultGuard - implements IVaultGuard.
 
 Enforces write-protection rules from security.spec.md:
   - Agents may NOT write to 02-Library/ (human promotion only)
   - Agents may NOT delete files from 00-Inbox/ (source preservation)
   - Agents may NOT set reviewed=True or status='approved' in frontmatter (G3)
 
-Note: Ingestion Agent renames files within 00-Inbox/ — it does NOT call
+Note: Ingestion Agent renames files within 00-Inbox/ - it does NOT call
 assert_writable() because renaming is an explicit responsibility defined in
 its AGENT.md. VaultGuard is for agents writing new content.
 """
@@ -98,7 +98,7 @@ class VaultGuard(IVaultGuard):
             if frontmatter.get(field) == forbidden_value:
                 raise VaultWriteError(
                     f"Agents may not set {field}={forbidden_value!r} "
-                    f"— human-only field (security.spec.md G3)"
+                    f"- human-only field (security.spec.md G3)"
                 )
 
 

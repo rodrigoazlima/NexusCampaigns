@@ -9,7 +9,7 @@ No explanations.
 No additional text.
 
 ========================
-STEP 1 — IMAGE TYPE
+STEP 1 - IMAGE TYPE
 ========================
 
 Determine exactly one type.
@@ -20,7 +20,7 @@ Determine exactly one type.
 - scene     → environment, multiple subjects, objects, structures, landscapes
 
 ========================
-STEP 2 — VISUAL ANALYSIS
+STEP 2 - VISUAL ANALYSIS
 ========================
 
 Describe everything that is directly observable.
@@ -151,7 +151,7 @@ mood
 }
 
 ========================
-STEP 3 — PATHFINDER 2E CLASSIFICATION
+STEP 3 - PATHFINDER 2E CLASSIFICATION
 ========================
 
 If type == portrait OR body:
@@ -314,7 +314,7 @@ vitality
 none
 
 ========================
-STEP 4 — AI RECREATION PROMPT
+STEP 4 - AI RECREATION PROMPT
 ========================
 
 Generate one detailed image-generation prompt describing ONLY visible content.
@@ -337,7 +337,7 @@ Do not invent missing details.
 Do not mention Pathfinder.
 
 ========================
-STEP 5 — FLAVOR DESCRIPTION
+STEP 5 - FLAVOR DESCRIPTION
 ========================
 
 Write exactly three concise sentences.

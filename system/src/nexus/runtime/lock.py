@@ -1,4 +1,4 @@
-"""nexus.runtime.lock — single-instance process lock (runner.lock).
+"""nexus.runtime.lock - single-instance process lock (runner.lock).
 
 Separate from FileLock (nexus.shared.file_lock): this is a whole-process
 "only one scheduler loop at a time" guard, not a scoped critical-section lock.

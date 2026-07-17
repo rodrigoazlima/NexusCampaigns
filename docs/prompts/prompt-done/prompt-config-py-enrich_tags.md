@@ -34,7 +34,7 @@ Analyze the provided Python script and extract all relevant configuration settin
    - Put script-specific behavior (batch sizes, task-specific prompts, agent name, etc.) in **local**.
    - Make sure the JSONs contain good defaults so the script works even if the files are deleted.
    - Use clear, consistent naming.
-   - Do not include code — only configuration.
+   - Do not include code - only configuration.
 
 ---
 
@@ -172,7 +172,7 @@ def _assert_not_library(path: Path) -> None:
         path.resolve().relative_to(_LIBRARY.resolve())
         raise VaultWriteError(f"Agents may not modify 02-Library/: {path}")
     except ValueError:
-        pass  # not under library — safe to write
+        pass  # not under library - safe to write
 
 
 def _write_with_retry(
@@ -204,7 +204,7 @@ def _slug_similarity(a: str, b: str) -> float:
 
 
 # ---------------------------------------------------------------------------
-# EnrichTags action — main entry point
+# EnrichTags action - main entry point
 # ---------------------------------------------------------------------------
 
 def main() -> None:
@@ -215,7 +215,7 @@ def main() -> None:
 
     client = LLMClient(_LLM_CFG)
     if not client.is_available():
-        log.warning("LocalRouter (localhost:8080) offline — skipping batch")
+        log.warning("LocalRouter (localhost:8080) offline - skipping batch")
         log.done(t0, key="classified", count=0, failed=0)
         sys.exit(0)
 
@@ -257,7 +257,7 @@ def main() -> None:
             raw        = client.chat([{"role": "user", "content": prompt}], max_tokens=80)
             enrichment = TagEnrichmentOutput.model_validate(_json.loads(raw))
         except LLMOfflineError:
-            log.warning("LLM offline — aborting batch")
+            log.warning("LLM offline - aborting batch")
             break
         except (LLMResponseError, Exception) as exc:
             log.error(f"LLM error for {md_path.name}: {exc}")
@@ -299,7 +299,7 @@ def main() -> None:
 
 
 # ---------------------------------------------------------------------------
-# InferType action — type-only pass (targeted)
+# InferType action - type-only pass (targeted)
 # ---------------------------------------------------------------------------
 
 def _run_infer_type() -> tuple[int, int]:
@@ -307,7 +307,7 @@ def _run_infer_type() -> tuple[int, int]:
     log    = _make_logger()
     client = LLMClient(_LLM_CFG)
     if not client.is_available():
-        log.warning("LocalRouter offline — InferType skipped")
+        log.warning("LocalRouter offline - InferType skipped")
         return 0, 0
 
     bad_docs = _load_bad_docs()
@@ -332,7 +332,7 @@ def _run_infer_type() -> tuple[int, int]:
             raw           = client.chat([{"role": "user", "content": prompt}], max_tokens=10)
             inferred_type = _json.loads(raw).get("type")
         except LLMOfflineError:
-            log.warning("LLM offline — aborting InferType")
+            log.warning("LLM offline - aborting InferType")
             break
         except Exception as exc:
             log.error(f"InferType LLM error for {md_path.name}: {exc}")
@@ -356,7 +356,7 @@ def _run_infer_type() -> tuple[int, int]:
 
 
 # ---------------------------------------------------------------------------
-# FlagDuplicates action — exact + similarity-based slug comparison
+# FlagDuplicates action - exact + similarity-based slug comparison
 # ---------------------------------------------------------------------------
 
 def _run_flag_duplicates() -> int:

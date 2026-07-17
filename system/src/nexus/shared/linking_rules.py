@@ -1,15 +1,15 @@
 """shared.linking_rules
 
-Enforces linking-rules.spec.md — per-entity-type required outbound link rules.
+Enforces linking-rules.spec.md - per-entity-type required outbound link rules.
 Pure functions. No I/O. No side effects.
 
 Rules (from spec):
-  npc / character       — ≥1 of: location/city/village/dungeon, faction/organization/religion, quest
-  quest                 — ≥1 npc/character  AND  ≥1 location/city/village/dungeon
-  location/city/village/dungeon — ≥1 of: npc/character, faction/organization/religion
-  faction/organization/religion — ≥1 npc/character  AND  ≥1 location/city/village/dungeon
-  item / artifact       — ≥1 of: quest, npc/character
-  encounter             — ≥1 location/city/village/dungeon  AND  ≥1 creature/monster
+  npc / character       - ≥1 of: location/city/village/dungeon, faction/organization/religion, quest
+  quest                 - ≥1 npc/character  AND  ≥1 location/city/village/dungeon
+  location/city/village/dungeon - ≥1 of: npc/character, faction/organization/religion
+  faction/organization/religion - ≥1 npc/character  AND  ≥1 location/city/village/dungeon
+  item / artifact       - ≥1 of: quest, npc/character
+  encounter             - ≥1 location/city/village/dungeon  AND  ≥1 creature/monster
 """
 
 from __future__ import annotations

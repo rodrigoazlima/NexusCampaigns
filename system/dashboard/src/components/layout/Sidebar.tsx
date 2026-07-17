@@ -187,7 +187,7 @@ function NavGroup({ section, onNavigate, collapsed, first }: { section: NavSecti
   // Open by default, or whenever the group owns the active route (deep link).
   const [open, setOpen] = useState((section.defaultOpen ?? true) || containsActive)
 
-  // Collapsed rail: no room for the group header — show a divider, render items
+  // Collapsed rail: no room for the group header - show a divider, render items
   // per their open state (a closed group stays hidden until the rail expands).
   if (collapsed) {
     return (
@@ -296,7 +296,7 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Desktop sidebar — hidden below md */}
+      {/* Desktop sidebar - hidden below md */}
       <aside className={`hidden md:flex flex-shrink-0 flex-col bg-surface-1 border-r border-surface-3 h-screen transition-all duration-200 ${collapsed ? 'w-14' : 'w-56'}`}>
         <div className={`py-5 border-b border-surface-3 ${collapsed ? 'px-0' : 'px-4'}`}>
           <Logo collapsed={collapsed} />
@@ -305,7 +305,7 @@ export default function Sidebar() {
         <BottomBar collapsed={collapsed} onToggle={toggleCollapsed} />
       </aside>
 
-      {/* Mobile top bar — visible below md. box-content: h-14 row + notch padding on top */}
+      {/* Mobile top bar - visible below md. box-content: h-14 row + notch padding on top */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-30 h-14 box-content pt-[env(safe-area-inset-top)] bg-surface-1 border-b border-surface-3 flex items-center px-3 gap-3">
         <button
           onClick={() => setOpen(true)}
@@ -328,7 +328,7 @@ export default function Sidebar() {
       {/* Mobile drawer */}
       {open && (
         <div className="md:hidden fixed inset-0 z-40" role="dialog" aria-modal="true" aria-label="Navigation">
-          {/* Backdrop — touch-none: iOS ignores body overflow lock, block scroll gestures here */}
+          {/* Backdrop - touch-none: iOS ignores body overflow lock, block scroll gestures here */}
           <div
             className="absolute inset-0 bg-black/60 backdrop-blur-sm touch-none overscroll-none animate-fade-in"
             onClick={() => setOpen(false)}

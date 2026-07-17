@@ -7,7 +7,7 @@ import LoadingOverlay from '@/components/layout/LoadingOverlay'
 
 export const metadata: Metadata = {
   title: 'Nexus Campaigns',
-  description: 'Nexus Campaigns — Admin Dashboard',
+  description: 'Nexus Campaigns - Admin Dashboard',
 }
 
 export const viewport: Viewport = {

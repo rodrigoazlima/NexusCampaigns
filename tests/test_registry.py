@@ -1,4 +1,4 @@
-"""Tests for agent-registry.spec.md — RegistryConfig models and load_registry()."""
+"""Tests for agent-registry.spec.md - RegistryConfig models and load_registry()."""
 
 from __future__ import annotations
 
@@ -108,7 +108,7 @@ def registry(project_root: Path) -> RegistryConfig:
 
 
 # ---------------------------------------------------------------------------
-# load_registry — basic parsing
+# load_registry - basic parsing
 # ---------------------------------------------------------------------------
 
 class TestLoadRegistry:
@@ -190,7 +190,7 @@ class TestExecutionOrder:
         reg = load_registry()
         assert "runtime" in reg.execution_order
         assert "vision" in reg.execution_order
-        # static agents left execution_order — they run as in-process workers
+        # static agents left execution_order - they run as in-process workers
         assert "cleanup" not in reg.execution_order
 
 
@@ -303,13 +303,13 @@ class TestRegistryHelpers:
 
 
 # ---------------------------------------------------------------------------
-# load_vault_config — registry integration
+# load_vault_config - registry integration
 # ---------------------------------------------------------------------------
 
 class TestLoadVaultConfigWithRegistry:
     def test_uses_registry_endpoints(self, project_root: Path) -> None:
         cfg = load_vault_config(project_root)
-        # registry.yaml uses vision_llm / local_router — not legacy aliases
+        # registry.yaml uses vision_llm / local_router - not legacy aliases
         assert "vision_llm" in cfg.llm_endpoints
         assert "local_router" in cfg.llm_endpoints
 

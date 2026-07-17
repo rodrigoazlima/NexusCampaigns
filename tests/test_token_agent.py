@@ -1,4 +1,4 @@
-"""Tests for nexus.workers.token — agent-token.spec.md compliance."""
+"""Tests for nexus.workers.token - agent-token.spec.md compliance."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ import pytest
 
 # ---------------------------------------------------------------------------
 # sys.path is bootstrapped by conftest.py
-# "token" collides with stdlib token module — import via file path
+# "token" collides with stdlib token module - import via file path
 # ---------------------------------------------------------------------------
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -331,7 +331,7 @@ class TestStaleTokenDetection:
 
 
 # ---------------------------------------------------------------------------
-# Logger integration — DONE line uses "generated" keyword
+# Logger integration - DONE line uses "generated" keyword
 # ---------------------------------------------------------------------------
 
 class TestLoggerDoneFormat:

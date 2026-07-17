@@ -3,13 +3,13 @@ import { deflateSync } from 'zlib';
 
 /**
  * Confirms LM Studio's vision endpoint (localhost:1234, qwen3-vl-4b-instruct
- * per registry.yaml) accepts a large (2000x2000) image upload end-to-end —
+ * per registry.yaml) accepts a large (2000x2000) image upload end-to-end -
  * the pipeline's own resize step (agents/shared/llm_client.py, max 1024px)
  * masks this normally, so this hits the raw endpoint directly to confirm
  * the server itself has no hard size/payload ceiling below that.
  *
  * Network-dependent on a local, always-on service (unlike the GitHub-hitting
- * tests elsewhere in this suite) — skips rather than fails when offline.
+ * tests elsewhere in this suite) - skips rather than fails when offline.
  */
 
 const LM_STUDIO_URL = 'http://localhost:1234/v1/chat/completions';

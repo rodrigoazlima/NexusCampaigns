@@ -990,7 +990,7 @@ class TestIdempotency:
     def test_second_run_makes_no_llm_calls(
         self, vault: Path, mock_llm: _LLMController
     ) -> None:
-        """Second run skips files already in processed.txt — zero extra LLM calls."""
+        """Second run skips files already in processed.txt - zero extra LLM calls."""
         _inbox_note(vault, "entity.md", "x" * 200)
 
         run_compile_wiki(vault, mock_llm.port)

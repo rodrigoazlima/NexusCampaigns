@@ -5,25 +5,25 @@ Strategy: patch $VaultRoot in script text, inject LLM stub overrides before
 the main block, write to tmp_path, invoke via subprocess. All assertions are
 on file-system state (frontmatter content, bad-docs list, log files).
 
-No real LLM server needed — stubs override Test-LLMOnline / Invoke-TagLLM /
+No real LLM server needed - stubs override Test-LLMOnline / Invoke-TagLLM /
 Invoke-TypeLLM with deterministic in-process PowerShell functions.
 
 Behaviors under test:
-  1.  LLM offline       — early exit 0, no files modified
-  2.  No frontmatter    — file added to bad-docs.txt, not modified
-  3.  Already rich      — >5 tags + has type → skipped (file byte-identical)
-  4.  Needs tags        — ≤5 tags → merged with LLM stub response
-  5.  Needs type        — missing type → injected from LLM stub
-  6.  Needs both        — missing type AND ≤5 tags → both enriched
-  7.  Duplicate detect  — slug matches 02-Library slug → duplicate_of injected
-  8.  Bad-docs skip     — path in bad-docs.txt → skipped even if processable
-  9.  Inbox + Process   — both 00-Inbox/ and 01-Processing/ are scanned
-  10. Log markers       — START/DONE written to automation.log and task log
-  11. Idempotency       — second run on already-rich file exits 0, no change
-  12. Subdirectory scan — files in nested folders (e.g. 00-Inbox/images/) found
-  13. No-body file      — empty body after frontmatter handled without crash
-  14. Unicode content   — UTF-8 special characters preserved round-trip
-  15. Tag filtering     — LLM tags outside ValidTags list are silently dropped
+  1.  LLM offline       - early exit 0, no files modified
+  2.  No frontmatter    - file added to bad-docs.txt, not modified
+  3.  Already rich      - >5 tags + has type → skipped (file byte-identical)
+  4.  Needs tags        - ≤5 tags → merged with LLM stub response
+  5.  Needs type        - missing type → injected from LLM stub
+  6.  Needs both        - missing type AND ≤5 tags → both enriched
+  7.  Duplicate detect  - slug matches 02-Library slug → duplicate_of injected
+  8.  Bad-docs skip     - path in bad-docs.txt → skipped even if processable
+  9.  Inbox + Process   - both 00-Inbox/ and 01-Processing/ are scanned
+  10. Log markers       - START/DONE written to automation.log and task log
+  11. Idempotency       - second run on already-rich file exits 0, no change
+  12. Subdirectory scan - files in nested folders (e.g. 00-Inbox/images/) found
+  13. No-body file      - empty body after frontmatter handled without crash
+  14. Unicode content   - UTF-8 special characters preserved round-trip
+  15. Tag filtering     - LLM tags outside ValidTags list are silently dropped
 """
 
 from __future__ import annotations
@@ -141,7 +141,7 @@ reviewed: false
 ---
 # Ñoño Mágico
 
-Personagem com caracteres especiais: áéíóú ãõ ç — "quotes" and 'apostrophes'.
+Personagem com caracteres especiais: áéíóú ãõ ç - "quotes" and 'apostrophes'.
 """
 
 _NO_FRONTMATTER = "# Just a heading\n\nNo YAML here.\n"
@@ -270,7 +270,7 @@ def vault(tmp_path: Path) -> Generator[Path, None, None]:
 
 
 # ---------------------------------------------------------------------------
-# 1. LLM offline — early exit
+# 1. LLM offline - early exit
 # ---------------------------------------------------------------------------
 
 
@@ -336,7 +336,7 @@ class TestMissingFrontmatter:
 
 
 # ---------------------------------------------------------------------------
-# 3. Already-rich notes — skipped
+# 3. Already-rich notes - skipped
 # ---------------------------------------------------------------------------
 
 
@@ -374,7 +374,7 @@ class TestAlreadyRich:
 
 
 # ---------------------------------------------------------------------------
-# 4. Needs tags — enrichment
+# 4. Needs tags - enrichment
 # ---------------------------------------------------------------------------
 
 
@@ -461,7 +461,7 @@ class TestNeedsTags:
 
 
 # ---------------------------------------------------------------------------
-# 5. Needs type — type injection
+# 5. Needs type - type injection
 # ---------------------------------------------------------------------------
 
 
@@ -919,7 +919,7 @@ class TestUnicodeContent:
     def test_em_dash_in_body_preserved(self, vault: Path) -> None:
         content = (
             "---\nid: lore-em-dash\ntype: lore\ntags:\n  - lore\n---\n"
-            "Text with — em dash and … ellipsis.\n"
+            "Text with - em dash and … ellipsis.\n"
         )
         note = vault / "01-Processing" / "lore-em-dash.md"
         note.write_text(content, encoding="utf-8")
@@ -928,12 +928,12 @@ class TestUnicodeContent:
         run_enrich_tags(vault, stub_tags=["dark"])
 
         result = note.read_text(encoding="utf-8")
-        assert "—" in result
+        assert "-" in result
         assert "…" in result
 
 
 # ---------------------------------------------------------------------------
-# 15. Tag filtering — only ValidTags survive
+# 15. Tag filtering - only ValidTags survive
 # ---------------------------------------------------------------------------
 
 

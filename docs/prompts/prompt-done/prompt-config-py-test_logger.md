@@ -34,7 +34,7 @@ Analyze the provided Python script and extract all relevant configuration settin
    - Put script-specific behavior (batch sizes, task-specific prompts, agent name, etc.) in **local**.
    - Make sure the JSONs contain good defaults so the script works even if the files are deleted.
    - Use clear, consistent naming.
-   - Do not include code — only configuration.
+   - Do not include code - only configuration.
 
 ---
 
@@ -89,7 +89,7 @@ class TestLoggerInit:
         today     = datetime.now().strftime("%Y-%m-%d")
         logs_dir, _ = log_dirs
         assert (logs_dir / f"test_script_{today}.log").exists() or True
-        # Daily log created on first write — just check attribute set
+        # Daily log created on first write - just check attribute set
         assert logger._daily.name.startswith("test_script_")
 
     def test_ps1_extension_stripped(self, log_dirs):

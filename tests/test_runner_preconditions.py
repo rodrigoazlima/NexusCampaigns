@@ -1,5 +1,5 @@
 """nexus.runtime.preconditions.inbox_has_slot must skip queue entries whose
-file no longer exists on disk — otherwise a renamed/deleted/overwritten
+file no longer exists on disk - otherwise a renamed/deleted/overwritten
 source keeps the entry 'pending' forever and the runner dispatches against
 it every due cycle."""
 from __future__ import annotations
@@ -73,7 +73,7 @@ def test_valid_entry_still_counts_alongside_a_stale_one(runner):
 
 def test_vision_skips_non_image_extension(runner):
     """A mislabeled/misrouted queue entry pointing at a non-image file must
-    not trigger a vision dispatch — vision can never do anything with it."""
+    not trigger a vision dispatch - vision can never do anything with it."""
     doc = runner.PROJECT_ROOT / "00-Inbox" / "docs" / "notes.txt"
     doc.parent.mkdir(parents=True)
     doc.write_bytes(b"not an image")
@@ -99,7 +99,7 @@ def test_vision_skips_zero_byte_file(runner):
 
 def test_non_vision_slot_counts_non_image_document(runner):
     """lore/classification/wiki entries legitimately point at documents too
-    (state-files.spec.md) — the extension filter is vision-only."""
+    (state-files.spec.md) - the extension filter is vision-only."""
     doc = runner.PROJECT_ROOT / "00-Inbox" / "docs" / "notes.txt"
     doc.parent.mkdir(parents=True)
     doc.write_bytes(b"lore fodder")

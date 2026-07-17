@@ -10,23 +10,23 @@ import {
   Inbox, CircleDot, MessageSquare, ArrowRight, Sparkles,
 } from 'lucide-react'
 
-// A "campaign building block" — each pillar groups the entity types a Game
+// A "campaign building block" - each pillar groups the entity types a Game
 // Master actually thinks in while building a world. Order = the order you
 // usually build a campaign: a place, the people in it, who's fighting, the
 // plot, the threats, then the depth that ties it together.
 const PILLARS = [
   { key: 'world', label: 'World & Places', icon: MapIcon, accent: 'text-green-400', ring: 'border-green-500/20 hover:border-green-500/40',
-    types: ['location', 'city', 'village', 'dungeon'], hint: 'The stage — where your story happens' },
+    types: ['location', 'city', 'village', 'dungeon'], hint: 'The stage - where your story happens' },
   { key: 'cast', label: 'Characters & NPCs', icon: Users, accent: 'text-blue-400', ring: 'border-blue-500/20 hover:border-blue-500/40',
-    types: ['npc', 'character'], hint: 'The cast — motivations, secrets, the people who drive play' },
+    types: ['npc', 'character'], hint: 'The cast - motivations, secrets, the people who drive play' },
   { key: 'powers', label: 'Factions & Powers', icon: Flag, accent: 'text-purple-400', ring: 'border-purple-500/20 hover:border-purple-500/40',
-    types: ['faction', 'organization', 'religion'], hint: 'The conflict — who wants what, and why' },
+    types: ['faction', 'organization', 'religion'], hint: 'The conflict - who wants what, and why' },
   { key: 'story', label: 'Quests & Story', icon: ScrollText, accent: 'text-yellow-400', ring: 'border-yellow-500/20 hover:border-yellow-500/40',
-    types: ['quest', 'event', 'timeline'], hint: 'The plot — hooks, stakes, what happens next' },
+    types: ['quest', 'event', 'timeline'], hint: 'The plot - hooks, stakes, what happens next' },
   { key: 'bestiary', label: 'Bestiary', icon: Skull, accent: 'text-red-400', ring: 'border-red-500/20 hover:border-red-500/40',
-    types: ['creature', 'monster', 'encounter'], hint: 'The challenges — what the party fights' },
+    types: ['creature', 'monster', 'encounter'], hint: 'The challenges - what the party fights' },
   { key: 'lore', label: 'Treasures & Lore', icon: Gem, accent: 'text-teal-400', ring: 'border-teal-500/20 hover:border-teal-500/40',
-    types: ['item', 'artifact', 'lore'], hint: 'Reward & depth — history, myth, treasure' },
+    types: ['item', 'artifact', 'lore'], hint: 'Reward & depth - history, myth, treasure' },
 ] as const
 
 type Entry = ReviewItem & { origin: 'draft' | 'canon' }
@@ -115,14 +115,14 @@ export default async function GMHubPage() {
                 </div>
               </div>
 
-              {/* Item previews — click straight through, no detour */}
+              {/* Item previews - click straight through, no detour */}
               <div className="flex-1 border-t border-surface-3/60">
                 {items.length === 0 ? (
                   <Link
                     href="/gm/inbox"
                     className="block px-4 py-5 text-xs text-zinc-600 hover:text-zinc-400 transition-colors text-center"
                   >
-                    Nothing here yet — drop sources in the Inbox →
+                    Nothing here yet - drop sources in the Inbox →
                   </Link>
                 ) : (
                   items.slice(0, 4).map((e) => (
@@ -145,7 +145,7 @@ export default async function GMHubPage() {
                       )}
                       <div className="flex-1 min-w-0">
                         <div className="text-xs text-zinc-200 truncate group-hover:text-white">{e.id}</div>
-                        <div className="text-[11px] text-zinc-600 truncate">{e.excerpt || '—'}</div>
+                        <div className="text-[11px] text-zinc-600 truncate">{e.excerpt || '-'}</div>
                       </div>
                       {e.origin === 'canon' && (
                         <span className="text-[9px] px-1 py-0.5 rounded bg-success/10 text-success flex-shrink-0">canon</span>

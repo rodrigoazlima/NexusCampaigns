@@ -28,7 +28,7 @@ responsibilities:
   - Load 02-Library/ canon entity list (id, type, tags, relationships) as context string
   - Read each pending document file from the path stored in inbox-queue.json
   - Strip HTML tags/styles/scripts from DOCX-converted files before LLM call
-  - Skip files under 100 chars (even after HTML stripping) — mark agents.wiki=done, not bad
+  - Skip files under 100 chars (even after HTML stripping) - mark agents.wiki=done, not bad
   - Truncate content to 6000 chars with truncation notice
   - Call LLM with DM synthesis prompt enforcing AGENTS.md frontmatter schema
   - Enforce post-LLM: status=draft, reviewed=false, quality=0, source=[filename]

@@ -9,7 +9,7 @@ Pre-generate 320px-wide webp thumbnails for every image entry in the inbox
 queue into `system/state/thumbs/<sha1(queue-key)>.webp`. Dashboard's
 `/api/image?thumb=1` serves them, falling back to the original.
 
-Simplest consumer in the set — pure cache warmer: no vault writes, no queue
+Simplest consumer in the set - pure cache warmer: no vault writes, no queue
 slot of its own, no commits.
 
 ## Worker mapping
@@ -29,7 +29,7 @@ def handle(item) -> WorkResult:
     ...
 ```
 
-No inbox-queue slot is added for thumbnails — the thumb file's existence IS
+No inbox-queue slot is added for thumbnails - the thumb file's existence IS
 the done-marker (cheap to stat, self-healing when a thumb is deleted). This
 preserves current behavior and keeps the queue schema untouched.
 
@@ -61,7 +61,7 @@ workers:
 - `agents/thumbnails/` (agent.json, AGENT.md, prompts/system.md, state/).
 - `_AGENT_JSON_SPECS["thumbnails"]`.
 - `nexus/tasks/thumbnails_agent.py` → `nexus/workers/thumbnails.py`.
-- No `_PRECONDITIONS` entry exists (interval-only today) — the worker gains
+- No `_PRECONDITIONS` entry exists (interval-only today) - the worker gains
   a real pending-check, dropping the run-and-scan-everything cycle.
 
 ## Migration steps

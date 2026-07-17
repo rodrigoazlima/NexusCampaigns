@@ -4,31 +4,31 @@ Tests for .automation/06-classify-images.ps1
 Strategy: patch $VaultRoot in script text, inject PowerShell stubs overriding
 Test-LMStudioOnline / Invoke-VisionLLM / Test-IsToken / Invoke-TokenFaceMatch
 before the main block, write patched copy to tmp_path, invoke via subprocess.
-All assertions check filesystem state — which files exist, JSON index content,
+All assertions check filesystem state - which files exist, JSON index content,
 markdown frontmatter, and log output.
 
 No real LM Studio server, System.Drawing, or Python face-matcher needed.
 
 Behaviors under test:
-  1.  LM Studio offline      — early exit 0, no files renamed, index unchanged
-  2.  No unprocessed images  — exit 0, "No unprocessed images" logged
-  3.  Portrait happy path    — rename, draft md, JSON index
-  4.  Battlemap happy path   — battlemap-{env}.ext naming + location entity type
-  5.  Scene happy path       — scene-{env}.ext naming + location entity type
-  6.  Body happy path        — {race}-{class}-{element}.body.ext naming
-  7.  Token naming           — .token.ext suffix, token:true in frontmatter
-  8.  Filename collision     — existing file bumped to -1 counter suffix
-  9.  JSON index v2 schema   — sha256 key, pathIndex, required fields
- 10.  Already indexed        — pathIndex entry → skipped on second run
- 11.  Draft markdown         — AGENTS.md-compliant YAML frontmatter + embed
- 12.  LLM failed             — pseudoKey "path:..." in index, failed count logged
- 13.  LLM connection-error   — image NOT indexed, classified count unaffected
- 14.  Logging                — START/DONE markers, timestamp format, task prefix
- 15.  Idempotency            — second run adds no new index entries, exits 0
- 16.  Queue vision update    — inbox-queue.json vision=done for processed image
- 17.  Multiple image formats — .png/.jpg/.jpeg files discovered and renamed
- 18.  Parametrized types     — all four types produce correct filename suffix
- 19.  Invalid LLM values     — unknown type/race/element sanitized to defaults
+  1.  LM Studio offline      - early exit 0, no files renamed, index unchanged
+  2.  No unprocessed images  - exit 0, "No unprocessed images" logged
+  3.  Portrait happy path    - rename, draft md, JSON index
+  4.  Battlemap happy path   - battlemap-{env}.ext naming + location entity type
+  5.  Scene happy path       - scene-{env}.ext naming + location entity type
+  6.  Body happy path        - {race}-{class}-{element}.body.ext naming
+  7.  Token naming           - .token.ext suffix, token:true in frontmatter
+  8.  Filename collision     - existing file bumped to -1 counter suffix
+  9.  JSON index v2 schema   - sha256 key, pathIndex, required fields
+ 10.  Already indexed        - pathIndex entry → skipped on second run
+ 11.  Draft markdown         - AGENTS.md-compliant YAML frontmatter + embed
+ 12.  LLM failed             - pseudoKey "path:..." in index, failed count logged
+ 13.  LLM connection-error   - image NOT indexed, classified count unaffected
+ 14.  Logging                - START/DONE markers, timestamp format, task prefix
+ 15.  Idempotency            - second run adds no new index entries, exits 0
+ 16.  Queue vision update    - inbox-queue.json vision=done for processed image
+ 17.  Multiple image formats - .png/.jpg/.jpeg files discovered and renamed
+ 18.  Parametrized types     - all four types produce correct filename suffix
+ 19.  Invalid LLM values     - unknown type/race/element sanitized to defaults
 """
 
 from __future__ import annotations
@@ -74,7 +74,7 @@ def make_png(path: Path, width: int = 32, height: int = 32) -> Path:
 
 
 def make_token_png(path: Path, width: int = 64, height: int = 64) -> Path:
-    """RGBA PNG with transparent corners — passes Test-IsToken in the real script."""
+    """RGBA PNG with transparent corners - passes Test-IsToken in the real script."""
     path.parent.mkdir(parents=True, exist_ok=True)
     img = Image.new("RGBA", (width, height), color=(100, 150, 200, 255))
     px = img.load()
@@ -967,7 +967,7 @@ class TestClassificationTypes:
 
 
 # ---------------------------------------------------------------------------
-# 21. Invalid LLM values — sanitization
+# 21. Invalid LLM values - sanitization
 # ---------------------------------------------------------------------------
 
 

@@ -43,8 +43,8 @@ Files to create:
 - `agents/tests/test_canon_validator.py`
 
 Files to modify:
-- `agents/shared/interfaces.py` — `ICanonValidator` already defined; verify `CanonReport` model is complete
-- `agents/review/tools/daily_report.py` — include canon report in daily summary
+- `agents/shared/interfaces.py` - `ICanonValidator` already defined; verify `CanonReport` model is complete
+- `agents/review/tools/daily_report.py` - include canon report in daily summary
 
 ---
 
@@ -170,7 +170,7 @@ Also includes `02-Library/` subdirectory entities if any are in subfolders.
 For each entity, for each wikilink in `relationships` + body: check if target slug is in `slug_index`. If not: emit `violation_type: "broken_link"`, severity `"error"`.
 
 ```
-"[[npc-wizard-old-tower]]" not found in 02-Library/ — broken link in npc-warrior-annun
+"[[npc-wizard-old-tower]]" not found in 02-Library/ - broken link in npc-warrior-annun
 ```
 
 ### `detect_duplicate_ids(scans) → list[CanonViolation]`
@@ -199,7 +199,7 @@ Checks:
 - `status` is not `"approved"` → severity `"error"` (should not be in `02-Library/` if not approved... unless Curator placed it as `"review"`)
 - Actually: `02-Library/` may contain `status: review` (Curator placed, awaiting human). These are valid.
 - Flag: `status: draft` → severity `"error"` (draft in Library = pipeline bug)
-- Flag: `reviewed: false` AND `status: approved` → severity `"error"` (impossible state — approved but not reviewed)
+- Flag: `reviewed: false` AND `status: approved` → severity `"error"` (impossible state - approved but not reviewed)
 - Flag: `quality < 7` AND `status: approved` → severity `"warning"` (quality degraded after approval)
 
 ### `write_report(report: CanonReport) → None`
@@ -218,8 +218,8 @@ Your role: perform a daily read-only consistency audit of 02-Library/.
 
 ## Workflow
 
-1. Call `scan_library` — load all entities with frontmatter and body
-2. Call `build_slug_index` — build the slug → path lookup
+1. Call `scan_library` - load all entities with frontmatter and body
+2. Call `build_slug_index` - build the slug → path lookup
 3. Call `detect_broken_links` with scans and index
 4. Call `detect_duplicate_ids` with scans
 5. Call `detect_missing_metadata` with scans
@@ -302,5 +302,5 @@ def test_report_written_atomically(tmp_path):
 - Duplicate IDs detected across all `02-Library/` entities.
 - Status violations (draft in library, approved-but-not-reviewed) flagged as errors.
 - Orphan entities (older than 7 days, no links) flagged as warnings.
-- Agent is strictly read-only — zero modifications to any vault files.
+- Agent is strictly read-only - zero modifications to any vault files.
 - Canon health status surfaced in daily review report.

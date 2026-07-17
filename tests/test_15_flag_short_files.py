@@ -1,24 +1,24 @@
 """
-Tests for .automation/15-flag-short-files.py — Short-Content Flagging Agent
+Tests for .automation/15-flag-short-files.py - Short-Content Flagging Agent
 
 Strategy: import the Python module directly and exercise all public functions
 against isolated tmp_path vaults.  No network, no external processes, no
 writes outside tmp_path.
 
 Behaviors under test:
-  1.  parse_fm            — frontmatter parsed correctly from markdown text
-  2.  count_body_lines    — non-blank line counting
-  3.  set_field           — YAML field insert / in-place replace
-  4.  bad_index_io        — load / save bad-index.json round-trip
-  5.  upsert_bad_entry    — insert new entries; update existing without duplicate
-  6.  build_js            — bad-index.js written with correct JS wrapper
-  7.  flag_bad            — manual flag: updates frontmatter + index + JS
-  8.  process_flag        — short files flagged; bad-index + logs written
-  9.  process_clear       — previously-flagged files cleared when body grows
- 10.  process_skip        — already-flagged short files not re-written
- 11.  process_dry_run     — dry-run: logs actions but modifies nothing
- 12.  process_backfill    — already-flagged files absent from index are backfilled
- 13.  process_errors      — missing 01-Processing/ returns exit code 1
+  1.  parse_fm            - frontmatter parsed correctly from markdown text
+  2.  count_body_lines    - non-blank line counting
+  3.  set_field           - YAML field insert / in-place replace
+  4.  bad_index_io        - load / save bad-index.json round-trip
+  5.  upsert_bad_entry    - insert new entries; update existing without duplicate
+  6.  build_js            - bad-index.js written with correct JS wrapper
+  7.  flag_bad            - manual flag: updates frontmatter + index + JS
+  8.  process_flag        - short files flagged; bad-index + logs written
+  9.  process_clear       - previously-flagged files cleared when body grows
+ 10.  process_skip        - already-flagged short files not re-written
+ 11.  process_dry_run     - dry-run: logs actions but modifies nothing
+ 12.  process_backfill    - already-flagged files absent from index are backfilled
+ 13.  process_errors      - missing 01-Processing/ returns exit code 1
 """
 
 from __future__ import annotations
@@ -74,7 +74,7 @@ _API_REQUIRED = (
 _MISSING_API = [fn for fn in _API_REQUIRED if not hasattr(_mod, fn)]
 if _MISSING_API:
     pytest.skip(
-        f"flag_short_files.py API changed — functions not found: {_MISSING_API}. "
+        f"flag_short_files.py API changed - functions not found: {_MISSING_API}. "
         "Refactored module uses _flag_short_file/main/call_tool. "
         "Next step: rewrite these tests against nexus/tasks/flag_short_files.py API.",
         allow_module_level=True,
@@ -100,7 +100,7 @@ _NEEDS_REPROCESSING_RE = _mod._NEEDS_REPROCESSING_RE
 
 
 # ---------------------------------------------------------------------------
-# Image comparison helpers (project convention — kept for consistency)
+# Image comparison helpers (project convention - kept for consistency)
 # ---------------------------------------------------------------------------
 
 
@@ -571,7 +571,7 @@ class TestFlagBad:
 
 
 # ---------------------------------------------------------------------------
-# 8. process — flagging short files
+# 8. process - flagging short files
 # ---------------------------------------------------------------------------
 
 
@@ -662,7 +662,7 @@ class TestProcessFlag:
 
 
 # ---------------------------------------------------------------------------
-# 9. process — clearing previously-flagged files
+# 9. process - clearing previously-flagged files
 # ---------------------------------------------------------------------------
 
 
@@ -689,7 +689,7 @@ class TestProcessClear:
 
 
 # ---------------------------------------------------------------------------
-# 10. process — skip already-flagged short files
+# 10. process - skip already-flagged short files
 # ---------------------------------------------------------------------------
 
 
@@ -717,7 +717,7 @@ class TestProcessSkip:
 
 
 # ---------------------------------------------------------------------------
-# 11. process — dry run
+# 11. process - dry run
 # ---------------------------------------------------------------------------
 
 
@@ -763,7 +763,7 @@ class TestProcessDryRun:
 
 
 # ---------------------------------------------------------------------------
-# 12. process — backfill
+# 12. process - backfill
 # ---------------------------------------------------------------------------
 
 
@@ -793,7 +793,7 @@ class TestProcessBackfill:
 
 
 # ---------------------------------------------------------------------------
-# 13. process — error cases
+# 13. process - error cases
 # ---------------------------------------------------------------------------
 
 

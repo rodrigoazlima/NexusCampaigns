@@ -84,7 +84,7 @@ def test_keeps_best_score_if_revision_regresses(monkeypatch) -> None:
     import lore.tools.generate_npcs as mod
 
     round1 = _make_npc(description="Round 1 output")
-    round2 = _make_npc(description="Round 2 output — worse")
+    round2 = _make_npc(description="Round 2 output - worse")
     scores = iter([4, 6, 3])
     monkeypatch.setattr(mod._GATE, "score", lambda _fm, _body: next(scores))
 

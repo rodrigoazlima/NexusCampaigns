@@ -1,4 +1,4 @@
-# Spec — Service Installation
+# Spec - Service Installation
 
 ---
 
@@ -49,7 +49,7 @@ A clean run produces `--- START ---` and `--- DONE ---` in
 |----------|-------|
 | **Name** | `vault-knowledge-factory` |
 | **Display name** | Vault Nexus Campaigns |
-| **Description** | DM pipeline — ingests, classifies, and links vault entities on schedule |
+| **Description** | DM pipeline - ingests, classifies, and links vault entities on schedule |
 | **Entry command** | `python <project_root>/agents/runtime/tools/runner.py` |
 | **Working directory** | `<project_root>` (repo root, not `agents/`) |
 | **Restart policy** | Always; delay 30s on failure |
@@ -62,7 +62,7 @@ all commands below.
 
 ## Required Environment Variables
 
-Set these in the service environment (not the shell profile — services do not
+Set these in the service environment (not the shell profile - services do not
 source shell init files):
 
 | Variable | Example | Purpose |
@@ -74,7 +74,7 @@ source shell init files):
 | `GEMINI_API_KEY` | `...` | Required if any agent uses `gemini-api` dispatch |
 | `OPENROUTER_API_KEY` | `...` | Required if any agent uses `openrouter-api` dispatch |
 
-**LLM endpoints and model identifiers** are configured in `registry.yaml` under `llm_endpoints` — not environment variables. Only API authentication keys come from env vars.
+**LLM endpoints and model identifiers** are configured in `registry.yaml` under `llm_endpoints` - not environment variables. Only API authentication keys come from env vars.
 
 `vault_root` is configured in `registry.yaml`. It does not need to be set as an env var unless you want to override the registry value.
 
@@ -82,12 +82,12 @@ source shell init files):
 
 ## Installation
 
-### Windows — NSSM
+### Windows - NSSM
 
 NSSM (Non-Sucking Service Manager) wraps any executable as a Windows
 service with restart policies and I/O redirection.
 
-Download: https://nssm.cc/download — place `nssm.exe` on `PATH` or
+Download: https://nssm.cc/download - place `nssm.exe` on `PATH` or
 reference by absolute path.
 
 ```bat
@@ -115,7 +115,7 @@ nssm set vault-knowledge-factory AppEnvironmentExtra ^
 nssm start vault-knowledge-factory
 ```
 
-### Windows — Task Scheduler (no NSSM)
+### Windows - Task Scheduler (no NSSM)
 
 For environments where installing NSSM is not permitted, use Task Scheduler
 with a wrapper script.
@@ -140,7 +140,7 @@ schtasks /create /tn "VaultKnowledgeFactory" ^
 
 ---
 
-### Linux — systemd
+### Linux - systemd
 
 Create `/etc/systemd/system/vault-knowledge-factory.service`:
 
@@ -179,11 +179,11 @@ sudo systemctl start vault-knowledge-factory
 
 ---
 
-### macOS — launchd
+### macOS - launchd
 
 Create `~/Library/LaunchAgents/com.vaultknowledgefactory.plist`
 (user agent) or `/Library/LaunchDaemons/com.vaultknowledgefactory.plist`
-(system daemon — requires root):
+(system daemon - requires root):
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -238,7 +238,7 @@ launchctl load ~/Library/LaunchAgents/com.vaultknowledgefactory.plist
 
 After starting the service, verify it is running correctly:
 
-**1 — Process is alive:**
+**1 - Process is alive:**
 
 ```sh
 # Linux / macOS
@@ -248,14 +248,14 @@ pgrep -a python | grep runner.py
 tasklist | findstr python
 ```
 
-**2 — Lock file exists** (created on first cycle, removed when the process exits cleanly):
+**2 - Lock file exists** (created on first cycle, removed when the process exits cleanly):
 
 ```sh
 # Should exist while running:
 <project_root>/agents/runtime/state/runner.lock
 ```
 
-**3 — Log output:**
+**3 - Log output:**
 
 ```sh
 # Tail the master log
@@ -265,12 +265,12 @@ tail -f <project_root>/agents/runtime/state/logs/automation.log
 Expected output pattern on each cycle:
 ```
 [2026-06-10 08:00:01] [runtime] INFO: --- START ---
-[2026-06-10 08:00:01] [runtime] INFO: Skip ingestion-agent — not yet due
+[2026-06-10 08:00:01] [runtime] INFO: Skip ingestion-agent - not yet due
 [2026-06-10 08:00:02] [runtime] INFO: Dispatching review-agent (...)
 [2026-06-10 08:00:04] [runtime] INFO: --- DONE --- processed=1 failed=0 elapsed=2.1s
 ```
 
-**4 — Service status per platform:**
+**4 - Service status per platform:**
 
 ```sh
 # systemd
@@ -288,9 +288,9 @@ nssm status vault-knowledge-factory
 ## Uninstallation
 
 Stop the service before uninstalling. The vault content and state files are
-**not removed** by uninstall steps — they must be deleted manually if desired.
+**not removed** by uninstall steps - they must be deleted manually if desired.
 
-### Windows — NSSM
+### Windows - NSSM
 
 ```bat
 REM Run as Administrator
@@ -298,13 +298,13 @@ nssm stop vault-knowledge-factory
 nssm remove vault-knowledge-factory confirm
 ```
 
-### Windows — Task Scheduler
+### Windows - Task Scheduler
 
 ```bat
 schtasks /delete /tn "VaultKnowledgeFactory" /f
 ```
 
-### Linux — systemd
+### Linux - systemd
 
 ```sh
 sudo systemctl stop vault-knowledge-factory
@@ -313,7 +313,7 @@ sudo rm /etc/systemd/system/vault-knowledge-factory.service
 sudo systemctl daemon-reload
 ```
 
-### macOS — launchd
+### macOS - launchd
 
 ```sh
 launchctl unload ~/Library/LaunchAgents/com.vaultknowledgefactory.plist

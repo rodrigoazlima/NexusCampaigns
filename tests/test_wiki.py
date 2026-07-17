@@ -254,7 +254,7 @@ class TestBatchSize:
 
 
 # ---------------------------------------------------------------------------
-# main() — LLM offline path
+# main() - LLM offline path
 # ---------------------------------------------------------------------------
 
 class TestMainOffline:
@@ -295,7 +295,7 @@ class TestMainOffline:
 
 
 # ---------------------------------------------------------------------------
-# main() — happy path
+# main() - happy path
 # ---------------------------------------------------------------------------
 
 class TestMainHappyPath:
@@ -459,7 +459,7 @@ class TestStripHtml:
 
 
 # ---------------------------------------------------------------------------
-# _unique_output — collision handling
+# _unique_output - collision handling
 # ---------------------------------------------------------------------------
 
 class TestUniqueOutput:

@@ -1,6 +1,6 @@
 """Abstract interfaces and base classes for all pipeline components.
 
-Protocols (I*) define structural contracts — no implementation.
+Protocols (I*) define structural contracts - no implementation.
 BaseAgent provides a concrete default execute() per shared-library.spec.md.
 Concrete implementations live in each agent's tools/ package.
 """
@@ -39,7 +39,7 @@ from .models import (
 
 
 # ---------------------------------------------------------------------------
-# IAgent — every pipeline agent satisfies this contract
+# IAgent - every pipeline agent satisfies this contract
 # ---------------------------------------------------------------------------
 
 @runtime_checkable
@@ -214,7 +214,7 @@ class IStateStore(ABC):
     @abstractmethod
     def init_defaults(self) -> None:
         """Write the default empty structure if the file does not yet exist.
-        Idempotent — never overwrites an existing file.
+        Idempotent - never overwrites an existing file.
         Default structures are defined in shared.defaults.
         """
         ...
@@ -401,7 +401,7 @@ class IReportBuilder(ABC):
 
 
 # ---------------------------------------------------------------------------
-# IRunner — dispatch abstraction
+# IRunner - dispatch abstraction
 # ---------------------------------------------------------------------------
 
 @runtime_checkable
@@ -411,8 +411,8 @@ class IRunner(Protocol):
     def run(self, dispatch_config: dict, context: dict) -> RunResult:
         """Execute agent via the runner's transport.
 
-        dispatch_config — the type-specific sub-config dict (e.g. cli, openai_api).
-        context — runtime values: {"project_root": str, "agent_dir": str}.
+        dispatch_config - the type-specific sub-config dict (e.g. cli, openai_api).
+        context - runtime values: {"project_root": str, "agent_dir": str}.
         Returns RunResult; never raises on transport errors (captures to .error).
         """
         ...
@@ -423,7 +423,7 @@ class IRunner(Protocol):
 # ---------------------------------------------------------------------------
 
 class IOrchestrator(ABC):
-    """Contract for the runner — schedules and dispatches agents."""
+    """Contract for the runner - schedules and dispatches agents."""
 
     @abstractmethod
     def is_due(self, task_id: str) -> bool:
@@ -460,7 +460,7 @@ class IQualityGate(ABC):
 
     @abstractmethod
     def score(self, frontmatter: dict, body: str) -> int:
-        """Compute quality score 0–10. Pure — no I/O."""
+        """Compute quality score 0–10. Pure - no I/O."""
         ...
 
     @abstractmethod
@@ -630,7 +630,7 @@ class IQueueRegistrar(ABC):
 
 
 # ---------------------------------------------------------------------------
-# ISignalEmitter — file-based inter-agent signal bus
+# ISignalEmitter - file-based inter-agent signal bus
 # ---------------------------------------------------------------------------
 
 @runtime_checkable
@@ -649,7 +649,7 @@ class ISignalEmitter(Protocol):
 
 
 # ---------------------------------------------------------------------------
-# IRegistryLoader — registry.yaml loader contract
+# IRegistryLoader - registry.yaml loader contract
 # ---------------------------------------------------------------------------
 
 @runtime_checkable
@@ -670,7 +670,7 @@ class IRegistryLoader(Protocol):
 # ---------------------------------------------------------------------------
 
 class LLMOfflineError(Exception):
-    """LLM server unreachable — caller should skip batch, not fail permanently."""
+    """LLM server unreachable - caller should skip batch, not fail permanently."""
 
 
 class LLMResponseError(Exception):
@@ -682,4 +682,4 @@ class VaultWriteError(PermissionError):
 
 
 class DispatchError(Exception):
-    """Orchestrator could not dispatch an agent — unknown type, missing config, etc."""
+    """Orchestrator could not dispatch an agent - unknown type, missing config, etc."""

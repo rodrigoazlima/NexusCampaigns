@@ -34,26 +34,26 @@ Analyze the provided Python script and extract all relevant configuration settin
    - Put script-specific behavior (batch sizes, task-specific prompts, agent name, etc.) in **local**.
    - Make sure the JSONs contain good defaults so the script works even if the files are deleted.
    - Use clear, consistent naming.
-   - Do not include code — only configuration.
+   - Do not include code - only configuration.
 
 ---
 
 **Script to analyze:**
 
 # shared\runners\openai_compat.py
-"""OpenAICompatRunner — OpenAI REST API and any compatible endpoint.
+"""OpenAICompatRunner - OpenAI REST API and any compatible endpoint.
 
 Supported: OpenAI, LM Studio (localhost:1234), LocalRouter (localhost:8080),
 Ollama, and any server that speaks the OpenAI chat completions schema.
 
 Dispatch config keys (from OpenAIApiConfig):
-  base_url         str   — API base URL, e.g. http://localhost:1234/v1
-  model            str   — model identifier
-  system_file      str?  — path to system prompt, relative to agent_dir
-  prompt_file      str?  — path to user prompt, relative to agent_dir
-  max_tokens       int   — default 1024
-  temperature      float — default 0.0
-  timeout_seconds  int   — default 120
+  base_url         str   - API base URL, e.g. http://localhost:1234/v1
+  model            str   - model identifier
+  system_file      str?  - path to system prompt, relative to agent_dir
+  prompt_file      str?  - path to user prompt, relative to agent_dir
+  max_tokens       int   - default 1024
+  temperature      float - default 0.0
+  timeout_seconds  int   - default 120
 
 Auth: OPENAI_API_KEY env var. For local endpoints set to any non-empty string.
 
@@ -134,7 +134,7 @@ class OpenAICompatRunner:
                     )
 
             except urllib.error.URLError as exc:
-                # Server offline — skip batch silently, no retry
+                # Server offline - skip batch silently, no retry
                 return RunResult(
                     exit_code=1,
                     error=f"LLM server unreachable ({base_url}): {exc}",
@@ -148,7 +148,7 @@ class OpenAICompatRunner:
                         error=f"API auth error HTTP {exc.code}: {exc.reason}",
                         duration_ms=_ms(t0),
                     )
-                # 5xx — retry
+                # 5xx - retry
                 last_error = f"HTTP {exc.code}: {exc.reason} (attempt {attempt + 1})"
 
             except (KeyError, IndexError) as exc:

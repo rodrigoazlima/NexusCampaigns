@@ -1,14 +1,14 @@
-"""nexus.workers.report — scheduled pipeline-health report worker.
+"""nexus.workers.report - scheduled pipeline-health report worker.
 
 Aggregates automation logs + queue depth + vault health into a JSON report,
 rebuilds reports-data.js for the dashboard, injects suggestedQuality into
 01-Processing drafts. Replaces nexus.tasks.daily_report.
 
-Report output paths deliberately stay at system/state/review/reports/ —
+Report output paths deliberately stay at system/state/review/reports/ -
 dashboard /api routes read them. Only worker-internal logs moved.
 
 Guard rules: never writes 02-Library; 01-Processing frontmatter gets
-suggestedQuality only — never status, reviewed, quality.
+suggestedQuality only - never status, reviewed, quality.
 """
 
 from __future__ import annotations
@@ -236,7 +236,7 @@ def _library_link_violations(fio: FrontmatterIO) -> list[dict[str, Any]]:
 def _load_tasks_config() -> dict[str, Any]:
     """Discover task configs by scanning agents/*/agent.json files.
 
-    ponytail: covers LLM agents only — worker config lives in
+    ponytail: covers LLM agents only - worker config lives in
     registry.yaml; add it here if reports-data.js ever needs it.
     """
     tasks = []

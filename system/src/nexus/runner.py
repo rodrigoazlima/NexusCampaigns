@@ -1,6 +1,6 @@
 """nexus.runner
 
-Python runtime — the scheduler for the agent pipeline. Entrypoint only; the
+Python runtime - the scheduler for the agent pipeline. Entrypoint only; the
 implementation lives in nexus.runtime (see nexus/runtime/__init__.py for the
 module map), split by responsibility per SOLID.
 

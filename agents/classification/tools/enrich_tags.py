@@ -58,7 +58,7 @@ _QUEUE_FILE   = _SHARED_STATE / "inbox-queue.json"
 
 _TAG_LIBRARY_FILE = _AGENT_STATE / "tag-library.json"
 
-# Tags are no longer filtered against a fixed vocabulary — the LLM proposes
+# Tags are no longer filtered against a fixed vocabulary - the LLM proposes
 # freely and _canonicalize_tag() folds variants into whichever spelling was
 # seen first (state/tag-library.json), so "elf" stays "elf" even if a later
 # note's model says "elven".
@@ -82,7 +82,7 @@ _LLM_CFG = load_llm_endpoint(
     model_key    = "text_model",
 )
 
-# Second opinion for refine_tags_with_library — same LM Studio instance the
+# Second opinion for refine_tags_with_library - same LM Studio instance the
 # vision agent uses, model independently selectable via agent.json so
 # classification isn't pinned to whatever model the vision agent runs.
 _VISION_LLM_CFG = load_llm_endpoint(
@@ -104,7 +104,7 @@ _SIMILARITY_THRESHOLD = 0.85
 
 # Minimum shared-prefix ratio (common leading chars / shorter tag's length) to
 # fold a tag into an existing canonical one. Character-level difflib ratio
-# (used above for slugs) is the wrong tool for short single words — it scores
+# (used above for slugs) is the wrong tool for short single words - it scores
 # "elf"/"self" at 0.86 (false positive, no shared stem) while scoring
 # "elf"/"elven" at only 0.5 (false negative, the exact case this exists for).
 # Prefix ratio catches plurals/inflections that share a stem ("elf"->"elven",
@@ -112,7 +112,7 @@ _SIMILARITY_THRESHOLD = 0.85
 _TAG_FOLD_THRESHOLD = 0.65
 
 # Types the vision agent assigns as placeholder defaults (portrait→npc, battlemap→location).
-# These are safe to refine — a more specific type should be inferred from content.
+# These are safe to refine - a more specific type should be inferred from content.
 _VISION_DEFAULTS: frozenset[str] = frozenset({"npc", "location"})
 
 # Vision image-type tags → plausible entity types (used to build prompt hint)
@@ -187,7 +187,7 @@ def _assert_not_library(path: Path) -> None:
         path.resolve().relative_to(_LIBRARY.resolve())
         raise VaultWriteError(f"Agents may not modify 02-Library/: {path}")
     except ValueError:
-        pass  # not under library — safe to write
+        pass  # not under library - safe to write
 
 
 def _write_with_retry(
@@ -219,7 +219,7 @@ def _slug_similarity(a: str, b: str) -> float:
 
 
 # ---------------------------------------------------------------------------
-# Tag library — canonicalizes free-form LLM tags instead of a fixed vocabulary
+# Tag library - canonicalizes free-form LLM tags instead of a fixed vocabulary
 # ---------------------------------------------------------------------------
 
 def _load_tag_library() -> dict[str, Any]:
@@ -252,9 +252,9 @@ def _canonicalize_tag(raw: str, library: dict[str, Any]) -> str:
     """Fold a free-form tag into whichever spelling was registered first.
 
     Exact match reuses the existing entry. Otherwise fuzzy-matches against
-    every known tag by shared-prefix ratio (ponytail: O(n) scan — fine at
+    every known tag by shared-prefix ratio (ponytail: O(n) scan - fine at
     hundreds of tags, add an index if the library grows into the thousands;
-    prefix matching is a heuristic, not real stemming — a short unrelated
+    prefix matching is a heuristic, not real stemming - a short unrelated
     word sharing a stem's prefix, e.g. "elf"/"elbow", can occasionally
     over-fold. Acceptable for a DM's personal tag vocabulary; swap for real
     stemming if it misbehaves) and folds into the best match above
@@ -294,7 +294,7 @@ def _image_hint(tags: list[str]) -> str:
     for tag in tags:
         candidates = _IMAGE_TYPE_HINTS.get(tag)
         if candidates:
-            return f"Image classified as '{tag}' — likely entity types: {', '.join(candidates)}.\n"
+            return f"Image classified as '{tag}' - likely entity types: {', '.join(candidates)}.\n"
     return ""
 
 
@@ -331,12 +331,12 @@ def _mark_classification_done(entry: dict) -> Optional[str]:
 
 
 def _mark_queue_done(queue: dict[str, Any], rel: str) -> None:
-    """Mark classification slot done for rel — locked, fresh, one entry at a time.
+    """Mark classification slot done for rel - locked, fresh, one entry at a time.
 
     rel may be an .md path (01-Processing/) or a direct inbox image path.
     For .md files, also marks the source image's queue entry done via
     the frontmatter 'source' field. `queue` is only consulted (not mutated)
-    to decide which keys exist — the actual write reloads fresh under lock.
+    to decide which keys exist - the actual write reloads fresh under lock.
     """
     if rel in queue:
         locked_update_queue_entry(_QUEUE_FILE, rel, _mark_classification_done)
@@ -367,7 +367,7 @@ def _source_candidate_tags(fm: dict, queue: dict[str, Any]) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# EnrichTags action — core loop
+# EnrichTags action - core loop
 # ---------------------------------------------------------------------------
 
 def _run_enrich_tags() -> tuple[int, int]:
@@ -377,7 +377,7 @@ def _run_enrich_tags() -> tuple[int, int]:
     client = LLMClient(_LLM_CFG)
     if not client.is_available():
         log = _make_logger()
-        log.warning(f"Text LLM ({_LLM_CFG.url}) offline — skipping batch")
+        log.warning(f"Text LLM ({_LLM_CFG.url}) offline - skipping batch")
         return 0, 0
 
     vision_client = LLMClient(_VISION_LLM_CFG)
@@ -442,15 +442,15 @@ def _run_enrich_tags() -> tuple[int, int]:
         try:
             raw        = client.chat([{"role": "user", "content": prompt}], max_tokens=80)
             if not raw or not raw.strip():
-                log.warning(f"Empty LLM response for {md_path.name} — skipping (transient)")
+                log.warning(f"Empty LLM response for {md_path.name} - skipping (transient)")
                 time.sleep(0.3)
                 continue
             enrichment = TagEnrichmentOutput.model_validate(_json.loads(raw))
         except LLMOfflineError:
-            log.warning("LLM offline — aborting batch")
+            log.warning("LLM offline - aborting batch")
             break
         except (LLMResponseError, _json.JSONDecodeError) as exc:
-            log.warning(f"LLM response error for {md_path.name}: {exc} — skipping (transient)")
+            log.warning(f"LLM response error for {md_path.name}: {exc} - skipping (transient)")
             time.sleep(0.3)
             continue
         except Exception as exc:
@@ -505,7 +505,7 @@ def _run_enrich_tags() -> tuple[int, int]:
                         fm["type"] = refined_type
                         changed = True
                 except Exception as exc:
-                    log.warning(f"Vision refinement failed for {md_path.name}: {exc} — keeping text-only result")
+                    log.warning(f"Vision refinement failed for {md_path.name}: {exc} - keeping text-only result")
 
         if changed:
             ok = _write_with_retry(md_path, fm, body, fio)
@@ -534,7 +534,7 @@ def _run_enrich_tags() -> tuple[int, int]:
 
 
 def main() -> None:
-    """EnrichTags entry point — called when run as a CLI script."""
+    """EnrichTags entry point - called when run as a CLI script."""
     log = _make_logger()
     t0  = log.start()
     count, failed = _run_enrich_tags()
@@ -543,7 +543,7 @@ def main() -> None:
 
 
 # ---------------------------------------------------------------------------
-# InferType action — type-only pass (targeted)
+# InferType action - type-only pass (targeted)
 # ---------------------------------------------------------------------------
 
 def _run_infer_type() -> tuple[int, int]:
@@ -551,7 +551,7 @@ def _run_infer_type() -> tuple[int, int]:
     log    = _make_logger()
     client = LLMClient(_LLM_CFG)
     if not client.is_available():
-        log.warning("Text LLM offline — InferType skipped")
+        log.warning("Text LLM offline - InferType skipped")
         return 0, 0
 
     bad_docs = _load_bad_docs()
@@ -585,7 +585,7 @@ def _run_infer_type() -> tuple[int, int]:
             raw           = client.chat([{"role": "user", "content": prompt}], max_tokens=10)
             inferred_type = _json.loads(raw).get("type")
         except LLMOfflineError:
-            log.warning("LLM offline — aborting InferType")
+            log.warning("LLM offline - aborting InferType")
             break
         except Exception as exc:
             log.error(f"InferType LLM error for {md_path.name}: {exc}")
@@ -609,7 +609,7 @@ def _run_infer_type() -> tuple[int, int]:
 
 
 # ---------------------------------------------------------------------------
-# FlagDuplicates action — exact + similarity-based slug comparison
+# FlagDuplicates action - exact + similarity-based slug comparison
 # ---------------------------------------------------------------------------
 
 def _run_flag_duplicates() -> int:

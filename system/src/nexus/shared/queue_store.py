@@ -2,7 +2,7 @@
 
 Every agent tool that touches the shared inbox queue must persist one item
 at a time through this helper instead of buffering a whole batch in memory
-and saving once — otherwise two agents running concurrently (pipeline_mode:
+and saving once - otherwise two agents running concurrently (pipeline_mode:
 async) can clobber each other's updates, and a crash mid-batch loses all
 progress made before the final save.
 """
@@ -39,7 +39,7 @@ def locked_update_queue_entry(
 
     `mutate(entry)` receives the entry dict for `rel_key` (empty dict if new)
     and mutates it in place. It may return a new key to rename the entry to
-    (e.g. vision renaming a hashed filename to a descriptive slug) — the old
+    (e.g. vision renaming a hashed filename to a descriptive slug) - the old
     key is dropped in that case.
     """
     with FileLock(queue_file):

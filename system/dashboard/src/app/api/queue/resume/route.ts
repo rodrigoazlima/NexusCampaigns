@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
       if (!entry?.agents) continue
       let touched = false
       // When `agent` is given (e.g. an agent detail page), only that slot is
-      // touched — the other agents on this queue entry are left alone.
+      // touched - the other agents on this queue entry are left alone.
       const slots = body.agent ? [body.agent] : Object.keys(entry.agents)
       for (const agent of slots) {
         if (entry.agents[agent] === 'paused') {

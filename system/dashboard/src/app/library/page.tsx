@@ -223,7 +223,7 @@ export default async function LibraryPage() {
                       </div>
                     </td>
                     <td className="px-4 py-2 font-mono text-zinc-500">{e.relationships.length}</td>
-                    <td className="px-4 py-2 text-zinc-500">{e.updated || '—'}</td>
+                    <td className="px-4 py-2 text-zinc-500">{e.updated || '-'}</td>
                   </tr>
                 ))}
               </tbody>

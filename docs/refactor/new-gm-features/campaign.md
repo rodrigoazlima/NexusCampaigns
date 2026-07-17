@@ -1,10 +1,10 @@
-# Campaign Setting — Page Spec
+# Campaign Setting - Page Spec
 
 **Route:** `/gm` (replaces the current "Campaign Workshop" hub)
 **Icon:** `Dices` · **Nav:** GAME MASTER → Campaign
 **Source guide:** `docs/specs/guides/campaign-setting-guide.md`
 
-The command center for a whole campaign setting. Not an entity collection — it
+The command center for a whole campaign setting. Not an entity collection - it
 is the **frame + progress + readiness** layer that sits over the six pillar
 pages. A GM lands here to answer one question: *is my setting ready to run, and
 what's the next thing to build?*
@@ -18,10 +18,10 @@ place, a handful of people who want conflicting things, and a reason the party
 can't sit still" (the guide's rule of thumb). This page operationalizes the
 guide's 8 sections:
 
-- **§0 Frame** — the decisions (pitch, tone, scale, tension, buy-in).
-- **§1–6 Pillars** — progress per domain, deep-linking to the pillar pages.
-- **§7 Wiring** — relationship-web health (orphans, triangles).
-- **§8 Readiness** — the go/no-go checklist, computed from real vault state.
+- **§0 Frame** - the decisions (pitch, tone, scale, tension, buy-in).
+- **§1–6 Pillars** - progress per domain, deep-linking to the pillar pages.
+- **§7 Wiring** - relationship-web health (orphans, triangles).
+- **§8 Readiness** - the go/no-go checklist, computed from real vault state.
 
 ---
 
@@ -69,14 +69,14 @@ Six tiles (reuse the existing PILLARS array from `/gm/page.tsx`). Per tile:
 - pillar icon + label (World & Places, Characters & NPCs, …)
 - big count of entities in that pillar (draft + canon, canon-wins merge)
 - `{n} new` warning chip when unreviewed drafts exist
-- a thin **build-checklist progress bar** — % of that pillar's "build first"
+- a thin **build-checklist progress bar** - % of that pillar's "build first"
   items satisfied (see §6 readiness rules)
 - click → the pillar page (`/gm/places`, `/gm/npcs`, …)
 
 This replaces today's hub item-preview lists; previews move into the pillar
 pages where they belong.
 
-## 5. Readiness checklist (§8) — the heart of the page
+## 5. Readiness checklist (§8) - the heart of the page
 
 Seven rows from the guide, each computed live. Tag **NEW**
 `GET /api/gm/readiness` returns `{ checks: [{ id, ok, detail, fixHref }] }`.
@@ -91,12 +91,12 @@ Seven rows from the guide, each computed live. Tag **NEW**
 | 6 | One hook + two threads | ≥1 `quest` flagged hook + ≥2 other `quest` | `/gm/quests` |
 | 7 | World moves without players | ≥1 `timeline`/`event` or any faction clock | `/gm/factions` |
 
-Each row: green ✓ / amber ✗ + the live `detail` ("2/3 NPCs — add 1 more") and a
+Each row: green ✓ / amber ✗ + the live `detail` ("2/3 NPCs - add 1 more") and a
 **Fix it →** button to the relevant pillar page (pre-filtered). When all 7 pass,
 the readiness ring goes solid green and **Run ▸** becomes primary/enabled.
 
 > Heuristics (which body section counts as a "want", a "clock") live in the
-> readiness endpoint, not the UI — keep them server-side and tunable.
+> readiness endpoint, not the UI - keep them server-side and tunable.
 
 ## 6. Wiring health (§7)
 

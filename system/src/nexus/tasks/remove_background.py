@@ -49,7 +49,7 @@ _MASTER_LOG   = _PROJECT_ROOT / "agents" / "runtime" / "state" / "logs" / "autom
 _LUMA_W = np.array([0.2126, 0.7152, 0.0722], dtype=np.float32)
 
 # --------------------------------------------------------------------------
-# Configuration — defaults; live values come from system/state/token/bg-config.json
+# Configuration - defaults; live values come from system/state/token/bg-config.json
 # --------------------------------------------------------------------------
 _DEFAULT_CFG: dict[str, Any] = {
     "method":        "hybrid",   # hybrid | luma | color
@@ -82,7 +82,7 @@ def _load_config() -> dict[str, Any]:
     return cfg
 
 
-# Loaded once at import — every variable below originates from agent config
+# Loaded once at import - every variable below originates from agent config
 CONFIG        = _load_config()
 METHOD        = CONFIG["method"]
 MARGIN        = float(CONFIG["margin"])
@@ -143,7 +143,7 @@ def _smoothstep(x: np.ndarray) -> np.ndarray:
 
 
 def _alpha_from_luma(rgb: np.ndarray, floor: float, margin: float) -> np.ndarray:
-    """Alpha from luminance — captures soft glow halos as they fade to dark."""
+    """Alpha from luminance - captures soft glow halos as they fade to dark."""
     lum = _luminance(rgb)
     lo = min(0.95, floor + margin)
     hi = max(lo + 1e-3, float(np.percentile(lum, 99.5)))
@@ -151,7 +151,7 @@ def _alpha_from_luma(rgb: np.ndarray, floor: float, margin: float) -> np.ndarray
 
 
 def _alpha_from_color(rgb: np.ndarray, bg_rgb: np.ndarray, margin: float) -> np.ndarray:
-    """Alpha from color distance to bg — keeps the saturated subject solid."""
+    """Alpha from color distance to bg - keeps the saturated subject solid."""
     dist = np.linalg.norm(rgb - bg_rgb[None, None, :], axis=2) / np.sqrt(3.0)
     lo = margin
     hi = max(lo + 1e-3, float(np.percentile(dist, 99.5)))
@@ -302,7 +302,7 @@ def main(inputs: list[str] | None = None) -> None:
     try:
         from PIL import Image  # noqa: F401
     except ImportError:
-        log.error("Pillow not installed — install: pip install Pillow")
+        log.error("Pillow not installed - install: pip install Pillow")
         log.done(t0, key="processed", count=0, failed=0)
         sys.exit(1)
 

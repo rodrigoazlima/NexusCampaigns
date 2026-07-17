@@ -4,7 +4,7 @@ purpose: >
   Builds and maintains a keyword + tag search index over 02-Library/ and
   01-Processing/ entities. Writes search-index.json. Answers DM queries
   by filtering the index and returning ranked SearchEntry results with
-  wikilink citations. No LLM calls — pure text matching.
+  wikilink citations. No LLM calls - pure text matching.
 inputs:
   - vault://02-Library/**/*.md
   - vault://01-Processing/**/*.md
@@ -33,5 +33,5 @@ state_files:
   - state/search-index.json
   - state/logs/search_YYYY-MM-DD.log
 commit_scope:
-  # none — agent produces no knowledge-base content; must not auto-commit
+  # none - agent produces no knowledge-base content; must not auto-commit
 ---

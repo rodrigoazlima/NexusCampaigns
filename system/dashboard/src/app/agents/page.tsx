@@ -94,13 +94,13 @@ export default async function AgentsPage() {
                         )}
                       </div>
                     ) : (
-                      <span className="text-zinc-600">—</span>
+                      <span className="text-zinc-600">-</span>
                     )}
                   </td>
                   <td className="px-4 py-2 font-mono text-zinc-400">{formatDateTime(agent.lastRun)}</td>
                   <td className="px-4 py-2 font-mono text-zinc-300 text-right">{agent.totalRuns}</td>
                   <td className="px-4 py-2 font-mono text-zinc-400 text-right">
-                    {agent.avgDurationMs > 0 ? formatDuration(agent.avgDurationMs) : '—'}
+                    {agent.avgDurationMs > 0 ? formatDuration(agent.avgDurationMs) : '-'}
                   </td>
                   <td className={`px-4 py-2 font-mono text-right ${agent.totalFailed > 0 ? 'text-danger' : 'text-zinc-500'}`}>
                     {agent.totalFailed}

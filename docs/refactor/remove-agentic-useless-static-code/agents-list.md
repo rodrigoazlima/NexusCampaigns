@@ -3,7 +3,7 @@
 Post-refactor inventory. LLM agents are discovered from `agents/*/agent.json`
 (scheduled by `nexus.runner` in `registry.yaml` `execution_order`). Static
 work runs as in-process **workers** (`nexus.workers.*`), configured in the
-`workers:` block of `agents/registry.yaml` — no agent.json, no subprocess.
+`workers:` block of `agents/registry.yaml` - no agent.json, no subprocess.
 
 ## LLM agents
 
@@ -41,4 +41,4 @@ python -m nexus.workers.<name>                       # worker directly (one pend
 `agent.json` is machine-local (gitignored) and exists for LLM agents only; the
 maintenance worker regenerates missing ones from `_AGENT_JSON_SPECS` in
 `system/src/nexus/workers/maintenance.py`. Worker config is git-tracked in
-`agents/registry.yaml` — nothing machine-local to regenerate.
+`agents/registry.yaml` - nothing machine-local to regenerate.

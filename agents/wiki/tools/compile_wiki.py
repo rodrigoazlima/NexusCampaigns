@@ -161,7 +161,7 @@ def _enforce_and_write(
 ) -> None:
     """Parse LLM output, enforce security constraints, write to out_path.
 
-    Enforced fields (G3 — no self-approval):
+    Enforced fields (G3 - no self-approval):
       status=draft, reviewed=false, quality=0, source=[source_name]
     """
     today = date.today().isoformat()
@@ -193,7 +193,7 @@ def _enforce_and_write(
     # Source tracking
     fm["source"] = [source_name]
 
-    # Validate type — default to lore if LLM returned an unknown value
+    # Validate type - default to lore if LLM returned an unknown value
     if str(fm.get("type", "")) not in _ALLOWED_TYPES:
         fm["type"] = "lore"
 
@@ -273,7 +273,7 @@ def main() -> None:
 
     client = LLMClient(_LLM_CFG)
     if not client.is_available():
-        log.warning("LocalRouter (localhost:8080) offline — skipping batch")
+        log.warning("LocalRouter (localhost:8080) offline - skipping batch")
         log.done(t0, key="processed", count=0, failed=0)
         sys.exit(0)
 
@@ -328,7 +328,7 @@ def main() -> None:
                 max_tokens=1500,
             )
         except LLMOfflineError:
-            log.warning("LLM offline — aborting batch")
+            log.warning("LLM offline - aborting batch")
             break
         except (LLMResponseError, Exception) as exc:
             log.error(f"LLM error for {md_path.name}: {exc}")
@@ -444,7 +444,7 @@ def call_tool(name: str, args: dict, context: dict) -> str:
         rel_key  = args["source_path"]
         bad_docs = _load_bad_docs()
         if rel_key in bad_docs:
-            return f"ERROR: {rel_key} is in bad-wiki-docs.txt — skipped"
+            return f"ERROR: {rel_key} is in bad-wiki-docs.txt - skipped"
         abs_path = _PROJECT_ROOT / rel_key
         if not abs_path.exists():
             return f"ERROR: File not found: {abs_path}"

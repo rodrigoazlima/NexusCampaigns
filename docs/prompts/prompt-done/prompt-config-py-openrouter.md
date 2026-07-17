@@ -34,26 +34,26 @@ Analyze the provided Python script and extract all relevant configuration settin
    - Put script-specific behavior (batch sizes, task-specific prompts, agent name, etc.) in **local**.
    - Make sure the JSONs contain good defaults so the script works even if the files are deleted.
    - Use clear, consistent naming.
-   - Do not include code — only configuration.
+   - Do not include code - only configuration.
 
 ---
 
 **Script to analyze:**
 
 # shared\runners\openrouter.py
-"""OpenRouterRunner — OpenRouter unified gateway.
+"""OpenRouterRunner - OpenRouter unified gateway.
 
 OpenRouter exposes an OpenAI-compatible API at https://openrouter.ai/api/v1.
 Any model available on OpenRouter can be used (e.g. anthropic/claude-sonnet-4-6,
 google/gemini-2.5-flash, meta-llama/llama-3.1-8b-instruct).
 
 Dispatch config keys (from OpenRouterApiConfig):
-  model            str   — OpenRouter model slug, e.g. anthropic/claude-sonnet-4-6
-  system_file      str?  — path to system prompt, relative to agent_dir
-  prompt_file      str?  — path to user prompt, relative to agent_dir
-  max_tokens       int   — default 4096
-  temperature      float — default 0.0
-  timeout_seconds  int   — default 180
+  model            str   - OpenRouter model slug, e.g. anthropic/claude-sonnet-4-6
+  system_file      str?  - path to system prompt, relative to agent_dir
+  prompt_file      str?  - path to user prompt, relative to agent_dir
+  max_tokens       int   - default 4096
+  temperature      float - default 0.0
+  timeout_seconds  int   - default 180
 
 Auth: OPENROUTER_API_KEY env var.
 
@@ -155,7 +155,7 @@ class OpenRouterRunner:
                         error=f"OpenRouter auth/billing error HTTP {exc.code}: {exc.reason}",
                         duration_ms=_ms(t0),
                     )
-                # 5xx — retry
+                # 5xx - retry
                 last_error = f"HTTP {exc.code}: {exc.reason} (attempt {attempt + 1})"
 
             except (KeyError, IndexError) as exc:

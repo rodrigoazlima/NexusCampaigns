@@ -1,4 +1,4 @@
-"""nexus.runtime.signals — cross-checks pending signal-bus entries against
+"""nexus.runtime.signals - cross-checks pending signal-bus entries against
 each task's signal_triggers to force an immediate (out-of-interval) dispatch."""
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ def check_signals(
             pending = consumer.pending(signal_type)
             if pending:
                 log.info(
-                    f"Signal '{signal_type}' pending ({len(pending)} item(s)) — "
+                    f"Signal '{signal_type}' pending ({len(pending)} item(s)) - "
                     f"triggering {task_id} immediately"
                 )
                 triggered.add(task_id)

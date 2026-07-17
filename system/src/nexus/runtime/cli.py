@@ -1,4 +1,4 @@
-"""nexus.runtime.cli — argument parsing and process entrypoint for
+"""nexus.runtime.cli - argument parsing and process entrypoint for
 `python -m nexus.runner` / `python system/src/nexus/runner.py`."""
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from .scheduler import Runtime
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Vault Nexus Campaigns — agent runtime",
+        description="Vault Nexus Campaigns - agent runtime",
     )
     parser.add_argument("--once", action="store_true", help="Run one scheduling cycle then exit")
     parser.add_argument("--task", metavar="TASK_ID", default=None, help="Run only this specific task")

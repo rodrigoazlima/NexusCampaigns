@@ -11,7 +11,7 @@ export function formatRelative(dateStr: string | null): string {
 }
 
 export function formatDateTime(dateStr: string | null): string {
-  if (!dateStr) return '—'
+  if (!dateStr) return '-'
   try {
     return format(parseISO(dateStr), 'MMM d, HH:mm:ss')
   } catch {

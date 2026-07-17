@@ -134,7 +134,7 @@ class TestExtractCandidateTags:
 
     def test_drops_sentence_length_pseudo_tag(self):
         """The LLM sometimes ignores the '1-3 word tag' instruction and
-        returns a full descriptive sentence as one array item — that must
+        returns a full descriptive sentence as one array item - that must
         not land in frontmatter tags: as if it were a real tag."""
         sentence = (
             "a large sword with a black blade and hilt, featuring white "
@@ -172,7 +172,7 @@ class TestIsConcreteTag:
 # ---------------------------------------------------------------------------
 
 def _write_real_jpg(path):
-    """A real (tiny) JPEG — _image_content_block PIL-opens the file, so fake
+    """A real (tiny) JPEG - _image_content_block PIL-opens the file, so fake
     bytes crash it."""
     from PIL import Image
     Image.new("RGB", (8, 8), (128, 64, 32)).save(path, format="JPEG")
@@ -355,7 +355,7 @@ class TestRefineTagsWithLibrary:
 
     def test_final_tags_merge_not_replace(self, tmp_path):
         """Cycle 4 must never silently drop a tag an earlier cycle already
-        grounded in the image's own visual_analysis — a model that rephrases
+        grounded in the image's own visual_analysis - a model that rephrases
         ("weapon" -> "stylized sword") instead of listing both would
         otherwise erase "weapon" from the note entirely."""
         img = tmp_path / "sword.jpg"
@@ -427,7 +427,7 @@ class TestIsToken:
             pytest.skip("Pillow not available")
 
     def test_two_transparent_corners_is_token(self, tmp_path):
-        """Spec says ≥2 transparent corners — two should be enough."""
+        """Spec says ≥2 transparent corners - two should be enough."""
         try:
             from PIL import Image
             img = Image.new("RGBA", (64, 64), (255, 0, 0, 255))
@@ -511,7 +511,7 @@ class TestImageFilenameSlug:
         assert slug == "item-stylized-sword"
 
     def test_scene_with_place_entity_type_keeps_environment_slug(self):
-        """entity_type=location is place-like — the scene bucket is correct
+        """entity_type=location is place-like - the scene bucket is correct
         here, no override should trigger."""
         c = _clf(type_="scene", environment="forest")
         c = c.model_copy(update={"entity_type": "location"})
@@ -917,7 +917,7 @@ class TestWriteDraft:
 
     def test_draft_merges_candidate_tags_into_tags_not_as_field(self, patch_roots, vault, tmp_path):
         """The multi-cycle conversation's final tags land in the note's `tags:`
-        (they're already library-aligned by cycle 4) — but never as a separate
+        (they're already library-aligned by cycle 4) - but never as a separate
         `candidate_tags:` frontmatter field."""
         import yaml
         img = vault / "00-Inbox" / "images" / "warrior.jpg"
@@ -952,7 +952,7 @@ class TestWriteDraft:
 
     def test_draft_uses_item_body_for_object_in_scene_bucket(self, patch_roots, vault, tmp_path):
         """A sword photographed with no readable environment lands on
-        type=scene/entity_type=item — the body must not claim '**Type**:
+        type=scene/entity_type=item - the body must not claim '**Type**:
         Scene' (the old bug: frontmatter said item, body said Scene) and
         must use the item body's own sections instead of scene's Atmosphere/
         Story Hooks template."""

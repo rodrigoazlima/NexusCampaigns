@@ -34,7 +34,7 @@ Analyze the provided Python script and extract all relevant configuration settin
    - Put script-specific behavior (batch sizes, task-specific prompts, agent name, etc.) in **local**.
    - Make sure the JSONs contain good defaults so the script works even if the files are deleted.
    - Use clear, consistent naming.
-   - Do not include code — only configuration.
+   - Do not include code - only configuration.
 
 ---
 
@@ -43,7 +43,7 @@ Analyze the provided Python script and extract all relevant configuration settin
 # ingestion\tools\ingestion_agent.py
 """ingestion.tools.ingestion_agent
 
-Ingestion Agent — first stage of the vault pipeline.
+Ingestion Agent - first stage of the vault pipeline.
   - Strips emoji from filenames in 00-Inbox/ (idempotent)
   - Converts .docx files vault-wide to GFM Markdown via Pandoc
   - Registers new Inbox files into .system/state/inbox-queue.json
@@ -124,7 +124,7 @@ _EMOJI_RE = re.compile(
 
 
 # ---------------------------------------------------------------------------
-# Logger factory — used by call_tool() agentic dispatch (no agent instance)
+# Logger factory - used by call_tool() agentic dispatch (no agent instance)
 # ---------------------------------------------------------------------------
 
 def _make_logger() -> Logger:
@@ -220,7 +220,7 @@ def strip_emoji_filenames(inbox: Path, log: Logger) -> int:
 def _ensure_pandoc(log: Logger) -> bool:
     if shutil.which("pandoc"):
         return True
-    log.warning("pandoc not found — attempting: winget install JohnMacFarlane.Pandoc")
+    log.warning("pandoc not found - attempting: winget install JohnMacFarlane.Pandoc")
     try:
         result = subprocess.run(
             ["winget", "install", "--id", "JohnMacFarlane.Pandoc", "-e", "--silent"],
@@ -290,7 +290,7 @@ def _flatten_media(images_dir: Path, md_path: Path, log: Logger) -> None:
     try:
         media_sub.rmdir()
     except OSError:
-        pass  # non-empty after move (subdirs) — leave it
+        pass  # non-empty after move (subdirs) - leave it
 
     if moved and md_path.exists():
         _fix_md_image_refs(md_path, images_dir)
@@ -315,13 +315,13 @@ def _fix_md_image_refs(md_path: Path, images_dir: Path) -> None:
 
         md_path.write_text(content, encoding="utf-8")
     except Exception:
-        pass  # non-fatal — images still exist, paths just need manual fix
+        pass  # non-fatal - images still exist, paths just need manual fix
 
 
 def process_docx_files(log: Logger) -> tuple[int, int]:
     """Discover + convert unprocessed .docx files vault-wide (max BATCH_SIZE)."""
     if not _ensure_pandoc(log):
-        log.warning("DOCX conversion skipped — pandoc unavailable")
+        log.warning("DOCX conversion skipped - pandoc unavailable")
         return 0, 0
 
     processed = _load_processed_docx()
@@ -395,7 +395,7 @@ def register_new_files(log: Logger) -> tuple[int, int]:
 
     if added:
         _save_queue(queue)
-        log.info(f"Queue saved — {added} new entry/entries (total: {len(queue)})")
+        log.info(f"Queue saved - {added} new entry/entries (total: {len(queue)})")
 
     return added, 0
 

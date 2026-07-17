@@ -40,7 +40,7 @@ ITEMS & LORE  (Treasures tab)
 - If the image was classified as battlemap or scene, the entity is likely location/dungeon/encounter.
 - If unsure, return null for type rather than guessing wrong.
 
-Tags are free-form — invent whatever short, specific words best describe this note (objects, materials, creatures, themes, etc.), not just the categories above. Prefer reusing a known or candidate tag over inventing a new spelling of the same idea (e.g. if "elf" is already known, don't write "elven").
+Tags are free-form - invent whatever short, specific words best describe this note (objects, materials, creatures, themes, etc.), not just the categories above. Prefer reusing a known or candidate tag over inventing a new spelling of the same idea (e.g. if "elf" is already known, don't write "elven").
 
 Known tags already in use (reuse if they fit): {known_tags}
 Candidate tags from image analysis (verify/select what genuinely applies, ignore the rest, add others you notice): {candidate_tags}

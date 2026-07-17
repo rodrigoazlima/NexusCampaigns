@@ -1,4 +1,4 @@
-# Spec — State Files
+# Spec - State Files
 
 All runtime state is stored in JSON files. State files are gitignored runtime artefacts except where noted.
 
@@ -114,7 +114,7 @@ All runtime state is stored in JSON files. State files are gitignored runtime ar
 ```
 
 Failed images stored with pseudo-key `path:{rel}` and `status: failed`.  
-Connection-error images are NOT stored — retried next run.
+Connection-error images are NOT stored - retried next run.
 
 ---
 

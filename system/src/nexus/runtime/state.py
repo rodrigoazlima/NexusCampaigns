@@ -1,4 +1,4 @@
-"""nexus.runtime.state — tasks-state.json I/O (per-task/worker lastRun)."""
+"""nexus.runtime.state - tasks-state.json I/O (per-task/worker lastRun)."""
 
 from __future__ import annotations
 

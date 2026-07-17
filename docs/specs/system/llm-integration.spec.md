@@ -1,4 +1,4 @@
-# Spec — LLM Integration
+# Spec - LLM Integration
 
 ---
 
@@ -27,7 +27,7 @@ See [agent-dispatch.spec.md](agent-dispatch.spec.md) for the full provider confi
 
 ## Current Agent Assignments
 
-All active agents use `dispatch.type: claude-api` — Claude operates as the AI agent and calls
+All active agents use `dispatch.type: claude-api` - Claude operates as the AI agent and calls
 Python tools via the tool-use loop. Some agents' tools make additional LLM calls internally
 (to local endpoints) for vision classification and text synthesis.
 
@@ -84,5 +84,5 @@ Agents that send images (Vision, Lore):
 | # | Item | Status |
 |---|---|---|
 | 1 | Vision + Lore use LM Studio locally; no cloud fallback defined | Open |
-| 2 | Classification / Wiki use separate LocalRouter port (8080) — migrate to unified `agent.json` per-agent config | Open |
+| 2 | Classification / Wiki use separate LocalRouter port (8080) - migrate to unified `agent.json` per-agent config | Open |
 | 3 | Face matching distance threshold and match method not formally specified | Open |

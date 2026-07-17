@@ -1,4 +1,4 @@
-# Nexus Campaigns — Dashboard Product Specification
+# Nexus Campaigns - Dashboard Product Specification
 
 **Version:** 1.1
 **Date:** 2026-06-13
@@ -85,9 +85,9 @@ Answers: "What is the current state of the entire factory?"
 **KPI row 2:** Images Classified · Tokens Generated · NPCs Generated · Orphan Entities · Campaign Files
 
 **Panel row:**
-- Pipeline Flow — horizontal bar per stage with file counts
-- Queue Health — total / pending / done / stuck
-- Last Report — 24h agent run summary
+- Pipeline Flow - horizontal bar per stage with file counts
+- Queue Health - total / pending / done / stuck
+- Last Report - 24h agent run summary
 
 **Agent Health grid:** compact `AgentCard` per agent (status dot + stats + schedule)
 
@@ -135,8 +135,8 @@ Answers: "What is the current state of the entire factory?"
 ### Library Analytics Page `/library`
 
 - 4 KPIs: total entities · distinct types · avg quality · orphan count
-- Entity type breakdown — horizontal bar chart
-- Quality histogram — 10 buckets (1–10), color-coded red / yellow / green
+- Entity type breakdown - horizontal bar chart
+- Quality histogram - 10 buckets (1–10), color-coded red / yellow / green
 - Recently added table: id · type · quality · tags · links · created
 
 ---
@@ -155,16 +155,16 @@ Answers: "What is the current state of the entire factory?"
 ### Colors (Tailwind tokens)
 
 ```
-surface:   #09090b   — base background
-surface-1: #111113   — card background
-surface-2: #18181b   — hover states
-surface-3: #27272a   — borders
-surface-4: #3f3f46   — disabled / muted borders
-primary:   #0C5CAB   — interactive blue
-success:   #10b981   — approved / healthy / good
-warning:   #f59e0b   — draft / pending / caution
-danger:    #ef4444   — error / stuck / orphan
-neutral:   #6b7280   — secondary text
+surface:   #09090b   - base background
+surface-1: #111113   - card background
+surface-2: #18181b   - hover states
+surface-3: #27272a   - borders
+surface-4: #3f3f46   - disabled / muted borders
+primary:   #0C5CAB   - interactive blue
+success:   #10b981   - approved / healthy / good
+warning:   #f59e0b   - draft / pending / caution
+danger:    #ef4444   - error / stuck / orphan
+neutral:   #6b7280   - secondary text
 ```
 
 ### Status Mapping
@@ -215,7 +215,7 @@ neutral:   #6b7280   — secondary text
 
 ## 7. Real-Time Strategy
 
-Pages use Next.js `force-dynamic` — every request reads fresh vault data.
+Pages use Next.js `force-dynamic` - every request reads fresh vault data.
 Sidebar shows "Live · 30s refresh" indicator.
 
 **Current:** meta-refresh or client `useEffect` + `router.refresh()` every 30s.
@@ -226,7 +226,7 @@ Sidebar shows "Live · 30s refresh" indicator.
 
 ## 8. Implementation Phases
 
-### Phase 1 — MVP (complete)
+### Phase 1 - MVP (complete)
 
 - [x] Next.js 16 App Router scaffold (TypeScript, Tailwind, IBM Plex Sans)
 - [x] Design system tokens + dark theme
@@ -235,7 +235,7 @@ Sidebar shows "Live · 30s refresh" indicator.
 - [x] All 7 read-only API routes
 - [x] Vault filesystem reader + frontmatter parser + log parser
 
-### Phase 2 — Game Master Write Interface (complete)
+### Phase 2 - Game Master Write Interface (complete)
 
 - [x] 5 GM pages: Hub, Review, Inbox, Tokens, Chat
 - [x] 7 GM API routes under `/api/gm/` (inbox, tokens, approve, reject, flag, edit, chat)
@@ -246,16 +246,16 @@ Sidebar shows "Live · 30s refresh" indicator.
 - [x] Image serving via `/api/image` for vault PNG files
 - [x] GM components: ImageModal, QualityPicker, GMActionBar, InboxImageCard, TokenCard, ReviewCard, ChatMessage
 
-### Phase 3 — Automation & Analytics
+### Phase 3 - Automation & Analytics
 
 - [ ] Client-side 30s auto-refresh (`AutoRefresh` component)
-- [ ] Campaign Dashboard `/campaigns` — reads `03-Campaigns/`
-- [ ] Knowledge Graph `/graph` — React Flow + `02-Library/` relationship data
+- [ ] Campaign Dashboard `/campaigns` - reads `03-Campaigns/`
+- [ ] Knowledge Graph `/graph` - React Flow + `02-Library/` relationship data
 - [ ] Full-text search across all entities
 - [ ] Bulk approve (all drafts with quality ≥ 7)
-- [ ] Growth trend charts — Recharts LineChart, daily snapshot series
+- [ ] Growth trend charts - Recharts LineChart, daily snapshot series
 
-### Phase 4 — Live & Team
+### Phase 4 - Live & Team
 
 - [ ] WebSocket live updates via `chokidar` file watcher
 - [ ] Browser notifications for new errors or stuck items

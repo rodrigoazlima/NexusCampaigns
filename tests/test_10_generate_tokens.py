@@ -1,16 +1,16 @@
 """
-Tests for .automation/10-generate-tokens.py — RPG Token Generator
+Tests for .automation/10-generate-tokens.py - RPG Token Generator
 
 Strategy: import Python functions directly via importlib; no mediapipe/opencv required.
 generate_token tests use the no-face fallback path with programmatic test images.
 
 Behaviors under test:
-  1.  parse_focus_head     — None; scalar; 1/2/3/4-value lists; float coercion
-  2.  load_config          — missing file; partial override; unknown keys; corrupt JSON
-  3.  detect_ring_radii    — standard ring; all-transparent fallback; threshold boundary
-  4.  make_circle_mask     — size; mode; center opaque; corners transparent; anti-aliasing
-  5.  load_json / save_json — missing; corrupt; round-trip; unicode; UTF-8 BOM
-  6.  generate_token        — happy path; skip-existing; force; output size; RGBA;
+  1.  parse_focus_head     - None; scalar; 1/2/3/4-value lists; float coercion
+  2.  load_config          - missing file; partial override; unknown keys; corrupt JSON
+  3.  detect_ring_radii    - standard ring; all-transparent fallback; threshold boundary
+  4.  make_circle_mask     - size; mode; center opaque; corners transparent; anti-aliasing
+  5.  load_json / save_json - missing; corrupt; round-trip; unicode; UTF-8 BOM
+  6.  generate_token        - happy path; skip-existing; force; output size; RGBA;
                               transparent corners; center opaque; parent dir creation;
                               various source formats/sizes; padding; focus_head
 """
@@ -72,7 +72,7 @@ _API_REQUIRED = (
 _MISSING_API = [fn for fn in _API_REQUIRED if not hasattr(_mod, fn)]
 if _MISSING_API:
     pytest.skip(
-        f"generate_tokens.py API changed — functions not found: {_MISSING_API}. "
+        f"generate_tokens.py API changed - functions not found: {_MISSING_API}. "
         "Refactored module uses _load_config/_make_token/etc. (internal names). "
         "Next step: rewrite these tests against nexus/tasks/generate_tokens.py API "
         "or extend agents/tests/test_token_agent.py.",
@@ -543,7 +543,7 @@ class TestSaveJson:
 
 
 # ---------------------------------------------------------------------------
-# 6. generate_token — happy path
+# 6. generate_token - happy path
 # ---------------------------------------------------------------------------
 
 
@@ -584,7 +584,7 @@ class TestGenerateTokenHappyPath:
             assert img.getpixel(xy)[3] == 0, f"Corner {xy} should be transparent"
 
     def test_center_pixel_is_opaque(self, tmp_path: Path, source: Path, moldura: Path) -> None:
-        """Center of the canvas is inside the circle — alpha must be non-zero."""
+        """Center of the canvas is inside the circle - alpha must be non-zero."""
         out = tmp_path / "out-token.png"
         generate_token(source, out, moldura)
         alpha = Image.open(out).convert("RGBA").getpixel((256, 256))[3]
@@ -599,7 +599,7 @@ class TestGenerateTokenHappyPath:
 
 
 # ---------------------------------------------------------------------------
-# 6b. generate_token — skip / force
+# 6b. generate_token - skip / force
 # ---------------------------------------------------------------------------
 
 
@@ -636,7 +636,7 @@ class TestGenerateTokenSkipAndForce:
 
 
 # ---------------------------------------------------------------------------
-# 6c. generate_token — output size
+# 6c. generate_token - output size
 # ---------------------------------------------------------------------------
 
 
@@ -659,7 +659,7 @@ class TestGenerateTokenOutputSize:
 
 
 # ---------------------------------------------------------------------------
-# 6d. generate_token — image content
+# 6d. generate_token - image content
 # ---------------------------------------------------------------------------
 
 
@@ -700,7 +700,7 @@ class TestGenerateTokenImageContent:
 
 
 # ---------------------------------------------------------------------------
-# 6e. generate_token — source formats and sizes
+# 6e. generate_token - source formats and sizes
 # ---------------------------------------------------------------------------
 
 
@@ -750,7 +750,7 @@ class TestGenerateTokenInputFormats:
 
 
 # ---------------------------------------------------------------------------
-# 6f. generate_token — padding and focus_head
+# 6f. generate_token - padding and focus_head
 # ---------------------------------------------------------------------------
 
 

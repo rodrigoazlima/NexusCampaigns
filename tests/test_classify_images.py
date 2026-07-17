@@ -66,7 +66,7 @@ def assert_images_similar(
     Raises AssertionError if SSIM < *min_ssim*.
     """
     if not HAS_SKIMAGE:
-        pytest.skip("scikit-image not available — SSIM test skipped")
+        pytest.skip("scikit-image not available - SSIM test skipped")
 
     gray_a = np.array(Image.open(path_a).convert("L"))
     gray_b_img = Image.open(path_b).convert("L")
@@ -77,7 +77,7 @@ def assert_images_similar(
     gray_b = np.array(gray_b_img)
     score: float = ssim(gray_a, gray_b, data_range=255)
     assert score >= min_ssim, (
-        f"SSIM {score:.4f} < {min_ssim} — images are not sufficiently similar\n"
+        f"SSIM {score:.4f} < {min_ssim} - images are not sufficiently similar\n"
         f"  A: {path_a}\n  B: {path_b}"
     )
 
@@ -366,7 +366,7 @@ class TestTokenDetection:
     def test_semi_transparent_corner_below_threshold_not_token(self, tmp_path: Path) -> None:
         img = Image.new("RGBA", (64, 64), (200, 100, 50, 255))
         px = img.load()
-        # alpha = 200 (>= 128) at all corners — not transparent enough
+        # alpha = 200 (>= 128) at all corners - not transparent enough
         for x, y in [(0, 0), (63, 0), (0, 63), (63, 63)]:
             px[x, y] = (0, 0, 0, 200)
         path = tmp_path / "semi.png"
@@ -686,7 +686,7 @@ class TestCompanionMarkdown:
         assert "## Description" not in md
 
     def test_utf8_encoded(self, processing: Path) -> None:
-        desc = "Café du dragon — fée magique"
+        desc = "Café du dragon - fée magique"
         md_path = write_companion_md(processing, image_name="test.jpg",
                                      type_="portrait", description=desc)
         raw = md_path.read_bytes()
@@ -825,7 +825,7 @@ class TestImageComparisonHelpers:
 
     @pytest.mark.skipif(not HAS_SKIMAGE, reason="scikit-image not available")
     def test_ssim_different_sizes_resized(self, tmp_path: Path) -> None:
-        """assert_images_similar resizes before comparison — no crash."""
+        """assert_images_similar resizes before comparison - no crash."""
         img = Image.new("RGB", (64, 64), (100, 150, 200))
         p1, p2 = tmp_path / "a.png", tmp_path / "b.png"
         img.save(p1)

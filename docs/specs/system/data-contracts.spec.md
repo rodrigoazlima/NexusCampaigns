@@ -1,4 +1,4 @@
-# Spec — Data Contracts
+# Spec - Data Contracts
 
 ---
 

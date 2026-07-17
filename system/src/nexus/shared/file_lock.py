@@ -1,4 +1,4 @@
-"""Cross-process advisory file lock — blocking variant of runner.py's lock pattern.
+"""Cross-process advisory file lock - blocking variant of runner.py's lock pattern.
 
 Used to serialize read-modify-write access to files shared across agent
 processes (inbox-queue.json, tasks-state.json) when the pipeline runs agents

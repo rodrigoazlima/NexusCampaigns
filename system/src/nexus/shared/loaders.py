@@ -1,4 +1,4 @@
-"""Config loader — builds VaultConfig and RegistryConfig from project root.
+"""Config loader - builds VaultConfig and RegistryConfig from project root.
 
 config.py declares the VaultConfig structure; this module resolves it from disk.
 registry.yaml (agent-registry.spec.md) is the single source of truth for
@@ -135,7 +135,7 @@ def load_llm_endpoint(
 
     model_key, when given, resolves a specific model the same way: agent.json
     tasks.<task_id>.llm.<model_key> overrides registry.yaml's model for
-    ``alias`` — e.g. one agent needing both a text and a vision model can
+    ``alias`` - e.g. one agent needing both a text and a vision model can
     call this twice against different aliases with model_key="text_model" /
     "vision_model", letting each be picked independently via agent.json
     without touching the shared registry.yaml endpoint definitions.
@@ -153,7 +153,7 @@ def load_llm_endpoint(
             raw = json.loads((agent_dir / "agent.json").read_text(encoding="utf-8"))
             llm_block = raw["tasks"][task_id]["llm"]
         except Exception:
-            llm_block = None  # no agent.json / no llm block — registry or default applies
+            llm_block = None  # no agent.json / no llm block - registry or default applies
 
         if llm_block is not None:
             try:

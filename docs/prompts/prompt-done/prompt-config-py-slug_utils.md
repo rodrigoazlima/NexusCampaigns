@@ -34,7 +34,7 @@ Analyze the provided Python script and extract all relevant configuration settin
    - Put script-specific behavior (batch sizes, task-specific prompts, agent name, etc.) in **local**.
    - Make sure the JSONs contain good defaults so the script works even if the files are deleted.
    - Use clear, consistent naming.
-   - Do not include code — only configuration.
+   - Do not include code - only configuration.
 
 ---
 
@@ -43,7 +43,7 @@ Analyze the provided Python script and extract all relevant configuration settin
 # shared\slug_utils.py
 """Slug and wikilink utilities shared across pipeline agents.
 
-All functions are pure — no I/O, no side effects.
+All functions are pure - no I/O, no side effects.
 """
 
 from __future__ import annotations
@@ -89,7 +89,7 @@ def entity_id_from_path(path: Path) -> str:
 
 
 def normalize_slug(path: Path) -> str:
-    """Alias for entity_id_from_path — explicit intent signal for wikilink code."""
+    """Alias for entity_id_from_path - explicit intent signal for wikilink code."""
     return path.stem
 
 

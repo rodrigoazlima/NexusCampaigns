@@ -3,7 +3,7 @@ import { createDraft } from '@/lib/vault'
 
 export const dynamic = 'force-dynamic'
 
-// Body skeleton per type — pre-fills the editor's structured sections.
+// Body skeleton per type - pre-fills the editor's structured sections.
 // Only the cast pillar (npc/character) is wired this phase; other pillars add
 // their skeleton when their page lands.
 const NPC_SKELETON = `## Identity
@@ -12,7 +12,7 @@ const NPC_SKELETON = `## Identity
 - **Voice / mannerism:**
 
 ## Want
-> What they want from the party or the world — the engine of every scene.
+> What they want from the party or the world - the engine of every scene.
 
 ## Secret
 > Something the party can discover that changes how they see them.
@@ -28,7 +28,7 @@ const NPC_SKELETON = `## Identity
 ## Related
 `
 
-// bestiary.md Delta 3 — placed-fight skeleton vs. leaner stat-entity skeleton.
+// bestiary.md Delta 3 - placed-fight skeleton vs. leaner stat-entity skeleton.
 const ENCOUNTER_SKELETON = `## Composition
 - **What & how many:** [[ ]] ×N
 
@@ -36,7 +36,7 @@ const ENCOUNTER_SKELETON = `## Composition
 - **Where:** [[ ]]
 
 ## Reason
-> Why it's here, now — guarding/hunting what.
+> Why it's here, now - guarding/hunting what.
 
 ## Terrain & hazards
 - **Cover / verticality / escape routes:**
@@ -71,7 +71,7 @@ const CREATURE_SKELETON = `## Appearance
 ## Related
 `
 
-// factions.md Delta 3 — goal/method/leader/stronghold/resource/rival + clock.
+// factions.md Delta 3 - goal/method/leader/stronghold/resource/rival + clock.
 const FACTION_SKELETON = `## Goal
 > What this faction wants.
 
@@ -90,7 +90,7 @@ const FACTION_SKELETON = `## Goal
 ## Rivalry
 - **At war with:** [[ ]]
 
-## Clock — advances when ignored
+## Clock - advances when ignored
 - [ ] Step 1:
 - [ ] Step 2:
 - [ ] Step 3:
@@ -98,7 +98,7 @@ const FACTION_SKELETON = `## Goal
 ## Related
 `
 
-// places.md Delta 3 — purpose/control/affordances/sensory/secret/connections.
+// places.md Delta 3 - purpose/control/affordances/sensory/secret/connections.
 const PLACE_SKELETON = `## Purpose
 > What this place is *for* in the story.
 
@@ -118,12 +118,12 @@ const PLACE_SKELETON = `## Purpose
 
 ## Connections
 - **Leads to:** [[ ]]
-- **Occupied by:** [[ ]]   (NPC/faction — no empty rooms)
+- **Occupied by:** [[ ]]   (NPC/faction - no empty rooms)
 
 ## Related
 `
 
-// quests.md Delta 3 — hook/patron/place/obstacle/stakes/clock/branches/reward.
+// quests.md Delta 3 - hook/patron/place/obstacle/stakes/clock/branches/reward.
 const QUEST_SKELETON = `## Hook
 > How the party hears of it.
 
@@ -137,7 +137,7 @@ const QUEST_SKELETON = `## Hook
 -
 
 ## Stakes
-> Why the party cares — concrete, not abstract.
+> Why the party cares - concrete, not abstract.
 
 ## Clock
 - **Deadline / what gets worse:**
@@ -155,7 +155,7 @@ const QUEST_SKELETON = `## Hook
 ## Related
 `
 
-// event / timeline — leaner: when it happens, what changes, who's involved.
+// event / timeline - leaner: when it happens, what changes, who's involved.
 const EVENT_SKELETON = `## When
 - **Date (ISO):**
 
@@ -166,12 +166,12 @@ const EVENT_SKELETON = `## When
 - [[ ]]
 
 ## Consequence
-> What changes in the world — happens whether or not the party acts.
+> What changes in the world - happens whether or not the party acts.
 
 ## Related
 `
 
-// treasures.md Delta 3 — item/artifact: effect/origin/desire/hook/price.
+// treasures.md Delta 3 - item/artifact: effect/origin/desire/hook/price.
 const ITEM_SKELETON = `## Effect
 > What it does.
 
@@ -182,7 +182,7 @@ const ITEM_SKELETON = `## Effect
 - **Who wants it:** [[ ]]   (NPC/faction)
 
 ## Hook
-> The story it carries — the next adventure it creates.
+> The story it carries - the next adventure it creates.
 
 ## Price / catch
 > The cost or curse.
@@ -190,7 +190,7 @@ const ITEM_SKELETON = `## Effect
 ## Related
 `
 
-// treasures.md Delta 3 — lore: a planted question + the GM-known answer + reveal.
+// treasures.md Delta 3 - lore: a planted question + the GM-known answer + reveal.
 const LORE_SKELETON = `## The question
 > What mystery this plants.
 

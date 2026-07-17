@@ -34,7 +34,7 @@ Analyze the provided Python script and extract all relevant configuration settin
    - Put script-specific behavior (batch sizes, task-specific prompts, agent name, etc.) in **local**.
    - Make sure the JSONs contain good defaults so the script works even if the files are deleted.
    - Use clear, consistent naming.
-   - Do not include code — only configuration.
+   - Do not include code - only configuration.
 
 ---
 
@@ -144,7 +144,7 @@ def _splice_related(body: str, new_slugs: list[str]) -> tuple[str, int]:
     new_body = _SECTION_RE.sub(replacer, body)
 
     if inserted_count == 0 and not _RELATED_HEADER_RE.search(body):
-        # Section was absent — create it
+        # Section was absent - create it
         new_body = body.rstrip("\n") + "\n\n## Related\n" + "\n".join(
             f"[[{s}]]" for s in new_slugs
         ) + "\n"
@@ -181,7 +181,7 @@ def _atomic_write(path: Path, fm: dict, body: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# WikilinkResolver — implements IWikilinkResolver
+# WikilinkResolver - implements IWikilinkResolver
 # ---------------------------------------------------------------------------
 
 class WikilinkResolver(IWikilinkResolver):
@@ -252,7 +252,7 @@ class WikilinkResolver(IWikilinkResolver):
         score += min(len(src_kw & tgt_kw), 2)
 
         # Required-link type boost: +5 if candidate fills a missing required link group
-        # (linking-rules.spec.md — per-type enforcement)
+        # (linking-rules.spec.md - per-type enforcement)
         src_linked = (
             slugs_from_relationships(source_fm.get("relationships") or [])
             + extract_wikilinks(source_body)
@@ -322,7 +322,7 @@ def _mark_processed(store: StateStore, rel: str, links_inserted: int) -> None:
 
 
 # ---------------------------------------------------------------------------
-# main — direct invocation
+# main - direct invocation
 # ---------------------------------------------------------------------------
 
 def main() -> None:
@@ -340,7 +340,7 @@ def main() -> None:
     store.init_defaults()
 
     if not _LIBRARY.is_dir():
-        log.info("02-Library/ does not exist — nothing to process")
+        log.info("02-Library/ does not exist - nothing to process")
         log.done(t0, key="linked", count=0, failed=0)
         sys.exit(0)
 

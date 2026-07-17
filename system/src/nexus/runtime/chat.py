@@ -1,4 +1,4 @@
-"""nexus.runtime.chat — dispatches one dashboard chat-queue item (--chat-id),
+"""nexus.runtime.chat - dispatches one dashboard chat-queue item (--chat-id),
 a synchronous request/response path independent of the scheduler cycle."""
 
 from __future__ import annotations

@@ -34,14 +34,14 @@ Analyze the provided Python script and extract all relevant configuration settin
    - Put script-specific behavior (batch sizes, task-specific prompts, agent name, etc.) in **local**.
    - Make sure the JSONs contain good defaults so the script works even if the files are deleted.
    - Use clear, consistent naming.
-   - Do not include code — only configuration.
+   - Do not include code - only configuration.
 
 ---
 
 **Script to analyze:**
 
 # tests\test_registry.py
-"""Tests for agent-registry.spec.md — RegistryConfig models and load_registry()."""
+"""Tests for agent-registry.spec.md - RegistryConfig models and load_registry()."""
 
 from __future__ import annotations
 
@@ -151,7 +151,7 @@ def registry(project_root: Path) -> RegistryConfig:
 
 
 # ---------------------------------------------------------------------------
-# load_registry — basic parsing
+# load_registry - basic parsing
 # ---------------------------------------------------------------------------
 
 class TestLoadRegistry:
@@ -344,13 +344,13 @@ class TestRegistryHelpers:
 
 
 # ---------------------------------------------------------------------------
-# load_vault_config — registry integration
+# load_vault_config - registry integration
 # ---------------------------------------------------------------------------
 
 class TestLoadVaultConfigWithRegistry:
     def test_uses_registry_endpoints(self, project_root: Path) -> None:
         cfg = load_vault_config(project_root)
-        # registry.yaml uses vision_llm / local_router — not legacy aliases
+        # registry.yaml uses vision_llm / local_router - not legacy aliases
         assert "vision_llm" in cfg.llm_endpoints
         assert "local_router" in cfg.llm_endpoints
 

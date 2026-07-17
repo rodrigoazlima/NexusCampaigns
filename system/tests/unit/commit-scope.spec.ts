@@ -11,14 +11,14 @@ import { join } from 'path';
  * `system/src/nexus/shared/agent_tools.py` so it validates exactly what the committer
  * will stage. Any non-`knowledge-base/` entry is a leak and fails the suite.
  *
- * An empty scope (agent produces no vault content) is valid — the runner skips
+ * An empty scope (agent produces no vault content) is valid - the runner skips
  * the commit entirely.
  */
 
 const AGENTS_DIR = join(__dirname, '..', '..', '..', 'agents');
 const ALLOWED_PREFIX = 'knowledge-base/';
 
-// Ported verbatim from runner.py — keep in sync if the runner regex changes.
+// Ported verbatim from runner.py - keep in sync if the runner regex changes.
 const COMMIT_SCOPE_RE = /^commit_scope:\s*\n((?:[ \t]+-[^\n]+\n?)+)/m;
 const SCOPE_ITEM_RE = /^\s+-\s+(.+)$/gm;
 
@@ -44,7 +44,7 @@ function discoverAgents(): string[] {
     .sort();
 }
 
-test.describe('commit_scope — agents may only auto-commit knowledge-base/', () => {
+test.describe('commit_scope - agents may only auto-commit knowledge-base/', () => {
   const agents = discoverAgents();
 
   test('agents are discovered', () => {

@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
         env: { ...process.env },
       })
     } catch (execErr) {
-      // runner may exit non-zero on LLM error — read queue for actual error
+      // runner may exit non-zero on LLM error - read queue for actual error
       const item = findById(chatId)
       if (item?.status === 'error') {
         return NextResponse.json({ error: item.error ?? 'Agent dispatch failed' }, { status: 500 })

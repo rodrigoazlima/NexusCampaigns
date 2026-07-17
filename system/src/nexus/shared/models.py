@@ -1,6 +1,6 @@
 """Data contracts for the Vault Nexus Campaigns pipeline.
 
-Pydantic v2 models only — no logic, no I/O, no side effects.
+Pydantic v2 models only - no logic, no I/O, no side effects.
 All validation is declarative (field constraints + allowed enums).
 """
 
@@ -53,7 +53,7 @@ class ImageType(str, Enum):
     token     = "token"
 
 
-# Race/CharClass removed as strict enums — PF2e has hundreds of ancestries and
+# Race/CharClass removed as strict enums - PF2e has hundreds of ancestries and
 # classes. Open strings are used in VisionClassification instead, validated
 # against PF2e vocabulary constants defined below.
 
@@ -164,7 +164,7 @@ class VisionClassification(BaseModel):
 
     ancestry / char_class / creature_type are open strings against PF2e vocabulary
     (PF2E_ANCESTRIES / PF2E_CLASSES / PF2E_CREATURE_TYPES).
-    Strict enum validation removed — PF2e has too many options to enumerate.
+    Strict enum validation removed - PF2e has too many options to enumerate.
     """
     type:          ImageType
     ancestry:      str       = "none"   # PF2E_ANCESTRIES
@@ -174,12 +174,12 @@ class VisionClassification(BaseModel):
     environment:   Environment = Environment.none
     description:   str       = ""
     # Open brainstorm harvested from the LLM's own visual_analysis block
-    # (equipment/clothing/fantasy_features arrays) — never written to note
+    # (equipment/clothing/fantasy_features arrays) - never written to note
     # frontmatter; state-only input to the classification agent's tag library.
     candidate_tags: list[str] = Field(default_factory=list)
     # Grounded entity-type guess (EntityType's 18 values, e.g. npc/location/item)
     # from the multi-cycle conversation's dedicated entity-type turn. Open
-    # string like ancestry/creature_type — "none" if that cycle never ran or
+    # string like ancestry/creature_type - "none" if that cycle never ran or
     # didn't produce a recognized value; _write_draft falls back to its
     # portrait/battlemap placeholder heuristic in that case.
     entity_type: str = "none"
@@ -211,7 +211,7 @@ class NPCLLMOutput(BaseModel):
     description:   str      = ""
     plot_hooks:    list[str] = Field(default_factory=list)
     tactics:       str       = ""
-    # Reflexion loop metadata — never comes from LLM; set by _flag_for_human_review
+    # Reflexion loop metadata - never comes from LLM; set by _flag_for_human_review
     needs_human_review: bool = False
     review_notes:       str  = ""
 
@@ -298,7 +298,7 @@ class InboxQueueEntry(BaseModel):
     reruns:     dict[str, int] = Field(default_factory=dict)   # per-agent manual reprocess count (dashboard action)
 
 
-# Type alias — the full queue is a str→entry dict
+# Type alias - the full queue is a str→entry dict
 InboxQueue = dict[str, InboxQueueEntry]
 
 
@@ -437,7 +437,7 @@ class LmStudioConfig(BaseModel):
     timeout_seconds: int                  = 1800
     system_file:     Optional[str]        = None
     prompt_file:     Optional[str]        = None
-    tools_module:    Optional[str]        = None   # dotted import path — enables agentic tool-call loop
+    tools_module:    Optional[str]        = None   # dotted import path - enables agentic tool-call loop
     history_file:    Optional[str]        = None   # relative to agent state/ dir
     max_tool_rounds: int                  = 20
 
@@ -475,7 +475,7 @@ class TaskDispatchEntry(BaseModel):
 
 
 class AgentFolderConfig(BaseModel):
-    """Root schema for agent.json — keyed by task ID."""
+    """Root schema for agent.json - keyed by task ID."""
     cleanupDays: int = 90
     tasks: dict[str, TaskDispatchEntry]
 
@@ -578,7 +578,7 @@ class RepairReport(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Review agent — ReviewItem
+# Review agent - ReviewItem
 # ---------------------------------------------------------------------------
 
 class ReviewItem(BaseModel):
@@ -722,7 +722,7 @@ class SearchIndexState(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Registry — agent-registry.spec.md
+# Registry - agent-registry.spec.md
 # ---------------------------------------------------------------------------
 
 class LLMEndpointSpec(BaseModel):
@@ -762,7 +762,7 @@ class SharedStateFileSpec(BaseModel):
 
 
 class DefaultDispatchConfig(BaseModel):
-    """registry.yaml `default_dispatch` — fallback used when an agent has no
+    """registry.yaml `default_dispatch` - fallback used when an agent has no
     agent.json (or no entry for the requested task_id)."""
     type:            str            = "lm-studio"
     base_url:        str            = "http://localhost:1234/v1"

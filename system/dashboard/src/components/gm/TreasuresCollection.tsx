@@ -34,11 +34,11 @@ const TYPES = ['item', 'artifact', 'lore'] as const
 
 // treasures.md Delta 2 build-guidance checklist (§6).
 const GUIDANCE = [
-  'Rewards that hook — the best treasure creates the next adventure',
+  'Rewards that hook - the best treasure creates the next adventure',
   'Signature items / artifacts tied to factions or history',
-  "History the party can discover — in ruins, NPC mouths, items",
-  'Mysteries with answers — plant questions early, know the answers',
-  'Consistent internal logic — magic, gods, money: pick rules, hold them',
+  "History the party can discover - in ruins, NPC mouths, items",
+  'Mysteries with answers - plant questions early, know the answers',
+  'Consistent internal logic - magic, gods, money: pick rules, hold them',
 ]
 
 const isLore = (i: TreasureItem) => i.type === 'lore'
@@ -47,7 +47,7 @@ const isItem = (i: TreasureItem) => !isLore(i) // item / artifact
 const unowned = (i: TreasureItem) => isItem(i) && !i.owner && i.relationships.length === 0
 const unanswered = (i: TreasureItem) => isLore(i) && i.question && !i.answer
 const openMystery = (i: TreasureItem) => isLore(i) && i.question
-// lore with no reveal channel — "wall of text" (Delta 4)
+// lore with no reveal channel - "wall of text" (Delta 4)
 const wallOfText = (i: TreasureItem) => isLore(i) && !i.hasReveal
 
 const chipCls = (type: string) =>
@@ -219,7 +219,7 @@ export default function TreasuresCollection({ items }: { items: TreasureItem[] }
                 </>
               )}
             </div>
-            <Tip label="Generate with AI — coming soon">
+            <Tip label="Generate with AI - coming soon">
               <Link
                 href="/gm/chat"
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-surface-3 text-zinc-400 hover:text-zinc-200 border border-surface-3 transition-colors"
@@ -238,7 +238,7 @@ export default function TreasuresCollection({ items }: { items: TreasureItem[] }
           className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-zinc-300 hover:text-white transition-colors"
         >
           {guideOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-          Build guidance — the treasures &amp; lore checklist
+          Build guidance - the treasures &amp; lore checklist
         </button>
         {guideOpen && (
           <ul className="px-4 pb-3 space-y-1.5 border-t border-surface-3/60 pt-3">
@@ -335,7 +335,7 @@ export default function TreasuresCollection({ items }: { items: TreasureItem[] }
           </div>
         </div>
       ) : filtered.length === 0 ? (
-        <div className="panel p-12 text-center text-zinc-500 text-sm">No entities match — clear filters</div>
+        <div className="panel p-12 text-center text-zinc-500 text-sm">No entities match - clear filters</div>
       ) : view === 'grid' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {filtered.map((i) => {
@@ -361,25 +361,25 @@ export default function TreasuresCollection({ items }: { items: TreasureItem[] }
                     {isItem(i) && i.owner ? (
                       <p className="text-[11px] text-zinc-500 truncate mt-0.5">wanted by {i.owner}</p>
                     ) : (
-                      <p className="text-[11px] text-zinc-500 truncate mt-0.5">{i.excerpt || '—'}</p>
+                      <p className="text-[11px] text-zinc-500 truncate mt-0.5">{i.excerpt || '-'}</p>
                     )}
                     <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                       <span className={`text-[9px] px-1.5 py-0.5 rounded font-semibold uppercase ${chipCls(i.type)}`}>{i.type}</span>
                       <span className={`text-[9px] px-1 py-0.5 rounded ${i.origin === 'canon' ? 'bg-success/10 text-success' : 'bg-surface-3 text-zinc-400'}`}>{i.origin}</span>
                       <span className="text-[9px] font-mono text-zinc-500">Q{i.quality}</span>
-                      {isItem(i) && i.hasHook && <span className="text-[9px] px-1 py-0.5 rounded bg-orange-500/15 text-orange-400" title="carries a hook — seeds the next adventure">→ hook</span>}
+                      {isItem(i) && i.hasHook && <span className="text-[9px] px-1 py-0.5 rounded bg-orange-500/15 text-orange-400" title="carries a hook - seeds the next adventure">→ hook</span>}
                       {isLore(i) && i.question && (
                         i.answer
                           ? <span className="text-[9px] px-1 py-0.5 rounded bg-success/10 text-success" title="mystery with an answer">answered</span>
                           : <span className="text-[9px] px-1 py-0.5 rounded bg-warning/15 text-warning" title="question with no answer">unanswered</span>
                       )}
-                      {wallOfText(i) && <span className="text-[9px] px-1 py-0.5 rounded bg-warning/15 text-warning" title="no reveal channel — wall of text">wall of text</span>}
+                      {wallOfText(i) && <span className="text-[9px] px-1 py-0.5 rounded bg-warning/15 text-warning" title="no reveal channel - wall of text">wall of text</span>}
                       {unowned(i) && <span className="text-[9px] px-1 py-0.5 rounded bg-warning/15 text-warning" title="no owner and no quest link">unowned</span>}
                       {i.origin === 'draft' && !i.reviewed && <span className="text-[9px] px-1 py-0.5 rounded bg-warning/15 text-warning">new</span>}
                     </div>
                   </div>
                 </Link>
-                {/* Quick actions — drafts only (action endpoints operate on 01-Processing) */}
+                {/* Quick actions - drafts only (action endpoints operate on 01-Processing) */}
                 {i.origin === 'draft' && (
                   <div className="flex items-center gap-1.5 px-3 py-2 border-t border-surface-3/60 opacity-0 group-hover:opacity-100 transition-opacity">
                     <ActionBtn label="Promote to canon" variant="success" busy={busy === i.filename} onClick={() => act('approve', i.filename, 'Promoted to Library')}><Check size={14} /></ActionBtn>
@@ -437,7 +437,7 @@ export default function TreasuresCollection({ items }: { items: TreasureItem[] }
                   </td>
                   <td className="p-2 text-zinc-500">
                     {isItem(i)
-                      ? (i.owner ?? (unowned(i) ? <span className="text-warning">⚠ unowned</span> : '—'))
+                      ? (i.owner ?? (unowned(i) ? <span className="text-warning">⚠ unowned</span> : '-'))
                       : (i.hasReveal ? 'revealed' : <span className="text-warning">⚠ no reveal</span>)}
                   </td>
                   <td className="p-2"><span className={`px-1 py-0.5 rounded text-[10px] ${i.origin === 'canon' ? 'bg-success/10 text-success' : 'bg-surface-3 text-zinc-400'}`}>{i.origin}</span></td>
@@ -447,7 +447,7 @@ export default function TreasuresCollection({ items }: { items: TreasureItem[] }
                     {i.tags.slice(0, 3).join(', ')}{i.tags.length > 3 ? ` +${i.tags.length - 3}` : ''}
                   </td>
                   <td className="p-2">{i.relationships.length === 0 ? <span className="text-warning">⚠ 0</span> : i.relationships.length}</td>
-                  <td className="p-2 text-zinc-500">{i.updated || '—'}</td>
+                  <td className="p-2 text-zinc-500">{i.updated || '-'}</td>
                   <td className="p-2">
                     <div className="flex items-center gap-1 justify-end">
                       {i.origin === 'draft' && (

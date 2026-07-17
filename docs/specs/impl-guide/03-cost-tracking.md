@@ -1,4 +1,4 @@
-# Impl: Cost Tracking — Claude API Runner
+# Impl: Cost Tracking - Claude API Runner
 
 **Phase:** P1  
 **Priority:** High  
@@ -27,12 +27,12 @@ This also blocks implementation of the semantic quality judge (P5), which requir
 ## Scope
 
 Files to modify:
-- `agents/shared/runners/claude.py` — capture `usage` fields from API response
-- `agents/runtime/tools/runner.py` — record cost after each dispatch
-- `agents/review/tools/daily_report.py` — add cost summary to report
+- `agents/shared/runners/claude.py` - capture `usage` fields from API response
+- `agents/runtime/tools/runner.py` - record cost after each dispatch
+- `agents/review/tools/daily_report.py` - add cost summary to report
 
 Files to create:
-- `agents/runtime/state/costs/` — directory, one JSON per day
+- `agents/runtime/state/costs/` - directory, one JSON per day
 - `agents/tests/test_cost_tracking.py`
 
 ---
@@ -47,7 +47,7 @@ Pricing as of 2026-06 (verify against Anthropic pricing page before enabling bud
 | claude-sonnet-4-6 | $3.00 | $15.00 |
 | claude-opus-4-8 | $15.00 | $75.00 |
 
-Store raw token counts, not dollar amounts — pricing changes. Compute cost on read.
+Store raw token counts, not dollar amounts - pricing changes. Compute cost on read.
 
 ---
 
@@ -98,7 +98,7 @@ result.output_tokens = total_output
 result.model = model_id
 ```
 
-This is additive across all rounds of a single run — total cost of one agent execution.
+This is additive across all rounds of a single run - total cost of one agent execution.
 
 ---
 

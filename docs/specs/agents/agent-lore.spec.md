@@ -1,4 +1,4 @@
-# Agent Spec — Lore
+# Agent Spec - Lore
 
 **Trigger:** hourly  
 **Input:** images in `agents/vision/state/processed-images.json` with `type ∈ {portrait, body, token}` not yet in `agents/lore/state/processed-npcs.json`; `agents/lore/state/scenarios.json` for arc context; `02-Library/` for canon reference  

@@ -1,7 +1,7 @@
-"""signal_bus.py — lightweight file-based inter-agent signal bus.
+"""signal_bus.py - lightweight file-based inter-agent signal bus.
 
 Signals are advisory and fire-and-forget (G5). The runtime is the only
-consumer — agents never read signal files directly.
+consumer - agents never read signal files directly.
 """
 
 from __future__ import annotations
@@ -70,7 +70,7 @@ class SignalConsumer:
                 if signal_type is None or data.get("type") == signal_type:
                     signals.append(data)
             except Exception:
-                f.unlink(missing_ok=True)  # corrupted signal — discard
+                f.unlink(missing_ok=True)  # corrupted signal - discard
         return signals
 
     def consume(self, signal_id: str) -> None:

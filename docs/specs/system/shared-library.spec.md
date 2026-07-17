@@ -1,4 +1,4 @@
-# Spec — Shared Python Library
+# Spec - Shared Python Library
 
 Location: `agents/shared/`
 
@@ -13,15 +13,15 @@ Shared code used by 3+ agents. Agent-specific logic stays in `{agent}/tools/`. C
 | `interfaces.py` | All abstract interfaces and protocols for pipeline components |
 | `models.py` | Pydantic data models for all state files, LLM outputs, and reports |
 | `config.py` | `VaultConfig`, `VaultPaths`, `SystemPaths`, `LLMEndpointConfig` dataclasses |
-| `loaders.py` | `load_vault_config()` — reads `registry.yaml`, constructs `VaultConfig` |
+| `loaders.py` | `load_vault_config()` - reads `registry.yaml`, constructs `VaultConfig` |
 | `defaults.py` | Default empty structures for all state files (used by `IStateStore.init_defaults()`) |
 | `agent_tools.py` | Tool definitions for Claude tool-use dispatch agents |
-| `llm_client.py` | `ILLMClient` implementation — HTTP calls with retry and vision support |
-| `logger.py` | `ILogger` implementation — dual-file logging (shared log + per-agent daily rotation) |
-| `frontmatter_io.py` | `IFrontmatterIO` implementation — ruamel.yaml read/write for entity files |
-| `state_store.py` | `IStateStore` implementation — atomic JSON read/write with file locking |
-| `quality_gate.py` | `IQualityGate` implementation — quality score computation (0–10) |
-| `vault_guard.py` | `IVaultGuard` implementation — write-protection enforcement |
+| `llm_client.py` | `ILLMClient` implementation - HTTP calls with retry and vision support |
+| `logger.py` | `ILogger` implementation - dual-file logging (shared log + per-agent daily rotation) |
+| `frontmatter_io.py` | `IFrontmatterIO` implementation - ruamel.yaml read/write for entity files |
+| `state_store.py` | `IStateStore` implementation - atomic JSON read/write with file locking |
+| `quality_gate.py` | `IQualityGate` implementation - quality score computation (0–10) |
+| `vault_guard.py` | `IVaultGuard` implementation - write-protection enforcement |
 | `entity_scanner.py` | Scan vault directories and return parsed `EntityFrontmatter` objects |
 | `slug_utils.py` | Slug generation, normalization, collision resolution |
 
@@ -29,7 +29,7 @@ Shared code used by 3+ agents. Agent-specific logic stays in `{agent}/tools/`. C
 
 | Module | Runner class | Dispatch type |
 |--------|-------------|---------------|
-| `runners/__init__.py` | `get_runner()` factory + `IRunner` protocol | — |
+| `runners/__init__.py` | `get_runner()` factory + `IRunner` protocol | - |
 | `runners/cli.py` | `CliRunner` | `cli` |
 | `runners/openai_compat.py` | `OpenAICompatRunner` | `openai-api` |
 | `runners/claude.py` | `ClaudeRunner` | `claude-api` |
@@ -99,7 +99,7 @@ class IQualityGate(ABC):
 
 | Exception | Meaning |
 |-----------|---------|
-| `LLMOfflineError` | LLM server unreachable — skip batch, retry next run |
+| `LLMOfflineError` | LLM server unreachable - skip batch, retry next run |
 | `LLMResponseError` | LLM returned unexpected content after all retries |
 | `VaultWriteError` | Attempted write to a protected vault directory |
 | `DispatchError` | Orchestrator could not dispatch an agent |

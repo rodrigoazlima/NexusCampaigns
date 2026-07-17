@@ -1,4 +1,4 @@
-# Spec — Linking Rules
+# Spec - Linking Rules
 
 ---
 
@@ -24,7 +24,7 @@ Every `02-Library/` entity must have ≥1 outbound `[[wikilink]]`. No orphan ent
 
 ## Wikilink Syntax
 
-Use `[[slug-name]]` — match exact filename without extension.
+Use `[[slug-name]]` - match exact filename without extension.
 
 ```markdown
 ## Related

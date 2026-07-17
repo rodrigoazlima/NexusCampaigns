@@ -56,7 +56,7 @@ body {
   background: #52525b;
 }
 
-/* Masonry (react-masonry-css) — library ships no CSS of its own */
+/* Masonry (react-masonry-css) - library ships no CSS of its own */
 .masonry-grid {
   display: flex;
   margin-left: -1rem;

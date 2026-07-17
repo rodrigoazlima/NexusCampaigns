@@ -34,7 +34,7 @@ Analyze the provided Python script and extract all relevant configuration settin
    - Put script-specific behavior (batch sizes, task-specific prompts, agent name, etc.) in **local**.
    - Make sure the JSONs contain good defaults so the script works even if the files are deleted.
    - Use clear, consistent naming.
-   - Do not include code — only configuration.
+   - Do not include code - only configuration.
 
 ---
 
@@ -44,7 +44,7 @@ Analyze the provided Python script and extract all relevant configuration settin
 """Default empty state structures for every gitignored runtime state file.
 
 These are the values written by IStateStore.init_defaults() on first boot.
-No logic — pure data. Implementations call these; they never compute them.
+No logic - pure data. Implementations call these; they never compute them.
 
 Keyed by canonical state file path relative to project root.
 """
@@ -58,7 +58,7 @@ from typing import Any
 # ---------------------------------------------------------------------------
 
 INBOX_QUEUE_DEFAULT: dict[str, Any] = {}
-"""inbox-queue.json — populated by ingestion agent."""
+"""inbox-queue.json - populated by ingestion agent."""
 
 # ---------------------------------------------------------------------------
 # Vision agent state
@@ -69,20 +69,20 @@ PROCESSED_IMAGES_DEFAULT: dict[str, Any] = {
     "images": {},
     "pathIndex": {},
 }
-"""processed-images.json — populated by vision agent."""
+"""processed-images.json - populated by vision agent."""
 
 TOKEN_LINKS_DEFAULT: dict[str, Any] = {}
-"""token-links.json — face-match links written by vision agent."""
+"""token-links.json - face-match links written by vision agent."""
 
 # ---------------------------------------------------------------------------
 # Lore agent state
 # ---------------------------------------------------------------------------
 
 PROCESSED_NPCS_DEFAULT: dict[str, Any] = {}
-"""processed-npcs.json — keyed by rel_path|scenario_id composite key."""
+"""processed-npcs.json - keyed by rel_path|scenario_id composite key."""
 
 SCENARIOS_DEFAULT: list[dict[str, Any]] = [
-    # Seed with one example — users replace with real scenarios.
+    # Seed with one example - users replace with real scenarios.
     {
         "id":          "default-scenario",
         "name":        "Default Scenario",
@@ -91,21 +91,21 @@ SCENARIOS_DEFAULT: list[dict[str, Any]] = [
         "active":      False,
     }
 ]
-"""scenarios.json — list of active campaign scenarios consumed by lore agent."""
+"""scenarios.json - list of active campaign scenarios consumed by lore agent."""
 
 # ---------------------------------------------------------------------------
 # Token agent state
 # ---------------------------------------------------------------------------
 
 GENERATED_TOKENS_DEFAULT: dict[str, Any] = {}
-"""generated-tokens.json — keyed by source image SHA256."""
+"""generated-tokens.json - keyed by source image SHA256."""
 
 # ---------------------------------------------------------------------------
 # Runtime state
 # ---------------------------------------------------------------------------
 
 AGENT_METRICS_DEFAULT: dict[str, Any] = {}
-"""agent-metrics.json — per-task run history keyed by task-id; populated by runner."""
+"""agent-metrics.json - per-task run history keyed by task-id; populated by runner."""
 
 TASKS_STATE_DEFAULT: dict[str, Any] = {
     "repair-agent":             {"lastRun": "1970-01-01T00:00:00+00:00"},
@@ -120,14 +120,14 @@ TASKS_STATE_DEFAULT: dict[str, Any] = {
     "wikilink-agent":           {"lastRun": "1970-01-01T00:00:00+00:00"},
     "cleanup-agent":            {"lastRun": "1970-01-01T00:00:00+00:00"},
 }
-"""tasks-state.json — last-run timestamps, reset to epoch forces immediate first run."""
+"""tasks-state.json - last-run timestamps, reset to epoch forces immediate first run."""
 
 # ---------------------------------------------------------------------------
 # Wikilink agent state
 # ---------------------------------------------------------------------------
 
 WIKILINK_STATE_DEFAULT: dict[str, Any] = {}
-"""wikilink-state.json — keyed by relative path, tracks processed files."""
+"""wikilink-state.json - keyed by relative path, tracks processed files."""
 
 # ---------------------------------------------------------------------------
 # Relationship agent state
@@ -138,7 +138,7 @@ RELATIONSHIP_GRAPH_DEFAULT: dict[str, Any] = {
     "generatedAt": "1970-01-01T00:00:00+00:00",
     "edges":       [],
 }
-"""relationship-graph.json — populated by relationship agent."""
+"""relationship-graph.json - populated by relationship agent."""
 
 # ---------------------------------------------------------------------------
 # Canon agent state
@@ -151,7 +151,7 @@ CANON_REPORT_DEFAULT: dict[str, Any] = {
     "entities_scanned": 0,
     "entities_clean":   0,
 }
-"""canon-report-latest.json — most recent canon integrity report."""
+"""canon-report-latest.json - most recent canon integrity report."""
 
 # ---------------------------------------------------------------------------
 # Search agent state
@@ -162,7 +162,7 @@ SEARCH_INDEX_DEFAULT: dict[str, Any] = {
     "indexed_at": "1970-01-01T00:00:00+00:00",
     "entries":    {},
 }
-"""search-index.json — full-text entity index built by search agent."""
+"""search-index.json - full-text entity index built by search agent."""
 
 # ---------------------------------------------------------------------------
 # Deduplication agent state
@@ -174,7 +174,7 @@ DEDUP_REPORT_DEFAULT: dict[str, Any] = {
     "candidates":    [],
     "files_scanned": 0,
 }
-"""dedup-report-latest.json — most recent deduplication candidates."""
+"""dedup-report-latest.json - most recent deduplication candidates."""
 
 # ---------------------------------------------------------------------------
 # Mapping: canonical relative path → default value

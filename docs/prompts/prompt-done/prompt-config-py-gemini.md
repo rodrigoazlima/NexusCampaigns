@@ -34,22 +34,22 @@ Analyze the provided Python script and extract all relevant configuration settin
    - Put script-specific behavior (batch sizes, task-specific prompts, agent name, etc.) in **local**.
    - Make sure the JSONs contain good defaults so the script works even if the files are deleted.
    - Use clear, consistent naming.
-   - Do not include code — only configuration.
+   - Do not include code - only configuration.
 
 ---
 
 **Script to analyze:**
 
 # shared\runners\gemini.py
-"""GeminiRunner — Google Gemini API.
+"""GeminiRunner - Google Gemini API.
 
 Dispatch config keys (from GeminiApiConfig):
-  model            str   — model ID, e.g. gemini-2.5-flash
-  system_file      str?  — path to system prompt, relative to agent_dir
-  prompt_file      str?  — path to user prompt, relative to agent_dir
-  max_tokens       int   — default 2048
-  temperature      float — default 0.0
-  timeout_seconds  int   — default 120 (accepted; SDK timeout via request_options)
+  model            str   - model ID, e.g. gemini-2.5-flash
+  system_file      str?  - path to system prompt, relative to agent_dir
+  prompt_file      str?  - path to user prompt, relative to agent_dir
+  max_tokens       int   - default 2048
+  temperature      float - default 0.0
+  timeout_seconds  int   - default 120 (accepted; SDK timeout via request_options)
 
 Auth: GEMINI_API_KEY env var.
 
@@ -76,7 +76,7 @@ class GeminiRunner:
         except ImportError:
             return RunResult(
                 exit_code=1,
-                error="google-generativeai package not installed — run: pip install google-generativeai",
+                error="google-generativeai package not installed - run: pip install google-generativeai",
             )
 
         api_key = os.environ.get("GEMINI_API_KEY")

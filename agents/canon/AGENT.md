@@ -4,7 +4,7 @@ purpose: >
   Validates consistency of approved entities in 02-Library/ against each other.
   Detects broken wikilinks, missing required fields, duplicate IDs, orphan entities
   (no relationships), and contradiction flags. Produces a CanonReport. Read-only
-  on all vault directories — never modifies content.
+  on all vault directories - never modifies content.
 inputs:
   - vault://02-Library/**/*.md
   - agents/canon/state/canon-report-latest.json
@@ -28,7 +28,7 @@ responsibilities:
   - Write CanonReport to canon-report-latest.json and dated archive
   - Emit START/DONE log markers via shared Logger
 restrictions:
-  - Read-only on 02-Library/ — must never write to vault directories
+  - Read-only on 02-Library/ - must never write to vault directories
   - Must not modify any approved entity without explicit human action
   - Must not call any LLM
 state_files:
@@ -36,5 +36,5 @@ state_files:
   - state/reports/
   - state/logs/canon_YYYY-MM-DD.log
 commit_scope:
-  # none — agent produces no knowledge-base content; must not auto-commit
+  # none - agent produces no knowledge-base content; must not auto-commit
 ---

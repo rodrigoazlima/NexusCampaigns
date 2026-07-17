@@ -34,7 +34,7 @@ Analyze the provided Python script and extract all relevant configuration settin
    - Put script-specific behavior (batch sizes, task-specific prompts, agent name, etc.) in **local**.
    - Make sure the JSONs contain good defaults so the script works even if the files are deleted.
    - Use clear, consistent naming.
-   - Do not include code — only configuration.
+   - Do not include code - only configuration.
 
 ---
 
@@ -43,15 +43,15 @@ Analyze the provided Python script and extract all relevant configuration settin
 # repair\tools\repair_agent.py
 """repair.tools.repair_agent
 
-Maintenance agent — no LLM, no vault content changes.
+Maintenance agent - no LLM, no vault content changes.
 
 Actions (per agent-repair.spec.md):
-  ParseErrorPatterns  — scan automation.log (last 24h) for fixable error patterns
-  RemoveStaleLock     — delete runner.lock if age > 30 min
-  CreateMissingDirs   — ensure all required dirs exist
-  ValidateImageRefs   — verify processed-images.json refs by SHA256 identity
-  DetectOverdueAgents — flag agents not run within 2 × intervalSeconds
-  WriteRepairReport   — emit repair-YYYY-MM-DD.json to reports dir
+  ParseErrorPatterns  - scan automation.log (last 24h) for fixable error patterns
+  RemoveStaleLock     - delete runner.lock if age > 30 min
+  CreateMissingDirs   - ensure all required dirs exist
+  ValidateImageRefs   - verify processed-images.json refs by SHA256 identity
+  DetectOverdueAgents - flag agents not run within 2 × intervalSeconds
+  WriteRepairReport   - emit repair-YYYY-MM-DD.json to reports dir
 """
 
 from __future__ import annotations
@@ -170,7 +170,7 @@ def _remove_stale_lock(log: Logger) -> int:
             _LOCK_FILE.unlink()
             log.info(f"Removed stale lock (age={age:.0f}s pid={data.get('pid')})")
             return 1
-        log.info(f"Lock is fresh (age={age:.0f}s) — skipping")
+        log.info(f"Lock is fresh (age={age:.0f}s) - skipping")
     except Exception as exc:
         log.warning(f"Cannot inspect lock file: {exc}")
     return 0
@@ -192,7 +192,7 @@ def _create_missing_dirs(log: Logger) -> int:
 
 
 # ---------------------------------------------------------------------------
-# ValidateImageRefs — SHA256 identity check
+# ValidateImageRefs - SHA256 identity check
 # ---------------------------------------------------------------------------
 
 def _sha256_of_file(path: Path) -> str:
@@ -228,14 +228,14 @@ def _validate_image_refs(log: Logger) -> tuple[int, list[str]]:
         abs_path = _PROJECT_ROOT / rel_path
 
         if not abs_path.exists():
-            # File missing — prune entry
+            # File missing - prune entry
             del images[key]
             invalid_refs.append(rel_path)
             removed += 1
             log.info(f"Pruned missing image ref: {rel_path}")
             continue
 
-        # SHA256 identity check — skip pseudo-keys (path:...)
+        # SHA256 identity check - skip pseudo-keys (path:...)
         if key.startswith("path:"):
             continue
 
@@ -249,7 +249,7 @@ def _validate_image_refs(log: Logger) -> tuple[int, list[str]]:
                         f"stored={stored_sha[:8]}… actual={actual_sha[:8]}…"
                     )
                     invalid_refs.append(rel_path)
-                    # Flag entry as failed rather than deleting — preserves audit trail
+                    # Flag entry as failed rather than deleting - preserves audit trail
                     images[key]["status"] = "failed"
                     removed += 1
             except Exception as exc:
@@ -392,7 +392,7 @@ TOOLS = SELF_MANAGEMENT_TOOLS + [
         "name": "remove_stale_lock",
         "description": (
             "Remove runner.lock if it is older than 30 minutes. "
-            "Safe to call unconditionally — returns 0 if lock is absent or fresh."
+            "Safe to call unconditionally - returns 0 if lock is absent or fresh."
         ),
         "input_schema": {"type": "object", "properties": {}},
     },

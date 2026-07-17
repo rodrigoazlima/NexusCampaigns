@@ -1,4 +1,4 @@
-"""nexus.workers.ingestion — vault ingestion (queue producer).
+"""nexus.workers.ingestion - vault ingestion (queue producer).
 
 First pipeline stage and the only queue producer: turns raw files dropped
 into 00-Inbox/ into inbox-queue entries the consumer workers feed on.
@@ -58,7 +58,7 @@ _REGISTRY_FILE = _AGENTS_DIR / "registry.yaml"
 
 _MAX_ATTEMPTS = 3   # poison-pill guard (worker-contract.spec.md)
 
-# Canonical vault-root folders per CLAUDE.md — anything else at vault root
+# Canonical vault-root folders per CLAUDE.md - anything else at vault root
 # is "stray" content that landed outside the pipeline (e.g. a reorganized
 # vault, a folder dropped in by hand).
 _CANON_VAULT_DIRS = frozenset({
@@ -90,7 +90,7 @@ _EMOJI_RE = re.compile(
 
 
 # ---------------------------------------------------------------------------
-# Worker state — processed-docx list + per-file attempt counter
+# Worker state - processed-docx list + per-file attempt counter
 # ---------------------------------------------------------------------------
 
 def _processed_docx_file() -> Path:
@@ -185,7 +185,7 @@ def _strip_emoji_filename(path: Path, log: Logger) -> Path:
 def _ensure_pandoc(log: Logger) -> bool:
     if shutil.which("pandoc"):
         return True
-    log.warning("pandoc not found — attempting: winget install JohnMacFarlane.Pandoc")
+    log.warning("pandoc not found - attempting: winget install JohnMacFarlane.Pandoc")
     try:
         result = subprocess.run(
             ["winget", "install", "--id", "JohnMacFarlane.Pandoc", "-e", "--silent"],
@@ -255,7 +255,7 @@ def _flatten_media(images_dir: Path, md_path: Path, log: Logger) -> None:
     try:
         media_sub.rmdir()
     except OSError:
-        pass  # non-empty after move (subdirs) — leave it
+        pass  # non-empty after move (subdirs) - leave it
 
     if moved and md_path.exists():
         _fix_md_image_refs(md_path, images_dir)
@@ -280,7 +280,7 @@ def _fix_md_image_refs(md_path: Path, images_dir: Path) -> None:
 
         md_path.write_text(content, encoding="utf-8")
     except Exception:
-        pass  # non-fatal — images still exist, paths just need manual fix
+        pass  # non-fatal - images still exist, paths just need manual fix
 
 
 # ---------------------------------------------------------------------------
@@ -412,8 +412,8 @@ def _register_file(path: Path, log: Logger, *, img_hash: Optional[str] = None) -
 
 
 def _register_duplicate_image(path: Path, original: dict, img_hash: str, log: Logger) -> None:
-    """Register a content-identical image: the file itself is kept — 00-Inbox/
-    is never modified or deleted from (vault hard rule) — but every downstream
+    """Register a content-identical image: the file itself is kept - 00-Inbox/
+    is never modified or deleted from (vault hard rule) - but every downstream
     agent slot is skipped so vision/classification/lore/token never produce a
     second draft for a picture that already has one.
     """
@@ -438,7 +438,7 @@ def _register_duplicate_image(path: Path, original: dict, img_hash: str, log: Lo
     log.warning(
         f"Duplicate image ingested: content-identical to "
         f"{original.get('path')} (first seen "
-        f"{original.get('firstSeenAt', 'unknown')}) — queued but all "
+        f"{original.get('firstSeenAt', 'unknown')}) - queued but all "
         f"downstream agent slots skipped{image_tag(sha256=img_hash, path=rel)}"
     )
 
@@ -515,7 +515,7 @@ class IngestionWorker:
                 self._pandoc_ok = _ensure_pandoc(log)
             if not self._pandoc_ok:
                 _bump_attempts(item.key)
-                return WorkResult("error", "pandoc unavailable — DOCX conversion skipped")
+                return WorkResult("error", "pandoc unavailable - DOCX conversion skipped")
 
         # 1. Emoji strip (rename changes the queue key going forward)
         path = _strip_emoji_filename(path, log)
@@ -528,14 +528,14 @@ class IngestionWorker:
                 return WorkResult("error", f"pandoc conversion failed: {path.name}")
             _mark_docx_processed(path)
 
-        # 3. Register queue entry — last step, so a crash before it re-picks
+        # 3. Register queue entry - last step, so a crash before it re-picks
         #    the file next cycle
         if action == "ingest":
             if _file_type(path) == "image":
                 # Content-hash dedup: this is the single queue producer every
                 # inbox file funnels through (dashboard upload or a raw
                 # filesystem drop alike), so this is the one place a check
-                # here catches every duplicate regardless of how it arrived —
+                # here catches every duplicate regardless of how it arrived -
                 # see nexus.shared.image_hashes for why the dashboard's own
                 # pre-write check alone isn't enough.
                 img_hash = sha256_of_file(path)

@@ -15,7 +15,7 @@ export const STATUS_META: Record<QueueStatus, { label: string; badge: string; ch
 type StatusInput = Pick<QueueItem, 'agents' | 'ingestedAt'>
 
 // Single source of truth for a queue item's headline status. Priority matters:
-// an item can have e.g. one 'error' slot and the rest 'done' — error wins so
+// an item can have e.g. one 'error' slot and the rest 'done' - error wins so
 // it doesn't silently read as pending.
 export function resolveStatus(item: StatusInput): QueueStatus {
   const statuses = Object.values(item.agents)

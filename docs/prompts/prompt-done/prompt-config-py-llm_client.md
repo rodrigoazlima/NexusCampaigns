@@ -34,14 +34,14 @@ Analyze the provided Python script and extract all relevant configuration settin
    - Put script-specific behavior (batch sizes, task-specific prompts, agent name, etc.) in **local**.
    - Make sure the JSONs contain good defaults so the script works even if the files are deleted.
    - Use clear, consistent naming.
-   - Do not include code — only configuration.
+   - Do not include code - only configuration.
 
 ---
 
 **Script to analyze:**
 
 # shared\llm_client.py
-"""Concrete LLMClient — implements ILLMClient.
+"""Concrete LLMClient - implements ILLMClient.
 
 Sends requests to a local OpenAI-compatible endpoint.
   - temperature = 0
@@ -88,7 +88,7 @@ def _resize_and_encode(path: Path) -> str:
         img.save(buf, format="JPEG", quality=85)
         raw = buf.getvalue()
     except ImportError:
-        raw = path.read_bytes()   # PIL unavailable — send raw bytes
+        raw = path.read_bytes()   # PIL unavailable - send raw bytes
 
     return base64.b64encode(raw).decode()
 

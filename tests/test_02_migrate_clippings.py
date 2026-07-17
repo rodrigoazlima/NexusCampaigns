@@ -493,7 +493,7 @@ class TestContentSnippet:
     ) -> None:
         """Files shorter than 600 chars are sent without truncation."""
         mock_llm.set_category("MARKETING")
-        body = "Short marketing blurb — far under the limit."
+        body = "Short marketing blurb - far under the limit."
         (vault / "Clippings" / "blurb.md").write_text(body, encoding="utf-8")
 
         run_migrate(vault, mock_llm.port)

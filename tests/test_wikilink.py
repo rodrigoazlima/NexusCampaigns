@@ -284,7 +284,7 @@ class TestStateHelpers:
 
 
 # ---------------------------------------------------------------------------
-# pending() — no library
+# pending() - no library
 # ---------------------------------------------------------------------------
 
 class TestPendingNoLibrary:
@@ -295,7 +295,7 @@ class TestPendingNoLibrary:
 
 
 # ---------------------------------------------------------------------------
-# Worker cycle — happy path
+# Worker cycle - happy path
 # ---------------------------------------------------------------------------
 
 class TestWorkerHappyPath:
@@ -322,7 +322,7 @@ class TestWorkerHappyPath:
         _run()  # populates state
         mtime_before = path_a.stat().st_mtime
 
-        # Second cycle — both already processed, pending() must be empty
+        # Second cycle - both already processed, pending() must be empty
         assert _mod.create().pending() == []
         assert path_a.stat().st_mtime == mtime_before
 
@@ -358,7 +358,7 @@ class TestBatchSize:
 
 
 # ---------------------------------------------------------------------------
-# Worker options — min_score and max_links
+# Worker options - min_score and max_links
 # ---------------------------------------------------------------------------
 
 class TestWorkerOptions:

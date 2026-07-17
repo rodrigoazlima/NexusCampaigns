@@ -44,7 +44,7 @@ function Poster({ e }: { e: Entry }) {
 }
 
 // Hover shows an inviting pulse; hold the hover 3s without clicking and it
-// fires for you — the countdown ring is the affordance that tells the user
+// fires for you - the countdown ring is the affordance that tells the user
 // that's about to happen (same idea as a "next episode" auto-play prompt).
 function ArrowButton({
   direction, visible, onTrigger,

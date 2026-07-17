@@ -7,15 +7,15 @@ Requires:
   - Pillow, numpy (for token generation)
 
 Pipeline stages:
-  1. Download    — JPEG lands in 00-Inbox/images/e2e-test/
-  2. Ingestion   — runner dispatches ingestion_agent.py → inbox-queue.json updated
-  3. Vision      — runner dispatches classify_images.py → LM Studio classifies,
+  1. Download    - JPEG lands in 00-Inbox/images/e2e-test/
+  2. Ingestion   - runner dispatches ingestion_agent.py → inbox-queue.json updated
+  3. Vision      - runner dispatches classify_images.py → LM Studio classifies,
                    renames image, writes body draft to 01-Processing/
-  4. Lore        — runner dispatches generate_npcs.py → NPC sheet written to 01-Processing/
-  5. Classification — runner dispatches enrich_tags.py → tags/type enriched,
+  4. Lore        - runner dispatches generate_npcs.py → NPC sheet written to 01-Processing/
+  5. Classification - runner dispatches enrich_tags.py → tags/type enriched,
                    queue classification slot marked done
-  6. Token       — runner dispatches generate_tokens.py → token PNG created
-  7. Review      — draft entity in 01-Processing/ flagged for human review
+  6. Token       - runner dispatches generate_tokens.py → token PNG created
+  7. Review      - draft entity in 01-Processing/ flagged for human review
 
 Run normally (auto-cleanup):
   pytest agents/tests/e2e/test_pipeline_e2e.py -v
@@ -137,7 +137,7 @@ def _find_e2e_vision_entry() -> dict | None:
 
 
 # ---------------------------------------------------------------------------
-# Stage 1 — Download
+# Stage 1 - Download
 # ---------------------------------------------------------------------------
 
 def test_stage1_download():
@@ -151,7 +151,7 @@ def test_stage1_download():
     resp.raise_for_status()
     raw = resp.content
 
-    # Convert to true JPEG — wikia may serve WebP regardless of URL extension.
+    # Convert to true JPEG - wikia may serve WebP regardless of URL extension.
     # The dashboard image API uses file extension for Content-Type, so must be real JPEG.
     magic = raw[:2]
     if magic != b"\xff\xd8":
@@ -163,12 +163,12 @@ def test_stage1_download():
         img_path.write_bytes(raw)
 
     assert img_path.exists()
-    assert img_path.stat().st_size > 10_000, "Image too small — download failed"
+    assert img_path.stat().st_size > 10_000, "Image too small - download failed"
     assert img_path.read_bytes()[:2] == b"\xff\xd8", "Not a valid JPEG"
 
 
 # ---------------------------------------------------------------------------
-# Stage 2 — Ingestion
+# Stage 2 - Ingestion
 # ---------------------------------------------------------------------------
 
 def test_stage2_ingestion():
@@ -184,7 +184,7 @@ def test_stage2_ingestion():
     assert _QUEUE_FILE.exists(), "inbox-queue.json not created"
 
     queue = _read_json(_QUEUE_FILE)
-    # Use original filename — ingestion registers images before any rename
+    # Use original filename - ingestion registers images before any rename
     img_rel = img_path.relative_to(_PROJECT_ROOT).as_posix()
 
     assert img_rel in queue, (
@@ -198,7 +198,7 @@ def test_stage2_ingestion():
 
 
 # ---------------------------------------------------------------------------
-# Stage 3 — Vision classification
+# Stage 3 - Vision classification
 # ---------------------------------------------------------------------------
 
 def test_stage3_vision():
@@ -253,7 +253,7 @@ def test_stage3_vision():
 
 
 # ---------------------------------------------------------------------------
-# Stage 4 — Lore (NPC sheet generation)
+# Stage 4 - Lore (NPC sheet generation)
 # ---------------------------------------------------------------------------
 
 def test_stage4_lore():
@@ -268,29 +268,29 @@ def test_stage4_lore():
     entry = _find_e2e_vision_entry()
     assert entry is not None, "Run test_stage3 first"
 
-    # Check scenarios exist — lore agent needs at least one active scenario
+    # Check scenarios exist - lore agent needs at least one active scenario
     scenarios_file = _AGENTS_DIR / "lore" / "state" / "scenarios.json"
     if not scenarios_file.exists():
-        pytest.skip("No scenarios.json — lore agent has nothing to generate against")
+        pytest.skip("No scenarios.json - lore agent has nothing to generate against")
 
     scenarios = _read_json(scenarios_file)
     active = [s for s in (scenarios if isinstance(scenarios, list) else scenarios.values())
               if s.get("active", True)]
     if not active:
-        pytest.skip("No active scenarios — lore agent skipped")
+        pytest.skip("No active scenarios - lore agent skipped")
 
     # Only character types (portrait, body, token) get NPC generation
     vision_type = entry.get("type", "")
     if vision_type not in ("portrait", "body", "token"):
         pytest.skip(
-            f"Image classified as '{vision_type}' — lore only runs on character images"
+            f"Image classified as '{vision_type}' - lore only runs on character images"
         )
 
     result = _run_agent("lore-agent", timeout=LLM_AGENT_TIMEOUT)
 
     combined = result.stdout + result.stderr
     if "LLMOfflineError" in combined or "unreachable" in combined.lower():
-        pytest.fail("LM Studio offline — cannot run lore-agent")
+        pytest.fail("LM Studio offline - cannot run lore-agent")
 
     assert result.returncode == 0, (
         f"lore-agent failed (exit {result.returncode})\n{result.stdout[-2000:]}"
@@ -315,7 +315,7 @@ def test_stage4_lore():
     assert "## Description" in content, "NPC draft missing '## Description' section"
     assert "## Abilities" in content, "NPC draft missing '## Abilities' section"
 
-    # Queue lore slot updated — works because vision updated the queue key to the
+    # Queue lore slot updated - works because vision updated the queue key to the
     # renamed image path, which matches img_entry["path"] used by lore
     queue = _read_json(_QUEUE_FILE)
     key = _e2e_inbox_key()
@@ -326,7 +326,7 @@ def test_stage4_lore():
 
 
 # ---------------------------------------------------------------------------
-# Stage 5 — Classification (tag enrichment + type inference)
+# Stage 5 - Classification (tag enrichment + type inference)
 # ---------------------------------------------------------------------------
 
 def test_stage5_classification():
@@ -337,12 +337,12 @@ def test_stage5_classification():
     Files with 3+ tags and a type set are auto-marked done without an LLM call.
     """
     assert _QUEUE_FILE.exists(), "Run test_stage2 first"
-    assert _find_e2e_draft() is not None, "Run test_stage3 first — no draft to classify"
+    assert _find_e2e_draft() is not None, "Run test_stage3 first - no draft to classify"
 
     result = _run_agent("classification-agent", timeout=120)
 
     # Exit code 1 means at least one permanent LLM failure; 0 means clean run.
-    # Both are acceptable here — we check queue state directly.
+    # Both are acceptable here - we check queue state directly.
     combined = result.stdout + result.stderr
     assert "Traceback" not in combined or "classified:" in combined, (
         f"classification-agent crashed unexpectedly:\n{combined[-2000:]}"
@@ -368,7 +368,7 @@ def test_stage5_classification():
 
 
 # ---------------------------------------------------------------------------
-# Stage 6 — Token generation
+# Stage 6 - Token generation
 # ---------------------------------------------------------------------------
 
 def test_stage6_token():
@@ -384,7 +384,7 @@ def test_stage6_token():
 
     combined = result.stdout + result.stderr
     if "Pillow not installed" in combined or "ImportError" in combined:
-        pytest.skip("Pillow/numpy not installed — token generation skipped")
+        pytest.skip("Pillow/numpy not installed - token generation skipped")
 
     assert result.returncode == 0, (
         f"token worker failed (exit {result.returncode})\n{result.stdout[-2000:]}"
@@ -405,7 +405,7 @@ def test_stage6_token():
 
 
 # ---------------------------------------------------------------------------
-# Stage 7 — Human review flag
+# Stage 7 - Human review flag
 # ---------------------------------------------------------------------------
 
 def test_stage7_review_flag():
@@ -423,7 +423,7 @@ def test_stage7_review_flag():
     # Must NOT be in 02-Library yet (requires human approval)
     library_copy = _VAULT_ROOT / "02-Library" / draft.name
     assert not library_copy.exists(), (
-        "Entity already promoted to 02-Library — human review bypassed"
+        "Entity already promoted to 02-Library - human review bypassed"
     )
 
     print(f"\n[e2e] Draft entity ready for review: {draft.name}")

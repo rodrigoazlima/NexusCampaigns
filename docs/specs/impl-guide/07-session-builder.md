@@ -9,7 +9,7 @@
 
 ## Problem
 
-Adventure modules (from the Adventure Builder) describe the full arc but do not produce session-by-session prep. The DM still needs to translate "Act 2: Complication" into a concrete 3-hour session with opening scene, middle beats, and a satisfying stopping point. This is mechanical work the agent can assist with — especially when prior session notes are available to track where the party actually is.
+Adventure modules (from the Adventure Builder) describe the full arc but do not produce session-by-session prep. The DM still needs to translate "Act 2: Complication" into a concrete 3-hour session with opening scene, middle beats, and a satisfying stopping point. This is mechanical work the agent can assist with - especially when prior session notes are available to track where the party actually is.
 
 ---
 
@@ -34,9 +34,9 @@ It does NOT run automatically without human intent. The DM decides when to prep 
 ## Inputs
 
 1. **Adventure module:** `03-Campaigns/{arc}/adventure-module.md` (or approved version)
-2. **Prior session notes:** `03-Campaigns/{arc}/sessions/session-*.md` — played sessions
-3. **Session request file:** `03-Campaigns/{arc}/request-session-{N}.yaml` — optional parameters
-4. **Canon entities:** `02-Library/` — for NPC stat lookups
+2. **Prior session notes:** `03-Campaigns/{arc}/sessions/session-*.md` - played sessions
+3. **Session request file:** `03-Campaigns/{arc}/request-session-{N}.yaml` - optional parameters
+4. **Canon entities:** `02-Library/` - for NPC stat lookups
 
 ---
 
@@ -75,10 +75,10 @@ status: draft
 reviewed: false
 ---
 
-# Session 3 Prep — The Fall of Annûn
+# Session 3 Prep - The Fall of Annûn
 
 ## Opening Scene
-[Specific paragraph describing where the session starts — continue from last session's stopping point]
+[Specific paragraph describing where the session starts - continue from last session's stopping point]
 
 ## Session Goals
 1. Advance hook: [merchant disappearance from seed]
@@ -97,7 +97,7 @@ reviewed: false
 - Reveal condition: [if party investigates merchant hook]
 
 ## Location: [[location-cursed-forest]]
-[2-paragraph DM description — atmosphere, notable features, hazards]
+[2-paragraph DM description - atmosphere, notable features, hazards]
 
 ## Encounter Seeds
 
@@ -133,7 +133,7 @@ Files to create:
 - `agents/tests/test_session_builder.py`
 
 Files to modify:
-- `agents/session-builder/AGENT.md` — fill stub
+- `agents/session-builder/AGENT.md` - fill stub
 
 ---
 
@@ -203,7 +203,7 @@ class SessionNote:
 
 ### `read_entity(slug: str) → EntityContent`
 
-Same as in Adventure Builder — reads from `02-Library/`. Used for NPC stat lookup.
+Same as in Adventure Builder - reads from `02-Library/`. Used for NPC stat lookup.
 
 ### `write_session_prep(arc: str, session: int, content: str) → None`
 
@@ -227,23 +227,23 @@ Your role: generate specific, actionable session prep documents from adventure m
 
 ## Workflow
 
-1. Call `list_pending_session_requests` — find arcs needing session prep
+1. Call `list_pending_session_requests` - find arcs needing session prep
 2. For each request:
    a. Call `read_adventure_module` for the arc
    b. Call `read_prior_sessions` for played sessions (understand current party state)
    c. Call `read_entity` for key NPCs appearing in this session
-   d. Generate session prep document — specific, not generic
+   d. Generate session prep document - specific, not generic
    e. Call `write_session_prep`
 3. Call `write_log`
 
 ## Rules
 
-- Base session on `party_state` from request file — do not start from scratch
+- Base session on `party_state` from request file - do not start from scratch
 - Never repeat encounters or scenes from prior session notes
-- Use entity stats from 02-Library/ — do not invent stats
+- Use entity stats from 02-Library/ - do not invent stats
 - Session length implied by `duration_hours` (3h = 3-4 encounters max)
 - Match tone from adventure module, adjust per request file `focus` field
-- Prep is a draft (status: draft, reviewed: false) — human DM adjusts before use
+- Prep is a draft (status: draft, reviewed: false) - human DM adjusts before use
 - After writing, the request file is consumed (deleted)
 - If adventure module is absent: skip request, log warning
 ```
@@ -301,7 +301,7 @@ def test_no_sessions_yet_handled(tmp_path):
 - Session prep generated whenever `request-session-N.yaml` exists and adventure module is present.
 - Request file consumed (deleted) after prep is written.
 - Prior session content is never repeated in new prep.
-- NPC stats come from `02-Library/` — no invented stats.
+- NPC stats come from `02-Library/` - no invented stats.
 - Output matches session prep format with all required sections.
 - Approved session notes never overwritten.
 - Agent handles missing adventure module gracefully (skip + log).

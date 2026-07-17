@@ -1,4 +1,4 @@
-"""nexus.runtime.dispatch_config — resolves a task_id to an AgentDispatchConfig
+"""nexus.runtime.dispatch_config - resolves a task_id to an AgentDispatchConfig
 (agent.json, falling back to registry.yaml's default_dispatch), plus the
 small pieces of agent-folder convention that resolution depends on: the
 task_id → agent-directory name mapping, commit_scope parsing from AGENT.md,
@@ -44,7 +44,7 @@ def load_agent_dispatch(task_id: str, log: Logger) -> Optional[AgentDispatchConf
 
     Falls back to registry.yaml's `default_dispatch` (paired with the
     agent's registered `tools:` entry) when agent.json is missing or has no
-    entry for this task_id — lets an agent run off its registry.yaml
+    entry for this task_id - lets an agent run off its registry.yaml
     declaration alone. See docs/specs/agents/agent-dispatch-settings.md.
     """
     agent_name = agent_name_from_task_id(task_id)
@@ -55,15 +55,15 @@ def load_agent_dispatch(task_id: str, log: Logger) -> Optional[AgentDispatchConf
             raw = json.loads(agent_json.read_text(encoding="utf-8"))
             folder_cfg = AgentFolderConfig.model_validate(raw)
         except Exception as exc:
-            log.error(f"Failed to parse {agent_json}: {exc} — skipping {task_id}")
+            log.error(f"Failed to parse {agent_json}: {exc} - skipping {task_id}")
             return None
 
         entry: Optional[TaskDispatchEntry] = folder_cfg.tasks.get(task_id)
         if entry is not None:
             return entry.dispatch
-        log.warning(f"Task ID {task_id!r} not found in {agent_json} — trying registry default_dispatch")
+        log.warning(f"Task ID {task_id!r} not found in {agent_json} - trying registry default_dispatch")
     else:
-        log.warning(f"agent.json not found: {agent_json} — trying registry default_dispatch")
+        log.warning(f"agent.json not found: {agent_json} - trying registry default_dispatch")
 
     return build_default_dispatch(agent_name, task_id, log)
 
@@ -74,7 +74,7 @@ def build_default_dispatch(agent_name: str, task_id: str, log: Logger) -> Option
     try:
         registry = load_registry(PROJECT_ROOT)
     except Exception as exc:
-        log.error(f"Could not load registry.yaml for default_dispatch fallback: {exc} — skipping {task_id}")
+        log.error(f"Could not load registry.yaml for default_dispatch fallback: {exc} - skipping {task_id}")
         return None
 
     default_cfg = registry.default_dispatch
@@ -82,7 +82,7 @@ def build_default_dispatch(agent_name: str, task_id: str, log: Logger) -> Option
     if default_cfg is None or reg_agent is None or not reg_agent.tools:
         log.error(
             f"No agent.json and no usable registry default for {task_id!r} "
-            f"(agent={agent_name!r}) — skipping"
+            f"(agent={agent_name!r}) - skipping"
         )
         return None
 
@@ -96,7 +96,7 @@ def build_default_dispatch(agent_name: str, task_id: str, log: Logger) -> Option
     )
 
     if default_cfg.type != "lm-studio":
-        log.error(f"default_dispatch type {default_cfg.type!r} not supported by fallback builder — skipping {task_id}")
+        log.error(f"default_dispatch type {default_cfg.type!r} not supported by fallback builder - skipping {task_id}")
         return None
 
     return AgentDispatchConfig(

@@ -1,4 +1,4 @@
-"""Concrete FrontmatterIO — implements IFrontmatterIO.
+"""Concrete FrontmatterIO - implements IFrontmatterIO.
 
 Reads and writes YAML frontmatter in Markdown files.
 Uses ruamel.yaml for round-trip fidelity when available; falls back to PyYAML.
@@ -23,7 +23,7 @@ _FENCE_RE = re.compile(r"^---[ \t]*\r?\n(.*?)\r?\n---[ \t]*\r?\n?", re.DOTALL)
 
 
 # ---------------------------------------------------------------------------
-# YAML helpers — ruamel first, PyYAML fallback
+# YAML helpers - ruamel first, PyYAML fallback
 # ---------------------------------------------------------------------------
 
 def _load_yaml(text: str) -> dict[str, Any]:

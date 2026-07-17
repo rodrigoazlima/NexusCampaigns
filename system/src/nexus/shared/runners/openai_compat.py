@@ -1,30 +1,30 @@
-"""OpenAICompatRunner — OpenAI REST API and any compatible endpoint.
+"""OpenAICompatRunner - OpenAI REST API and any compatible endpoint.
 
 Supported: OpenAI, LM Studio (localhost:1234), LocalRouter (localhost:8080),
 Ollama, and any server that speaks the OpenAI chat completions schema.
 
 Two dispatch patterns (mirrors shared.runners.claude):
 
-  Tool-use pattern — set tools_module
+  Tool-use pattern - set tools_module
     Agentic loop: model emits tool_calls, we execute mod.call_tool(), feed
     results back, repeat until finish_reason == "stop" or max_tool_rounds.
     Anthropic-style TOOLS (name/description/input_schema) are converted to
     OpenAI's function-calling schema on the fly.
 
-  Prompt pattern — no tools_module
+  Prompt pattern - no tools_module
     Single non-agentic chat completion, returns text response.
 
 Dispatch config keys (from OpenAIApiConfig / LmStudioConfig):
-  base_url         str   — API base URL, e.g. http://localhost:1234/v1
-  model            str   — model identifier
-  system_file      str?  — path to system prompt, relative to agent_dir
-  prompt_file      str?  — path to user prompt, relative to agent_dir (prompt pattern only)
-  tools_module     str?  — dotted import path for agent's tool module (tool-use pattern only)
-  history_file     str?  — filename for persistent chat history, under agent state/
-  max_tool_rounds  int   — agentic loop cap, default 20
-  max_tokens       int   — default 1024
-  temperature      float — default 0.0
-  timeout_seconds  int   — default 120
+  base_url         str   - API base URL, e.g. http://localhost:1234/v1
+  model            str   - model identifier
+  system_file      str?  - path to system prompt, relative to agent_dir
+  prompt_file      str?  - path to user prompt, relative to agent_dir (prompt pattern only)
+  tools_module     str?  - dotted import path for agent's tool module (tool-use pattern only)
+  history_file     str?  - filename for persistent chat history, under agent state/
+  max_tool_rounds  int   - agentic loop cap, default 20
+  max_tokens       int   - default 1024
+  temperature      float - default 0.0
+  timeout_seconds  int   - default 120
 
 Auth: OPENAI_API_KEY env var. For local endpoints set to any non-empty string.
 
@@ -66,7 +66,7 @@ class OpenAICompatRunner:
         return self._run_prompt(cfg, agent_dir)
 
     # ---------------------------------------------------------------------- #
-    # Prompt pattern — single non-agentic call
+    # Prompt pattern - single non-agentic call
     # ---------------------------------------------------------------------- #
 
     def _run_prompt(self, cfg: dict, agent_dir: Path) -> RunResult:
@@ -95,7 +95,7 @@ class OpenAICompatRunner:
         return RunResult(exit_code=0, output=text, duration_ms=_ms(t0))
 
     # ---------------------------------------------------------------------- #
-    # Tool-use pattern — agentic loop
+    # Tool-use pattern - agentic loop
     # ---------------------------------------------------------------------- #
 
     def _run_tool_use(
@@ -171,7 +171,7 @@ class OpenAICompatRunner:
                 resp, error = _post_chat(cfg, messages, tools=tools)
                 if resp is None:
                     exit_code  = 1
-                    last_error = error or "LLM request failed — max retries exhausted mid-loop"
+                    last_error = error or "LLM request failed - max retries exhausted mid-loop"
                     break
 
                 try:

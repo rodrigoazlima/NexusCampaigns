@@ -1,4 +1,4 @@
-# Agent Spec — Wiki
+# Agent Spec - Wiki
 
 **Trigger:** hourly  
 **Input:** `00-Inbox/` markdown documents (`document` entries in `system/state/inbox-queue.json` with `agents.wiki = pending`)  
@@ -10,11 +10,11 @@
 
 ## Responsibilities
 
-1. **Load canon context** — load approved entities from `02-Library/` (id, type, tags, relationships) as LLM context to prevent contradictions.
-2. **Scan pending docs** — read `system/state/inbox-queue.json` for entries with `type: document` and `agents.wiki: pending`.
-3. **Synthesize entity page** — for each pending document, call text LLM with the raw content and canon context to produce a structured entity page.
-4. **Write draft** — write `01-Processing/{slug}.md` following the AGENTS.md-compliant frontmatter standard.
-5. **Mark queue done** — set `agents.wiki = done` in `system/state/inbox-queue.json`.
+1. **Load canon context** - load approved entities from `02-Library/` (id, type, tags, relationships) as LLM context to prevent contradictions.
+2. **Scan pending docs** - read `system/state/inbox-queue.json` for entries with `type: document` and `agents.wiki: pending`.
+3. **Synthesize entity page** - for each pending document, call text LLM with the raw content and canon context to produce a structured entity page.
+4. **Write draft** - write `01-Processing/{slug}.md` following the AGENTS.md-compliant frontmatter standard.
+5. **Mark queue done** - set `agents.wiki = done` in `system/state/inbox-queue.json`.
 
 ---
 

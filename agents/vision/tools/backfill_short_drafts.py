@@ -99,7 +99,7 @@ def main() -> None:
         try:
             fm, body = fio.read(md_path)
         except Exception as exc:
-            print(f"  SKIP {md_path.name}: parse error — {exc}")
+            print(f"  SKIP {md_path.name}: parse error - {exc}")
             skipped += 1
             continue
 
@@ -123,7 +123,7 @@ def main() -> None:
             clf      = _clf_from_entry(entry)
             new_body = _build_body(clf)
         except Exception as exc:
-            print(f"  SKIP {md_path.name}: body build failed — {exc}")
+            print(f"  SKIP {md_path.name}: body build failed - {exc}")
             skipped += 1
             continue
 

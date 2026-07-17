@@ -1,14 +1,14 @@
-"""nexus.workers.shortfiles — draft QA gate (queue consumer, derived pending set).
+"""nexus.workers.shortfiles - draft QA gate (queue consumer, derived pending set).
 
 Scans 01-Processing/ for .md drafts with fewer than MIN_BODY_LINES body
 lines; sets needs_reprocessing: true and injects suggestedQuality: 0 when
 quality: 0. Replaces nexus.tasks.flag_short_files.
 
-seen.json (path → {mtime, verdict}) skips unchanged files — the one
+seen.json (path → {mtime, verdict}) skips unchanged files - the one
 behavior improvement over the task, which re-read every draft every run.
 
 Guard rules: never writes 02-Library. 01-Processing frontmatter fields
-needs_reprocessing + suggestedQuality only — never status/reviewed/quality.
+needs_reprocessing + suggestedQuality only - never status/reviewed/quality.
 """
 
 from __future__ import annotations
@@ -144,7 +144,7 @@ class ShortfilesWorker:
         if len(body_lines) >= self.min_body_lines:
             seen[item.key] = {"mtime": mtime, "verdict": "ok"}
             _save_seen(seen)
-            return WorkResult("skip", f"{len(body_lines)} body lines — long enough")
+            return WorkResult("skip", f"{len(body_lines)} body lines - long enough")
 
         changed = False
         if not fm.get("needs_reprocessing"):
@@ -155,7 +155,7 @@ class ShortfilesWorker:
             changed = True
         if changed:
             self._fio.write(md_path, fm, body)
-            # flag write bumps mtime — record the post-write mtime so the
+            # flag write bumps mtime - record the post-write mtime so the
             # file is not re-picked next cycle
             mtime = md_path.stat().st_mtime
 

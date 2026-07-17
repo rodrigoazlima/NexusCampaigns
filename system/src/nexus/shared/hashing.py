@@ -1,6 +1,6 @@
-"""nexus.shared.hashing — canonical image-identity hash.
+"""nexus.shared.hashing - canonical image-identity hash.
 
-blake2b, 32-byte digest — the algorithm behind every "sha256" field in vault
+blake2b, 32-byte digest - the algorithm behind every "sha256" field in vault
 state (processed-images.json, frontmatter, token-links.json). Not actual
 SHA-256; the field name is historical and kept for on-disk compatibility.
 """

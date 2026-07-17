@@ -34,7 +34,7 @@ alone.
 
 | Now | Target |
 |-----|--------|
-| `system/state/review/reports/` (report JSONs + reports-data.js) | unchanged — dashboard reads these paths |
+| `system/state/review/reports/` (report JSONs + reports-data.js) | unchanged - dashboard reads these paths |
 | logs `system/state/review/logs/` | `system/state/workers/report/logs/` |
 
 Report output paths deliberately do NOT move: dashboard `/api` routes and
@@ -53,23 +53,23 @@ workers:
 ## Guard rules (carried over)
 
 - Never writes `02-Library/`.
-- `01-Processing` frontmatter: `suggestedQuality` only — never `status`,
+- `01-Processing` frontmatter: `suggestedQuality` only - never `status`,
   `reviewed`, `quality`.
 
 ## Errors / retries
 
 - A failing aggregation section (corrupt log line, unreadable draft) is
-  captured inside the report under `warnings[]` — the run itself still
+  captured inside the report under `warnings[]` - the run itself still
   returns `done` (matches today's resilience).
 - `error` only when the report file itself cannot be written.
 
 ## Deletions when migrated
 
-- `agents/review/` — jointly with worker-shortfiles (see that spec's
+- `agents/review/` - jointly with worker-shortfiles (see that spec's
   ordering note); whichever migrates second deletes the folder.
 - `_AGENT_JSON_SPECS["review"]` report entry.
 - `nexus/tasks/daily_report.py` → `nexus/workers/report.py`.
-- No `_PRECONDITIONS` entry exists (always-run) — nothing to remove there.
+- No `_PRECONDITIONS` entry exists (always-run) - nothing to remove there.
 
 ## Migration steps
 

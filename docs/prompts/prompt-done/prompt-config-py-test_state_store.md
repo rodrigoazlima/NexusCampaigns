@@ -34,7 +34,7 @@ Analyze the provided Python script and extract all relevant configuration settin
    - Put script-specific behavior (batch sizes, task-specific prompts, agent name, etc.) in **local**.
    - Make sure the JSONs contain good defaults so the script works even if the files are deleted.
    - Use clear, consistent naming.
-   - Do not include code — only configuration.
+   - Do not include code - only configuration.
 
 ---
 
@@ -70,7 +70,7 @@ class TestStateStoreLoad:
         s = StateStore(tmp_path / "s.json", default=default)
         result = s.load()
         result["b"] = 2
-        # Second load must return a fresh copy — not the mutated result
+        # Second load must return a fresh copy - not the mutated result
         assert s.load() == {"a": 1}
 
     def test_list_default_returns_copy(self, list_store):

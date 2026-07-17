@@ -85,7 +85,7 @@ export async function GET(req: NextRequest) {
     try {
       v0Models = await fetchV0Models(host)
     } catch {
-      // v0 unavailable — continue with v1 only
+      // v0 unavailable - continue with v1 only
     }
 
     const enriched: LmStudioModelMeta[] = v1Models.map((v1) => {

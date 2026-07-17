@@ -13,10 +13,10 @@ inputs:
   - vault://01-Processing/**/*.md
   - vault://02-Library/**/*.md (read-only: slug list for dedup check)
   - state/bad-docs.txt
-  - LLM (text): classification_text_llm registry alias, LM Studio by default —
+  - LLM (text): classification_text_llm registry alias, LM Studio by default -
     model selectable via agent.json tasks.classification-agent.llm.text_model
   - LLM (vision): vision_llm registry alias (same LM Studio instance vision
-    agent uses) — model selectable via .llm.vision_model
+    agent uses) - model selectable via .llm.vision_model
 outputs:
   - vault://00-Inbox/**/*.md (frontmatter updated in-place)
   - vault://01-Processing/**/*.md (frontmatter updated in-place)
@@ -39,7 +39,7 @@ responsibilities:
     tags (from vision) + known tags (top of the tag library)
   - Canonicalize each returned tag against state/tag-library.json (shared-prefix
     ratio ≥0.65 folds inflections/variants into the first-seen spelling; no
-    match registers a new canonical tag) — no fixed tag vocabulary
+    match registers a new canonical tag) - no fixed tag vocabulary
   - Validate type against 18-type allowed list
   - When candidate_tags are unreviewed and the source image still resolves on
     disk: call refine_tags_with_library() (imported from
@@ -57,7 +57,7 @@ restrictions:
   - Must not modify 02-Library/ files
   - Must not remove existing tags (only add/merge)
   - Tag LLM max 80 tokens; type LLM max 10 tokens; vision refinement max 1024 tokens
-  - Vision refinement failures (offline, parse error) never fail the file — falls back to the text-only result
+  - Vision refinement failures (offline, parse error) never fail the file - falls back to the text-only result
 state_files:
   - state/bad-docs.txt
   - state/tag-library.json
@@ -68,17 +68,17 @@ commit_scope:
 
 ## Tag Library
 
-Tags are no longer a fixed list — the LLM proposes freely and `_canonicalize_tag()`
+Tags are no longer a fixed list - the LLM proposes freely and `_canonicalize_tag()`
 folds near-duplicate spellings into whichever one was registered first in
 `state/tag-library.json` (e.g. "elven"/"elfo" fold into "elf" if "elf" already
-exists there, via a shared-prefix ratio ≥ `_TAG_FOLD_THRESHOLD` (0.65) — a
+exists there, via a shared-prefix ratio ≥ `_TAG_FOLD_THRESHOLD` (0.65) - a
 different, word-scale heuristic from the character-overlap `_slug_similarity`
 used for duplicate-slug detection). New tags register themselves as new
 canonical entries.
 
 `refine_tags_with_library()` (public function, `agents/vision/tools/classify_images.py`)
 gives this agent its own image-grounded second opinion using the same library,
-via a separately-configurable vision LLM — see `agent.json`'s `llm.vision_model`.
+via a separately-configurable vision LLM - see `agent.json`'s `llm.vision_model`.
 
 ## Valid Types (18)
 npc · character · faction · location · city · village · dungeon · item · artifact · quest · encounter · creature · monster · event · religion · organization · timeline · lore

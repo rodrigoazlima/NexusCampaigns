@@ -7,7 +7,7 @@ Arc: {arc}
 Existing canon entities (do NOT contradict these):
 {canon_context}
 
-Return ONLY valid JSON — no explanation, no markdown fences:
+Return ONLY valid JSON - no explanation, no markdown fences:
 {
   "name": "Full Name (evocative, setting-appropriate)",
   "ancestry": "PF2e ancestry (e.g. Human, Elf, Dragon, Undead)",

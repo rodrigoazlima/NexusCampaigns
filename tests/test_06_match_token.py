@@ -4,17 +4,17 @@ Tests for .automation/06-match-token.py
 Strategy:
 - Load module via importlib.util (handles the numeric filename prefix)
 - Unit test each internal function with mocked external libraries
-  (face_recognition, imagehash) — no real models or GPU required
-- CLI integration tests via subprocess — validate JSON stdout contract
+  (face_recognition, imagehash) - no real models or GPU required
+- CLI integration tests via subprocess - validate JSON stdout contract
 - All temp files via tmp_path; no global state mutations
 
 Behaviors under test:
-  1.  _crop_circle_content  — bounding-box crop, mode conversion, edge cases
-  2.  _match_imagehash      — hash comparison, threshold, multi-candidate, errors
-  3.  _match_face_recognition — encoding compare, threshold, multi-candidate, errors
-  4.  main() CLI            — JSON output contract, missing files, method flags
-  5.  Auto method selection — library fallback chain
-  6.  Parametrized          — sizes, thresholds, boundary conditions
+  1.  _crop_circle_content  - bounding-box crop, mode conversion, edge cases
+  2.  _match_imagehash      - hash comparison, threshold, multi-candidate, errors
+  3.  _match_face_recognition - encoding compare, threshold, multi-candidate, errors
+  4.  main() CLI            - JSON output contract, missing files, method flags
+  5.  Auto method selection - library fallback chain
+  6.  Parametrized          - sizes, thresholds, boundary conditions
 """
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-# Library availability flags — used to skip CLI tests that need real installs
+# Library availability flags - used to skip CLI tests that need real installs
 _IMAGEHASH_AVAILABLE = importlib.util.find_spec("imagehash") is not None
 _FACE_REC_AVAILABLE = importlib.util.find_spec("face_recognition") is not None
 
@@ -38,7 +38,7 @@ _skip_no_imagehash = pytest.mark.skipif(
 )
 
 # ---------------------------------------------------------------------------
-# Module loader — importlib handles the "06-" numeric prefix
+# Module loader - importlib handles the "06-" numeric prefix
 # ---------------------------------------------------------------------------
 
 SCRIPT_PATH = Path(__file__).parent.parent / ".automation" / "06-match-token.py"
@@ -64,7 +64,7 @@ match_token = _load_module()
 
 
 # ---------------------------------------------------------------------------
-# Image factories — create minimal valid images for each test
+# Image factories - create minimal valid images for each test
 # ---------------------------------------------------------------------------
 
 def make_solid_rgba(
@@ -73,7 +73,7 @@ def make_solid_rgba(
     height: int = 64,
     color: tuple[int, int, int, int] = (150, 100, 50, 255),
 ) -> Path:
-    """Fully-opaque RGBA PNG — no transparent pixels."""
+    """Fully-opaque RGBA PNG - no transparent pixels."""
     path.parent.mkdir(parents=True, exist_ok=True)
     Image.new("RGBA", (width, height), color=color).save(str(path), "PNG")
     return path
@@ -123,7 +123,7 @@ def make_jpg(
 
 
 # ---------------------------------------------------------------------------
-# _FakeHash — integer-backed stand-in for imagehash hash objects
+# _FakeHash - integer-backed stand-in for imagehash hash objects
 # Subtraction returns the absolute difference between integer values.
 # ---------------------------------------------------------------------------
 
@@ -505,7 +505,7 @@ class TestMatchFaceRecognition:
 
 
 # ===========================================================================
-# 4. main() — CLI contract via subprocess
+# 4. main() - CLI contract via subprocess
 # ===========================================================================
 
 
@@ -677,7 +677,7 @@ def test_imagehash_accepts_different_formats(
     with patch.dict(sys.modules, {"imagehash": mock_ih}):
         path, dist, err = match_token._match_imagehash(token, [cand], threshold=20)
 
-    # Should either match or return a structured error — never raise
+    # Should either match or return a structured error - never raise
     assert isinstance(path, (Path, type(None)))
 
 

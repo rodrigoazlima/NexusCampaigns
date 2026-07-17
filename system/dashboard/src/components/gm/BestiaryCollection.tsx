@@ -35,10 +35,10 @@ const PRESSURES = ['brute', 'swarm', 'social', 'puzzle'] as const
 // bestiary.md Delta 2 build-guidance checklist.
 const GUIDANCE = [
   'A signature threat for the region ("you are here")',
-  'Encounters with a reason to exist — guarding / hunting what?',
-  'Variety of pressure — brute · swarm · social/avoidable · puzzle-creature',
-  'Terrain in every fight — cover, hazards, verticality, escape routes',
-  'Non-combat outs — talk past, sneak, bargain',
+  'Encounters with a reason to exist - guarding / hunting what?',
+  'Variety of pressure - brute · swarm · social/avoidable · puzzle-creature',
+  'Terrain in every fight - cover, hazards, verticality, escape routes',
+  'Non-combat outs - talk past, sneak, bargain',
 ]
 
 const isEncounter = (i: BestiaryItem) => i.type === 'encounter'
@@ -210,7 +210,7 @@ export default function BestiaryCollection({ items }: { items: BestiaryItem[] })
                 </>
               )}
             </div>
-            <Tip label="Generate with AI — coming soon">
+            <Tip label="Generate with AI - coming soon">
               <Link
                 href="/gm/chat"
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-surface-3 text-zinc-400 hover:text-zinc-200 border border-surface-3 transition-colors"
@@ -229,7 +229,7 @@ export default function BestiaryCollection({ items }: { items: BestiaryItem[] })
           className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-zinc-300 hover:text-white transition-colors"
         >
           {guideOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-          Build guidance — the bestiary checklist
+          Build guidance - the bestiary checklist
         </button>
         {guideOpen && (
           <ul className="px-4 pb-3 space-y-1.5 border-t border-surface-3/60 pt-3">
@@ -331,7 +331,7 @@ export default function BestiaryCollection({ items }: { items: BestiaryItem[] })
           </div>
         </div>
       ) : filtered.length === 0 ? (
-        <div className="panel p-12 text-center text-zinc-500 text-sm">No entities match — clear filters</div>
+        <div className="panel p-12 text-center text-zinc-500 text-sm">No entities match - clear filters</div>
       ) : view === 'grid' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {filtered.map((i) => {
@@ -350,20 +350,20 @@ export default function BestiaryCollection({ items }: { items: BestiaryItem[] })
                       <span className="text-xs font-mono text-zinc-100 truncate group-hover:text-red-400">{i.id}</span>
                       {i.signature && <Star size={11} className="text-yellow-400 fill-yellow-400 flex-shrink-0" />}
                     </div>
-                    <p className="text-[11px] text-zinc-500 truncate mt-0.5">{i.excerpt || '—'}</p>
+                    <p className="text-[11px] text-zinc-500 truncate mt-0.5">{i.excerpt || '-'}</p>
                     <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                       <span className={`text-[9px] px-1.5 py-0.5 rounded font-semibold uppercase ${TYPE_CHIP}`}>{i.type}</span>
                       <span className={`text-[9px] px-1 py-0.5 rounded ${i.origin === 'canon' ? 'bg-success/10 text-success' : 'bg-surface-3 text-zinc-400'}`}>{i.origin}</span>
                       <span className="text-[9px] font-mono text-zinc-500">Q{i.quality}</span>
                       {i.pressure && <span className="text-[9px] px-1 py-0.5 rounded bg-surface-3 text-zinc-300 capitalize">{i.pressure}</span>}
-                      {i.relationships.length === 0 && <span className="text-[9px] text-warning" title="orphan — no relationships">⚠</span>}
-                      {isFlat(i) && <span className="text-[9px] px-1 py-0.5 rounded bg-warning/15 text-warning" title="no terrain — flat fight">flat</span>}
-                      {isForced(i) && <span className="text-[9px] px-1 py-0.5 rounded bg-warning/15 text-warning" title="no non-combat alternative — forced fight">forced</span>}
+                      {i.relationships.length === 0 && <span className="text-[9px] text-warning" title="orphan - no relationships">⚠</span>}
+                      {isFlat(i) && <span className="text-[9px] px-1 py-0.5 rounded bg-warning/15 text-warning" title="no terrain - flat fight">flat</span>}
+                      {isForced(i) && <span className="text-[9px] px-1 py-0.5 rounded bg-warning/15 text-warning" title="no non-combat alternative - forced fight">forced</span>}
                       {i.origin === 'draft' && !i.reviewed && <span className="text-[9px] px-1 py-0.5 rounded bg-warning/15 text-warning">new</span>}
                     </div>
                   </div>
                 </Link>
-                {/* Quick actions — drafts only (action endpoints operate on 01-Processing) */}
+                {/* Quick actions - drafts only (action endpoints operate on 01-Processing) */}
                 {i.origin === 'draft' && (
                   <div className="flex items-center gap-1.5 px-3 py-2 border-t border-surface-3/60 opacity-0 group-hover:opacity-100 transition-opacity">
                     <ActionBtn label="Promote to canon" variant="success" busy={busy === i.filename} onClick={() => act('approve', i.filename, 'Promoted to Library')}><Check size={14} /></ActionBtn>
@@ -418,7 +418,7 @@ export default function BestiaryCollection({ items }: { items: BestiaryItem[] })
                       </Link>
                     </td>
                     <td className="p-2"><span className={`px-1.5 py-0.5 rounded text-[10px] uppercase font-semibold ${TYPE_CHIP}`}>{i.type}</span></td>
-                    <td className="p-2 text-zinc-400 capitalize">{i.pressure ?? '—'}</td>
+                    <td className="p-2 text-zinc-400 capitalize">{i.pressure ?? '-'}</td>
                     <td className="p-2"><span className={`px-1 py-0.5 rounded text-[10px] ${i.origin === 'canon' ? 'bg-success/10 text-success' : 'bg-surface-3 text-zinc-400'}`}>{i.origin}</span></td>
                     <td className="p-2"><QualityBar score={i.quality} showLabel={false} /></td>
                     <td className="p-2 text-zinc-400">{i.status}</td>
@@ -426,7 +426,7 @@ export default function BestiaryCollection({ items }: { items: BestiaryItem[] })
                       {i.tags.slice(0, 3).join(', ')}{i.tags.length > 3 ? ` +${i.tags.length - 3}` : ''}
                     </td>
                     <td className="p-2">{i.relationships.length === 0 ? <span className="text-warning">⚠ 0</span> : i.relationships.length}</td>
-                    <td className="p-2 text-zinc-500">{i.updated || '—'}</td>
+                    <td className="p-2 text-zinc-500">{i.updated || '-'}</td>
                     <td className="p-2">
                       <div className="flex items-center gap-1 justify-end">
                         {i.origin === 'draft' && (

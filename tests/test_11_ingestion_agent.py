@@ -1,5 +1,5 @@
 """
-Tests for .automation/11-ingestion-agent.ps1 — Ingestion Agent
+Tests for .automation/11-ingestion-agent.ps1 - Ingestion Agent
 
 Strategy: patch $VaultRoot in the script text, inject no-op function stubs
 for irrelevant phases, write the patched script to tmp_path, and invoke
@@ -7,15 +7,15 @@ via subprocess.  All assertions check filesystem state and JSON outputs.
 No LLM, no pandoc install needed (fake pandoc.bat injected into PATH).
 
 Behaviors under test:
-  1.  get_slug               — lowercase, hyphens, strip specials, trim edges
-  2.  remove_emoji_filenames — emoji stripped; clean files untouched; empty stem
+  1.  get_slug               - lowercase, hyphens, strip specials, trim edges
+  2.  remove_emoji_filenames - emoji stripped; clean files untouched; empty stem
                                skipped; .git/ excluded; collision preserved; idempotent
-  3.  register_inbox_files   — queue.json created; correct type per extension;
+  3.  register_inbox_files   - queue.json created; correct type per extension;
                                correct agent slots per type; required fields present;
                                idempotent on re-run; new files added on next run
-  4.  convert_docx_files     — fake pandoc: .md created, processed tracked;
+  4.  convert_docx_files     - fake pandoc: .md created, processed tracked;
                                pandoc failure: logged, still marked; idempotent
-  5.  integration            — full script exits 0; START/DONE log markers;
+  5.  integration            - full script exits 0; START/DONE log markers;
                                per-task log file; elapsed time; queue depth
 """
 
@@ -49,7 +49,7 @@ _PS_EXE = "pwsh" if shutil.which("pwsh") else "powershell"
 _MAIN_ANCHOR = 'New-Item -ItemType Directory -Force -Path "$AutoDir\\logs" | Out-Null'
 
 # ---------------------------------------------------------------------------
-# Fake pandoc — avoids installing pandoc on CI
+# Fake pandoc - avoids installing pandoc on CI
 # ---------------------------------------------------------------------------
 
 _FAKE_PANDOC_PS1 = r"""
@@ -301,7 +301,7 @@ class TestRemoveEmojiFilenames:
         assert (vault / "00-Inbox" / "clean-file.png").exists()
 
     def test_emoji_only_filename_not_removed(self, vault: Path) -> None:
-        """Empty-stem files are skipped — the original file must survive."""
+        """Empty-stem files are skipped - the original file must survive."""
         _make_inbox_file(vault, "🎃.md")
         _run_script(vault, stubs=self._STUBS)
         assert (vault / "00-Inbox" / "🎃.md").exists()
@@ -523,7 +523,7 @@ class TestQueueStructure:
         assert isinstance(entry["agents"], dict)
 
     def test_queue_key_is_relative_path(self, vault: Path) -> None:
-        """Keys must be relative paths — not absolute (no drive letter)."""
+        """Keys must be relative paths - not absolute (no drive letter)."""
         _make_inbox_file(vault, "images/hero.png")
         _run_script(vault, stubs=_QUEUE_ONLY_STUBS)
         key, _ = self._first_entry(vault)
@@ -656,7 +656,7 @@ class TestDocxConversion:
 
 
 # ---------------------------------------------------------------------------
-# 5. Integration — full script with all three phases
+# 5. Integration - full script with all three phases
 # ---------------------------------------------------------------------------
 
 

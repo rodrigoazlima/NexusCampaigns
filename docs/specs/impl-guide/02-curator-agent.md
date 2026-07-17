@@ -9,7 +9,7 @@
 
 ## Problem
 
-Every item in `01-Processing/` requires full manual promotion by the human DM. At steady state the pipeline generates many drafts per day (NPCs, wiki pages, classified images). Manual promotion of each item is unsustainable. The bottleneck is not quality — QualityGate can already compute a deterministic score. The bottleneck is the absence of anything that acts on that score.
+Every item in `01-Processing/` requires full manual promotion by the human DM. At steady state the pipeline generates many drafts per day (NPCs, wiki pages, classified images). Manual promotion of each item is unsustainable. The bottleneck is not quality - QualityGate can already compute a deterministic score. The bottleneck is the absence of anything that acts on that score.
 
 The `ICurator` interface already exists in `shared/interfaces.py:502`. Nothing implements it.
 
@@ -17,7 +17,7 @@ The `ICurator` interface already exists in `shared/interfaces.py:502`. Nothing i
 
 ## Goal
 
-The Curator Agent scans `01-Processing/`, scores each file with `QualityGate`, and for files scoring ≥ 7 with all required metadata present: copies the file to `02-Library/` with `status: review` (NOT `status: approved`). The human DM then sets `reviewed: true` + `status: approved` — a single-field edit, not a full review from scratch.
+The Curator Agent scans `01-Processing/`, scores each file with `QualityGate`, and for files scoring ≥ 7 with all required metadata present: copies the file to `02-Library/` with `status: review` (NOT `status: approved`). The human DM then sets `reviewed: true` + `status: approved` - a single-field edit, not a full review from scratch.
 
 Files scoring < 7 are left in `01-Processing/` with a `curator_notes` frontmatter field explaining what is missing.
 
@@ -48,7 +48,7 @@ Files to create:
 - `agents/tests/test_curator.py`
 
 Files to modify:
-- `agents/shared/interfaces.py` — `ICurator` already defined; `CuratorSuggestion` model may need `curator_notes` field
+- `agents/shared/interfaces.py` - `ICurator` already defined; `CuratorSuggestion` model may need `curator_notes` field
 
 ---
 
@@ -91,7 +91,7 @@ purpose: >
 inputs:
   - 01-Processing/
 outputs:
-  - 02-Library/  (status: review only — never status: approved)
+  - 02-Library/  (status: review only - never status: approved)
 dependencies:
   - lore
   - wiki
@@ -113,7 +113,7 @@ restrictions:
   - Never set status: approved
   - Never modify 00-Inbox/
   - Never overwrite an existing 02-Library/ file
-  - If 02-Library/{slug}.md already exists, skip — do not overwrite canon
+  - If 02-Library/{slug}.md already exists, skip - do not overwrite canon
 state_files:
   - agents/curator/state/curator-state.json
 commit_scope:
@@ -157,7 +157,7 @@ class ScoringResult:
 ### `promote_to_library(path: str) → PromotionResult`
 
 Steps:
-1. `VaultGuard.assert_writable(target)` — verifies target is in `02-Library/`, not `00-Inbox/`
+1. `VaultGuard.assert_writable(target)` - verifies target is in `02-Library/`, not `00-Inbox/`
 2. Check `02-Library/{slug}.md` does NOT exist. If it does: skip, log warning, return `skipped=True`.
 3. Read frontmatter + body from `01-Processing/{slug}.md`
 4. Set `frontmatter["status"] = "review"` (not "approved")
@@ -205,15 +205,15 @@ Your role: promote qualifying drafts from 01-Processing/ to 02-Library/ for huma
 ## Workflow
 
 On each run:
-1. Call `list_processing_drafts` — get unassessed .md files with pre-computed scores
+1. Call `list_processing_drafts` - get unassessed .md files with pre-computed scores
 2. For each file with `is_promotable: true`: call `promote_to_library`
 3. For each file with `is_promotable: false`: call `annotate_with_curator_notes` with the gap list
 4. Call `write_log` with counts
 
 ## Rules
 
-- NEVER set reviewed: true — human-only field
-- NEVER set status: approved — human-only transition
+- NEVER set reviewed: true - human-only field
+- NEVER set status: approved - human-only transition
 - If 02-Library/{slug}.md already exists: skip it, never overwrite
 - Only promote files where is_promotable is true from list_processing_drafts
 - Write curator_notes for every non-promotable file so the human knows what to fix
@@ -253,12 +253,12 @@ Re-assessment trigger: if `01-Processing/{slug}.md` `updated` date is newer than
 The Curator writes to `02-Library/`. `VaultGuard.assert_writable()` currently blocks all writes to `02-Library/` (agents may not write directly). The Curator is an exception.
 
 Two options:
-1. Add a `trusted_agents` list to `VaultGuard` — Curator is whitelisted.
+1. Add a `trusted_agents` list to `VaultGuard` - Curator is whitelisted.
 2. Curator bypasses VaultGuard and enforces its own constraints directly.
 
 **Decision:** Option 2. The Curator explicitly checks `status: review` (never `approved`) and checks for pre-existing files before writing. The guard on `02-Library/` in VaultGuard protects against uncontrolled writes; the Curator is a controlled write. Document this exception in `AGENT.md` `restrictions` section and add a comment to `vault_guard.py`.
 
-Do NOT modify VaultGuard logic — it protects other agents. The Curator skips the VaultGuard call for its promotion write only.
+Do NOT modify VaultGuard logic - it protects other agents. The Curator skips the VaultGuard call for its promotion write only.
 
 ---
 

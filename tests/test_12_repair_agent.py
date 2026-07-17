@@ -1,5 +1,5 @@
 """
-Tests for .automation/12-repair-agent.ps1 — Repair Agent
+Tests for .automation/12-repair-agent.ps1 - Repair Agent
 
 Strategy: patch $VaultRoot in the script text, inject stubs for external
 calls (Invoke-WebRequest for LM Studio), write the patched copy to tmp_path,
@@ -8,16 +8,16 @@ and invoke via subprocess.  All assertions check filesystem state and JSON.
 No LM Studio, no Python subprocess, no network access needed.
 
 Behaviors under test:
-  1.  Integration         — full script exits 0; START/DONE markers; log files
-  2.  Stale lock repair   — runner.lock >30 min removed; fresh lock preserved
-  3.  Missing directories — required dirs created when absent
-  4.  State entry repair  — missing tasks-state.json entries added with epoch ts
-  5.  Stale agent detect  — agents overdue >2x interval → WARN logged
-  6.  Dashboard integrity — reports-data.js rebuilt when missing/stale/outdated
-  7.  Error log parsing   — keywords parsed; patterns → buckets; 24h cutoff; self-ref skipped
-  8.  Bad-index feedback  — improvement notes added; short_content threshold warns
-  9.  SHA256 identity     — flags md files missing/unresolvable sha256; clears false positives
- 10.  Repair report       — writes reports/repair-YYYY-MM-DD.json with correct structure
+  1.  Integration         - full script exits 0; START/DONE markers; log files
+  2.  Stale lock repair   - runner.lock >30 min removed; fresh lock preserved
+  3.  Missing directories - required dirs created when absent
+  4.  State entry repair  - missing tasks-state.json entries added with epoch ts
+  5.  Stale agent detect  - agents overdue >2x interval → WARN logged
+  6.  Dashboard integrity - reports-data.js rebuilt when missing/stale/outdated
+  7.  Error log parsing   - keywords parsed; patterns → buckets; 24h cutoff; self-ref skipped
+  8.  Bad-index feedback  - improvement notes added; short_content threshold warns
+  9.  SHA256 identity     - flags md files missing/unresolvable sha256; clears false positives
+ 10.  Repair report       - writes reports/repair-YYYY-MM-DD.json with correct structure
 """
 
 from __future__ import annotations
@@ -969,9 +969,9 @@ class TestSha256IdentityCheck:
         assert result.returncode == 0, result.stderr
 
     @pytest.mark.parametrize("sha_length,should_flag", [
-        (63, True),   # too short — invalid length
-        (65, True),   # too long — invalid length
-        (64, False),  # correct — resolves in index
+        (63, True),   # too short - invalid length
+        (65, True),   # too long - invalid length
+        (64, False),  # correct - resolves in index
     ])
     def test_sha256_length_validation(
         self, vault: Path, sha_length: int, should_flag: bool

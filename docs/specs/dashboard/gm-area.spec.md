@@ -1,4 +1,4 @@
-# Game Master Area — Product Specification
+# Game Master Area - Product Specification
 
 **Version:** 1.0
 **Date:** 2026-06-13
@@ -171,8 +171,8 @@ All routes: `export const dynamic = 'force-dynamic'`. Write routes: `POST`.
 
 | Method | Route | Body | Returns |
 |--------|-------|------|---------|
-| GET | `/api/gm/inbox` | — | `InboxImage[]` |
-| GET | `/api/gm/tokens` | — | `{ tokens: TokenFile[], frames: string[] }` |
+| GET | `/api/gm/inbox` | - | `InboxImage[]` |
+| GET | `/api/gm/tokens` | - | `{ tokens: TokenFile[], frames: string[] }` |
 | POST | `/api/gm/approve` | `{ filename, quality }` | `{ ok, promoted }` |
 | POST | `/api/gm/reject` | `{ filename, reason? }` | `{ ok }` |
 | POST | `/api/gm/flag` | `{ filename }` | `{ ok }` |
@@ -292,7 +292,7 @@ Agent system prompts already exist at:
 
 ## 11. Implementation Phases
 
-### Phase 1 — MVP (this PR)
+### Phase 1 - MVP (this PR)
 - [x] Spec file written
 - [ ] vault.ts: `writeFrontmatter`, `promoteToLibrary`, `readInboxImages`, `readTokenFiles`
 - [ ] types.ts: `InboxImage`, `TokenFile`, `GMChatMessage`
@@ -303,7 +303,7 @@ Agent system prompts already exist at:
 - [ ] Sidebar: GM section
 - [ ] Spec updated post-implementation
 
-### Phase 2 — Enhanced
+### Phase 2 - Enhanced
 - [ ] Streaming chat responses (SSE)
 - [ ] Bulk approve/reject (select all high-quality)
 - [ ] Inline relationship editor (add wikilinks visually)
@@ -311,7 +311,7 @@ Agent system prompts already exist at:
 - [ ] Tag autocomplete from 02-Library/ tag corpus
 - [ ] Keyboard shortcuts (j/k navigation, a=approve, r=reject, f=flag)
 
-### Phase 3 — Advanced
+### Phase 3 - Advanced
 - [ ] Drag-and-drop inbox upload
 - [ ] Custom scenario builder (edit scenarios.json via UI)
 - [ ] Token frame selector (choose frame per NPC)

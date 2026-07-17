@@ -1,8 +1,8 @@
-# Nexus Campaigns — Logo Prompt (Gemini-optimized)
+# Nexus Campaigns - Logo Prompt (Gemini-optimized)
 
 Prompts tuned for **Gemini image generation** (Nano Banana / Imagen 3). Gemini
 responds best to descriptive natural-language scenes plus an explicit style and
-output spec — not keyword soup. Copy a block below, paste into Gemini, iterate.
+output spec - not keyword soup. Copy a block below, paste into Gemini, iterate.
 
 **What it represents:** an AI-powered Dungeon Master vault that ingests raw
 campaign inspiration and weaves it into a linked, quality-gated knowledge graph.
@@ -11,7 +11,7 @@ nodes) and **arcane fantasy** (the D&D / spellbook world the content lives in).
 
 ---
 
-## 1. Primary prompt (app icon — recommended)
+## 1. Primary prompt (app icon - recommended)
 
 > A minimalist app icon for "Nexus Campaigns", an AI Dungeon Master toolkit.
 > Centerpiece: a glowing arcane nexus rendered as a constellation of small
@@ -40,7 +40,7 @@ nodes) and **arcane fantasy** (the D&D / spellbook world the content lives in).
 ## 3. Monogram variant ("N" mark)
 
 > A geometric monogram logo of the letter "N" constructed entirely from connected
-> network nodes and glowing edges — the negative space and node placement form a
+> network nodes and glowing edges - the negative space and node placement form a
 > clean capital N. Magical circuit / constellation styling. Deep purple-to-teal
 > gradient glow on a dark background. Minimal, modern, scalable vector logo. No
 > serifs from a normal font; the letterform is built from the graph itself.
@@ -80,7 +80,7 @@ nodes) and **arcane fantasy** (the D&D / spellbook world the content lives in).
 - literal text or letters spelled out (Gemini renders text poorly)
 - generic "AI brain", circuit-board cliché, glowing-blue-hologram look
 - photorealism, drop shadows, skeuomorphic clutter
-- more than one focal motif — keep it readable at 80×80px
+- more than one focal motif - keep it readable at 80×80px
 
 ---
 

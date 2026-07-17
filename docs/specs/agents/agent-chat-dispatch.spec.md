@@ -1,4 +1,4 @@
-# Spec — Agent Chat Dispatch
+# Spec - Agent Chat Dispatch
 
 **Version:** 1.0
 **Date:** 2026-06-14
@@ -7,7 +7,7 @@
 
 ## Purpose
 
-Allows the GM dashboard chat UI to send messages directly to vault agents using each agent's configured LLM and system prompt — without requiring a separate API key or hardcoded provider.
+Allows the GM dashboard chat UI to send messages directly to vault agents using each agent's configured LLM and system prompt - without requiring a separate API key or hardcoded provider.
 
 ---
 
@@ -52,7 +52,7 @@ Items accumulate in the queue (never auto-deleted). Clean up manually or via cle
 
 ---
 
-## Runner — `--chat-id` Mode
+## Runner - `--chat-id` Mode
 
 ```
 python runner.py --chat-id <uuid>
@@ -88,7 +88,7 @@ Loaded from (first match wins):
 |-----------------|-----------|
 | `lm-studio`     | HTTP POST to `base_url/chat/completions` (OpenAI-compat) |
 | `openai-api`    | Same as lm-studio |
-| `claude-api`    | Anthropic SDK — requires `ANTHROPIC_API_KEY` env var |
+| `claude-api`    | Anthropic SDK - requires `ANTHROPIC_API_KEY` env var |
 
 Uses `model`, `max_tokens`, `temperature`, `timeout_seconds` from agent's dispatch config.
 

@@ -1,4 +1,4 @@
-# Spec — Dashboard Agent Configuration Dialog
+# Spec - Dashboard Agent Configuration Dialog
 
 ---
 
@@ -20,7 +20,7 @@ Props: `agentName`, `agentDisplayName`, `open`, `onClose`.
 
 ```
 ┌──────────────────────────────────────────────┐
-│ Agent Config — {displayName}          [×]    │
+│ Agent Config - {displayName}          [×]    │
 ├──────────────────────────────────────────────┤
 │ [General] [Intelligence] [Fallback]          │  ← TaskForm tabs
 │                                              │
@@ -43,7 +43,7 @@ Multiple tasks → outer tab row above TaskForm selects the active task.
 |-------|------|-------|
 | Description | text | `task.description` |
 | Interval (s) | number | `task.intervalSeconds`, min 60; humanised label shown below |
-| Requires | tags (read-only) | `task.required_capabilities` — see Capability System |
+| Requires | tags (read-only) | `task.required_capabilities` - see Capability System |
 | Signal Triggers | tags (read-only) | `task.signal_triggers` |
 | Emits Signals | tags (read-only) | `task.emits_signals` |
 
@@ -69,7 +69,7 @@ Type options:
 
 Same provider fields as Intelligence tab.  
 Toggle enables/disables fallback dispatch.  
-Disabled state shows: `"No fallback configured — failed runs stay failed."`  
+Disabled state shows: `"No fallback configured - failed runs stay failed."`  
 Enabled state shows: `"Tried automatically if primary intelligence exits non-zero."`
 
 ---
@@ -86,19 +86,19 @@ Declares what the task needs from its intelligence provider. Human-set; never wr
 
 | Provider | Definite | Uncertain (model-dependent) |
 |----------|----------|-----------------------------|
-| `claude-api` | vision, text, tool-call | — |
-| `claude-code` | text, tool-call | — |
-| `codex-cli` | text, tool-call | — |
+| `claude-api` | vision, text, tool-call | - |
+| `claude-code` | text, tool-call | - |
+| `codex-cli` | text, tool-call | - |
 | `openai-api` | text | vision, tool-call |
 | `gemini-api` | text, tool-call | vision |
 | `openrouter-api` | text | vision, tool-call |
 | `lm-studio` | text | vision, tool-call |
-| `cli` | — | — |
+| `cli` | - | - |
 
 ### Warning rendering
 
-- **Red banner (`✕`)** — capability is required but provider definitively does not support it.
-- **Yellow banner (`⚠`)** — capability is required; provider *may* support it depending on the specific model loaded.
+- **Red banner (`✕`)** - capability is required but provider definitively does not support it.
+- **Yellow banner (`⚠`)** - capability is required; provider *may* support it depending on the specific model loaded.
 
 Both banners have `role="alert"` and `aria-label` on the icon for accessibility.
 
@@ -153,7 +153,7 @@ Both banners have `role="alert"` and `aria-label` on the icon for accessibility.
 | System File | `system_file` | |
 | Prompt File | `prompt_file` | |
 
-Model fetch: `GET {base_url}/models` → `data[].id`. Falls back to text input on error with message `"LM Studio not reachable — enter model ID manually"`. Refresh button (`↻`) re-fetches on demand.
+Model fetch: `GET {base_url}/models` → `data[].id`. Falls back to text input on error with message `"LM Studio not reachable - enter model ID manually"`. Refresh button (`↻`) re-fetches on demand.
 
 ### OpenAI API (`openai-api`)
 

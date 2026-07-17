@@ -1,5 +1,5 @@
-"""nexus.runtime.committer — stages a scoped set of paths and commits them.
-Shared by agent dispatch (Runtime.commit_changes) and the worker loop —
+"""nexus.runtime.committer - stages a scoped set of paths and commits them.
+Shared by agent dispatch (Runtime.commit_changes) and the worker loop -
 both auto-commit only their own declared commit_scope, never a blanket `git add`.
 """
 
@@ -16,7 +16,7 @@ from .paths import GIT_COMMIT_LOCK_TARGET, PROJECT_ROOT
 def commit_scoped(label: str, scope: list[str], log: Logger) -> None:
     """Stage only the scoped paths and commit."""
     # `git reset` clobbers the whole index, so in async mode two agents
-    # committing at once could wipe each other's staged scope — serialize
+    # committing at once could wipe each other's staged scope - serialize
     # the reset→add→commit critical section regardless of pipeline_mode.
     with FileLock(GIT_COMMIT_LOCK_TARGET, timeout=30.0):
         # Clear the index first so any stray pre-staged file (leftover from a

@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
 
     // Find this item's existing entry. Prefer matching by the tokenPath the
     // client already has (vault filename/source-basename slugs don't follow a
-    // consistent convention, e.g. "body-x.md" vs source "x.body.jpg" — string
+    // consistent convention, e.g. "body-x.md" vs source "x.body.jpg" - string
     // guessing there is unreliable) and fall back to a slug guess otherwise.
     const matchedKey = Object.keys(genTokens).find((k) => {
       const t = genTokens[k]
@@ -59,10 +59,10 @@ export async function POST(req: NextRequest) {
 
     const tokenPath = path.relative(PROJECT_ROOT, tokenAbsPath).replace(/\\/g, '/')
 
-    // Update generated-tokens.json entry — reuse the same matched key so the
+    // Update generated-tokens.json entry - reuse the same matched key so the
     // index and the file on disk never point at two different tokens. Writes
     // to the same canonical path the token worker itself reads/writes
-    // (system/state/workers/token/generated-tokens.json) — a prior version of
+    // (system/state/workers/token/generated-tokens.json) - a prior version of
     // this route wrote to a legacy path nothing else reads.
     try {
       if (matchedKey) {
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
       fs.writeFileSync(tmp, JSON.stringify(genTokens, null, 2), 'utf-8')
       fs.renameSync(tmp, GENERATED_TOKENS_PATH)
     } catch {
-      // non-fatal — PNG is saved, index update failed
+      // non-fatal - PNG is saved, index update failed
     }
 
     // Pause the token worker's queue slot for this source so a future
@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
           fs.renameSync(tmp, queuePath)
         }
       } catch {
-        // non-fatal — PNG + index are saved, pause is best-effort
+        // non-fatal - PNG + index are saved, pause is best-effort
       }
     }
 

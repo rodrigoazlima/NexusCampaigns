@@ -34,7 +34,7 @@ Analyze the provided Python script and extract all relevant configuration settin
    - Put script-specific behavior (batch sizes, task-specific prompts, agent name, etc.) in **local**.
    - Make sure the JSONs contain good defaults so the script works even if the files are deleted.
    - Use clear, consistent naming.
-   - Do not include code — only configuration.
+   - Do not include code - only configuration.
 
 ---
 
@@ -108,7 +108,7 @@ def main() -> None:
     scanned = 0
 
     if not _PROCESSING.exists():
-        log.info("01-Processing/ does not exist — nothing to scan")
+        log.info("01-Processing/ does not exist - nothing to scan")
         log.done(t0, key="processed", count=0, failed=0)
         sys.exit(0)
 
@@ -128,7 +128,7 @@ def main() -> None:
             )
             _flag_short_file(md_path, fio, log)
 
-    log.info(f"Scanned {scanned} files — {flagged} flagged as short (< {MIN_BODY_LINES} lines)")
+    log.info(f"Scanned {scanned} files - {flagged} flagged as short (< {MIN_BODY_LINES} lines)")
     log.done(t0, key="processed", count=flagged, failed=0)
     sys.exit(0)
 

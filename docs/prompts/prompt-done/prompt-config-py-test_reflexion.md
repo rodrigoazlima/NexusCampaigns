@@ -34,7 +34,7 @@ Analyze the provided Python script and extract all relevant configuration settin
    - Put script-specific behavior (batch sizes, task-specific prompts, agent name, etc.) in **local**.
    - Make sure the JSONs contain good defaults so the script works even if the files are deleted.
    - Use clear, consistent naming.
-   - Do not include code — only configuration.
+   - Do not include code - only configuration.
 
 ---
 
@@ -127,7 +127,7 @@ def test_keeps_best_score_if_revision_regresses(monkeypatch) -> None:
     import lore.tools.generate_npcs as mod
 
     round1 = _make_npc(description="Round 1 output")
-    round2 = _make_npc(description="Round 2 output — worse")
+    round2 = _make_npc(description="Round 2 output - worse")
     scores = iter([4, 6, 3])
     monkeypatch.setattr(mod._GATE, "score", lambda _fm, _body: next(scores))
 

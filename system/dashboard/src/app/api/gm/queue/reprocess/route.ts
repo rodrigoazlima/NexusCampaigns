@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 const QUEUE_FILE = path.join(PROJECT_ROOT, 'system', 'state', 'inbox-queue.json')
 const PROCESSING = path.join(VAULT_ROOT, '01-Processing')
 
-// Agents whose work lives in the generated drafts — reprocessing these also
+// Agents whose work lives in the generated drafts - reprocessing these also
 // flags the source's drafts as needs_reprocessing (reuses the existing flag).
 const DRAFT_AGENTS = new Set(['lore', 'wiki', 'classification', 'review'])
 
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
           }
         }
       } catch {
-        // 01-Processing may not exist — slot reset already persisted
+        // 01-Processing may not exist - slot reset already persisted
       }
     }
 

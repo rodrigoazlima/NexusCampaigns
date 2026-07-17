@@ -4,7 +4,7 @@ purpose: >
   Deep deduplication across 00-Inbox/, 01-Processing/, and 02-Library/ using
   slug matching, shared-tag overlap, and body content similarity. Produces
   DedupReport listing merge candidates above threshold. Flags files for human
-  review — never deletes or merges automatically.
+  review - never deletes or merges automatically.
 inputs:
   - vault://00-Inbox/**/*.md
   - vault://01-Processing/**/*.md
@@ -36,5 +36,5 @@ state_files:
   - state/reports/
   - state/logs/deduplication_YYYY-MM-DD.log
 commit_scope:
-  # none — agent produces no knowledge-base content; must not auto-commit
+  # none - agent produces no knowledge-base content; must not auto-commit
 ---

@@ -8,30 +8,30 @@ tmp_path, invoke via subprocess.  All assertions check filesystem state
 No external services needed.
 
 Behaviors under test:
-   1.  Empty log           — report written with 0 tasks, 0 errors
-   2.  Log parsing         — START/DONE counted per task; runs/completedRuns correct
-   3.  24h window          — entries older than 24h excluded from stats
-   4.  Malformed lines     — silently skipped without crash
-   5.  Skipped task IDs    — runner/review-agent not aggregated
-   6.  Severity detect     — error/warning/info keywords classified correctly
-   7.  Repair-agent filter — [CHECK]/[WARN]/[REPAIR] prefixed lines not counted as errors
-   8.  Pending review      — reviewed:false and status:draft detected
-   9.  Orphan detection    — files without [[wikilinks]] flagged
-  10.  Quality scoring     — Get-QualityScore rubric (+2 per criterion, max 10)
-  11.  suggestedQuality    — written to frontmatter when quality:0 or missing
-  12.  suggestedQuality    — not written when quality already > 0
-  13.  suggestedQuality    — not duplicated on second run
-  14.  Queue stats         — total/pending/done/stuck counted correctly
-  15.  Queue stuck         — pending + ingestedAt > 48h → stuck
-  16.  Report JSON         — written to reports/report-YYYY-MM-DD.json
-  17.  Report structure    — top-level keys: date, summary, tasks, vaultHealth, queueStats
-  18.  Summary totals      — totalRuns/totalErrors/totalWarnings match task detail
-  19.  reports-data.js     — created; embeds REPORTS, TASK_CONFIG, TASK_INTERVALS
-  20.  Multi-report JS     — second run merges previous report into reports-data.js
-  21.  Logging             — automation.log + per-task log created with START/DONE
-  22.  Missing dirs        — missing 01-Processing or queue file → exits 0
-  23.  Empty vault         — no drafts → pendingReview/orphans empty lists
-  24.  Idempotency         — double run exits 0; one report file per date
+   1.  Empty log           - report written with 0 tasks, 0 errors
+   2.  Log parsing         - START/DONE counted per task; runs/completedRuns correct
+   3.  24h window          - entries older than 24h excluded from stats
+   4.  Malformed lines     - silently skipped without crash
+   5.  Skipped task IDs    - runner/review-agent not aggregated
+   6.  Severity detect     - error/warning/info keywords classified correctly
+   7.  Repair-agent filter - [CHECK]/[WARN]/[REPAIR] prefixed lines not counted as errors
+   8.  Pending review      - reviewed:false and status:draft detected
+   9.  Orphan detection    - files without [[wikilinks]] flagged
+  10.  Quality scoring     - Get-QualityScore rubric (+2 per criterion, max 10)
+  11.  suggestedQuality    - written to frontmatter when quality:0 or missing
+  12.  suggestedQuality    - not written when quality already > 0
+  13.  suggestedQuality    - not duplicated on second run
+  14.  Queue stats         - total/pending/done/stuck counted correctly
+  15.  Queue stuck         - pending + ingestedAt > 48h → stuck
+  16.  Report JSON         - written to reports/report-YYYY-MM-DD.json
+  17.  Report structure    - top-level keys: date, summary, tasks, vaultHealth, queueStats
+  18.  Summary totals      - totalRuns/totalErrors/totalWarnings match task detail
+  19.  reports-data.js     - created; embeds REPORTS, TASK_CONFIG, TASK_INTERVALS
+  20.  Multi-report JS     - second run merges previous report into reports-data.js
+  21.  Logging             - automation.log + per-task log created with START/DONE
+  22.  Missing dirs        - missing 01-Processing or queue file → exits 0
+  23.  Empty vault         - no drafts → pendingReview/orphans empty lists
+  24.  Idempotency         - double run exits 0; one report file per date
 """
 
 from __future__ import annotations
@@ -349,7 +349,7 @@ class TestEmptyLog:
 
 
 # ---------------------------------------------------------------------------
-# 2. Log parsing — START/DONE counted per task
+# 2. Log parsing - START/DONE counted per task
 # ---------------------------------------------------------------------------
 
 
@@ -842,7 +842,7 @@ class TestSuggestedQualityIdempotent:
 
 
 # ---------------------------------------------------------------------------
-# 14. Queue stats — total/pending/done/stuck
+# 14. Queue stats - total/pending/done/stuck
 # ---------------------------------------------------------------------------
 
 
@@ -1159,7 +1159,7 @@ class TestLogging:
 
 
 # ---------------------------------------------------------------------------
-# 22. Missing directories / files — exits 0
+# 22. Missing directories / files - exits 0
 # ---------------------------------------------------------------------------
 
 

@@ -1,5 +1,5 @@
-"""nexus.runtime.metrics — per-run metrics for agents and workers
-(state/agent-metrics.json). No cost/token data — see nexus.runtime.costs.
+"""nexus.runtime.metrics - per-run metrics for agents and workers
+(state/agent-metrics.json). No cost/token data - see nexus.runtime.costs.
 """
 
 from __future__ import annotations

@@ -122,7 +122,7 @@ export default function WikiBrowser({ items }: { items: WikiItem[] }) {
                 className="text-xs bg-surface-3 border border-surface-3 text-zinc-300 pl-7 pr-2 py-1.5 rounded outline-none focus:border-primary/40 transition-colors w-56"
               />
             </div>
-            <Tip label="Graph view — coming soon">
+            <Tip label="Graph view - coming soon">
               <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-surface-3 text-zinc-600 border border-surface-3 cursor-not-allowed">
                 <Share2 size={14} /> Graph
               </span>
@@ -214,10 +214,10 @@ export default function WikiBrowser({ items }: { items: WikiItem[] }) {
         <main className="flex-1 min-w-0">
           {items.length === 0 ? (
             <div className="panel p-12 text-center text-zinc-500 text-sm">
-              Nothing in the Library yet — build entities in the pillar pages, then promote them here.
+              Nothing in the Library yet - build entities in the pillar pages, then promote them here.
             </div>
           ) : filtered.length === 0 ? (
-            <div className="panel p-12 text-center text-zinc-500 text-sm">No match — try a tag or a different term.</div>
+            <div className="panel p-12 text-center text-zinc-500 text-sm">No match - try a tag or a different term.</div>
           ) : view === 'table' ? (
             <WikiTable rows={filtered} />
           ) : grouped && groups ? (
@@ -266,7 +266,7 @@ function Row({ i }: { i: WikiItem }) {
           <span className={`text-[9px] px-1.5 py-0.5 rounded font-semibold uppercase ${chipOf(i.pillar)}`}>{i.type}</span>
           <span className={`text-[9px] px-1 py-0.5 rounded ${i.origin === 'canon' ? 'bg-success/10 text-success' : 'bg-surface-3 text-zinc-400'}`}>{i.origin}</span>
         </div>
-        <p className="text-[11px] text-zinc-600 truncate mt-0.5">{i.excerpt || '—'}</p>
+        <p className="text-[11px] text-zinc-600 truncate mt-0.5">{i.excerpt || '-'}</p>
       </div>
       <span className={`flex items-center gap-1 text-[11px] flex-shrink-0 ${links === 0 ? 'text-warning' : 'text-zinc-500'}`}>
         <Link2 size={11} /> {links}
@@ -313,7 +313,7 @@ function WikiTable({ rows }: { rows: WikiItem[] }) {
                 <td className="p-2"><QualityBar score={i.quality} showLabel={false} /></td>
                 <td className="p-2 text-zinc-500">{i.tags.slice(0, 3).join(', ')}{i.tags.length > 3 ? ` +${i.tags.length - 3}` : ''}</td>
                 <td className="p-2">{i.relationships.length === 0 ? <span className="text-warning">⚠ 0</span> : i.relationships.length}</td>
-                <td className="p-2 text-zinc-500">{i.updated || '—'}</td>
+                <td className="p-2 text-zinc-500">{i.updated || '-'}</td>
               </tr>
             )
           })}

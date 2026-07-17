@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
   const payload = {
     model: modelId,
     messages: [
-      { role: 'user', content: `hi — ${new Date().toISOString()}` },
+      { role: 'user', content: `hi - ${new Date().toISOString()}` },
     ],
     max_tokens: maxTokens ?? 128,
     temperature: temperature ?? 0,

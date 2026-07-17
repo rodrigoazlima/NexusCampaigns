@@ -1,12 +1,12 @@
-# setup-service.ps1 — Install and start Nexus Campaigns services
+# setup-service.ps1 - Install and start Nexus Campaigns services
 #
 # Installs pip deps, registers and starts the agent pipeline service, and registers
-# and starts the Next.js dashboard (via `next dev` — hot deploy — by default) on
+# and starts the Next.js dashboard (via `next dev` - hot deploy - by default) on
 # port 48080. Run once from elevated shell.
 #
 # Supported methods (auto-detected):
-#   nssm      — NSSM service manager (requires Admin; recommended for production)
-#   schtasks  — HKCU Run key (works without Admin; starts at logon)
+#   nssm      - NSSM service manager (requires Admin; recommended for production)
+#   schtasks  - HKCU Run key (works without Admin; starts at logon)
 #
 # Usage (requires pwsh / PowerShell 7+):
 #   # Install and start everything (run as Administrator):
@@ -58,7 +58,7 @@ param(
 if ($Help) {
     Write-Host @"
 
-setup-service.ps1 — Install and start Nexus Campaigns services
+setup-service.ps1 - Install and start Nexus Campaigns services
 
 USAGE
   pwsh -ExecutionPolicy Bypass -File setup-service.ps1 [parameters]
@@ -74,9 +74,9 @@ PARAMETERS
                             a vault dir that's already a git repo.
   -Python        <cmd>    Python executable to use. Default: python
   -Method        <str>    Install method: auto | nssm | schtasks. Default: auto
-                            auto     — picks nssm when admin + NSSM installed, else schtasks
-                            nssm     — Windows service via NSSM (requires Admin + NSSM)
-                            schtasks — HKCU Run key; no admin needed, starts at logon
+                            auto     - picks nssm when admin + NSSM installed, else schtasks
+                            nssm     - Windows service via NSSM (requires Admin + NSSM)
+                            schtasks - HKCU Run key; no admin needed, starts at logon
   -DashboardPort <int>    Next.js dashboard port. Default: read from global.json, else 48080
   -NoDashboard            Skip dashboard build and start entirely
   -Release                Use a production `next build`+`next start` instead of `next dev`.
@@ -114,9 +114,9 @@ EXAMPLES
   pwsh -ExecutionPolicy Bypass -File setup-service.ps1 -Uninstall
 
 LOGS
-  agents\runtime\state\logs\automation.log      — consolidated pipeline log
-  agents\runtime\state\logs\npm-build.log        — dashboard build output
-  agents\runtime\state\logs\nssm-install.log     — NSSM registration output
+  agents\runtime\state\logs\automation.log      - consolidated pipeline log
+  agents\runtime\state\logs\npm-build.log        - dashboard build output
+  agents\runtime\state\logs\nssm-install.log     - NSSM registration output
 
 "@
     exit 0
@@ -154,7 +154,7 @@ if (Test-Path $GlobalConfig) {
             $VaultRootRel = [string]$gc.vault_root
         }
     } catch {
-        Write-Host "WARN: could not parse $GlobalConfig — using built-in defaults. $_"
+        Write-Host "WARN: could not parse $GlobalConfig - using built-in defaults. $_"
     }
 }
 # -VaultRoot on the command line always wins over global.json.
@@ -195,11 +195,11 @@ function Is-Admin {
 # Catches the state that bit us before: a leftover .git\index.lock (stale or
 # from a hung daemon fetch/pull) silently blocks every git operation the
 # service and its tooling rely on. Also runs `git fsck` to catch a corrupted
-# repo. Reports but does not exit — caller decides whether to abort.
+# repo. Reports but does not exit - caller decides whether to abort.
 function Test-GitRepoHealth([string]$RepoPath) {
     $gitDir = Join-Path $RepoPath ".git"
     if (-not (Test-Path $gitDir)) {
-        Log "No .git directory at '$RepoPath' — skipping git health check." "WARN"
+        Log "No .git directory at '$RepoPath' - skipping git health check." "WARN"
         return $true
     }
 
@@ -209,10 +209,10 @@ function Test-GitRepoHealth([string]$RepoPath) {
     if (Test-Path $lockFile) {
         $gitProcs = Get-Process git -ErrorAction SilentlyContinue
         if ($gitProcs) {
-            Log "Git repo locked: '$lockFile' exists and git process(es) running (PID: $($gitProcs.Id -join ', ')) — a git operation is in progress. Re-run once it finishes." "ERROR"
+            Log "Git repo locked: '$lockFile' exists and git process(es) running (PID: $($gitProcs.Id -join ', ')) - a git operation is in progress. Re-run once it finishes." "ERROR"
             $ok = $false
         } else {
-            Log "Stale git lock found: '$lockFile' exists but no git process is running — removing." "WARN"
+            Log "Stale git lock found: '$lockFile' exists but no git process is running - removing." "WARN"
             Remove-Item $lockFile -Force -ErrorAction SilentlyContinue
         }
     }
@@ -239,7 +239,7 @@ function Test-GitRepoHealth([string]$RepoPath) {
 # refuses to clobber a real non-empty directory sitting at $LinkPath.
 function Ensure-Junction([string]$LinkPath, [string]$TargetPath) {
     if (-not (Test-Path $TargetPath)) {
-        Log "Junction target '$TargetPath' does not exist — creating it."
+        Log "Junction target '$TargetPath' does not exist - creating it."
         New-Item -ItemType Directory -Force -Path $TargetPath | Out-Null
     }
     $targetFull = (Resolve-Path -LiteralPath $TargetPath).Path.TrimEnd('\')
@@ -257,12 +257,12 @@ function Ensure-Junction([string]$LinkPath, [string]$TargetPath) {
         } elseif ($item.PSIsContainer) {
             $hasContent = @(Get-ChildItem -LiteralPath $LinkPath -Force -ErrorAction SilentlyContinue).Count -gt 0
             if ($hasContent) {
-                throw "'$LinkPath' is a real, non-empty directory — refusing to replace it with a link to '$targetFull'. Move its contents aside, then re-run."
+                throw "'$LinkPath' is a real, non-empty directory - refusing to replace it with a link to '$targetFull'. Move its contents aside, then re-run."
             }
             Log "Removing empty placeholder directory: $LinkPath"
             Remove-Item -LiteralPath $LinkPath -Force -Recurse
         } else {
-            throw "'$LinkPath' exists and is not a directory — cannot link there."
+            throw "'$LinkPath' exists and is not a directory - cannot link there."
         }
     }
 
@@ -270,7 +270,7 @@ function Ensure-Junction([string]$LinkPath, [string]$TargetPath) {
     Log "Junction created: $LinkPath -> $targetFull"
 }
 
-# Every agent (except shared/tests) gets a real prompts\ and state\ dir —
+# Every agent (except shared/tests) gets a real prompts\ and state\ dir -
 # creates only what's missing, never touches an existing one. tools\ is not
 # scaffolded: static task code lives in system/src/nexus/tasks, and LLM
 # agents track their tools\ in git.
@@ -293,9 +293,9 @@ function Ensure-AgentScaffold([string]$ProjectRoot) {
 # NOTE: these junctions cross-link agents into each other (agents/*/agents/<other>),
 # which is a real directory cycle on disk. Any tool that walks directories without
 # reparse-point awareness (git status, backup, indexers) can recurse forever through
-# it. The cycle is contained via .gitignore ("agents/*/agents/" etc. — git prunes
-# descent into ignored dirs) — see .gitignore. Don't remove that ignore rule.
-# LLM + planned agents only — static tasks are in-process workers now
+# it. The cycle is contained via .gitignore ("agents/*/agents/" etc. - git prunes
+# descent into ignored dirs) - see .gitignore. Don't remove that ignore rule.
+# LLM + planned agents only - static tasks are in-process workers now
 # (nexus.workers, configured in registry.yaml) and have no agents/ folders.
 $script:AgentRelations = @{
     "adventure-builder" = @(".knowledge-base/02-Library", ".knowledge-base/03-Campaigns", "agents/lore", "agents/canon", "agents/relationship")
@@ -316,11 +316,11 @@ $script:AgentRelations = @{
 # so an agent can reach everything it touches by a fixed relative path without
 # hardcoding "..\..\..". "agents/*" entries fan out to every other agent dir.
 # Every agent also gets system\state regardless of its entry in
-# $script:AgentRelations. (agents\shared is gone — the shared library is the
+# $script:AgentRelations. (agents\shared is gone - the shared library is the
 # installed nexus.shared package now, imported, not reached via mounts.)
 #
 # Every generated mount's top path segment is dot-prefixed by convention
-# (.knowledge-base, .agents, .system, ...) — agents\<name>\agents\<other> in
+# (.knowledge-base, .agents, .system, ...) - agents\<name>\agents\<other> in
 # particular is a real cycle on disk (agents/repair links to agents/cleanup,
 # which links back to agents/repair, etc.), and a reparse-point-unaware directory
 # walk (git status, backup, indexers) can recurse into that forever. Dot-prefixing
@@ -366,7 +366,7 @@ function Ensure-AgentRelationLinks([string]$ProjectRoot) {
     }
 }
 
-# Vault folder structure per CLAUDE.md. Creates only missing dirs — never
+# Vault folder structure per CLAUDE.md. Creates only missing dirs - never
 # touches existing content (00-Inbox, 02-Library, etc. may already hold data).
 function Ensure-VaultStructure([string]$VaultPath) {
     $dirs = @(
@@ -392,7 +392,7 @@ function Ensure-VaultStructure([string]$VaultPath) {
 }
 
 # Make the vault its own git repo so it can be pushed/pulled independently of the
-# app repo. Only acts when the target has no .git yet — never touches an existing
+# app repo. Only acts when the target has no .git yet - never touches an existing
 # repo's history. Opt-in via -VaultGitInit; safe to call unconditionally otherwise.
 function Ensure-VaultGitRepo([string]$VaultPath) {
     if (Test-Path (Join-Path $VaultPath ".git")) {
@@ -469,7 +469,7 @@ function Write-DefaultConfig {
     $envFile   = "$systemDir\.env.local"
 
     if (-not (Test-Path $systemDir)) {
-        Log "System dir not found: $systemDir — skipping config generation." "WARN"
+        Log "System dir not found: $systemDir - skipping config generation." "WARN"
         return
     }
     if ((Test-Path $envFile) -and -not $Force) {
@@ -480,7 +480,7 @@ function Write-DefaultConfig {
     $stamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     $lines = @(
         "# Generated by setup-service.ps1 on $stamp",
-        "# Canonical env config — source of truth for ports + vault root.",
+        "# Canonical env config - source of truth for ports + vault root.",
         "# Change ports.dashboard in system/.shared/config/global.json and re-run setup -Force.",
         "PROJECT_ROOT=$ProjectRoot",
         "VAULT_ROOT=$VaultRootAbs",
@@ -502,13 +502,13 @@ function Setup-Dashboard {
     Log "=== Dashboard setup (port $DashboardPort) ==="
 
     if (-not (Test-Path $DashboardDir)) {
-        Log "Dashboard dir not found: $DashboardDir — skipping." "WARN"
+        Log "Dashboard dir not found: $DashboardDir - skipping." "WARN"
         return
     }
 
     $nodePath = Find-Node
     if (-not $nodePath) {
-        Log "Node.js not found — install Node 18+ and re-run. Skipping dashboard." "WARN"
+        Log "Node.js not found - install Node 18+ and re-run. Skipping dashboard." "WARN"
         return
     }
     $npm = Join-Path (Split-Path $nodePath) "npm.cmd"
@@ -521,7 +521,7 @@ function Setup-Dashboard {
         Copy-Item $canonicalEnv $dashEnv -Force
         Log "Copied system\.env.local -> system\dashboard\.env.local"
     } else {
-        Log "system\.env.local not found — run Write-DefaultConfig first." "WARN"
+        Log "system\.env.local not found - run Write-DefaultConfig first." "WARN"
     }
 
     # Install deps (+ production build only when hot deploy is off)
@@ -531,15 +531,15 @@ function Setup-Dashboard {
         Step-Progress "Installing dashboard npm dependencies..." 65
         Log "Installing dashboard dependencies (npm install → $npmLog)..."
         & $npm install 2>&1 | Out-File $npmLog -Encoding UTF8
-        if ($LASTEXITCODE -ne 0) { Log "npm install failed — check $npmLog" "ERROR"; return }
+        if ($LASTEXITCODE -ne 0) { Log "npm install failed - check $npmLog" "ERROR"; return }
         if ($Release) {
             $buildLog = "$LogDir\npm-build.log"
             Step-Progress "Building dashboard (npm run build)..." 75
             Log "Building dashboard (npm run build → $buildLog)..."
             & $npm run build 2>&1 | Out-File $buildLog -Encoding UTF8
-            if ($LASTEXITCODE -ne 0) { Log "npm run build failed — check $buildLog" "ERROR"; return }
+            if ($LASTEXITCODE -ne 0) { Log "npm run build failed - check $buildLog" "ERROR"; return }
         } else {
-            Log "Hot deploy on — skipping production build, dashboard will run via 'next dev'."
+            Log "Hot deploy on - skipping production build, dashboard will run via 'next dev'."
         }
     } finally {
         Pop-Location
@@ -586,7 +586,7 @@ function Setup-Dashboard {
             -ArgumentList @($nextBin, $nextArgs, "--port", "$DashboardPort", "--hostname", "$DashboardHost") `
             -WorkingDirectory $DashboardDir -WindowStyle Hidden -PassThru
         if ($proc) { Log "Dashboard started (PID=$($proc.Id)) -> http://localhost:$DashboardPort" }
-        else       { Log "Dashboard Start-Process returned no handle — may have launched detached." "WARN" }
+        else       { Log "Dashboard Start-Process returned no handle - may have launched detached." "WARN" }
     }
 }
 
@@ -606,7 +606,7 @@ function Get-AuthToken {
 }
 
 # ---------------------------------------------------------------------------
-# Validation — assert all services are healthy (port + HTTP + PID checks)
+# Validation - assert all services are healthy (port + HTTP + PID checks)
 # ---------------------------------------------------------------------------
 
 function Assert-ServicesRunning {
@@ -624,7 +624,7 @@ function Assert-ServicesRunning {
             $ready = Get-NetTCPConnection -State Listen -LocalPort $DashboardPort -ErrorAction SilentlyContinue
         } while (-not $ready -and $elapsed -lt 30)
         if ($ready) { Log "Dashboard port $DashboardPort responded after ${elapsed}s." }
-        else         { Log "Dashboard port $DashboardPort did not respond within 30s — proceeding with validation." "WARN" }
+        else         { Log "Dashboard port $DashboardPort did not respond within 30s - proceeding with validation." "WARN" }
     }
 
     Log "--- Service Validation ---"
@@ -642,17 +642,17 @@ function Assert-ServicesRunning {
         $daemonProcs = @(Get-Process powershell, pwsh -ErrorAction SilentlyContinue |
                          Where-Object { $_.CommandLine -like "*daemon.ps1*" })
         if ($daemonProcs.Count -gt 0) {
-            Log "  [PASS] Daemon process(es) running — PIDs: $($daemonProcs.Id -join ', ')"
+            Log "  [PASS] Daemon process(es) running - PIDs: $($daemonProcs.Id -join ', ')"
         } else {
             Log "  [WARN] Daemon process not detected (HKCU Run key starts at next login)" "WARN"
         }
     }
 
-    # Runner process (active mid-cycle only — absence between cycles is normal)
+    # Runner process (active mid-cycle only - absence between cycles is normal)
     $runnerProcs = @(Get-Process python -ErrorAction SilentlyContinue |
                      Where-Object { $_.CommandLine -like "*nexus.runner*" -or $_.CommandLine -like "*runner.py*" })
     if ($runnerProcs.Count -gt 0) {
-        Log "  [PASS] Runner process(es) active — PIDs: $($runnerProcs.Id -join ', ')"
+        Log "  [PASS] Runner process(es) active - PIDs: $($runnerProcs.Id -join ', ')"
     } else {
         Log "  [INFO] Runner not active (normal between cycles)"
     }
@@ -664,13 +664,13 @@ function Assert-ServicesRunning {
             $ld = Get-Content $lockFile -Raw | ConvertFrom-Json
             $lp = Get-Process -Id ([int]$ld.pid) -ErrorAction SilentlyContinue
             if ($lp) { Log "  [PASS] Lock PID $($ld.pid) alive ($($lp.Name))" }
-            else      { Log "  [WARN] Lock PID $($ld.pid) is dead — stale lock file" "WARN" }
+            else      { Log "  [WARN] Lock PID $($ld.pid) is dead - stale lock file" "WARN" }
         } catch { Log "  [WARN] Lock file parse error: $_" "WARN" }
     } else {
         Log "  [INFO] Lock file absent (runner not mid-cycle)"
     }
 
-    # Dashboard NSSM service status (informational — port+HTTP are authoritative)
+    # Dashboard NSSM service status (informational - port+HTTP are authoritative)
     $dsvc = Get-Service -Name $DashboardSvc -ErrorAction SilentlyContinue
     if ($dsvc) {
         if ($dsvc.Status -eq "Running") {
@@ -686,7 +686,7 @@ function Assert-ServicesRunning {
         if ($tcp) {
             $ownerPid  = ($tcp | Select-Object -First 1).OwningProcess
             $ownerProc = Get-Process -Id $ownerPid -ErrorAction SilentlyContinue
-            Log "  [PASS] Dashboard port $DashboardPort listening — PID=$ownerPid ($($ownerProc.Name))"
+            Log "  [PASS] Dashboard port $DashboardPort listening - PID=$ownerPid ($($ownerProc.Name))"
             try {
                 $r = Invoke-WebRequest -Uri "http://localhost:$DashboardPort" -UseBasicParsing -TimeoutSec 10 -ErrorAction Stop
                 Log "  [PASS] Dashboard HTTP $($r.StatusCode) OK -> http://localhost:$DashboardPort"
@@ -700,7 +700,7 @@ function Assert-ServicesRunning {
     }
 
     if ($ok) { Log "--- Validation PASSED ---" }
-    else      { Log "--- Validation FAILED — review errors above ---" "ERROR" }
+    else      { Log "--- Validation FAILED - review errors above ---" "ERROR" }
 
     return $ok
 }
@@ -754,7 +754,7 @@ if ($Uninstall) {
         Remove-ItemProperty $regPath -Name $DashboardRun -Force
         Log "HKCU Run key '$DashboardRun' removed."
     }
-    # Stop any next.js dashboard process bound to the port, and wait for actual exit —
+    # Stop any next.js dashboard process bound to the port, and wait for actual exit -
     # Stop-Process -Force returns before the process handle is released, so a caller
     # that immediately does Remove-Item on the dashboard dir can still hit "file in use"
     # (e.g. dashboard-stderr.log) even though this block already "stopped" it.
@@ -767,7 +767,7 @@ if ($Uninstall) {
     }
 
     # Next.js dev spawns worker processes (separate PIDs from the port listener) that
-    # can still hold file handles in the dashboard dir — catch those by command line too.
+    # can still hold file handles in the dashboard dir - catch those by command line too.
     Get-Process node -ErrorAction SilentlyContinue |
         Where-Object { $_.CommandLine -like "*$DashboardDir*" -or $_.CommandLine -like "*next*dev*" -or $_.CommandLine -like "*next*start*" } |
         ForEach-Object { Log "Stopping dashboard worker PID=$($_.Id)"; Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }
@@ -778,7 +778,7 @@ if ($Uninstall) {
         ForEach-Object { Log "Stopping process PID=$($_.Id)"; Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }
 
     # Wait (up to 10s) for every PID we just told to die to actually exit before
-    # returning — callers (custom-install.ps1) chain a Remove-Item right after -Uninstall.
+    # returning - callers (custom-install.ps1) chain a Remove-Item right after -Uninstall.
     $allPids = @()
     if ($dProc) { $allPids += $dProc.OwningProcess }
     $allPids += (Get-Process node -ErrorAction SilentlyContinue |
@@ -791,7 +791,7 @@ if ($Uninstall) {
             $waited += 0.5
         }
         $stillAlive = $allPids | Where-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue }
-        if ($stillAlive) { Log "PID(s) still alive after ${waited}s: $($stillAlive -join ', ') — file locks may persist." "WARN" }
+        if ($stillAlive) { Log "PID(s) still alive after ${waited}s: $($stillAlive -join ', ') - file locks may persist." "WARN" }
         else { Log "All stopped processes confirmed exited." }
     }
 
@@ -800,7 +800,7 @@ if ($Uninstall) {
 }
 
 # ---------------------------------------------------------------------------
-# Clean Install — wipe all generated state, indexes, configs, and build artifacts
+# Clean Install - wipe all generated state, indexes, configs, and build artifacts
 # Only executes when -CleanInstall is passed. Requires explicit confirmation.
 # Preserves: 00-Inbox (source material), 02-Library (approved), 05-Assets (approved)
 # ---------------------------------------------------------------------------
@@ -867,7 +867,7 @@ if ($CleanInstall) {
         }
     }
 
-    # 6. Vault pipeline dirs (generated content only — NOT source/approved content)
+    # 6. Vault pipeline dirs (generated content only - NOT source/approved content)
     foreach ($vaultDir in @("01-Processing", "04-Relationships")) {
         $target = Join-Path $VaultRootAbs $vaultDir
         if (Test-Path $target) {
@@ -882,7 +882,7 @@ if ($CleanInstall) {
     New-Item -ItemType Directory -Force $cleanStateDir | Out-Null
     New-Item -ItemType Directory -Force "$cleanStateDir\logs" | Out-Null
 
-    # tasks-state.json — scan all agent.json files for task IDs, set all to epoch
+    # tasks-state.json - scan all agent.json files for task IDs, set all to epoch
     $epoch      = "1970-01-01T00:00:00Z"
     $tasksState = [ordered]@{}
     Get-ChildItem "$ProjectRoot\agents" -Recurse -Filter "agent.json" -ErrorAction SilentlyContinue |
@@ -900,7 +900,7 @@ if ($CleanInstall) {
         Set-Content "$cleanStateDir\tasks-state.json" -Encoding UTF8
     Log "Re-created tasks-state.json ($($tasksState.Count) agents → epoch)."
 
-    # agent-metrics.json — empty slate
+    # agent-metrics.json - empty slate
     '{}' | Set-Content "$cleanStateDir\agent-metrics.json" -Encoding UTF8
     Log "Re-created agent-metrics.json (empty)."
 
@@ -915,7 +915,7 @@ if ($CleanInstall) {
 # Remove any previous install before fresh install
 # ---------------------------------------------------------------------------
 
-Log "=== Vault Nexus Campaigns — Service Setup ==="
+Log "=== Vault Nexus Campaigns - Service Setup ==="
 Step-Progress "Removing previous installation..." 5
 Log "Checking for previous installation to remove..."
 
@@ -979,11 +979,11 @@ if (-not (Test-Path $ProjectRoot)) {
 }
 
 if (-not (Test-GitRepoHealth $ProjectRoot)) {
-    Log "Git repo health check failed for '$ProjectRoot' — fix the issue above and re-run." "ERROR"
+    Log "Git repo health check failed for '$ProjectRoot' - fix the issue above and re-run." "ERROR"
     exit 1
 }
 
-# Link the vault into the app repo — skip entirely when it already lives at
+# Link the vault into the app repo - skip entirely when it already lives at
 # <ProjectRoot>\.knowledge-base (the common case; nothing to redirect).
 if ($VaultRootAbs.TrimEnd('\') -ine $VaultLinkPath.TrimEnd('\')) {
     try {
@@ -1031,19 +1031,19 @@ Step-Progress "Installing Python dependencies..." 25
 Log "Installing pip dependencies..."
 & $Python -m pip install -e $ProjectRoot --quiet
 if ($LASTEXITCODE -ne 0) {
-    Log "pip install failed — check pyproject.toml." "ERROR"
+    Log "pip install failed - check pyproject.toml." "ERROR"
     exit 1
 }
 Log "Dependencies OK."
 
 # agent.json is gitignored (matches the repo's blanket *.json rule), so a fresh
-# clone has none — the scheduler would discover 0 tasks and the pipeline would
+# clone has none - the scheduler would discover 0 tasks and the pipeline would
 # never run. nexus.runner --ensure-config synthesizes any missing agent.json from
 # registry.yaml defaults; safe/idempotent to run on every install.
 Log "Ensuring agents/*/agent.json exist (synthesizing missing ones from registry.yaml)..."
 & $Python -m nexus.runner --ensure-config
 if ($LASTEXITCODE -ne 0) {
-    Log "nexus.runner --ensure-config exited $LASTEXITCODE — check logs; agent.json may be incomplete." "WARN"
+    Log "nexus.runner --ensure-config exited $LASTEXITCODE - check logs; agent.json may be incomplete." "WARN"
 } else {
     Log "agent.json config OK."
 }
@@ -1085,10 +1085,10 @@ if ($Method -eq "auto") {
         $Method = "nssm"
     } else {
         if ($nssmPath -and -not $isAdmin) {
-            Log "NSSM found but not running as Administrator — falling back to Task Scheduler." "WARN"
+            Log "NSSM found but not running as Administrator - falling back to Task Scheduler." "WARN"
             Log "Re-run as Administrator for NSSM installation." "WARN"
         } elseif (-not $nssmPath) {
-            Log "NSSM not found — using Task Scheduler." "WARN"
+            Log "NSSM not found - using Task Scheduler." "WARN"
             Log "Install NSSM for production installs: winget install NSSM.NSSM" "WARN"
         }
         $Method = "schtasks"
@@ -1139,7 +1139,7 @@ if ($Method -eq "nssm") {
 # ---------------------------------------------------------------------------
 
 if ($Method -eq "schtasks") {
-    # ONLOGON trigger requires admin — use HKCU Run key for auto-start at login.
+    # ONLOGON trigger requires admin - use HKCU Run key for auto-start at login.
     # No admin needed. Works for current user only.
     $RegPath  = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
     $RegValue = $TaskName   # reuse task name as registry value name
@@ -1152,7 +1152,7 @@ if ($Method -eq "schtasks") {
         Remove-ItemProperty $RegPath -Name $RegValue -Force
     }
 
-    # Register in HKCU Run — runs at every user login
+    # Register in HKCU Run - runs at every user login
     Set-ItemProperty $RegPath -Name $RegValue -Value $psCmd
     Log "Auto-start registered: HKCU\...\Run\$RegValue"
     Log "  Command: $psCmd"
@@ -1162,7 +1162,7 @@ if ($Method -eq "schtasks") {
         -ArgumentList @("-NonInteractive", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", $DaemonScript) `
         -WindowStyle Hidden -PassThru
     if ($proc) { Log "Daemon started (PID=$($proc.Id))." }
-    else       { Log "Start-Process returned no handle — daemon may have launched detached." "WARN" }
+    else       { Log "Start-Process returned no handle - daemon may have launched detached." "WARN" }
 }
 
 # ---------------------------------------------------------------------------

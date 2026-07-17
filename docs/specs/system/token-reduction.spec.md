@@ -1,4 +1,4 @@
-# Spec — Token Reduction via Precondition-Gated Dispatch
+# Spec - Token Reduction via Precondition-Gated Dispatch
 
 **Version:** 1.0
 **Date:** 2026-06-14
@@ -22,7 +22,7 @@ With 10+ agents running hourly, idle dispatch compounds into significant wasted 
 Before dispatching any agent, the runner evaluates a **precondition**: a fast local check
 (no LLM, no subprocess) that answers "is there actual work to do?"
 
-If the precondition returns `False`, the agent is skipped entirely — no dispatch, no tokens consumed.
+If the precondition returns `False`, the agent is skipped entirely - no dispatch, no tokens consumed.
 `lastRun` is **not updated**, so the agent will be re-evaluated next cycle.
 
 ---
@@ -56,8 +56,8 @@ Unknown task IDs default to `True` (always run) to avoid breaking new agents.
 | Wikilink | `wikilink-agent` | `02-Library/*.md` has ≥1 file absent from `wikilink-state.json` OR modified after its `processedAt` timestamp | `02-Library/`, `agents/wikilink/state/wikilink-state.json` |
 | Review (short files) | `review-agent-short-files` | `01-Processing/` contains ≥1 `.md` file | Filesystem scan |
 | Cleanup | `cleanup-agent` | Any log file in `agents/runtime/state/logs/` older than 7 days | Filesystem `mtime` scan |
-| Review | `review-agent` | **Always runs** (health monitor — skipping defeats its purpose) | — |
-| Repair | `repair-agent` | **Always runs** (health monitor — skipping defeats its purpose) | — |
+| Review | `review-agent` | **Always runs** (health monitor - skipping defeats its purpose) | - |
+| Repair | `repair-agent` | **Always runs** (health monitor - skipping defeats its purpose) | - |
 
 ---
 
@@ -75,7 +75,7 @@ Ingestion precondition triggers on:
 ## Precondition Failure Behaviour
 
 If the precondition check itself throws an exception (corrupt state file, permission error, etc.):
-- Warning logged: `Precondition check failed for {task_id}: {exc} — running anyway`
+- Warning logged: `Precondition check failed for {task_id}: {exc} - running anyway`
 - Agent dispatches normally
 - No silent skip on error
 

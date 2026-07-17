@@ -43,13 +43,13 @@ from nexus.shared.llm_client import _resize_and_encode  # noqa: E402
 from nexus.shared.loaders import load_llm_endpoint  # noqa: E402
 from nexus.shared.models import Element, Environment, ImageType  # noqa: E402
 
-# classification.tools.enrich_tags owns state/tag-library.json — read-only
+# classification.tools.enrich_tags owns state/tag-library.json - read-only
 # here (cycle 4 aligns against it, never writes it; classification is the
 # sole writer of canonical entries/aliases/counts).
 _CLASSIFICATION_TAG_LIBRARY = _AGENTS_DIR / "classification" / "state" / "tag-library.json"
 
 # Same 18-value taxonomy as classification agent's _ALLOWED_TYPES
-# (agents/classification/tools/enrich_tags.py) — kept in sync manually, same
+# (agents/classification/tools/enrich_tags.py) - kept in sync manually, same
 # convention already used for the PF2E_* vocab lists.
 _ENTITY_TYPES: frozenset[str] = frozenset({
     "npc", "character", "faction", "location", "city", "village", "dungeon",
@@ -58,17 +58,17 @@ _ENTITY_TYPES: frozenset[str] = frozenset({
 })
 
 # Adapted from agents/classification/prompts/enrich-tags.txt's dashboard-tab
-# guidance — duplicated per this codebase's existing manual-sync convention
+# guidance - duplicated per this codebase's existing manual-sync convention
 # for prompt text (see vision CLAUDE.md's PF2E_* sync note); update both
 # together if the taxonomy changes.
 _ENTITY_TYPE_GUIDANCE = """Entity types by dashboard tab:
 
-CHARACTERS & NPCS — npc (named non-player character, default for people), character (playable/significant individual)
-BESTIARY — creature (reusable monster stat-block), monster (unique/legendary named monster), encounter (a placed fight)
-PLACES — location (generic site/region), city, village, dungeon (underground ruin/cave/tomb)
-FACTIONS & POWERS — faction (group with a goal/agenda), organization (formal group, no antagonist role), religion
-QUESTS & EVENTS — quest (adventure hook), event (past/ongoing event), timeline (sequence of events)
-ITEMS & LORE — item (mundane/magical object), artifact (unique powerful relic), lore (world knowledge, not a physical object)
+CHARACTERS & NPCS - npc (named non-player character, default for people), character (playable/significant individual)
+BESTIARY - creature (reusable monster stat-block), monster (unique/legendary named monster), encounter (a placed fight)
+PLACES - location (generic site/region), city, village, dungeon (underground ruin/cave/tomb)
+FACTIONS & POWERS - faction (group with a goal/agenda), organization (formal group, no antagonist role), religion
+QUESTS & EVENTS - quest (adventure hook), event (past/ongoing event), timeline (sequence of events)
+ITEMS & LORE - item (mundane/magical object), artifact (unique powerful relic), lore (world knowledge, not a physical object)
 
 Choose the MOST SPECIFIC type. Prefer dungeon over location for a tomb/cave, creature over npc for a monster, artifact over item for relics."""
 
@@ -77,7 +77,7 @@ _MAX_CONVERSATION_MESSAGES = 10
 _VISION_SYSTEM_PROMPT = "You are a Pathfinder 2e image classifier. Return ONLY valid JSON."
 
 # Every prompt that asks the LLM for tags asks for "short (1-3 word)" concrete
-# tags, but nothing enforced that — a full visual_analysis sentence (e.g. "a
+# tags, but nothing enforced that - a full visual_analysis sentence (e.g. "a
 # large sword with a black blade and hilt, featuring white geometric
 # patterns...") could slip straight into frontmatter tags as if it were one
 # tag. Guard at the single append point every tag-collection site shares.
@@ -86,11 +86,11 @@ _MAX_TAG_WORDS = 6
 
 def _is_concrete_tag(tag: str) -> bool:
     """Reject sentence-length strings the LLM sometimes returns instead of a
-    short tag — keeps frontmatter `tags:` scannable/searchable rather than
+    short tag - keeps frontmatter `tags:` scannable/searchable rather than
     carrying paragraph-length prose."""
     return bool(tag) and 1 <= len(tag.split()) <= _MAX_TAG_WORDS
 
-# Vision-model token budgets — generous on purpose (assertive over cost-
+# Vision-model token budgets - generous on purpose (assertive over cost-
 # efficient): cycle 1's classify-image.txt asks for a large visual_analysis
 # JSON that 2048 tokens can truncate mid-object; follow-up cycles return
 # smaller JSON but tag lists shouldn't get clipped either.
@@ -148,7 +148,7 @@ _LLM_CFG = load_llm_endpoint(
 # ---------------------------------------------------------------------------
 
 # Despite the name (kept for on-disk field compatibility), this is blake2b,
-# not SHA-256 — see nexus.shared.hashing's module docstring.
+# not SHA-256 - see nexus.shared.hashing's module docstring.
 _sha256 = sha256_of_file
 
 
@@ -157,7 +157,7 @@ _sha256 = sha256_of_file
 # ---------------------------------------------------------------------------
 
 def _is_token(path: Path) -> bool:
-    """Return True if PNG has ≥2 transparent corners — canonical token detection."""
+    """Return True if PNG has ≥2 transparent corners - canonical token detection."""
     if path.suffix.lower() != ".png":
         return False
     try:
@@ -218,7 +218,7 @@ def _load_queue() -> dict[str, Any]:
 def _generated_token_paths() -> set[str]:
     """Project-relative paths of dashboard-generated tokens.
 
-    These artifacts live next to their source in 00-Inbox but are NOT raw input —
+    These artifacts live next to their source in 00-Inbox but are NOT raw input -
     re-ingesting them as new images is what duplicates tokens (each gm/view edit
     writes a differently-named token file; _resolve_image_target then bumps each to
     -01, -02…). Skip them here so they are never treated as source images.
@@ -290,7 +290,7 @@ def _get_folder_candidates(folder: Path, state: dict) -> list[Path]:
 def _try_face_match(token_path: Path, candidates: list[Path]) -> Optional[Path]:
     """Match a token to its source portrait via center-crop pixel similarity.
 
-    Uses PIL + numpy only — no heavy dependencies. Falls back to None if
+    Uses PIL + numpy only - no heavy dependencies. Falls back to None if
     either dep is missing or any image fails to load.
     Returns the best match above _FACE_SIMILARITY_THRESHOLD, or None.
     """
@@ -339,7 +339,7 @@ def _try_face_match(token_path: Path, candidates: list[Path]) -> Optional[Path]:
 def _inherit_clf_from_state(entry: dict) -> VisionClassification:
     """Rebuild a VisionClassification from a processed-images.json entry.
 
-    Overrides type to `token` — the token inherits all other metadata,
+    Overrides type to `token` - the token inherits all other metadata,
     including the source portrait's final tags/entity_type (same character,
     so both are just as applicable to the token), from its matched source.
     """
@@ -360,16 +360,16 @@ def _inherit_clf_from_state(entry: dict) -> VisionClassification:
 # Slug builders
 # ---------------------------------------------------------------------------
 
-# Entity types that can never legitimately BE a scene/battlemap themselves —
+# Entity types that can never legitimately BE a scene/battlemap themselves -
 # always a standalone physical object, not a place, creature, or character
 # that might reasonably appear within one. classify-image.txt's STEP 1 only
-# offers 4 structural types (portrait/body/battlemap/scene) — there is no
-# "isolated object" option — so a photographed weapon/artifact with little
+# offers 4 structural types (portrait/body/battlemap/scene) - there is no
+# "isolated object" option - so a photographed weapon/artifact with little
 # visible environment gets forced into "scene" by elimination. Deliberately
 # narrow (not "everything except place-like types"): a scene/battlemap
 # landing on entity_type "creature" or "npc" is an accepted, expected
 # disagreement (a monster or character standing in an environment shot is
-# still genuinely a scene) — only item/artifact are unambiguous.
+# still genuinely a scene) - only item/artifact are unambiguous.
 _OBJECT_ENTITY_TYPES: frozenset[str] = frozenset({"item", "artifact"})
 
 
@@ -493,23 +493,23 @@ def _atmosphere_lines(clf: VisionClassification) -> str:
     elem = clf.element.value     if clf.element.value     != "none" else None
 
     lighting_map = {
-        "dark":     "Dim, shadowy — torchlight or moonlight only",
+        "dark":     "Dim, shadowy - torchlight or moonlight only",
         "light":    "Bright and open, natural or magical illumination",
         "fire":     "Flickering orange glow, heat haze near the source",
         "void":     "Absolute darkness with pinpricks of cold starlight",
         "vitality": "Warm golden light, life energy visible as soft radiance",
     }
     mood_map = {
-        "dark":     "Dread and tension — something watches from the shadows",
-        "fire":     "Urgency and danger — heat presses in from all sides",
+        "dark":     "Dread and tension - something watches from the shadows",
+        "fire":     "Urgency and danger - heat presses in from all sides",
         "water":    "Eerie calm, reflections distort what is real",
-        "earth":    "Solid and ancient — the weight of stone above is palpable",
-        "air":      "Vertiginous openness — wind howls and pulls at equipment",
-        "void":     "Cosmic isolation — existence feels fragile here",
-        "vitality": "Hopeful and sacred — wounds ache less, resolve strengthens",
-        "nature":   "Alive and watching — rustles and growths respond to presence",
-        "metal":    "Cold and mechanical — every footstep rings against hard floors",
-        "wood":     "Organic and overgrown — roots and vines creep through cracks",
+        "earth":    "Solid and ancient - the weight of stone above is palpable",
+        "air":      "Vertiginous openness - wind howls and pulls at equipment",
+        "void":     "Cosmic isolation - existence feels fragile here",
+        "vitality": "Hopeful and sacred - wounds ache less, resolve strengthens",
+        "nature":   "Alive and watching - rustles and growths respond to presence",
+        "metal":    "Cold and mechanical - every footstep rings against hard floors",
+        "wood":     "Organic and overgrown - roots and vines creep through cracks",
     }
     sound_map = {
         "cave":      "Dripping water, distant echoes, the crunch of gravel underfoot",
@@ -553,14 +553,14 @@ def _battlemap_body(clf: VisionClassification) -> str:
         "forest":    ["Trees grant three-quarters cover at range",
                       "Dense undergrowth is difficult terrain (5 ft of movement per 5 ft)",
                       "High canopy may allow flying or climbing ambush"],
-        "city":      ["Rooftops accessible for archers — watch vertical threats",
+        "city":      ["Rooftops accessible for archers - watch vertical threats",
                       "Alleyways split groups; coordinating between lanes is difficult",
-                      "Civilians scatter — area spells risk collateral consequences"],
-        "ruins":     ["Unstable floors — failing checks drop combatants one level",
+                      "Civilians scatter - area spells risk collateral consequences"],
+        "ruins":     ["Unstable floors - failing checks drop combatants one level",
                       "Partial walls give half-cover without blocking movement",
                       "Rubble fields are difficult terrain throughout"],
         "volcano":   ["Lava pools deal 4d10 fire damage on contact (or per round)",
-                      "Steam vents are hazardous terrain — DC 15 Acrobatics to avoid",
+                      "Steam vents are hazardous terrain - DC 15 Acrobatics to avoid",
                       "Ground cracks can open as environmental hazards"],
         "temple":    ["Pillars grant cover and can be toppled as an action",
                       "Raised dais gives +1 circumstance bonus on attacks",
@@ -573,33 +573,33 @@ def _battlemap_body(clf: VisionClassification) -> str:
                       "Parapets grant cover and advantage on ranged attacks"],
     }
     hooks_map: dict[str, list[str]] = {
-        "cave":    ["Something moves in the deeper darkness — bones crunch underfoot",
+        "cave":    ["Something moves in the deeper darkness - bones crunch underfoot",
                     "A hidden fissure leads to an unexplored passage",
                     "Ancient markings on the walls predate the current inhabitants"],
         "dungeon": ["A cell block holds something that shouldn't still be alive",
                     "The lock mechanism on the far door is set to trap the next opener",
-                    "Rations and gear scattered — the previous expedition ended badly here"],
-        "forest":  ["Tracks converge on a specific tree — a den or lair above or below",
+                    "Rations and gear scattered - the previous expedition ended badly here"],
+        "forest":  ["Tracks converge on a specific tree - a den or lair above or below",
                     "The silence radius suggests a predator is active nearby",
                     "Fallen shrine in the clearing hints at a forgotten pact"],
         "ruins":   ["A sealed vault door bears a sigil that matches a faction crest",
-                    "Fresh campfire ash — someone camped here very recently",
+                    "Fresh campfire ash - someone camped here very recently",
                     "The collapse pattern suggests this wasn't accidental"],
         "volcano": ["Cultists performing a ritual at the caldera edge at midnight",
-                    "A heat-warped chest juts from the cooled lava — survivors' cache?",
+                    "A heat-warped chest juts from the cooled lava - survivors' cache?",
                     "The eruption cycle is accelerating; the party has limited time"],
-        "temple":  ["The altar responds to blood — what does it summon?",
+        "temple":  ["The altar responds to blood - what does it summon?",
                     "A hidden reliquary behind the main idol holds something valuable",
                     "The priests here serve a god whose name causes the walls to vibrate"],
-        "city":    ["A crowd has gathered around something — or someone — on the ground",
+        "city":    ["A crowd has gathered around something - or someone - on the ground",
                     "Wanted posters on every wall bearing a face that looks familiar",
                     "A merchant's stall is a front; the real business is in the back room"],
     }
 
-    default_tactics = ["Open terrain dominates — movement and positioning are key",
-                        "Identify the highest point — height advantage is decisive here",
+    default_tactics = ["Open terrain dominates - movement and positioning are key",
+                        "Identify the highest point - height advantage is decisive here",
                         "Flanking lanes are wide; spread out or be surrounded"]
-    default_hooks   = ["Something has been disturbed here recently — evidence of passage",
+    default_hooks   = ["Something has been disturbed here recently - evidence of passage",
                         "An item of interest is visible but retrieving it is the challenge",
                         "The environment itself becomes an antagonist as the fight progresses"]
 
@@ -626,19 +626,19 @@ def _scene_body(clf: VisionClassification) -> str:
     elem = clf.element.value     if clf.element.value     != "none" else "none"
 
     hooks_map: dict[str, list[str]] = {
-        "cave":      ["A figure stands at the cave mouth — ally, enemy, or something else?",
+        "cave":      ["A figure stands at the cave mouth - ally, enemy, or something else?",
                       "The light source in this scene will not last much longer",
                       "What the figure sees ahead should terrify any sane adventurer"],
-        "dungeon":   ["This is the moment before the door opens — what waits beyond?",
+        "dungeon":   ["This is the moment before the door opens - what waits beyond?",
                       "The party must choose: press on or fall back with what they have",
                       "Someone in this image knows more than they are saying"],
-        "forest":    ["The encounter began with an arrow — from which direction?",
+        "forest":    ["The encounter began with an arrow - from which direction?",
                       "A figure emerges from the treeline; their intent is unclear",
-                      "The beast here is not acting like prey — it is hunting"],
-        "volcano":   ["The ritual can still be stopped — but the window is closing",
+                      "The beast here is not acting like prey - it is hunting"],
+        "volcano":   ["The ritual can still be stopped - but the window is closing",
                       "Escape routes are being cut off by the eruption",
                       "The antagonist has planned for this terrain; the party has not"],
-        "city":      ["The crowd turns hostile — who gave the signal?",
+        "city":      ["The crowd turns hostile - who gave the signal?",
                       "The chase leads somewhere the party did not expect",
                       "A witness to something they should not have seen"],
         "interior":  ["The object that matters is somewhere in this room",
@@ -646,16 +646,16 @@ def _scene_body(clf: VisionClassification) -> str:
                       "Someone in this scene is lying"],
     }
     default_hooks = [
-        "The scene captures a pivotal moment — what came just before?",
+        "The scene captures a pivotal moment - what came just before?",
         "A detail in the background tells a different story than the foreground",
         "The emotional stakes here can anchor a session's dramatic peak",
     ]
     notes_map: dict[str, list[str]] = {
         "dark":  ["Use this scene at a low point in the campaign arc",
                   "Dim the lights at the table when describing this moment"],
-        "fire":  ["Read aloud the heat and urgency — time pressure is the mechanic",
+        "fire":  ["Read aloud the heat and urgency - time pressure is the mechanic",
                   "This works as an action climax or an emotional confrontation"],
-        "light": ["Scene suggests revelation or triumph — pair with a party achievement",
+        "light": ["Scene suggests revelation or triumph - pair with a party achievement",
                   "High contrast lighting suggests a moral choice moment"],
     }
     default_notes = ["Scene works as an establishing shot for a new location or encounter",
@@ -704,7 +704,7 @@ def _token_body(clf: VisionClassification) -> str:
         role_hints = ["Unnamed encounter participant", "Background NPC", "Crowd member with a secret"]
 
     vtt_notes = [
-        "512×512 circular portrait — drop directly into Foundry VTT or Roll20",
+        "512×512 circular portrait - drop directly into Foundry VTT or Roll20",
         "Scale to 1×1 grid square for Medium creatures; 2×2 for Large",
     ]
     if elem:
@@ -731,7 +731,7 @@ def _token_body(clf: VisionClassification) -> str:
 
 
 def _portrait_body(clf: VisionClassification) -> str:
-    """Minimal body for portrait/body types — lore agent will enrich these."""
+    """Minimal body for portrait/body types - lore agent will enrich these."""
     return (
         f"\n## Description\n\n{clf.description}\n\n"
         f"## Visual Classification\n\n"
@@ -742,7 +742,7 @@ def _portrait_body(clf: VisionClassification) -> str:
         f"- **Environment**: {clf.environment.value}\n\n"
         f"## Lore Status\n\n"
         f"- Pending NPC sheet generation by Lore Agent\n"
-        f"- Classification complete — awaiting scenario pairing\n\n"
+        f"- Classification complete - awaiting scenario pairing\n\n"
         f"## Related\n\n"
     )
 
@@ -753,7 +753,7 @@ def _item_body(clf: VisionClassification, entity_type: str) -> str:
     exists) but entity_type says this is really a photographed item/artifact/
     creature/etc, not a place. Scene's Atmosphere/Story-Hooks template would
     misleadingly describe an object photo as an establishing shot; this is a
-    minimal, honest body instead — same spirit as _portrait_body."""
+    minimal, honest body instead - same spirit as _portrait_body."""
     concrete_tags = [t for t in clf.candidate_tags if t not in (clf.type.value, clf.environment.value)]
     return (
         f"\n## Description\n\n{clf.description}\n\n"
@@ -762,7 +762,7 @@ def _item_body(clf: VisionClassification, entity_type: str) -> str:
         + "\n"
         f"## DM Notes\n\n"
         f"- Detected as **{entity_type}** from an image the vision model could not "
-        f"place in a specific environment — confirm type/name on review\n\n"
+        f"place in a specific environment - confirm type/name on review\n\n"
         f"## Details\n\n"
         f"- **Type**: {entity_type.capitalize()}\n"
         f"- **Element**: {clf.element.value}\n\n"
@@ -780,21 +780,21 @@ def _write_draft(
 ) -> str:
     """Writes the draft entity. Returns the resolved entity_type (frontmatter
     'type') so callers can log it distinctly from clf.type (the image's
-    structural portrait/body/battlemap/scene/token category) — the two are
+    structural portrait/body/battlemap/scene/token category) - the two are
     decided by separate, uncoordinated LLM cycles in classify_image_full and
     can disagree (e.g. a confirmed 'scene' image landing on entity_type
     'creature'); logging only clf.type previously hid which value actually
     became the note's type field.
 
     `original_image_path` is the pre-rename path (_rename_image renames the
-    image in-place to its canonical slug before this is called) — when it
+    image in-place to its canonical slug before this is called) - when it
     differs from `image_path`, the draft records both under `source`
     (current path) and `originalSource` (as-dropped path/filename), so the
     provenance trail survives the rename instead of only being reconstructable
     after the fact from automation.log timestamps.
 
     `entity_uuid`, when given, becomes the note's `uuid:` frontmatter instead
-    of a freshly minted one — callers pass the same uuid they're about to
+    of a freshly minted one - callers pass the same uuid they're about to
     (or already did) record against this image's sha256 in
     processed-images.json, so the note (dashboard URL) and the state ledger
     agree on one identifier instead of each minting their own.
@@ -813,7 +813,7 @@ def _write_draft(
     if clf.environment and clf.environment.value != "none":
         tags.append(clf.environment.value)
     # Final, library-aligned brainstorm from classify_image_full's multi-cycle
-    # conversation (state-only until now — this is the one place it becomes
+    # conversation (state-only until now - this is the one place it becomes
     # the note's actual tags).
     for tag in clf.candidate_tags:
         if tag not in tags:
@@ -868,7 +868,7 @@ def _write_draft(
 
 # Array leaves under the prompt's `visual_analysis` block that name concrete,
 # visible things worth surfacing as tag candidates (classify-image.txt already
-# asks the LLM for all of these — they were previously parsed and discarded,
+# asks the LLM for all of these - they were previously parsed and discarded,
 # since VisionClassification has no field for them).
 _CANDIDATE_TAG_PATHS: tuple[tuple[str, str], ...] = (
     ("equipment", "weapons"),
@@ -912,11 +912,11 @@ def _extract_candidate_tags(raw: dict) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# Multi-cycle classification — image stays in one conversation across up to
+# Multi-cycle classification - image stays in one conversation across up to
 # _MAX_CONVERSATION_MESSAGES messages: a clean cold call, then dedicated
 # image-type, entity-type, and tag-library-refinement follow-ups. Completion
 # goal: >= _MIN_TAGS_TARGET tags + both categories set. No message budget for
-# corrective retry turns — a cycle whose response fails to parse just keeps
+# corrective retry turns - a cycle whose response fails to parse just keeps
 # whatever was already collected instead of spending a "please retry" turn.
 # ---------------------------------------------------------------------------
 
@@ -925,7 +925,7 @@ def _parse_json_response(raw: str) -> dict:
 
     Observed live this session: LocalRouter's `auto` model sometimes wraps
     otherwise-valid JSON in a markdown code fence. Cheap insurance, not a
-    correctness risk — falls through to plain json.loads when there's no fence.
+    correctness risk - falls through to plain json.loads when there's no fence.
     """
     text = raw.strip()
     m = _JSON_FENCE_RE.match(text)
@@ -951,11 +951,11 @@ def _cycle2_prompt(tags_so_far: list[str]) -> str:
     remaining = max(0, _MIN_TAGS_TARGET - len(tags_so_far))
     return (
         "Confirm the image category and continue tagging.\n\n"
-        "Category — respond with exactly one of: portrait, body, battlemap, scene, token.\n\n"
+        "Category - respond with exactly one of: portrait, body, battlemap, scene, token.\n\n"
         f"We have {len(tags_so_far)} tag(s) so far: {', '.join(tags_so_far) or 'none'}. "
         "List additional short (1-3 word) concrete tags describing objects, materials, "
         f"subjects, or themes visible in the image, not already listed"
-        + (f" — aim for at least {remaining} more so the total reaches {_MIN_TAGS_TARGET}." if remaining else ".")
+        + (f" - aim for at least {remaining} more so the total reaches {_MIN_TAGS_TARGET}." if remaining else ".")
         + '\n\nReturn ONLY valid JSON:\n{"category": "...", "additional_tags": ["...", "..."]}'
     )
 
@@ -968,14 +968,14 @@ def _cycle3_prompt(tags_so_far: list[str]) -> str:
         f"{_ENTITY_TYPE_GUIDANCE}\n\n"
         f"We have {len(tags_so_far)} tag(s) so far: {', '.join(tags_so_far) or 'none'}. "
         "List any additional concrete tags not yet mentioned"
-        + (f" — aim for at least {remaining} more so the total reaches {_MIN_TAGS_TARGET}." if remaining else ".")
+        + (f" - aim for at least {remaining} more so the total reaches {_MIN_TAGS_TARGET}." if remaining else ".")
         + '\n\nReturn ONLY valid JSON:\n{"entity_type": "...", "additional_tags": ["...", "..."]}'
     )
 
 
 def _cycle4_prompt(current_tags: list[str], known_tags: list[str], entity_type_hint: str) -> str:
     return (
-        "Here is our tag library — canonical tags already in use elsewhere in "
+        "Here is our tag library - canonical tags already in use elsewhere in "
         f"this knowledge base: {', '.join(known_tags) or 'none yet'}\n\n"
         f"Our current tag list for this image: {', '.join(current_tags) or 'none'}\n\n"
         "Align these tags: where a known tag above means the same thing as one of "
@@ -1000,7 +1000,7 @@ def refine_tags_with_library(
     library's known canonical tags and finalize tags + entity type, image
     still in context. Public so other agents/system code can re-run just
     this refinement later (e.g. after the library has grown) without
-    redoing the full classification — pass history=None for a fresh
+    redoing the full classification - pass history=None for a fresh
     conversation, or an existing message list to extend it in place.
     """
     known_tags = sorted(
@@ -1019,7 +1019,7 @@ def refine_tags_with_library(
         ]
 
     if len(messages) + 1 > _MAX_CONVERSATION_MESSAGES:
-        # Over budget even before this turn's reply — accept what we have
+        # Over budget even before this turn's reply - accept what we have
         # rather than exceed the message cap.
         return current_tags, entity_type_hint
 
@@ -1046,7 +1046,7 @@ def refine_tags_with_library(
         if isinstance(et, str) and et in _ENTITY_TYPES:
             entity_type = et
     except (LLMOfflineError, LLMResponseError, Exception):
-        pass  # graceful degrade — keep current_tags/entity_type_hint as-is
+        pass  # graceful degrade - keep current_tags/entity_type_hint as-is
 
     return final_tags, entity_type
 
@@ -1058,9 +1058,9 @@ def classify_image_full(
     is_tk: bool,
 ) -> VisionClassification:
     """Full multi-cycle classification, image held in one conversation:
-    (1) clean cold call — existing classify-image.txt prompt, unchanged,
+    (1) clean cold call - existing classify-image.txt prompt, unchanged,
     (2) confirm image type + more tags, (3) infer entity type + more tags,
-    (4) tag-library refinement (refine_tags_with_library). Public — the
+    (4) tag-library refinement (refine_tags_with_library). Public - the
     single entry point other agents/system code should call for a from-image
     classification. Raises LLMOfflineError / LLMResponseError from cycle 1
     only (matches the old single-call contract callers already handle);
@@ -1077,7 +1077,7 @@ def classify_image_full(
         },
     ]
 
-    # --- Cycle 1: clean — errors propagate, same contract as the old single call ---
+    # --- Cycle 1: clean - errors propagate, same contract as the old single call ---
     raw_text = client.chat(messages, max_tokens=_CYCLE1_MAX_TOKENS)
     messages.append({"role": "assistant", "content": raw_text})
     raw = _parse_json_response(raw_text)
@@ -1101,7 +1101,7 @@ def classify_image_full(
                 if norm not in tags and _is_concrete_tag(norm):
                     tags.append(norm)
     except (LLMOfflineError, LLMResponseError, Exception):
-        pass  # keep cycle 1's type/tags — never fail the image over this
+        pass  # keep cycle 1's type/tags - never fail the image over this
 
     # --- Cycle 3: entity type + more tags ---
     entity_type = "none"
@@ -1147,7 +1147,7 @@ def main() -> None:
 
     client = LLMClient(_LLM_CFG)
     if not client.is_available():
-        log.warning("Qwen3-VL (localhost:1234) offline — skipping batch")
+        log.warning("Qwen3-VL (localhost:1234) offline - skipping batch")
         log.done(t0, key="classified", count=0, failed=0)
         sys.exit(0)
 
@@ -1169,7 +1169,7 @@ def main() -> None:
     log.info(f"Batch: {len(batch)} of {len(candidates)} image(s)")
 
     for img_path in batch:
-        orig_img_path = img_path  # pre-rename Path — _rename_image reassigns img_path below
+        orig_img_path = img_path  # pre-rename Path - _rename_image reassigns img_path below
         orig_rel = img_path.relative_to(_PROJECT_ROOT).as_posix()
         is_tk    = _is_token(img_path)
 
@@ -1200,12 +1200,12 @@ def main() -> None:
                 # concurrent request for another model briefly evicts this
                 # one. One retry after a short wait rides out that swap
                 # instead of aborting the whole batch.
-                log.warning(f"LLM offline while processing {img_path.name} — retrying once")
+                log.warning(f"LLM offline while processing {img_path.name} - retrying once")
                 time.sleep(10)
                 try:
                     clf = classify_image_full(img_path, client, prompt, is_tk)
                 except LLMOfflineError:
-                    log.warning(f"LLM still offline for {img_path.name} — aborting batch")
+                    log.warning(f"LLM still offline for {img_path.name} - aborting batch")
                     break
             except (LLMResponseError, Exception) as exc:
                 sha_fail  = _sha256(img_path)
@@ -1237,13 +1237,13 @@ def main() -> None:
         try:
             img_path = _rename_image(img_path, clf)
         except Exception as exc:
-            log.warning(f"Could not rename {img_path.name}: {exc} — using original path{image_tag(path=orig_rel)}")
+            log.warning(f"Could not rename {img_path.name}: {exc} - using original path{image_tag(path=orig_rel)}")
 
         new_rel = img_path.relative_to(_PROJECT_ROOT).as_posix()
         sha     = _sha256(img_path)
         # Reuse the uuid already on record for this hash (e.g. a stale-token
         # regeneration re-classifying the same source) instead of minting a
-        # second one — the note frontmatter and processed-images.json must
+        # second one - the note frontmatter and processed-images.json must
         # agree on a single identifier for the same image.
         entity_uuid = state.get("images", {}).get(sha, {}).get("uuid") or str(_uuid.uuid4())
 
@@ -1295,7 +1295,7 @@ def main() -> None:
             }
             _save_token_links(token_links)
 
-        # --- Update inbox-queue.json (step 10) — locked, one item at a time ---
+        # --- Update inbox-queue.json (step 10) - locked, one item at a time ---
         if orig_rel in queue and isinstance(queue[orig_rel].get("agents"), dict):
             def _mark_vision_done(entry: dict) -> Optional[str]:
                 entry.setdefault("agents", {})["vision"] = "done"

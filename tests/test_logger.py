@@ -46,7 +46,7 @@ class TestLoggerInit:
         today     = datetime.now().strftime("%Y-%m-%d")
         logs_dir, _ = log_dirs
         assert (logs_dir / f"test_script_{today}.log").exists() or True
-        # Daily log created on first write — just check attribute set
+        # Daily log created on first write - just check attribute set
         assert logger._daily.name.startswith("test_script_")
 
     def test_ps1_extension_stripped(self, log_dirs):

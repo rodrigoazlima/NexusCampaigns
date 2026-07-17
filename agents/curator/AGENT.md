@@ -4,7 +4,7 @@ purpose: >
   Assists human curation by scoring 01-Processing/ drafts for Library promotion
   readiness. Computes quality scores via QualityGate, identifies blockers
   (low quality, missing relationships, unreviewed), and writes a CuratorReport
-  summarising what is ready vs blocked. Never promotes content — that requires
+  summarising what is ready vs blocked. Never promotes content - that requires
   explicit human action.
 inputs:
   - vault://01-Processing/**/*.md
@@ -34,5 +34,5 @@ state_files:
   - state/curator-report-latest.json
   - state/logs/curator_YYYY-MM-DD.log
 commit_scope:
-  # none — agent produces no knowledge-base content; must not auto-commit
+  # none - agent produces no knowledge-base content; must not auto-commit
 ---

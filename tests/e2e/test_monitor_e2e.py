@@ -101,7 +101,7 @@ def _detect_and_delete_image():
     """Delete inbox image if present so stage1 always downloads fresh."""
     img = _INBOX_DIR / IMAGE_NAME
     if img.exists():
-        print(f"\n[monitor] Stale image found — deleting {img.name} for fresh start")
+        print(f"\n[monitor] Stale image found - deleting {img.name} for fresh start")
         img.unlink()
 
 
@@ -146,11 +146,11 @@ def cleanup_monitor_artifacts():
     _cleanup_state()            # clean pipeline state
     yield
     _cleanup_state()            # post-test: clean state only, image kept
-    print(f"\n[monitor] Image preserved — view at http://localhost:3131/gm/review")
+    print(f"\n[monitor] Image preserved - view at http://localhost:3131/gm/review")
 
 
 # ---------------------------------------------------------------------------
-# Stage 1 — Download
+# Stage 1 - Download
 # ---------------------------------------------------------------------------
 
 @pytest.mark.e2e
@@ -172,13 +172,13 @@ def test_stage1_download():
     is_png  = header[:4] == b"\x89PNG"
     is_webp = header[:4] == b"RIFF" and header[8:12] == b"WEBP"
     assert is_jpeg or is_png or is_webp, (
-        f"Not a valid image — magic bytes: {header[:4].hex()}"
+        f"Not a valid image - magic bytes: {header[:4].hex()}"
     )
     print(f"\n[monitor] Downloaded {img_path.stat().st_size:,} bytes → {img_path.name}")
 
 
 # ---------------------------------------------------------------------------
-# Stage 2 — Ingestion: image enters pipeline queue
+# Stage 2 - Ingestion: image enters pipeline queue
 # ---------------------------------------------------------------------------
 
 @pytest.mark.e2e
@@ -207,7 +207,7 @@ def test_stage2_ingestion():
 
 
 # ---------------------------------------------------------------------------
-# Stage 3 — Vision: image classified, draft written to 01-Processing/
+# Stage 3 - Vision: image classified, draft written to 01-Processing/
 # ---------------------------------------------------------------------------
 
 @pytest.mark.e2e
@@ -221,7 +221,7 @@ def test_stage3_vision():
     combined = result.stdout + result.stderr
     if "LLMOfflineError" in combined or "unreachable" in combined.lower():
         pytest.fail(
-            "LM Studio not running on localhost:1234 — start it with a vision model first."
+            "LM Studio not running on localhost:1234 - start it with a vision model first."
         )
 
     assert result.returncode == 0, (
@@ -249,7 +249,7 @@ def test_stage3_vision():
     assert "status: draft" in content, "Draft missing 'status: draft'"
     assert "reviewed: false" in content, "Draft missing 'reviewed: false'"
 
-    # Queue updated — vision renames the file to its canonical slug and
+    # Queue updated - vision renames the file to its canonical slug and
     # rekeys the queue entry to match (see classify_images.py step 10), so
     # re-resolve the marker-matched key rather than reusing the pre-rename one.
     queue     = _read_json(_QUEUE_FILE)
@@ -263,14 +263,14 @@ def test_stage3_vision():
 
 
 # ---------------------------------------------------------------------------
-# Stage 4 — Review readiness: draft present, not yet in library
+# Stage 4 - Review readiness: draft present, not yet in library
 # ---------------------------------------------------------------------------
 
 @pytest.mark.e2e
 def test_stage4_review_readiness():
     """Draft entity is present, in draft status, and not yet promoted to 02-Library."""
     draft = _draft_file()
-    assert draft is not None, "No draft entity found — run test_stage3 first"
+    assert draft is not None, "No draft entity found - run test_stage3 first"
 
     content = draft.read_text(encoding="utf-8")
     assert "status: draft" in content
@@ -278,7 +278,7 @@ def test_stage4_review_readiness():
 
     library_copy = _VAULT_ROOT / "02-Library" / draft.name
     assert not library_copy.exists(), (
-        f"Draft already in 02-Library — human review was bypassed: {library_copy}"
+        f"Draft already in 02-Library - human review was bypassed: {library_copy}"
     )
 
     print(f"\n[monitor] Entity ready for review: {draft.name}")

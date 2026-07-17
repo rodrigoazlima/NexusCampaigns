@@ -1,4 +1,4 @@
-"""Concrete LLMClient — implements ILLMClient.
+"""Concrete LLMClient - implements ILLMClient.
 
 Sends requests to a local OpenAI-compatible endpoint.
   - temperature = 0
@@ -45,7 +45,7 @@ def _resize_and_encode(path: Path) -> str:
         img.save(buf, format="JPEG", quality=85)
         raw = buf.getvalue()
     except ImportError:
-        raw = path.read_bytes()   # PIL unavailable — send raw bytes
+        raw = path.read_bytes()   # PIL unavailable - send raw bytes
 
     return base64.b64encode(raw).decode()
 
@@ -150,7 +150,7 @@ class LLMClient(ILLMClient):
 
             except (TimeoutError, ConnectionError) as exc:
                 # Read timeout / connection reset mid-response: server slow or
-                # swapping models, not a bad image — must never mark the image
+                # swapping models, not a bad image - must never mark the image
                 # failed, so surface as offline (caller aborts batch, retries
                 # next run).
                 raise LLMOfflineError(f"LLM connection dropped: {exc}") from exc

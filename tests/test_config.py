@@ -1,4 +1,4 @@
-"""Tests for shared.config — dataclasses."""
+"""Tests for shared.config - dataclasses."""
 
 from pathlib import Path
 import pytest

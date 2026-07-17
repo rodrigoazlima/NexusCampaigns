@@ -22,7 +22,7 @@ are done (or have exhausted their retries).
    codebase root by stripping the `$PromptDirectory` tail off `$PSScriptRoot`
    (its own absolute folder) and `Set-Location`s there, so the relative defaults
    (`docs/prompts`, `system/...`) resolve no matter where you invoke it from.
-   The root is computed from the variables, not a hardcoded depth — move the
+   The root is computed from the variables, not a hardcoded depth - move the
    script and it still finds the right root as long as it stays under
    `$PromptDirectory`.
 2. **Discovers prompts.** Every top-level `*.md` in `docs/prompts/` except
@@ -30,9 +30,9 @@ are done (or have exhausted their retries).
 3. **Runs each prompt.** Pipes the file's contents into
    `claude --dangerously-skip-permissions -p` as a background job, capturing
    output and exit code.
-4. **On success** — marks the prompt completed and **moves the file into
+4. **On success** - marks the prompt completed and **moves the file into
    `docs/prompts/prompt-done/`** so it won't run again.
-5. **On failure** — increments the retry count and waits out the cooldown before
+5. **On failure** - increments the retry count and waits out the cooldown before
    trying again. Failure = non-zero exit code, or output matching a known
    limit message (`usage limit reached`, `insufficient credits`,
    `credit limit reached`).

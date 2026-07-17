@@ -1,4 +1,4 @@
-# Agent Spec — Vision
+# Agent Spec - Vision
 
 **Trigger:** hourly  
 **Input:** `00-Inbox/images/**/*.{png,jpg,jpeg,webp}` not yet in `agents/vision/state/processed-images.json`  
@@ -51,34 +51,34 @@ Returns JSON only:
 - `portrait` / `body`: environment set to `none`
 
 The same LLM response also includes a `visual_analysis` block (equipment,
-clothing, fantasy_features, environment_details, etc. — see
+clothing, fantasy_features, environment_details, etc. - see
 `prompts/classify-image.txt`). `_extract_candidate_tags()` flattens a fixed
 allowlist of its array leaves (weapons, tools, materials, creatures, ...) into
-a seed tag list — a free-form brainstorm, not validated against any
-vocabulary — carried forward into the follow-up cycles below.
+a seed tag list - a free-form brainstorm, not validated against any
+vocabulary - carried forward into the follow-up cycles below.
 
 ---
 
 ## Multi-Cycle Conversation (`classify_image_full`)
 
 The prompt above is only cycle 1. `classify_image_full(img_path, client, prompt, is_tk)`
-(public — importable by other agents/system code) keeps the same image in
+(public - importable by other agents/system code) keeps the same image in
 conversation context for up to **10 messages total** (1 system + 4 × user/assistant):
 
-1. **Clean** — the LLM Prompt Contract above, unchanged. Seeds the tag list via `_extract_candidate_tags`.
-2. **Image type + tags** — confirms `type` and asks for more concrete tags, told the running count.
-3. **Entity type + tags** — infers the note's eventual `EntityType` (npc/location/quest/item/etc., same 18-value taxonomy as `agent-classification.spec.md`), plus more tags.
-4. **Tag-library refinement** — `refine_tags_with_library(img_path, client, current_tags, entity_type_hint, library, history=...)` (also public, independently callable with `history=None` for a fresh conversation) sends the top known tags from classification agent's `state/tag-library.json` (read-only here — classification owns writes) and asks the model to align/finalize. The LLM's `final_tags` are **merged** into `current_tags`, never used to replace them wholesale — otherwise a model that rephrases (e.g. "weapon" → "stylized sword") instead of listing both would silently erase a tag an earlier cycle already grounded in the image's own `visual_analysis`.
+1. **Clean** - the LLM Prompt Contract above, unchanged. Seeds the tag list via `_extract_candidate_tags`.
+2. **Image type + tags** - confirms `type` and asks for more concrete tags, told the running count.
+3. **Entity type + tags** - infers the note's eventual `EntityType` (npc/location/quest/item/etc., same 18-value taxonomy as `agent-classification.spec.md`), plus more tags.
+4. **Tag-library refinement** - `refine_tags_with_library(img_path, client, current_tags, entity_type_hint, library, history=...)` (also public, independently callable with `history=None` for a fresh conversation) sends the top known tags from classification agent's `state/tag-library.json` (read-only here - classification owns writes) and asks the model to align/finalize. The LLM's `final_tags` are **merged** into `current_tags`, never used to replace them wholesale - otherwise a model that rephrases (e.g. "weapon" → "stylized sword") instead of listing both would silently erase a tag an earlier cycle already grounded in the image's own `visual_analysis`.
 
 Every tag appended at any cycle (including the cycle-1 harvest) passes
-`_is_concrete_tag()` — 1-6 words — before being kept. Prompts ask for
+`_is_concrete_tag()` - 1-6 words - before being kept. Prompts ask for
 "short (1-3 word)" tags but nothing previously enforced that, so a full
 `visual_analysis` sentence could land in frontmatter `tags:` as if it were
 one tag.
 
-**Completion goal:** ≥6 tags and both categories set by the end. No message budget for corrective retries — a cycle whose response fails to parse (or errors: `LLMOfflineError`/`LLMResponseError`/other) keeps the prior cycle's values rather than spending a message on "please retry." Only cycle 1's errors propagate to the caller (same contract the old single-call `_classify_one` had); cycles 2-4 degrade gracefully so a hiccup mid-conversation never fails an otherwise-classifiable image.
+**Completion goal:** ≥6 tags and both categories set by the end. No message budget for corrective retries - a cycle whose response fails to parse (or errors: `LLMOfflineError`/`LLMResponseError`/other) keeps the prior cycle's values rather than spending a message on "please retry." Only cycle 1's errors propagate to the caller (same contract the old single-call `_classify_one` had); cycles 2-4 degrade gracefully so a hiccup mid-conversation never fails an otherwise-classifiable image.
 
-The final tag list (`VisionClassification.candidate_tags`) and `entity_type` **are** written to the note's frontmatter by `_write_draft` — no longer state-only, since cycle 4 has already aligned them against the shared tag library.
+The final tag list (`VisionClassification.candidate_tags`) and `entity_type` **are** written to the note's frontmatter by `_write_draft` - no longer state-only, since cycle 4 has already aligned them against the shared tag library.
 
 ---
 
@@ -96,14 +96,14 @@ Collision resolution: bump existing file to `{base}-N.{suffix}.ext`.
 
 ### Object-in-scene-bucket override
 
-STEP 1 of the classify-image prompt offers only 4 structural types — there is
-no "isolated object" option — so a photographed weapon/artifact with little
+STEP 1 of the classify-image prompt offers only 4 structural types - there is
+no "isolated object" option - so a photographed weapon/artifact with little
 visible environment gets forced into `scene` (or `battlemap`) by elimination.
 Cycle 3's `entity_type` is what actually reveals this: if `type` is
 `scene`/`battlemap` and `entity_type` is `item` or `artifact`,
 `_is_object_in_scene_bucket()` is true and:
 
-Deliberately narrow — not "any entity_type that isn't place-like". A
+Deliberately narrow - not "any entity_type that isn't place-like". A
 scene/battlemap landing on entity_type `creature` or `npc` is left alone: a
 monster or character standing in an environment shot is still genuinely a
 scene, and forcing it through the object template below would be a
@@ -112,7 +112,7 @@ environment itself.
 
 - the image filename slug and entity slug are built from
   `{entity_type}-{descriptor}` (`build_entity_slug`) instead of
-  `{type}-{environment}` — `descriptor` is the first candidate tag that
+  `{type}-{environment}` - `descriptor` is the first candidate tag that
   survives slugification, falling back to `environment` if none did
 - the draft body uses `_item_body()` (Description / Visual Details / DM
   Notes / Details) instead of the scene/battlemap Atmosphere template
@@ -156,7 +156,7 @@ shows.
 ```
 
 Failed images stored with pseudo-key `path:{rel}` and `status: failed`.  
-Connection-error images NOT stored — retried next run.
+Connection-error images NOT stored - retried next run.
 
 ---
 

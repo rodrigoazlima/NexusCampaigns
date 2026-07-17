@@ -1,4 +1,4 @@
-"""ClaudeCodeRunner — dispatch via Claude Code CLI (`claude -p ...`)."""
+"""ClaudeCodeRunner - dispatch via Claude Code CLI (`claude -p ...`)."""
 
 from __future__ import annotations
 
@@ -66,7 +66,7 @@ class ClaudeCodeRunner:
             error     = f"claude CLI timed out after {timeout_seconds}s"
         except FileNotFoundError:
             exit_code = 1
-            error     = "claude CLI not found — ensure Claude Code is installed and on PATH"
+            error     = "claude CLI not found - ensure Claude Code is installed and on PATH"
         except Exception as exc:
             exit_code = 1
             error     = str(exc)

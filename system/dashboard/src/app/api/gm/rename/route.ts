@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
 
     if (sourceFiles.length > 0) {
       // source[0] is already project-relative (e.g. ".knowledge-base/00-Inbox/RAW/clipart/x.webp"),
-      // not a bare filename under 00-Inbox — renaming must preserve its subfolder.
+      // not a bare filename under 00-Inbox - renaming must preserve its subfolder.
       const sourceFile = sourceFiles[0]
       const oldImageAbs = path.join(PROJECT_ROOT, sourceFile)
 

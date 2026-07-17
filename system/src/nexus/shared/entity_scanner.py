@@ -1,4 +1,4 @@
-"""Entity scanner — enumerate vault entities with parsed frontmatter.
+"""Entity scanner - enumerate vault entities with parsed frontmatter.
 
 Shared by review, curator, canon, relationship, search, and deduplication agents.
 All scanning is read-only.
@@ -27,7 +27,7 @@ class EntityScanner:
         """Yield (path, frontmatter, body) for every parseable .md file.
 
         Files whose frontmatter cannot be validated as EntityFrontmatter are
-        silently skipped — callers get only well-formed records.
+        silently skipped - callers get only well-formed records.
 
         Args:
             *dirs: One or more vault directories to scan.

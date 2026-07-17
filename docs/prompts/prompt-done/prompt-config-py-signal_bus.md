@@ -34,17 +34,17 @@ Analyze the provided Python script and extract all relevant configuration settin
    - Put script-specific behavior (batch sizes, task-specific prompts, agent name, etc.) in **local**.
    - Make sure the JSONs contain good defaults so the script works even if the files are deleted.
    - Use clear, consistent naming.
-   - Do not include code — only configuration.
+   - Do not include code - only configuration.
 
 ---
 
 **Script to analyze:**
 
 # shared\signal_bus.py
-"""signal_bus.py — lightweight file-based inter-agent signal bus.
+"""signal_bus.py - lightweight file-based inter-agent signal bus.
 
 Signals are advisory and fire-and-forget (G5). The runtime is the only
-consumer — agents never read signal files directly.
+consumer - agents never read signal files directly.
 """
 
 from __future__ import annotations
@@ -113,7 +113,7 @@ class SignalConsumer:
                 if signal_type is None or data.get("type") == signal_type:
                     signals.append(data)
             except Exception:
-                f.unlink(missing_ok=True)  # corrupted signal — discard
+                f.unlink(missing_ok=True)  # corrupted signal - discard
         return signals
 
     def consume(self, signal_id: str) -> None:

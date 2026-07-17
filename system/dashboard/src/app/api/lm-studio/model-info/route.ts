@@ -80,7 +80,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'baseUrl and modelId required' }, { status: 400 })
   }
 
-  // derive host — strip /v1 or /v1/ suffix
+  // derive host - strip /v1 or /v1/ suffix
   const host = baseUrl.replace(/\/v1\/?$/, '').replace(/\/$/, '')
   const v1Base = baseUrl.replace(/\/+$/, '')
 
