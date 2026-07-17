@@ -144,7 +144,31 @@ agents:
     tools:
       - tools/classify_images.py
     prompts:
-      - prompts/classify-image.txt
+      - prompts/classify-step1-type.txt
+      - prompts/classify-step2-visual.txt
+      - prompts/classify-step3-pf2e-character.txt
+      - prompts/classify-step3-pf2e-environment.txt
+      - prompts/classify-step4-description.txt
+    # Tunables for classify_images.py's classify_image_full multi-step
+    # conversation (see docs/agents/vision/image-classification-workflow.md).
+    # Shared default - overridable per-machine via agent.json
+    # tasks.vision-agent.pipeline.*, same precedence as llm_endpoints
+    # (agent.json > registry.yaml > classify_images.py's hardcoded fallback).
+    # Free-form, not part of agent-registry.spec.md's RegistryConfig schema -
+    # read as a raw dict, same convention as workers' own `options:` blocks.
+    options:
+      batch_size: 10
+      min_tags_target: 6
+      max_conversation_messages: 20
+      step_max_retries: 2                # + 1 initial attempt = 3 tries per required step
+      step_retry_backoff_seconds: 3
+      followup_max_tokens: 1024
+      face_similarity_threshold: 0.85
+      step_max_tokens:
+        type: 256
+        visual: 4096
+        pf2e: 512
+        description: 512
     shared_state:
       reads:
         - system/state/inbox-queue.json

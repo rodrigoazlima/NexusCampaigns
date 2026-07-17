@@ -17,6 +17,8 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
+import yaml
+
 _TOOLS_DIR    = Path(__file__).resolve().parent
 _AGENTS_DIR   = _TOOLS_DIR.parents[1]
 _PROJECT_ROOT = _AGENTS_DIR.parent
@@ -72,8 +74,6 @@ ITEMS & LORE - item (mundane/magical object), artifact (unique powerful relic), 
 
 Choose the MOST SPECIFIC type. Prefer dungeon over location for a tomb/cave, creature over npc for a monster, artifact over item for relics."""
 
-_MIN_TAGS_TARGET = 6
-_MAX_CONVERSATION_MESSAGES = 10
 _VISION_SYSTEM_PROMPT = "You are a Pathfinder 2e image classifier. Return ONLY valid JSON."
 
 # Every prompt that asks the LLM for tags asks for "short (1-3 word)" concrete
@@ -90,18 +90,72 @@ def _is_concrete_tag(tag: str) -> bool:
     carrying paragraph-length prose."""
     return bool(tag) and 1 <= len(tag.split()) <= _MAX_TAG_WORDS
 
-# Vision-model token budgets - generous on purpose (assertive over cost-
-# efficient): cycle 1's classify-image.txt asks for a large visual_analysis
-# JSON that 2048 tokens can truncate mid-object; follow-up cycles return
-# smaller JSON but tag lists shouldn't get clipped either.
-_CYCLE1_MAX_TOKENS   = 4096
-_FOLLOWUP_MAX_TOKENS = 1024
-
 _JSON_FENCE_RE = re.compile(r"^```(?:json)?\s*\n?(.*?)\n?```\s*$", re.DOTALL)
 
 TASK_ID         = "vision-agent"
 SCRIPT_BASENAME = "classify_images.py"
-BATCH_SIZE      = 10
+
+# ---------------------------------------------------------------------------
+# Pipeline config - registry.yaml agents.vision.options is the shared default;
+# agent.json tasks.vision-agent.pipeline overrides it per-machine (same
+# precedence as load_llm_endpoint's agent.json > registry.yaml > hardcoded
+# fallback). Raw dict reads, not RegistryConfig/pydantic - same convention
+# workers already use for their own per-worker `options:` blocks
+# (nexus.workers.base.WorkerConfig.options) since this is free-form, not part
+# of the agent-registry.spec.md schema.
+# ---------------------------------------------------------------------------
+_PIPELINE_DEFAULTS: dict[str, Any] = {
+    "batch_size":                 10,
+    "min_tags_target":            6,
+    "max_conversation_messages":  20,
+    "step_max_retries":           2,   # + 1 initial attempt = 3 tries per required step
+    "step_retry_backoff_seconds": 3,
+    "followup_max_tokens":        1024,
+    "face_similarity_threshold":  0.85,
+    # Vision-model token budgets per required step - generous on purpose
+    # (assertive over cost-efficient). "visual" (STEP 2) asks for a large
+    # nested visual_analysis JSON that a small budget can truncate mid-object;
+    # the other steps return a handful of short fields.
+    "step_max_tokens": {"type": 256, "visual": 4096, "pf2e": 512, "description": 512},
+}
+
+_REGISTRY_FILE = _AGENTS_DIR / "registry.yaml"
+_AGENT_JSON_FILE = _AGENTS_DIR / "vision" / "agent.json"
+
+
+def _load_pipeline_config() -> dict[str, Any]:
+    cfg = json.loads(json.dumps(_PIPELINE_DEFAULTS))  # cheap deep copy
+
+    try:
+        registry = yaml.safe_load(_REGISTRY_FILE.read_text(encoding="utf-8")) or {}
+        opts = registry["agents"]["vision"]["options"]
+        for key in cfg:
+            if key in opts:
+                cfg[key] = opts[key]
+    except Exception:
+        pass  # registry.yaml missing/malformed - keep _PIPELINE_DEFAULTS
+
+    try:
+        agent_cfg = json.loads(_AGENT_JSON_FILE.read_text(encoding="utf-8"))
+        overrides = agent_cfg["tasks"][TASK_ID]["pipeline"]
+        for key in cfg:
+            if key in overrides:
+                cfg[key] = overrides[key]
+    except Exception:
+        pass  # no agent.json / no pipeline block - registry default applies
+
+    return cfg
+
+
+_PIPELINE                   = _load_pipeline_config()
+BATCH_SIZE                  = int(_PIPELINE["batch_size"])
+_MIN_TAGS_TARGET            = int(_PIPELINE["min_tags_target"])
+_MAX_CONVERSATION_MESSAGES  = int(_PIPELINE["max_conversation_messages"])
+_STEP_MAX_RETRIES           = int(_PIPELINE["step_max_retries"])
+_STEP_RETRY_BACKOFF_S       = float(_PIPELINE["step_retry_backoff_seconds"])
+_FOLLOWUP_MAX_TOKENS        = int(_PIPELINE["followup_max_tokens"])
+_FACE_SIMILARITY_THRESHOLD  = float(_PIPELINE["face_similarity_threshold"])
+_STEP_MAX_TOKENS: dict[str, int] = {k: int(v) for k, v in _PIPELINE["step_max_tokens"].items()}
 
 _VAULT_ROOT   = _PROJECT_ROOT / ".knowledge-base"
 _INBOX        = _VAULT_ROOT / "00-Inbox"
@@ -115,15 +169,25 @@ _PROC_IMAGES  = _AGENT_STATE / "processed-images.json"
 _TOKEN_LINKS  = _AGENT_STATE / "token-links.json"
 _QUEUE_FILE   = _SHARED_STATE / "inbox-queue.json"
 _GEN_TOKENS   = _AGENTS_DIR / "token" / "state" / "generated-tokens.json"
-_PROMPT_FILE  = _AGENTS_DIR / "vision" / "prompts" / "classify-image.txt"
+_PROMPT_DIR   = _AGENTS_DIR / "vision" / "prompts"
 _SIGNALS_DIR  = _AGENTS_DIR / "runtime" / "state" / "signals"
+
+# The 4 required classify_image_full steps, each its own single-purpose LLM
+# turn. "pf2e" has two variants - the branch is picked in code from step 1's
+# already-parsed type (see classify_image_full), never asked as an LLM
+# if/else.
+_STEP_PROMPT_FILES: dict[str, str] = {
+    "type":             "classify-step1-type.txt",
+    "visual":           "classify-step2-visual.txt",
+    "pf2e_character":   "classify-step3-pf2e-character.txt",
+    "pf2e_environment": "classify-step3-pf2e-environment.txt",
+    "description":      "classify-step4-description.txt",
+}
 
 _IMAGE_EXTS = frozenset({".png", ".jpg", ".jpeg", ".webp"})
 
 # Types excluded from face-match candidate pool
 _EXCLUDE_TYPES = frozenset({"token", "battlemap", "scene"})
-
-_FACE_SIMILARITY_THRESHOLD = 0.85  # cosine similarity for face-region match
 
 # Model selectable via agents/registry.yaml -> llm_endpoints.vision_llm.model
 _FALLBACK_LLM_CFG = LLMEndpointConfig(
@@ -362,7 +426,7 @@ def _inherit_clf_from_state(entry: dict) -> VisionClassification:
 
 # Entity types that can never legitimately BE a scene/battlemap themselves -
 # always a standalone physical object, not a place, creature, or character
-# that might reasonably appear within one. classify-image.txt's STEP 1 only
+# that might reasonably appear within one. classify-step1-type.txt only
 # offers 4 structural types (portrait/body/battlemap/scene) - there is no
 # "isolated object" option - so a photographed weapon/artifact with little
 # visible environment gets forced into "scene" by elimination. Deliberately
@@ -867,9 +931,9 @@ def _write_draft(
 # ---------------------------------------------------------------------------
 
 # Array leaves under the prompt's `visual_analysis` block that name concrete,
-# visible things worth surfacing as tag candidates (classify-image.txt already
-# asks the LLM for all of these - they were previously parsed and discarded,
-# since VisionClassification has no field for them).
+# visible things worth surfacing as tag candidates (classify-step2-visual.txt
+# already asks the LLM for all of these - they were previously parsed and
+# discarded, since VisionClassification has no field for them).
 _CANDIDATE_TAG_PATHS: tuple[tuple[str, str], ...] = (
     ("equipment", "weapons"),
     ("equipment", "shield"),
@@ -912,12 +976,13 @@ def _extract_candidate_tags(raw: dict) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# Multi-cycle classification - image stays in one conversation across up to
-# _MAX_CONVERSATION_MESSAGES messages: a clean cold call, then dedicated
-# image-type, entity-type, and tag-library-refinement follow-ups. Completion
-# goal: >= _MIN_TAGS_TARGET tags + both categories set. No message budget for
-# corrective retry turns - a cycle whose response fails to parse just keeps
-# whatever was already collected instead of spending a "please retry" turn.
+# Multi-step/cycle classification - image stays in one conversation across up
+# to _MAX_CONVERSATION_MESSAGES messages: 4 required steps (type, visual
+# analysis, PF2e classification, description - see _run_required_step, each
+# retried up to _STEP_MAX_RETRIES times before aborting the image), then
+# dedicated image-type, entity-type, and tag-library-refinement follow-up
+# cycles that degrade gracefully instead of retrying. Completion goal for
+# those follow-ups: >= _MIN_TAGS_TARGET tags + both categories set.
 # ---------------------------------------------------------------------------
 
 def _parse_json_response(raw: str) -> dict:
@@ -945,6 +1010,17 @@ def _read_tag_library() -> dict[str, Any]:
 def _image_content_block(img_path: Path) -> dict:
     b64 = _resize_and_encode(img_path)
     return {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}}
+
+
+def _load_step_prompts() -> dict[str, str]:
+    """Read the 4 required-step prompt files (5 on disk - "pf2e" has a
+    character/environment variant, see _STEP_PROMPT_FILES) fresh each call so
+    an edited prompt file is picked up without restarting the process."""
+    prompts: dict[str, str] = {}
+    for key, filename in _STEP_PROMPT_FILES.items():
+        p = _PROMPT_DIR / filename
+        prompts[key] = p.read_text(encoding="utf-8") if p.exists() else ""
+    return prompts
 
 
 def _cycle2_prompt(tags_so_far: list[str]) -> str:
@@ -1051,36 +1127,137 @@ def refine_tags_with_library(
     return final_tags, entity_type
 
 
+_STRUCTURAL_TYPES = frozenset({"portrait", "body", "battlemap", "scene"})
+
+
+def _validate_step1(d: dict) -> None:
+    if d.get("type") not in _STRUCTURAL_TYPES:
+        raise ValueError(f"step 1: invalid/missing type {d.get('type')!r}")
+
+
+def _validate_step2(d: dict) -> None:
+    if not isinstance(d.get("visual_analysis"), dict):
+        raise ValueError("step 2: missing visual_analysis object")
+
+
+def _validate_step4(d: dict) -> None:
+    if not isinstance(d.get("description"), str) or not d["description"].strip():
+        raise ValueError("step 4: missing/empty description")
+
+
+def _run_required_step(
+    messages: list[dict],
+    client: LLMClient,
+    content: Any,
+    max_tokens: int,
+    validate: Optional[Any] = None,
+) -> dict:
+    """Send one required-step turn to completion, image already in
+    conversation context. Unlike cycles 2-4 below (which degrade gracefully
+    on any hiccup), a required step retries up to _STEP_MAX_RETRIES times -
+    same JSON turn re-sent with a short corrective nudge and backoff - before
+    giving up. LLMOfflineError is never retried here; it propagates
+    immediately so the caller's caller (main's per-image try/except) applies
+    its own connection-error handling instead of this step swallowing it.
+    Exhausting retries raises LLMResponseError, which aborts just this one
+    image (same contract the old single-call cycle 1 had).
+    """
+    messages.append({"role": "user", "content": content})
+    last_err: Optional[Exception] = None
+    for attempt in range(_STEP_MAX_RETRIES + 1):
+        if len(messages) + 1 > _MAX_CONVERSATION_MESSAGES:
+            raise LLMResponseError(
+                f"message budget ({_MAX_CONVERSATION_MESSAGES}) exhausted before a required step completed"
+            )
+        try:
+            raw_text = client.chat(messages, max_tokens=max_tokens)
+            messages.append({"role": "assistant", "content": raw_text})
+            parsed = _parse_json_response(raw_text)
+            if not isinstance(parsed, dict):
+                raise ValueError(f"expected a JSON object, got {type(parsed).__name__}")
+            if validate is not None:
+                validate(parsed)
+            return parsed
+        except LLMOfflineError:
+            raise
+        except Exception as exc:
+            last_err = exc
+            if attempt < _STEP_MAX_RETRIES:
+                time.sleep(_STEP_RETRY_BACKOFF_S)
+                messages.append({
+                    "role": "user",
+                    "content": "That was not valid JSON, or was missing a required field. "
+                                "Return ONLY valid JSON matching the requested schema.",
+                })
+    raise LLMResponseError(
+        f"required step never returned valid JSON after {_STEP_MAX_RETRIES + 1} attempt(s): {last_err}"
+    )
+
+
 def classify_image_full(
     img_path: Path,
     client: LLMClient,
-    prompt: str,
+    step_prompts: dict[str, str],
     is_tk: bool,
 ) -> VisionClassification:
-    """Full multi-cycle classification, image held in one conversation:
-    (1) clean cold call - existing classify-image.txt prompt, unchanged,
-    (2) confirm image type + more tags, (3) infer entity type + more tags,
-    (4) tag-library refinement (refine_tags_with_library). Public - the
-    single entry point other agents/system code should call for a from-image
-    classification. Raises LLMOfflineError / LLMResponseError from cycle 1
-    only (matches the old single-call contract callers already handle);
-    later cycles degrade gracefully instead of failing the whole image.
-    """
-    messages: list[dict] = [
-        {"role": "system", "content": _VISION_SYSTEM_PROMPT},
-        {
-            "role": "user",
-            "content": [
-                _image_content_block(img_path),
-                {"type": "text", "text": prompt or "Classify this RPG image. Return JSON only."},
-            ],
-        },
-    ]
+    """Full classification, image held in one conversation throughout:
 
-    # --- Cycle 1: clean - errors propagate, same contract as the old single call ---
-    raw_text = client.chat(messages, max_tokens=_CYCLE1_MAX_TOKENS)
-    messages.append({"role": "assistant", "content": raw_text})
-    raw = _parse_json_response(raw_text)
+    4 required steps, each its own single-purpose LLM turn (see
+    _run_required_step) - image type, visual analysis, PF2e classification,
+    flavor description - followed by 3 optional follow-up cycles (confirm
+    type + tags, entity type + tags, tag-library refinement) that degrade
+    gracefully on failure instead of aborting. Public - the single entry
+    point other agents/system code should call for a from-image
+    classification.
+
+    STEP 3 (PF2e classification) has a character variant (ancestry/class/
+    creature_type) and an environment variant (environment/element) - the
+    branch is picked here, in code, from step 1's own already-parsed type,
+    never asked as an LLM if/else the way the old monolithic prompt did.
+
+    Raises LLMOfflineError immediately (no retry - the caller's caller
+    handles that) or LLMResponseError once a required step exhausts its
+    retries; cycles 2-4 never raise.
+    """
+    step_prompts = step_prompts or _load_step_prompts()
+    messages: list[dict] = [{"role": "system", "content": _VISION_SYSTEM_PROMPT}]
+
+    # --- Step 1: image type ---
+    step1 = _run_required_step(
+        messages, client,
+        [_image_content_block(img_path), {"type": "text", "text": step_prompts.get("type", "")}],
+        _STEP_MAX_TOKENS["type"], validate=_validate_step1,
+    )
+
+    # --- Step 2: visual analysis ---
+    step2 = _run_required_step(
+        messages, client, step_prompts.get("visual", ""), _STEP_MAX_TOKENS["visual"], validate=_validate_step2,
+    )
+
+    # --- Step 3: PF2e classification - branch decided from step 1's type ---
+    is_character = step1["type"] in ("portrait", "body")
+    step3 = _run_required_step(
+        messages, client,
+        step_prompts.get("pf2e_character" if is_character else "pf2e_environment", ""),
+        _STEP_MAX_TOKENS["pf2e"],
+    )
+
+    # --- Step 4: flavor description ---
+    step4 = _run_required_step(
+        messages, client, step_prompts.get("description", ""), _STEP_MAX_TOKENS["description"],
+        validate=_validate_step4,
+    )
+
+    raw: dict[str, Any] = {
+        "type":           step1["type"],
+        "ancestry":       step3.get("ancestry", "none") if is_character else "none",
+        "class":          step3.get("class", "none") if is_character else "none",
+        "creature_type":  step3.get("creature_type", "none") if is_character else "none",
+        "element":        step3.get("element", "none") if not is_character else "none",
+        "environment":    step3.get("environment", "none") if not is_character else "none",
+        "description":    step4.get("description", ""),
+        "visual_analysis": step2.get("visual_analysis", {}),
+    }
     clf = VisionClassification.model_validate(raw)
     if is_tk:
         clf = clf.model_copy(update={"type": ImageType.token})
@@ -1101,7 +1278,7 @@ def classify_image_full(
                 if norm not in tags and _is_concrete_tag(norm):
                     tags.append(norm)
     except (LLMOfflineError, LLMResponseError, Exception):
-        pass  # keep cycle 1's type/tags - never fail the image over this
+        pass  # keep the required steps' type/tags - never fail the image over this
 
     # --- Cycle 3: entity type + more tags ---
     entity_type = "none"
@@ -1151,7 +1328,7 @@ def main() -> None:
         log.done(t0, key="classified", count=0, failed=0)
         sys.exit(0)
 
-    prompt      = _PROMPT_FILE.read_text(encoding="utf-8") if _PROMPT_FILE.exists() else ""
+    step_prompts = _load_step_prompts()
     state       = _load_state()
     token_links = _load_token_links()
     queue       = _load_queue()
@@ -1194,7 +1371,7 @@ def main() -> None:
 
         if clf is None:
             try:
-                clf = classify_image_full(img_path, client, prompt, is_tk)
+                clf = classify_image_full(img_path, client, step_prompts, is_tk)
             except LLMOfflineError:
                 # LM Studio can only hold one model loaded at a time; a
                 # concurrent request for another model briefly evicts this
@@ -1203,7 +1380,7 @@ def main() -> None:
                 log.warning(f"LLM offline while processing {img_path.name} - retrying once")
                 time.sleep(10)
                 try:
-                    clf = classify_image_full(img_path, client, prompt, is_tk)
+                    clf = classify_image_full(img_path, client, step_prompts, is_tk)
                 except LLMOfflineError:
                     log.warning(f"LLM still offline for {img_path.name} - aborting batch")
                     break
@@ -1445,10 +1622,10 @@ def call_tool(name: str, args: dict, context: dict) -> str:
         client = LLMClient(_LLM_CFG)
         if not client.is_available():
             return _json.dumps({"error": "LLM offline (localhost:1234)"})
-        prompt = _PROMPT_FILE.read_text(encoding="utf-8") if _PROMPT_FILE.exists() else ""
+        step_prompts = _load_step_prompts()
         is_tk  = _is_token(p)
         try:
-            clf = classify_image_full(p, client, prompt, is_tk)
+            clf = classify_image_full(p, client, step_prompts, is_tk)
             data = clf.model_dump()
             data["is_token"] = is_tk
             return _json.dumps(data)

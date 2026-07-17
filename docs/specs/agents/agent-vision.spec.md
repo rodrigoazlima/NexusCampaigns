@@ -33,7 +33,10 @@
 
 ## LLM Prompt Contract
 
-Returns JSON only:
+The single monolithic prompt has been split into 4 required steps, each its
+own LLM turn (see Multi-Step/Cycle Conversation below). Merged together, the
+required steps still produce the same shape `classify_image_full` validates
+against `VisionClassification`:
 
 ```json
 {
@@ -43,42 +46,79 @@ Returns JSON only:
   "creature_type": "PF2e creature trait | none",
   "element": "fire | water | earth | air | metal | wood | nature | dark | light | void | vitality | none",
   "environment": "dungeon | cave | forest | city | tavern | desert | snow | sea | swamp | ruins | temple | castle | plains | mountain | volcano | underwater | sky | astral | shadow | abyss | interior | exterior | none",
-  "description": "1-2 sentence string"
+  "description": "3 sentence string",
+  "visual_analysis": { "...": "..." }
 }
 ```
 
-- `battlemap` / `scene`: ancestry/class/creature_type/element set to `none`
-- `portrait` / `body`: environment set to `none`
+- `battlemap` / `scene`: ancestry/class/creature_type/element forced to `none` **in code**
+  (not asked of the LLM at all - STEP 3 only sends the environment/element prompt variant)
+- `portrait` / `body`: environment forced to `none` **in code**
+  (STEP 3 only sends the ancestry/class/creature_type prompt variant)
 
-The same LLM response also includes a `visual_analysis` block (equipment,
-clothing, fantasy_features, environment_details, etc. - see
-`prompts/classify-image.txt`). `_extract_candidate_tags()` flattens a fixed
-allowlist of its array leaves (weapons, tools, materials, creatures, ...) into
-a seed tag list - a free-form brainstorm, not validated against any
-vocabulary - carried forward into the follow-up cycles below.
+`visual_analysis` (equipment, clothing, fantasy_features, environment_details,
+etc. - see `prompts/classify-step2-visual.txt`) comes from STEP 2.
+`_extract_candidate_tags()` flattens a fixed allowlist of its array leaves
+(weapons, tools, materials, creatures, ...) into a seed tag list - a free-form
+brainstorm, not validated against any vocabulary - carried forward into the
+follow-up cycles below.
 
 ---
 
-## Multi-Cycle Conversation (`classify_image_full`)
+## Multi-Step/Cycle Conversation (`classify_image_full`)
 
-The prompt above is only cycle 1. `classify_image_full(img_path, client, prompt, is_tk)`
-(public - importable by other agents/system code) keeps the same image in
-conversation context for up to **10 messages total** (1 system + 4 × user/assistant):
+`classify_image_full(img_path, client, step_prompts, is_tk)` (public - importable
+by other agents/system code) keeps the same image in conversation context for
+up to **`max_conversation_messages` messages total** (default 20 - configurable,
+see `agent-vision`'s `AGENT.md` Pipeline Configuration table; 1 system + up to
+7 × user/assistant in the happy path: 4 required steps + 3 optional cycles).
 
-1. **Clean** - the LLM Prompt Contract above, unchanged. Seeds the tag list via `_extract_candidate_tags`.
-2. **Image type + tags** - confirms `type` and asks for more concrete tags, told the running count.
-3. **Entity type + tags** - infers the note's eventual `EntityType` (npc/location/quest/item/etc., same 18-value taxonomy as `agent-classification.spec.md`), plus more tags.
-4. **Tag-library refinement** - `refine_tags_with_library(img_path, client, current_tags, entity_type_hint, library, history=...)` (also public, independently callable with `history=None` for a fresh conversation) sends the top known tags from classification agent's `state/tag-library.json` (read-only here - classification owns writes) and asks the model to align/finalize. The LLM's `final_tags` are **merged** into `current_tags`, never used to replace them wholesale - otherwise a model that rephrases (e.g. "weapon" → "stylized sword") instead of listing both would silently erase a tag an earlier cycle already grounded in the image's own `visual_analysis`.
+### Required steps (1-4)
 
-Every tag appended at any cycle (including the cycle-1 harvest) passes
-`_is_concrete_tag()` - 1-6 words - before being kept. Prompts ask for
+Each is a single-purpose LLM turn via `_run_required_step`, retried up to
+`step_max_retries` times (a short corrective nudge turn + `step_retry_backoff_seconds`
+backoff) before giving up:
+
+1. **Type** (`prompts/classify-step1-type.txt`) - portrait/body/battlemap/scene.
+   Battlemap is decided by camera angle (straight-down/bird's-eye, even with no
+   grid or VTT branding visible) vs. scene (angled/eye-level camera) - not by
+   the presence of a grid alone.
+2. **Visual analysis** (`prompts/classify-step2-visual.txt`) - the large nested
+   `visual_analysis` JSON. Seeds the tag list via `_extract_candidate_tags`.
+3. **PF2e classification** - branch selected **in code** from step 1's own
+   already-parsed `type` (never an LLM if/else): `prompts/classify-step3-pf2e-character.txt`
+   (ancestry/class/creature_type) for portrait/body, or
+   `prompts/classify-step3-pf2e-environment.txt` (environment/element) for
+   battlemap/scene.
+4. **Flavor description** (`prompts/classify-step4-description.txt`) - three sentences.
+
+Exhausting a required step's retries raises `LLMResponseError`, aborting just
+that one image (same contract the old single-call cycle 1 had).
+`LLMOfflineError` is never retried at this level - it propagates immediately
+so the caller's own one-time offline retry (in `main()`) applies instead.
+
+### Optional follow-up cycles (5-7)
+
+These degrade gracefully instead of retrying - a parse/response error just
+keeps the prior step's values:
+
+5. **Image type + tags** - confirms `type` and asks for more concrete tags, told the running count.
+6. **Entity type + tags** - infers the note's eventual `EntityType` (npc/location/quest/item/etc., same 18-value taxonomy as `agent-classification.spec.md`), plus more tags.
+7. **Tag-library refinement** - `refine_tags_with_library(img_path, client, current_tags, entity_type_hint, library, history=...)` (also public, independently callable with `history=None` for a fresh conversation) sends the top known tags from classification agent's `state/tag-library.json` (read-only here - classification owns writes) and asks the model to align/finalize. The LLM's `final_tags` are **merged** into `current_tags`, never used to replace them wholesale - otherwise a model that rephrases (e.g. "weapon" → "stylized sword") instead of listing both would silently erase a tag an earlier cycle already grounded in the image's own `visual_analysis`.
+
+Every tag appended at any step/cycle (including the required steps' harvest)
+passes `_is_concrete_tag()` - 1-6 words - before being kept. Prompts ask for
 "short (1-3 word)" tags but nothing previously enforced that, so a full
 `visual_analysis` sentence could land in frontmatter `tags:` as if it were
 one tag.
 
-**Completion goal:** ≥6 tags and both categories set by the end. No message budget for corrective retries - a cycle whose response fails to parse (or errors: `LLMOfflineError`/`LLMResponseError`/other) keeps the prior cycle's values rather than spending a message on "please retry." Only cycle 1's errors propagate to the caller (same contract the old single-call `_classify_one` had); cycles 2-4 degrade gracefully so a hiccup mid-conversation never fails an otherwise-classifiable image.
+**Completion goal:** ≥`min_tags_target` tags (default 6) and both categories
+set by the end. The 4 required steps must all succeed (with retries) or the
+whole image aborts; the 3 optional cycles never abort - a cycle whose
+response fails to parse (or errors: `LLMOfflineError`/`LLMResponseError`/other)
+keeps the prior step/cycle's values rather than retrying.
 
-The final tag list (`VisionClassification.candidate_tags`) and `entity_type` **are** written to the note's frontmatter by `_write_draft` - no longer state-only, since cycle 4 has already aligned them against the shared tag library.
+The final tag list (`VisionClassification.candidate_tags`) and `entity_type` **are** written to the note's frontmatter by `_write_draft` - no longer state-only, since the tag-library-refinement cycle has already aligned them against the shared tag library.
 
 ---
 

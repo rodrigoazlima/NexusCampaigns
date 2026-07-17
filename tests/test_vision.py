@@ -178,35 +178,50 @@ def _write_real_jpg(path):
     Image.new("RGB", (8, 8), (128, 64, 32)).save(path, format="JPEG")
 
 
-_CYCLE1_JSON = json.dumps({
-    "type": "scene", "ancestry": "none", "class": "none",
-    "creature_type": "none", "element": "none", "environment": "interior",
-    "description": "An axe on a table.",
+# The 4 required steps (see classify_images.py's _STEP_PROMPT_FILES) plus
+# the 3 optional follow-up cycles - 7 client.chat() calls in the happy path.
+_STEP1_JSON = json.dumps({"type": "scene"})
+_STEP2_JSON = json.dumps({
     "visual_analysis": {"equipment": {"weapons": ["axe"], "shield": [], "other": []}},
 })
+_STEP3_JSON = json.dumps({"environment": "interior", "element": "none"})
+_STEP4_JSON = json.dumps({"description": "An axe on a table."})
 _CYCLE2_JSON = json.dumps({"category": "scene", "additional_tags": ["steel", "wood"]})
 _CYCLE3_JSON = json.dumps({"entity_type": "item", "additional_tags": ["blade"]})
 _CYCLE4_JSON = json.dumps({
     "final_tags": ["axe", "steel", "wood", "blade", "weapon", "iron"],
     "entity_type": "item",
 })
+_FULL_RUN_RESPONSES = [_STEP1_JSON, _STEP2_JSON, _STEP3_JSON, _STEP4_JSON, _CYCLE2_JSON, _CYCLE3_JSON, _CYCLE4_JSON]
+
+_STEP_PROMPTS = {
+    "type": "step1", "visual": "step2",
+    "pf2e_character": "step3-character", "pf2e_environment": "step3-environment",
+    "description": "step4",
+}
 
 
 class TestClassifyImageFull:
-    def test_full_four_cycle_run(self, tmp_path):
+    @pytest.fixture(autouse=True)
+    def _no_retry_backoff(self, monkeypatch):
+        # Required-step retries sleep _STEP_RETRY_BACKOFF_S between attempts -
+        # zero it out so a test that exhausts retries doesn't actually wait.
+        monkeypatch.setattr(_mod, "_STEP_RETRY_BACKOFF_S", 0)
+
+    def test_full_seven_step_run(self, tmp_path):
         img = tmp_path / "axe.jpg"
         _write_real_jpg(img)
 
         client = MagicMock()
-        client.chat.side_effect = [_CYCLE1_JSON, _CYCLE2_JSON, _CYCLE3_JSON, _CYCLE4_JSON]
+        client.chat.side_effect = list(_FULL_RUN_RESPONSES)
 
-        clf = _mod.classify_image_full(img, client, prompt="classify", is_tk=False)
+        clf = _mod.classify_image_full(img, client, _STEP_PROMPTS, is_tk=False)
 
         assert clf.type == ImageType.scene
         assert clf.entity_type == "item"
         assert clf.candidate_tags == ["axe", "steel", "wood", "blade", "weapon", "iron"]
         assert len(clf.candidate_tags) >= _mod._MIN_TAGS_TARGET
-        assert client.chat.call_count == 4
+        assert client.chat.call_count == 7
 
     def test_conversation_never_exceeds_message_cap(self, tmp_path):
         img = tmp_path / "axe.jpg"
@@ -214,13 +229,14 @@ class TestClassifyImageFull:
 
         client = MagicMock()
         seen_lengths = []
+        responses = list(_FULL_RUN_RESPONSES)
 
         def _chat(messages, **kwargs):
             seen_lengths.append(len(messages))
-            return [_CYCLE1_JSON, _CYCLE2_JSON, _CYCLE3_JSON, _CYCLE4_JSON][len(seen_lengths) - 1]
+            return responses[len(seen_lengths) - 1]
 
         client.chat.side_effect = _chat
-        _mod.classify_image_full(img, client, prompt="classify", is_tk=False)
+        _mod.classify_image_full(img, client, _STEP_PROMPTS, is_tk=False)
 
         # each call's message list + its reply must stay within the cap
         assert all(n + 1 <= _mod._MAX_CONVERSATION_MESSAGES for n in seen_lengths)
@@ -230,16 +246,21 @@ class TestClassifyImageFull:
         _write_real_jpg(img)
 
         client = MagicMock()
-        client.chat.side_effect = [_CYCLE1_JSON, "not json", "still not json", "nope"]
+        # required steps 1-4 all succeed; the 3 optional cycles all fail to
+        # parse and must degrade gracefully instead of raising
+        client.chat.side_effect = [
+            _STEP1_JSON, _STEP2_JSON, _STEP3_JSON, _STEP4_JSON,
+            "not json", "still not json", "nope",
+        ]
 
-        clf = _mod.classify_image_full(img, client, prompt="classify", is_tk=False)
+        clf = _mod.classify_image_full(img, client, _STEP_PROMPTS, is_tk=False)
 
-        # cycle 1's harvest survives; failed cycles degrade instead of raising
+        # required steps' harvest survives; failed optional cycles degrade
         assert clf.type == ImageType.scene
         assert "axe" in clf.candidate_tags
         assert clf.entity_type == "none"
 
-    def test_cycle1_error_propagates(self, tmp_path):
+    def test_required_step_error_propagates_after_retries(self, tmp_path):
         img = tmp_path / "axe.jpg"
         _write_real_jpg(img)
 
@@ -247,16 +268,18 @@ class TestClassifyImageFull:
         client.chat.return_value = "not json at all"
 
         with pytest.raises(Exception):
-            _mod.classify_image_full(img, client, prompt="classify", is_tk=False)
+            _mod.classify_image_full(img, client, _STEP_PROMPTS, is_tk=False)
+        # initial attempt + _STEP_MAX_RETRIES retries, all on step 1
+        assert client.chat.call_count == _mod._STEP_MAX_RETRIES + 1
 
     def test_token_flag_pins_type_against_cycle2(self, tmp_path):
         img = tmp_path / "tok.png"
         _write_real_jpg(img)
 
         client = MagicMock()
-        client.chat.side_effect = [_CYCLE1_JSON, _CYCLE2_JSON, _CYCLE3_JSON, _CYCLE4_JSON]
+        client.chat.side_effect = list(_FULL_RUN_RESPONSES)
 
-        clf = _mod.classify_image_full(img, client, prompt="classify", is_tk=True)
+        clf = _mod.classify_image_full(img, client, _STEP_PROMPTS, is_tk=True)
         assert clf.type == ImageType.token  # cycle 2's "scene" must not un-pin a token
 
 
@@ -1033,10 +1056,15 @@ class TestSignalEmission:
         with patch.object(_mod, "LLMClient") as MockClient:
             client = MockClient.return_value
             client.is_available.return_value = True
+            # Same canned reply for every required step (type/visual/pf2e/
+            # description) and every optional cycle - satisfies each step's
+            # validation (type is a valid structural type, visual_analysis
+            # is a dict, description is non-empty) without needing a
+            # per-call side_effect list.
             client.chat.return_value = json.dumps({
                 "type": "portrait", "ancestry": "human", "class": "fighter",
                 "creature_type": "none", "element": "dark", "environment": "none",
-                "description": "A warrior.",
+                "description": "A warrior.", "visual_analysis": {},
             })
 
             img = (
@@ -1046,14 +1074,13 @@ class TestSignalEmission:
             )
             _write_real_jpg(img)
 
-            with patch.object(_mod, "_PROMPT_FILE", patch_roots / "noprompt.txt" if False else _mod._PROMPT_FILE):
-                import contextlib, io as _io, sys as _sys
-                buf = _io.StringIO()
-                try:
-                    with contextlib.redirect_stdout(buf):
-                        _mod.main()
-                except SystemExit:
-                    pass
+            import contextlib, io as _io
+            buf = _io.StringIO()
+            try:
+                with contextlib.redirect_stdout(buf):
+                    _mod.main()
+            except SystemExit:
+                pass
 
         consumer = SignalConsumer(signals_dir)
         signals = consumer.pending("image-classified")
@@ -1228,7 +1255,7 @@ class TestCallTool:
             client.chat.return_value = json.dumps({
                 "type": "portrait", "ancestry": "human", "class": "fighter",
                 "creature_type": "none", "element": "dark", "environment": "none",
-                "description": "A warrior.",
+                "description": "A warrior.", "visual_analysis": {},
             })
             result = _mod.call_tool(
                 "classify_image",

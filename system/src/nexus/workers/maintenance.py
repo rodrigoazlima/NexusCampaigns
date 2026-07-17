@@ -170,7 +170,17 @@ _AGENT_JSON_SPECS: dict[str, list[dict]] = {
     "vision": [
         {"task_id": "vision-agent", "model": "claude-sonnet-4-6",
          "tools_module": "vision.tools.classify_images", "interval": 900,
-         "description": "Image classification via local vision LLM."},
+         "description": "Image classification via local vision LLM.",
+         # Mirrors registry.yaml agents.vision.options (the shared default) -
+         # scaffolded here too so a fresh clone's agent.json has the override
+         # path ready to edit, not just the registry default. Keep both in
+         # sync if a default changes.
+         "pipeline": {
+             "batch_size": 10, "min_tags_target": 6, "max_conversation_messages": 20,
+             "step_max_retries": 2, "step_retry_backoff_seconds": 3,
+             "followup_max_tokens": 1024, "face_similarity_threshold": 0.85,
+             "step_max_tokens": {"type": 256, "visual": 4096, "pf2e": 512, "description": 512},
+         }},
     ],
     "lore": [
         {"task_id": "lore-agent", "model": "claude-sonnet-4-6",
@@ -215,6 +225,8 @@ def _generate_missing_agent_configs(log: Logger) -> int:
             }
             if "llm" in t:
                 task_payload["llm"] = t["llm"]
+            if "pipeline" in t:
+                task_payload["pipeline"] = t["pipeline"]
             payload["tasks"][t["task_id"]] = task_payload
         agent_json.parent.mkdir(parents=True, exist_ok=True)
         agent_json.write_text(json.dumps(payload, indent=2), encoding="utf-8")

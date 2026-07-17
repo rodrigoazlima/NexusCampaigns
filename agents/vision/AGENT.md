@@ -2,8 +2,11 @@
 name: vision
 purpose: >
   Classifies RPG images in 00-Inbox/images/ using Qwen3-VL vision model via LM Studio,
-  via a bounded multi-cycle conversation (classify_image_full - up to 10 messages: clean
-  classification, image-type confirmation, entity-type inference, tag-library refinement).
+  via a bounded multi-step/cycle conversation (classify_image_full - up to
+  max_conversation_messages, default 20: 4 required steps - image type, visual analysis,
+  PF2e classification, flavor description, each retried up to step_max_retries times
+  before aborting the image - then 3 optional follow-up cycles that degrade gracefully -
+  image-type confirmation, entity-type inference, tag-library refinement).
   Detects image type (portrait/body/battlemap/scene/token) and entity type, renames files
   to canonical slug format, writes AGENTS.md-compliant draft entities to 01-Processing/,
   runs face-match to link tokens to their source portraits, maintains processed-images.json.
@@ -41,14 +44,21 @@ responsibilities:
     into candidate_tags - free-form (never validated against a vocabulary), but every
     appended tag must pass _is_concrete_tag (1-6 words) so a full sentence can't land
     in tags: as if it were one tag
-  - classify_image_full() (public - importable by other agents/system code) runs three
-    more follow-up turns in the SAME conversation (image stays in context, ≤10 messages
-    total): confirm image type + more tags, infer entity type (18-value taxonomy, same
-    as classification agent's) + more tags, then refine_tags_with_library() (also public,
-    independently callable) aligns the running tag list against classification agent's
-    state/tag-library.json (read-only here) before finalizing. Target: >=6 tags + both
-    categories set; a cycle whose response fails to parse keeps the prior cycle's values
-    rather than spending a message on a retry - no budget for corrective turns
+  - classify_image_full() (public - importable by other agents/system code) runs 4
+    required steps, each its own single-purpose LLM turn, image held in one conversation
+    throughout: (1) image type, (2) visual analysis, (3) PF2e classification - a
+    character variant (ancestry/class/creature_type) or environment variant
+    (environment/element), the branch picked in code from step 1's own parsed type,
+    never asked as an LLM if/else, (4) flavor description. Each required step retries
+    up to step_max_retries times (short corrective nudge + backoff) before giving up;
+    exhausting retries raises and aborts just that image. Then 3 optional follow-up
+    turns in the SAME conversation: confirm image type + more tags, infer entity type
+    (18-value taxonomy, same as classification agent's) + more tags, then
+    refine_tags_with_library() (also public, independently callable) aligns the running
+    tag list against classification agent's state/tag-library.json (read-only here)
+    before finalizing. Target: >=min_tags_target tags (default 6) + both categories set;
+    an optional cycle whose response fails to parse keeps the prior cycle's values
+    rather than retrying - no budget for corrective turns on those three
   - Final tags (candidate_tags) and entity_type land directly in the note's frontmatter
     via _write_draft - no longer state-only once the multi-cycle conversation finishes
   - Build target filename slug; bump existing same-named file to counter suffix (e.g. -01, -02).
@@ -74,7 +84,9 @@ restrictions:
   - Must not approve content (reviewed: false, status: draft always)
   - Must not modify 02-Library/
   - Must not mark images as failed on connection-error (only on repeated API errors)
-  - Max 3 LLM retries per image with 3s backoff
+  - Max step_max_retries (default 2) retries per required step, step_retry_backoff_seconds
+    (default 3) backoff between attempts - separate from main()'s own one-time
+    LLM-offline retry at the batch level
   - extract_text.py must not classify, rename, or re-write frontmatter fields - body append only
 state_files:
   - state/processed-images.json
@@ -84,6 +96,30 @@ commit_scope:
   - .knowledge-base/00-Inbox/images
   - .knowledge-base/01-Processing
 ---
+
+## Pipeline Configuration
+
+All tunables below live in `agents/registry.yaml` → `agents.vision.options` (shared
+default) and are overridable per-machine via `agents/vision/agent.json` →
+`tasks.vision-agent.pipeline` (same precedence as `llm_endpoints`: agent.json >
+registry.yaml > `classify_images.py`'s hardcoded `_PIPELINE_DEFAULTS` fallback).
+
+| Key | Default | Meaning |
+|---|---|---|
+| `batch_size` | 10 | images per run |
+| `min_tags_target` | 6 | tag-count goal the optional cycles aim for |
+| `max_conversation_messages` | 20 | hard cap on the classify_image_full conversation |
+| `step_max_retries` | 2 | retries per required step (+1 initial attempt) before aborting the image |
+| `step_retry_backoff_seconds` | 3 | sleep between a required step's retry attempts |
+| `followup_max_tokens` | 1024 | token budget for the 3 optional cycles |
+| `face_similarity_threshold` | 0.85 | cosine similarity for token→portrait face-match |
+| `step_max_tokens.type` | 256 | token budget for STEP 1 (image type) |
+| `step_max_tokens.visual` | 4096 | token budget for STEP 2 (visual analysis - the large nested JSON) |
+| `step_max_tokens.pf2e` | 512 | token budget for STEP 3 (character or environment branch) |
+| `step_max_tokens.description` | 512 | token budget for STEP 4 (flavor description) |
+
+See `docs/agents/vision/image-classification-workflow.md` for the full step-by-step
+conversation flow.
 
 ## Valid Classification Values
 

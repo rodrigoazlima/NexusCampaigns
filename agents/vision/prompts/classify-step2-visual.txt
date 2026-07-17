@@ -1,0 +1,58 @@
+========================
+STEP 2 - VISUAL ANALYSIS
+========================
+
+Describe everything that is directly observable in the image.
+
+Return ONLY valid JSON. No markdown. No explanations. No additional text.
+
+{
+  "visual_analysis": {
+    "subject": {
+      "count": 0,
+      "primary": "",
+      "secondary": [],
+      "gender_presentation": "",
+      "age_appearance": "",
+      "species_description": "",
+      "pose": "",
+      "expression": "",
+      "gaze": "",
+      "hair": {"color": "", "style": "", "length": ""},
+      "eyes": {"color": "", "appearance": ""},
+      "distinguishing_features": []
+    },
+    "clothing": {
+      "upper": "", "lower": "", "footwear": "", "armor": "", "cloak": "",
+      "headwear": "", "gloves": "", "materials": [], "colors": [],
+      "patterns": [], "ornaments": []
+    },
+    "equipment": {
+      "weapons": [], "shield": [], "focus_items": [], "bags": [], "books": [],
+      "musical_instruments": [], "tools": [], "other": []
+    },
+    "fantasy_features": {
+      "wings": [], "horns": [], "tail": [], "halo": [], "ears": "",
+      "magical_effects": [], "particles": [], "floating_objects": [], "creatures": []
+    },
+    "environment_details": {
+      "setting": "", "foreground": [], "midground": [], "background": [],
+      "architecture": [], "vegetation": [], "weather": "", "time_of_day": "",
+      "season": "", "terrain": []
+    },
+    "lighting": {
+      "primary_source": "", "secondary_source": "", "color": "", "intensity": "",
+      "rim_lighting": false, "volumetric": false, "bloom": false
+    },
+    "composition": {
+      "orientation": "", "camera_angle": "", "shot_type": "", "framing": "",
+      "subject_position": "", "depth": "", "perspective": ""
+    },
+    "style": {
+      "medium": "", "genre": "", "rendering": "", "linework": "",
+      "brushwork": "", "detail_level": "", "quality": ""
+    },
+    "color_palette": {"dominant": [], "accent": [], "temperature": "", "contrast": ""},
+    "mood": {"keywords": []}
+  }
+}

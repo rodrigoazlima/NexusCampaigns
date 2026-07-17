@@ -271,7 +271,7 @@ Fallback: if key missing, return `{ error: 'ANTHROPIC_API_KEY not set' }`.
 Agent system prompts already exist at:
 - `agents/lore/prompts/system.md`
 - `agents/wiki/prompts/system.md`
-- `agents/vision/prompts/classify-image.txt`
+- `agents/vision/prompts/classify-step1-type.txt` (+ `classify-step2-visual.txt`, `classify-step3-pf2e-{character,environment}.txt`, `classify-step4-description.txt`)
 - `agents/classification/prompts/system.md`
 
 ---

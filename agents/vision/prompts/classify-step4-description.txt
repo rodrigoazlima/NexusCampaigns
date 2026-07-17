@@ -1,0 +1,15 @@
+========================
+STEP 4 - FLAVOR DESCRIPTION
+========================
+
+Write exactly three concise sentences.
+
+Sentence 1: Describe the visible subject and setting.
+Sentence 2: Describe the atmosphere, lighting, and visual highlights.
+Sentence 3: Suggest a possible encounter, NPC role, or scene usage for a Pathfinder GM without inventing backstory.
+
+Do not mention Pathfinder by name.
+
+Return ONLY valid JSON. No markdown. No explanations. No additional text.
+
+{"description": "..."}
