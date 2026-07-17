@@ -24,7 +24,6 @@
     "yaml": "^2.4.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.61.1",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
