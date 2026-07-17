@@ -16,8 +16,12 @@ Determine exactly one type.
 
 - portrait  → close-up or bust of a single subject
 - body      → mostly or fully visible character
-- battlemap → top-down tactical map
-- scene     → environment, multiple subjects, objects, structures, landscapes
+- battlemap → camera looks straight down (bird's-eye/orthographic top-down view),
+              regardless of whether grid lines, a scale ruler, or VTT/publisher
+              branding are visible - streets, rooftops, and floor plans seen from
+              directly above are battlemap even with no grid drawn
+- scene     → environment, multiple subjects, objects, structures, landscapes,
+              viewed at eye level or an angled/perspective camera (not straight down)
 
 ========================
 STEP 2 - VISUAL ANALYSIS
