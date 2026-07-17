@@ -121,6 +121,13 @@ class TestExtractCandidateTags:
         raw = {"visual_analysis": {"equipment": {"weapons": ["", "  ", "axe", 5, None]}}}
         assert _mod._extract_candidate_tags(raw) == ["axe"]
 
+    def test_harvests_type_or_name_from_object_items(self):
+        raw = {"visual_analysis": {"equipment": {"weapons": [
+            {"type": "sword", "description": "a plain blade"},
+            {"name": "round shield"},
+        ]}}}
+        assert _mod._extract_candidate_tags(raw) == ["sword", "round shield"]
+
     def test_missing_visual_analysis_returns_empty(self):
         assert _mod._extract_candidate_tags({}) == []
 
@@ -259,6 +266,18 @@ class TestClassifyImageFull:
         assert clf.type == ImageType.scene
         assert "axe" in clf.candidate_tags
         assert clf.entity_type == "none"
+
+    @pytest.mark.parametrize("offline_call", [5, 6, 7])
+    def test_optional_cycle_offline_error_propagates(self, tmp_path, offline_call):
+        img = tmp_path / "axe.jpg"
+        _write_real_jpg(img)
+        client = MagicMock()
+        responses = list(_FULL_RUN_RESPONSES)
+        responses[offline_call - 1] = _mod.LLMOfflineError("model swapped")
+        client.chat.side_effect = responses
+
+        with pytest.raises(_mod.LLMOfflineError):
+            _mod.classify_image_full(img, client, _STEP_PROMPTS, is_tk=False)
 
     def test_required_step_error_propagates_after_retries(self, tmp_path):
         img = tmp_path / "axe.jpg"
@@ -1062,6 +1081,22 @@ class TestFailedImageStorage:
         }
         result = _mod._candidate_images(state, {})
         assert img not in result
+
+    def test_retry_failed_images_clears_only_failed_pseudo_entries(self, patch_roots, vault, tmp_path):
+        failed_rel = " .knowledge-base/00-Inbox/images/failed.jpg".strip()
+        ok_rel = ".knowledge-base/00-Inbox/images/ok.jpg"
+        state = {
+            "version": 2,
+            "images": {
+                f"path:{failed_rel}": {"status": "failed"},
+                "real-sha": {"status": "ok"},
+            },
+            "pathIndex": {failed_rel: f"path:{failed_rel}", ok_rel: "real-sha"},
+        }
+        assert _mod.retry_failed_images(state) == 1
+        assert failed_rel not in state["pathIndex"]
+        assert f"path:{failed_rel}" not in state["images"]
+        assert state["pathIndex"][ok_rel] == "real-sha"
 
 
 # ---------------------------------------------------------------------------

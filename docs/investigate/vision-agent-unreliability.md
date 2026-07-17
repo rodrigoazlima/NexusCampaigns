@@ -2,7 +2,7 @@
 
 **Date**: 2026-07-17
 **Trigger**: dashboard Vision Agent panel showing 15 runs / 1 processed / 125 failed.
-**Status**: root cause #1 fixed and verified live. #2-#4 are plan only, not yet implemented.
+**Status**: root causes #1-#4 are fixed. Root cause #1 was verified live; #2-#4 are covered by automated tests. The optional sparse-output warning remains deferred.
 
 ## Symptom
 
@@ -142,7 +142,7 @@ warrior's weapon, perhaps displayed for sale or inspection at a market stall.'}
 
 File changed: `agents/vision/prompts/classify-step4-description.txt`.
 
-## Root cause #2 (PLAN ONLY): step2 prompt causes silent tag data loss
+## Root cause #2 (FIXED): step2 prompt caused silent tag data loss
 
 `agents/vision/prompts/classify-step2-visual.txt` is a ~60-field nested JSON template
 with every value left as an empty string/array placeholder - no filled example anywhere.
@@ -174,9 +174,11 @@ nothing to grep for. This is the same "blank template, no example" prompt defect
 caused root cause #1, but here it degrades output quality instead of hard-failing, so it
 was invisible in the dashboard's failed-count.
 
-**Not yet fixed.**
+**Fix applied**: the prompt now provides a concrete filled example and explicitly
+requires plain string array members. `_extract_candidate_tags` also accepts a
+legacy/model-invented object member by extracting its `type` or `name` value.
 
-## Root cause #3 (PLAN ONLY): no retry path for failed images
+## Root cause #3 (FIXED): failed images had no retry path
 
 `_candidate_images` (`classify_images.py:299-316`) skips any path already present in
 `state["pathIndex"]`. Failed images are recorded there under key `path:{rel}`
@@ -189,9 +191,12 @@ something manually edits `processed-images.json`.
 Concretely: the 125 images already marked failed by root cause #1 will **stay failed**
 even now that the step4 prompt is fixed, unless their `path:{rel}` entries are cleared.
 
-**Not yet fixed.**
+**Fix applied**: run `python agents/vision/tools/classify_images.py --retry-failed`.
+It atomically removes only `status: failed` pseudo-entries from `images` and
+`pathIndex`, then processes the normal batch. Successful and migrated entries
+remain untouched.
 
-## Root cause #4 (PLAN ONLY): LLMOfflineError swallowed inside cycles 2-4
+## Root cause #4 (FIXED): LLMOfflineError was swallowed inside cycles 2-4
 
 Cycles 2-4 (`classify_images.py:1267-1304` - type-confirm, entity-type, tag-library
 refinement) each wrap their LLM call in:
@@ -211,9 +216,11 @@ propagates - `main()`'s offline-retry wrapper (lines 1372-1386) only wraps the c
 `status: ok` but sparse/no tags and `entity_type: none`, permanently, with no signal
 anything degraded.
 
-**Not yet fixed.**
+**Fix applied**: cycles 2-4 now re-raise `LLMOfflineError` while continuing to
+degrade gracefully on parse and format errors. This reaches `main()`'s existing
+one-time offline retry rather than saving sparse results as successful.
 
-## Fix plan (priority order, not yet applied)
+## Fix plan (implemented)
 
 1. **Rewrite `classify-step2-visual.txt`** the same way as step4: one concrete filled
    example instead of an all-blank template, explicit instruction that array items are
@@ -229,7 +236,7 @@ anything degraded.
    re-raise so it reaches `main()`'s existing retry-once/abort-batch logic; keep the
    broad catch only for parse/format errors. Drops the redundant exception tuple as a
    side effect.
-5. *(optional / lower priority)* Log a warning when a classification "succeeds" but
+5. *(optional / lower priority; deferred)* Log a warning when a classification "succeeds" but
    `visual_analysis` content is suspiciously sparse relative to what the image plausibly
    contains - there is currently zero observability into silent quality loss like #2.
 
@@ -245,8 +252,8 @@ anything degraded.
 
 ## Notes for the next agent picking this up
 
-- **Nothing here has been implemented except root cause #1.** `classify-step4-description.txt`
-  is the only file changed so far. Items 1-5 under "Fix plan" are still todo, in that order.
+- **Items 1-4 are implemented.** The only remaining listed work is the optional
+  sparse-classification observability warning.
 - **State file schema, so you don't have to re-derive it**: `agents/vision/state/processed-images.json`
   is `{version, images: {sha256: entry}, pathIndex: {relpath: sha256_or_"path:"+relpath}}`.
   A failed entry has no real sha256 key in `images` - it's stored under the literal string

@@ -256,6 +256,26 @@ def _save_state(state: dict) -> None:
     tmp.replace(_PROC_IMAGES)
 
 
+def retry_failed_images(state: dict) -> int:
+    """Remove failed pseudo-entries so their unchanged source paths can run again.
+
+    Successful and migrated entries remain untouched.  The caller must persist
+    the returned state with ``_save_state`` after this operation.
+    """
+    images = state.setdefault("images", {})
+    path_index = state.setdefault("pathIndex", {})
+    failed_paths = {
+        rel for rel, key in path_index.items()
+        if isinstance(key, str) and key.startswith("path:")
+        and isinstance(images.get(key), dict)
+        and images[key].get("status") == "failed"
+    }
+    for rel in failed_paths:
+        key = path_index.pop(rel)
+        images.pop(key, None)
+    return len(failed_paths)
+
+
 def _load_token_links() -> dict[str, Any]:
     if not _TOKEN_LINKS.exists():
         return {}
@@ -965,6 +985,8 @@ def _extract_candidate_tags(raw: dict) -> list[str]:
         seen: dict[str, None] = {}
         for section, key in _CANDIDATE_TAG_PATHS:
             for item in (analysis.get(section) or {}).get(key) or []:
+                if isinstance(item, dict):
+                    item = item.get("type") or item.get("name")
                 if not isinstance(item, str):
                     continue
                 norm = item.strip().lower()
@@ -1121,7 +1143,9 @@ def refine_tags_with_library(
         et = resp.get("entity_type")
         if isinstance(et, str) and et in _ENTITY_TYPES:
             entity_type = et
-    except (LLMOfflineError, LLMResponseError, Exception):
+    except LLMOfflineError:
+        raise
+    except Exception:
         pass  # graceful degrade - keep current_tags/entity_type_hint as-is
 
     return final_tags, entity_type
@@ -1217,7 +1241,8 @@ def classify_image_full(
 
     Raises LLMOfflineError immediately (no retry - the caller's caller
     handles that) or LLMResponseError once a required step exhausts its
-    retries; cycles 2-4 never raise.
+    retries. Optional cycles keep prior values on parse/format errors, but
+    propagate LLMOfflineError so main() can retry the model swap once.
     """
     step_prompts = step_prompts or _load_step_prompts()
     messages: list[dict] = [{"role": "system", "content": _VISION_SYSTEM_PROMPT}]
@@ -1277,7 +1302,9 @@ def classify_image_full(
                 norm = t.strip().lower()
                 if norm not in tags and _is_concrete_tag(norm):
                     tags.append(norm)
-    except (LLMOfflineError, LLMResponseError, Exception):
+    except LLMOfflineError:
+        raise
+    except Exception:
         pass  # keep the required steps' type/tags - never fail the image over this
 
     # --- Cycle 3: entity type + more tags ---
@@ -1295,7 +1322,9 @@ def classify_image_full(
                 norm = t.strip().lower()
                 if norm not in tags and _is_concrete_tag(norm):
                     tags.append(norm)
-    except (LLMOfflineError, LLMResponseError, Exception):
+    except LLMOfflineError:
+        raise
+    except Exception:
         pass
 
     # --- Cycle 4: tag-library refinement (in-conversation) ---
@@ -1310,7 +1339,7 @@ def classify_image_full(
 # Main
 # ---------------------------------------------------------------------------
 
-def main() -> None:
+def main(*, retry_failed: bool = False) -> None:
     log = Logger(
         task_id=TASK_ID,
         script_basename=SCRIPT_BASENAME,
@@ -1330,6 +1359,11 @@ def main() -> None:
 
     step_prompts = _load_step_prompts()
     state       = _load_state()
+    if retry_failed:
+        retried = retry_failed_images(state)
+        if retried:
+            _save_state(state)
+        log.info(f"Cleared {retried} failed image entr{'y' if retried == 1 else 'ies'} for retry")
     token_links = _load_token_links()
     queue       = _load_queue()
     candidates  = _candidate_images(state, queue)
@@ -1498,7 +1532,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    main(retry_failed="--retry-failed" in sys.argv[1:])
 
 
 # ---------------------------------------------------------------------------

@@ -58,7 +58,9 @@ responsibilities:
     tag list against classification agent's state/tag-library.json (read-only here)
     before finalizing. Target: >=min_tags_target tags (default 6) + both categories set;
     an optional cycle whose response fails to parse keeps the prior cycle's values
-    rather than retrying - no budget for corrective turns on those three
+    rather than retrying - no budget for corrective turns on those three. An
+    LLMOfflineError is the exception: it propagates so main() applies its existing
+    one-time model-swap retry rather than silently writing degraded output.
   - Final tags (candidate_tags) and entity_type land directly in the note's frontmatter
     via _write_draft - no longer state-only once the multi-cycle conversation finishes
   - Build target filename slug; bump existing same-named file to counter suffix (e.g. -01, -02).
@@ -73,6 +75,9 @@ responsibilities:
   - Update inbox-queue.json agents.vision = done for each processed file
   - Emit image-classified signal to signals dir (fire-and-forget per G5)
   - Abort batch silently on connection-error (do not mark image as failed)
+  - `python agents/vision/tools/classify_images.py --retry-failed` clears only
+    failed `path:` state entries, then reclassifies the normal batch; successful
+    entries are never reset
   - Batch: 10 images per run; process non-PNG before PNG (tokens last)
   - (extract_text.py) For each already-classified image not yet text-extracted, call
     Qwen3-VL for readable text (signage, banners, scrolls, engravings, letters)

@@ -114,9 +114,10 @@ one tag.
 
 **Completion goal:** ≥`min_tags_target` tags (default 6) and both categories
 set by the end. The 4 required steps must all succeed (with retries) or the
-whole image aborts; the 3 optional cycles never abort - a cycle whose
-response fails to parse (or errors: `LLMOfflineError`/`LLMResponseError`/other)
-keeps the prior step/cycle's values rather than retrying.
+whole image aborts. The 3 optional cycles keep prior values on parse/format
+errors rather than retrying. `LLMOfflineError` propagates from every optional
+cycle so `main()` performs its existing one-time model-swap retry instead of
+silently persisting degraded output.
 
 The final tag list (`VisionClassification.candidate_tags`) and `entity_type` **are** written to the note's frontmatter by `_write_draft` - no longer state-only, since the tag-library-refinement cycle has already aligned them against the shared tag library.
 
@@ -197,6 +198,10 @@ shows.
 
 Failed images stored with pseudo-key `path:{rel}` and `status: failed`.  
 Connection-error images NOT stored - retried next run.
+
+Run `python agents/vision/tools/classify_images.py --retry-failed` to remove
+only failed pseudo-entries and immediately reclassify the ordinary batch. This
+does not reset successful or migrated state entries.
 
 ---
 
