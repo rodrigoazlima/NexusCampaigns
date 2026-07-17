@@ -207,7 +207,7 @@ export default async function VisionAgentPage() {
             </thead>
             <tbody>
               {recentImages.map((img) => (
-                <tr key={img.sha256} className="border-b border-surface-3/50 hover:bg-surface-2">
+                <tr key={img.path} className="border-b border-surface-3/50 hover:bg-surface-2">
                   <td className="px-4 py-2 font-mono text-zinc-300 truncate max-w-[280px]" title={img.path}>
                     {img.originalName || img.path.split('/').pop()}
                   </td>
