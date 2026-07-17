@@ -107,7 +107,7 @@ export default function GMTokensPage() {
                 <CircleDot size={22} className="mx-auto text-zinc-600 mb-2" />
                 <div className="text-zinc-500 text-sm">No generated tokens found</div>
                 <div className="text-xs text-zinc-600 mt-1">
-                  Tokens appear here as *-token.png files in 00-Inbox/
+                  Tokens appear here as *-token.png files in 01-Processing/
                 </div>
               </div>
             ) : (

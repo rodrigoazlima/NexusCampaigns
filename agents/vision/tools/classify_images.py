@@ -168,7 +168,7 @@ _MASTER_LOG   = _AGENTS_DIR / "runtime" / "state" / "logs" / "automation.log"
 _PROC_IMAGES  = _AGENT_STATE / "processed-images.json"
 _TOKEN_LINKS  = _AGENT_STATE / "token-links.json"
 _QUEUE_FILE   = _SHARED_STATE / "inbox-queue.json"
-_GEN_TOKENS   = _AGENTS_DIR / "token" / "state" / "generated-tokens.json"
+_GEN_TOKENS   = _PROJECT_ROOT / "system" / "state" / "workers" / "token" / "generated-tokens.json"
 _PROMPT_DIR   = _AGENTS_DIR / "vision" / "prompts"
 _SIGNALS_DIR  = _AGENTS_DIR / "runtime" / "state" / "signals"
 

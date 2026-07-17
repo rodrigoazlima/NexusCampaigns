@@ -676,6 +676,26 @@ class TestCandidateImages:
         result = _mod._candidate_images({}, {})
         assert txt not in result
 
+    def test_skips_token_worker_generated_png(self, patch_roots, vault, tmp_path, monkeypatch):
+        # Regression guard: _GEN_TOKENS must point at the same file
+        # nexus.workers.token actually writes (system/state/workers/token/
+        # generated-tokens.json), not a stale legacy location - otherwise a
+        # dashboard-generated token PNG re-enters this scan and gets
+        # visually (re-)classified as a brand-new source image.
+        gen_tokens_path = tmp_path / "system" / "state" / "workers" / "token" / "generated-tokens.json"
+        gen_tokens_path.parent.mkdir(parents=True)
+        monkeypatch.setattr(_mod, "_GEN_TOKENS", gen_tokens_path)
+
+        img = vault / "00-Inbox" / "images" / "hero-token.png"
+        img.touch()
+        rel = img.relative_to(tmp_path).as_posix()
+        gen_tokens_path.write_text(json.dumps({
+            "abc123": {"sourcePath": "irrelevant", "tokenPath": rel, "generatedAt": "2026-06-01T00:00:00Z"}
+        }), encoding="utf-8")
+
+        result = _mod._candidate_images({}, {})
+        assert img not in result
+
 
 # ---------------------------------------------------------------------------
 # State I/O

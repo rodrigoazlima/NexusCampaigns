@@ -89,8 +89,10 @@ def _do_cleanup(root: Path) -> None:
         except Exception:
             pass
 
-    # Remove generated-tokens.json entries for e2e images
-    gen_tokens = root / "agents" / "token" / "state" / "generated-tokens.json"
+    # Remove generated-tokens.json entries for e2e images, and the token PNGs
+    # they point at - token worker's output_dir defaults to 01-Processing, so
+    # these no longer live under inbox_dir and aren't swept by the wipe above.
+    gen_tokens = root / "system" / "state" / "workers" / "token" / "generated-tokens.json"
     if gen_tokens.exists():
         try:
             gt = json.loads(gen_tokens.read_text(encoding="utf-8"))
@@ -99,6 +101,9 @@ def _do_cleanup(root: Path) -> None:
                 if isinstance(v, dict) and "e2e-test" in v.get("sourcePath", "")
             ]
             for k in keys_to_remove:
+                token_path = gt[k].get("tokenPath", "")
+                if token_path:
+                    (root / token_path).unlink(missing_ok=True)
                 gt.pop(k)
             if keys_to_remove:
                 gen_tokens.write_text(json.dumps(gt, indent=2), encoding="utf-8")

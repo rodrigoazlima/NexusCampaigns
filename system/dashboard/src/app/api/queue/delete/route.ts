@@ -2,7 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import crypto from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
-import { PROJECT_ROOT } from '@/lib/vault'
+import { PROJECT_ROOT, readGeneratedTokens } from '@/lib/vault'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,6 +34,11 @@ export async function POST(req: NextRequest) {
 
     const queue = JSON.parse(fs.readFileSync(QUEUE_FILE, 'utf-8')) as Record<string, unknown>
 
+    const tokenBySource = new Map<string, string>()
+    for (const t of Object.values(readGeneratedTokens())) {
+      tokenBySource.set(t.sourcePath.replace(/\\/g, '/'), t.tokenPath)
+    }
+
     let itemsDeleted = 0
     for (const p of paths) {
       if (!(p in queue)) continue
@@ -44,9 +49,18 @@ export async function POST(req: NextRequest) {
 
       unlinkIfExists(absolutePath)
 
-      const ext = path.extname(absolutePath)
-      const base = absolutePath.slice(0, -ext.length)
-      unlinkIfExists(`${base}-token.png`)
+      // Token PNG isn't necessarily next to the source (token worker's
+      // output_dir defaults to 01-Processing) - resolve via the
+      // generated-tokens.json index, falling back to the sibling guess for
+      // tokens generated before that default existed.
+      const indexedToken = tokenBySource.get(p.replace(/\\/g, '/'))
+      if (indexedToken) {
+        unlinkIfExists(path.join(PROJECT_ROOT, indexedToken))
+      } else {
+        const ext = path.extname(absolutePath)
+        const base = absolutePath.slice(0, -ext.length)
+        unlinkIfExists(`${base}-token.png`)
+      }
 
       const key = crypto.createHash('sha1').update(p.replace(/\\/g, '/')).digest('hex')
       unlinkIfExists(path.join(THUMBS_DIR, `${key}.webp`))

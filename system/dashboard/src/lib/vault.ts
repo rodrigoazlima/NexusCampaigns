@@ -1274,6 +1274,13 @@ export function readInboxImages(): InboxImage[] {
 
   const draftBySource = draftBySourceMap()
 
+  // Token PNGs are indexed by source path in generated-tokens.json (they no
+  // longer necessarily sit next to the source file - see readTokenFiles).
+  const tokenBySource = new Map<string, string>()
+  for (const t of Object.values(readGeneratedTokens())) {
+    tokenBySource.set(t.sourcePath.replace(/\\/g, '/'), t.tokenPath)
+  }
+
   // One readdir per unique directory instead of one existsSync per image
   const dirListings = new Map<string, Set<string>>()
   const listDir = (dir: string): Set<string> => {
@@ -1299,12 +1306,15 @@ export function readInboxImages(): InboxImage[] {
     const dirNames = listDir(dir)
     // Stale queue entries (file deleted from disk) would render as blank cards
     if (!dirNames.has(filename)) continue
+    const normQueuePath = queuePath.replace(/\\/g, '/')
     const base = filename.replace(/\.[^.]+$/, '')
-    const tokenFilename = `${base}-token.png`
-    const hasToken = dirNames.has(tokenFilename)
-    const tokenPath = hasToken
-      ? path.relative(PROJECT_ROOT, path.join(dir, tokenFilename)).replace(/\\/g, '/')
-      : null
+    const indexedToken = tokenBySource.get(normQueuePath)
+    const siblingTokenFilename = `${base}-token.png`
+    const tokenPath = indexedToken
+      ?? (dirNames.has(siblingTokenFilename)
+        ? path.relative(PROJECT_ROOT, path.join(dir, siblingTokenFilename)).replace(/\\/g, '/')
+        : null)
+    const hasToken = tokenPath !== null
 
     const agentStatuses = Object.values(entry.agents)
     const anyPending = agentStatuses.some((s) => s === 'pending')
@@ -1312,8 +1322,6 @@ export function readInboxImages(): InboxImage[] {
     const allDone = agentStatuses.every((s) => s === 'done' || s === 'skip')
     const ingestedTime = new Date(entry.ingestedAt).getTime()
     const isStuck = anyPending && !isNaN(ingestedTime) && ingestedTime < cutoff24h
-
-    const normQueuePath = queuePath.replace(/\\/g, '/')
     const draft = draftBySource.get(normQueuePath)
     const entityId = draft ? (draft.uuid || draft.id) : null
 
@@ -1586,6 +1594,9 @@ function scanDirForTokens(dir: string, projectRoot: string, results: TokenFile[]
 
 export function readTokenFiles(): { tokens: TokenFile[]; frames: string[] } {
   const tokens: TokenFile[] = []
+  // Token worker's configurable output_dir defaults to 01-Processing; 00-Inbox
+  // is scanned too for tokens generated before that default existed.
+  scanDirForTokens(path.join(VAULT_ROOT, '01-Processing'), PROJECT_ROOT, tokens)
   scanDirForTokens(path.join(VAULT_ROOT, '00-Inbox'), PROJECT_ROOT, tokens)
 
   const framesDir = path.join(VAULT_ROOT, '05-Assets', 'tokens', 'frames')

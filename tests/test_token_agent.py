@@ -243,7 +243,8 @@ class TestHandleGeneratedAtIntegrity:
 
         img_path = tmp_path / "hero.png"
         img_path.write_bytes(b"fake")
-        out_path = tmp_path / "hero-token.png"
+        out_path = tmp_path / ".knowledge-base" / "01-Processing" / "hero-token.png"
+        out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_bytes(b"fake-token")
 
         old_ts = datetime(2026, 6, 1, tzinfo=timezone.utc).timestamp()
@@ -674,7 +675,9 @@ class TestNoteTypeCacheLaziness:
         monkeypatch.setattr(mod, "_note_type_index", lambda: calls.append(1) or {})
 
         (tmp_path / "hero.png").write_bytes(b"fake")
-        (tmp_path / "hero-token.png").write_bytes(b"fake-token")
+        out_path = tmp_path / ".knowledge-base" / "01-Processing" / "hero-token.png"
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_bytes(b"fake-token")
 
         worker = self._worker(tmp_path, monkeypatch)
         item = mod.WorkItem("hero.png", {

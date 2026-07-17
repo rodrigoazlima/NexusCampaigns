@@ -69,6 +69,14 @@ _DEFAULT_CFG: dict[str, Any] = {
     "focus_head":     [0, 0, 0, 0],  # [top, right, bottom, left] % of crop_size
     "moldura_path":   ".knowledge-base/05-Assets/tokens/frames/frame.png",
     "moldura_by_type": {},        # e.g. {"creature": "path/to/creature_frame.png"}
+    # Output PNGs here (flat, by source slug stem) instead of next to the
+    # source image - source images live under 00-Inbox, which both the
+    # ingestion worker and the vision agent scan for new work; a token PNG
+    # written there is a re-ingestion/re-classification hazard that only a
+    # (fragile) exclusion-list lookup guards against. 01-Processing already
+    # holds the note draft for the same slug, so this is also just: put the
+    # derived asset next to the entity record it belongs to.
+    "output_dir":     ".knowledge-base/01-Processing",
 }
 
 _SKIP_TYPES = frozenset({"battlemap", "scene"})
@@ -193,6 +201,15 @@ def _set_queue_token_slot(source_rel: str, status: str, log: Logger) -> bool:
     if changed:
         log.info(f"Queue token slot [{status}]{image_tag(path=source_rel)}")
     return changed
+
+
+def _resolve_output_dir(cfg: dict[str, Any]) -> Path:
+    """Where generated token PNGs are written - configurable via output_dir
+    (registry.yaml worker options or 10-generate-tokens.json), defaulting to
+    01-Processing. Relative paths resolve against the project root."""
+    rel = cfg.get("output_dir") or _DEFAULT_CFG["output_dir"]
+    p = Path(rel)
+    return p if p.is_absolute() else _PROJECT_ROOT / rel
 
 
 def _pick_moldura(entry: dict[str, Any], cfg: dict[str, Any]) -> Path:
@@ -787,7 +804,7 @@ class TokenWorker:
         if not img_path.exists():
             return WorkResult("skip", f"source gone: {src_rel}")
 
-        out_path     = img_path.with_name(f"{img_path.stem}-token.png")
+        out_path     = _resolve_output_dir(self._cfg) / f"{img_path.stem}-token.png"
         moldura_path = _pick_moldura(entry, self._cfg)
         stale        = item.payload.get("stale", False)
 
@@ -871,7 +888,7 @@ def run_single(image_path: str, moldura_override: str | None = None,
     vision_entry = vision_state.get("images", {}).get(sha_key, {})
     entity_type  = _resolve_entity_type(rel, vision_entry)  # note_type_cache=None -> single lookup
 
-    out_path = img_path.parent / (img_path.stem + "-token.png")
+    out_path = _resolve_output_dir(cfg) / f"{img_path.stem}-token.png"
     ok, face = _make_token(img_path, out_path, cfg, log, moldura_path=moldura_path,
                            entity_type=entity_type)
     if ok:

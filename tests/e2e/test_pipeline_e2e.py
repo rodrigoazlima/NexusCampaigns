@@ -390,8 +390,9 @@ def test_stage6_token():
         f"token worker failed (exit {result.returncode})\n{result.stdout[-2000:]}"
     )
 
-    # Token file created next to source image
-    token_path = img_path.with_name(f"{img_path.stem}-token.png")
+    # Token file created under 01-Processing (token worker's default output_dir),
+    # not next to the source image - see nexus.workers.token._resolve_output_dir
+    token_path = _PROCESSING / f"{img_path.stem}-token.png"
     assert token_path.exists(), (
         f"Token not found at {token_path}\nagent output: {result.stdout[-1000:]}"
     )
