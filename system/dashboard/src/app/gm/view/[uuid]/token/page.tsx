@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { notFound } from 'next/navigation'
 import { readItemDetail } from '@/lib/vault'
+import { defaultImageUrl, imageUrl } from '@/lib/image'
 import TokenEditorCanvas from '@/components/gm/TokenEditorCanvas'
 
 export default async function TokenEditorPage({
@@ -14,13 +15,8 @@ export default async function TokenEditorPage({
 
   if (!item) notFound()
 
-  const imageSrc = item.source[0]
-    ? `/api/image?path=${encodeURIComponent(item.source[0])}`
-    : null
-
-  const tokenSrc = item.tokenPath
-    ? `/api/image?path=${encodeURIComponent(item.tokenPath)}`
-    : null
+  const imageSrc = imageUrl(item.source[0]) ?? defaultImageUrl(item.type)
+  const tokenSrc = imageUrl(item.tokenPath)
 
   return <TokenEditorCanvas item={item} imageSrc={imageSrc} tokenSrc={tokenSrc} />
 }

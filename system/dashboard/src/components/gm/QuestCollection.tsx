@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation'
 import type { ReviewItem } from '@/lib/types'
 import PageHeader from '@/components/widgets/PageHeader'
 import QualityBar from '@/components/widgets/QualityBar'
+import VaultImage from '@/components/shared/VaultImage'
 import { Tip } from './Tip'
 import {
   ScrollText, Plus, Sparkles, ChevronDown, ChevronRight, Loader2,
@@ -195,11 +196,6 @@ export default function QuestCollection({ items }: { items: QuestItem[] }) {
       return (b.updated ?? '').localeCompare(a.updated ?? '') // updated (default)
     })
 
-  const tokenSrc = (i: QuestItem) => {
-    const path = i.tokenPath || i.source[0]
-    return path ? `/api/image?path=${encodeURIComponent(path)}` : null
-  }
-
   const cardHref = (i: QuestItem) => `/gm/view/${i.uuid || encodeURIComponent(i.id)}`
 
   return (
@@ -363,17 +359,11 @@ export default function QuestCollection({ items }: { items: QuestItem[] }) {
       ) : view === 'grid' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {filtered.map((i) => {
-            const src = tokenSrc(i)
             const isQuest = i.type === 'quest'
             return (
               <div key={i.id} className="panel border border-surface-3 hover:border-yellow-500/30 transition-colors flex flex-col group overflow-hidden">
                 <Link href={cardHref(i)} className="flex-1 p-3 flex gap-3">
-                  {src ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img src={src} alt="" className="w-14 h-14 rounded-lg object-cover bg-surface-3 flex-shrink-0" />
-                  ) : (
-                    <span className={`w-14 h-14 rounded-lg flex items-center justify-center text-xs font-bold uppercase flex-shrink-0 ${TYPE_CHIP}`}>{i.type.slice(0, 3)}</span>
-                  )}
+                  <VaultImage path={i.tokenPath || i.source[0]} type={i.type} className="w-14 h-14 rounded-lg object-cover bg-surface-3 flex-shrink-0" alt="" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
                       {i.openingHook && <Star size={11} className="text-yellow-400 flex-shrink-0" />}

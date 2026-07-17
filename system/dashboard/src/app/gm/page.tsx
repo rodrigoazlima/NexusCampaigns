@@ -5,6 +5,7 @@ import type { ReviewItem } from '@/lib/types'
 import Link from 'next/link'
 import PageHeader from '@/components/widgets/PageHeader'
 import AutoRefresh from '@/components/AutoRefresh'
+import VaultImage from '@/components/shared/VaultImage'
 import {
   Dices, Map as MapIcon, Users, Flag, ScrollText, Skull, Gem,
   Inbox, CircleDot, MessageSquare, ArrowRight, Sparkles,
@@ -30,18 +31,6 @@ const PILLARS = [
 ] as const
 
 type Entry = ReviewItem & { origin: 'draft' | 'canon' }
-
-const typeChip: Record<string, string> = {
-  npc: 'bg-blue-500/10 text-blue-400', character: 'bg-blue-500/10 text-blue-400',
-  location: 'bg-green-500/10 text-green-400', city: 'bg-green-500/10 text-green-400',
-  village: 'bg-green-500/10 text-green-400', dungeon: 'bg-green-500/10 text-green-400',
-  faction: 'bg-purple-500/10 text-purple-400', organization: 'bg-purple-500/10 text-purple-400',
-  religion: 'bg-purple-500/10 text-purple-400', quest: 'bg-yellow-500/10 text-yellow-400',
-  event: 'bg-yellow-500/10 text-yellow-400', timeline: 'bg-yellow-500/10 text-yellow-400',
-  creature: 'bg-red-500/10 text-red-400', monster: 'bg-red-500/10 text-red-400',
-  encounter: 'bg-red-500/10 text-red-400', item: 'bg-orange-500/10 text-orange-400',
-  artifact: 'bg-orange-500/10 text-orange-400', lore: 'bg-teal-500/10 text-teal-400',
-}
 
 export default async function GMHubPage() {
   const drafts = readReviewItems().map((i): Entry => ({ ...i, origin: 'draft' }))
@@ -131,18 +120,7 @@ export default async function GMHubPage() {
                       href={href(e)}
                       className="flex items-center gap-2.5 px-4 py-2 hover:bg-surface-2 border-b border-surface-3/40 last:border-0 group"
                     >
-                      {e.tokenPath ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={`/api/image?path=${encodeURIComponent(e.tokenPath)}`}
-                          alt=""
-                          className="w-7 h-7 rounded object-cover flex-shrink-0 bg-surface-3"
-                        />
-                      ) : (
-                        <span className={`w-7 h-7 rounded flex items-center justify-center text-[9px] font-bold uppercase flex-shrink-0 ${typeChip[e.type] ?? 'bg-surface-3 text-zinc-500'}`}>
-                          {e.type.slice(0, 3)}
-                        </span>
-                      )}
+                      <VaultImage path={e.tokenPath} type={e.type} className="w-7 h-7 rounded object-cover flex-shrink-0 bg-surface-3" alt="" />
                       <div className="flex-1 min-w-0">
                         <div className="text-xs text-zinc-200 truncate group-hover:text-white">{e.id}</div>
                         <div className="text-[11px] text-zinc-600 truncate">{e.excerpt || '-'}</div>

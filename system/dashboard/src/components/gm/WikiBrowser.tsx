@@ -7,6 +7,7 @@ import type { ReviewItem } from '@/lib/types'
 import { PILLARS } from '@/lib/pillars'
 import PageHeader from '@/components/widgets/PageHeader'
 import QualityBar from '@/components/widgets/QualityBar'
+import VaultImage from '@/components/shared/VaultImage'
 import { Tip } from './Tip'
 import {
   BookOpen, Search, Link2, Share2, LayoutList, Table as TableIcon,
@@ -247,19 +248,10 @@ export default function WikiBrowser({ items }: { items: WikiItem[] }) {
 }
 
 function Row({ i }: { i: WikiItem }) {
-  const preview = i.tokenPath ?? i.source[0]
-  const src = preview ? `/api/image?path=${encodeURIComponent(preview)}` : null
   const links = i.relationships.length
   return (
     <Link href={hrefOf(i)} className="flex items-center gap-3 px-3 py-2 hover:bg-surface-2 group">
-      {src ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt="" className="w-8 h-8 rounded object-cover bg-surface-3 flex-shrink-0" />
-      ) : (
-        <span className={`w-8 h-8 rounded flex items-center justify-center text-[9px] font-bold uppercase flex-shrink-0 ${chipOf(i.pillar)}`}>
-          {i.type.slice(0, 3)}
-        </span>
-      )}
+      <VaultImage path={i.tokenPath ?? i.source[0]} type={i.type} className="w-8 h-8 rounded object-cover bg-surface-3 flex-shrink-0" alt="" />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <span className="text-xs font-mono text-zinc-100 truncate group-hover:text-primary">{i.id}</span>
@@ -293,17 +285,10 @@ function WikiTable({ rows }: { rows: WikiItem[] }) {
         </thead>
         <tbody>
           {rows.map((i) => {
-            const preview = i.tokenPath ?? i.source[0]
-            const src = preview ? `/api/image?path=${encodeURIComponent(preview)}` : null
             return (
               <tr key={i.id} className="border-b border-surface-3/40 hover:bg-surface-2">
                 <td className="p-2">
-                  {src ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={src} alt="" className="w-7 h-7 rounded-full object-cover bg-surface-3" />
-                  ) : (
-                    <span className={`w-7 h-7 rounded-full flex items-center justify-center text-[8px] font-bold uppercase ${chipOf(i.pillar)}`}>{i.type.slice(0, 2)}</span>
-                  )}
+                  <VaultImage path={i.tokenPath ?? i.source[0]} type={i.type} className="w-7 h-7 rounded-full object-cover bg-surface-3" alt="" />
                 </td>
                 <td className="p-2">
                   <Link href={hrefOf(i)} className="font-mono text-zinc-200 hover:text-primary">{i.id}</Link>

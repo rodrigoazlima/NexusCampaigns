@@ -10,12 +10,13 @@ import {
   Pencil, Check, X, Sparkles, ChevronDown, Save, Copy, CalendarDays
 } from 'lucide-react'
 import type { ItemDetail } from '@/lib/types'
-import { PILLARS, pillarOf } from '@/lib/pillars'
+import { imageUrl } from '@/lib/image'
 import QualityPicker from './QualityPicker'
 import ImageModal from './ImageModal'
 import TagEditor from './TagEditor'
 import RelationshipEditor from './RelationshipEditor'
 import ItemChatPanel from './ItemChatPanel'
+import VaultImage from '@/components/shared/VaultImage'
 import { Tip } from './Tip'
 
 import '@uiw/react-md-editor/markdown-editor.css'
@@ -224,13 +225,8 @@ export default function ItemDetailView({ item: initial }: Props) {
       .catch(() => {})
   }, [item.filename])
 
-  const imageSrc = item.source[0]
-    ? `/api/image?path=${encodeURIComponent(item.source[0])}`
-    : null
-
-  const tokenSrc = item.tokenPath
-    ? `/api/image?path=${encodeURIComponent(item.tokenPath)}${item.tokenUpdatedAt ? `&v=${encodeURIComponent(item.tokenUpdatedAt)}` : ''}`
-    : null
+  const imageSrc = imageUrl(item.source[0])
+  const tokenSrc = imageUrl(item.tokenPath, { cacheBust: item.tokenUpdatedAt })
 
   const showToast = useCallback((message: string, type: 'success' | 'error') => {
     setToast({ message, type })
@@ -604,34 +600,16 @@ export default function ItemDetailView({ item: initial }: Props) {
 
           {/* Hero - source image with token integrated */}
           <div data-component="ItemDetailView.HeroImage" className="relative group rounded-2xl overflow-hidden bg-surface-2 border border-surface-3 flex items-center justify-center" style={{ minHeight: 720 }}>
-            {imageSrc ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={imageSrc}
-                alt={item.id}
-                className="max-h-[60vh] w-full object-contain cursor-zoom-in"
-                onClick={() => { setModalSrc(imageSrc); setModalOpen(true) }}
-                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-              />
-            ) : tokenSrc ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={tokenSrc} alt={item.id}
-                className="max-h-[50vh] max-w-[60%] object-contain cursor-zoom-in"
-                onClick={() => { setModalSrc(tokenSrc); setModalOpen(true) }}
-              />
-            ) : (() => {
-              const pillar = PILLARS.find((p) => p.key === pillarOf(item.type))
-              const Icon = pillar?.icon
-              return Icon ? (
-                <div className={`flex flex-col items-center gap-2 py-20 ${pillar.accent}`}>
-                  <Icon size={40} />
-                  <span className="text-xs uppercase tracking-wide text-zinc-600">{item.type}</span>
-                </div>
-              ) : (
-                <div className="text-zinc-600 text-sm py-20">No image</div>
-              )
-            })()}
+            <VaultImage
+              path={item.source[0] || item.tokenPath}
+              type={item.type}
+              alt={item.id}
+              className={`max-h-[60vh] w-full object-contain ${(imageSrc || tokenSrc) ? 'cursor-zoom-in' : ''}`}
+              onClick={() => {
+                const target = imageSrc ?? tokenSrc
+                if (target) { setModalSrc(target); setModalOpen(true) }
+              }}
+            />
 
             {/* hover toolbar */}
             <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -667,8 +645,7 @@ export default function ItemDetailView({ item: initial }: Props) {
                     className="relative block w-24 h-24 rounded-full overflow-hidden border-2 border-zinc-700/70 shadow-2xl hover:border-primary/60 hover:scale-105 transition-all group/token bg-surface"
                     title="Open token editor"
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={tokenSrc} alt="token" className="w-full h-full object-contain" />
+                    <VaultImage path={item.tokenPath} type={item.type} alt="token" className="w-full h-full object-contain" />
                     <span className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover/token:opacity-100 transition-opacity">
                       <Pencil size={16} className="text-white" />
                     </span>
@@ -735,8 +712,7 @@ export default function ItemDetailView({ item: initial }: Props) {
                              transition-all duration-200 ease-out"
                 >
                   {tokenSrc && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={tokenSrc} alt="token preview" className="w-full h-20 object-contain rounded mb-2 bg-surface" />
+                    <VaultImage path={item.tokenPath} type={item.type} alt="token preview" className="w-full h-20 object-contain rounded mb-2 bg-surface" />
                   )}
                   <Link
                     href={`/gm/view/${item.uuid || item.id}/token`}

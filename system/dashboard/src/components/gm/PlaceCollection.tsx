@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation'
 import type { ReviewItem } from '@/lib/types'
 import PageHeader from '@/components/widgets/PageHeader'
 import QualityBar from '@/components/widgets/QualityBar'
+import VaultImage from '@/components/shared/VaultImage'
 import { Tip } from './Tip'
 import {
   Map, Plus, Sparkles, ChevronDown, ChevronRight, Loader2,
@@ -165,12 +166,6 @@ export default function PlaceCollection({ items }: { items: PlaceItem[] }) {
       if (sortBy === 'links') return b.relationships.length - a.relationships.length
       return (b.updated ?? '').localeCompare(a.updated ?? '') // updated (default)
     })
-
-  // Token first (rare for places), else the source image. LOC badge only when neither.
-  const previewSrc = (i: PlaceItem) => {
-    const p = i.tokenPath ?? i.source[0]
-    return p ? `/api/image?path=${encodeURIComponent(p)}` : null
-  }
 
   const cardHref = (i: PlaceItem) => `/gm/view/${i.uuid || encodeURIComponent(i.id)}`
 
@@ -327,17 +322,11 @@ export default function PlaceCollection({ items }: { items: PlaceItem[] }) {
       ) : view === 'grid' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {filtered.map((i) => {
-            const src = previewSrc(i)
             const occ = occupants(i)
             return (
               <div key={i.id} className={`panel border transition-colors flex flex-col group overflow-hidden ${isAnchor(i) ? 'border-green-500/50' : 'border-surface-3 hover:border-green-500/30'}`}>
                 <Link href={cardHref(i)} className="flex-1 p-3 flex gap-3">
-                  {src ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img src={src} alt="" className="w-14 h-14 rounded-lg object-cover bg-surface-3 flex-shrink-0" />
-                  ) : (
-                    <span className={`w-14 h-14 rounded-lg flex items-center justify-center text-xs font-bold uppercase flex-shrink-0 ${TYPE_CHIP}`}>{i.type.slice(0, 3)}</span>
-                  )}
+                  <VaultImage path={i.tokenPath ?? i.source[0]} type={i.type} className="w-14 h-14 rounded-lg object-cover bg-surface-3 flex-shrink-0" alt="" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
                       {isAnchor(i) && <Home size={11} className="text-green-400 flex-shrink-0" />}
@@ -400,17 +389,11 @@ export default function PlaceCollection({ items }: { items: PlaceItem[] }) {
             </thead>
             <tbody>
               {filtered.map((i) => {
-                const src = previewSrc(i)
                 const occ = occupants(i)
                 return (
                   <tr key={i.id} className="border-b border-surface-3/40 hover:bg-surface-2">
                     <td className="p-2">
-                      {src ? (
-                        /* eslint-disable-next-line @next/next/no-img-element */
-                        <img src={src} alt="" className="w-7 h-7 rounded-full object-cover bg-surface-3" />
-                      ) : (
-                        <span className={`w-7 h-7 rounded-full flex items-center justify-center text-[8px] font-bold uppercase ${TYPE_CHIP}`}>{i.type.slice(0, 2)}</span>
-                      )}
+                      <VaultImage path={i.tokenPath ?? i.source[0]} type={i.type} className="w-7 h-7 rounded-full object-cover bg-surface-3" alt="" />
                     </td>
                     <td className="p-2">
                       <Link href={cardHref(i)} className="font-mono text-zinc-200 hover:text-green-400 inline-flex items-center gap-1">

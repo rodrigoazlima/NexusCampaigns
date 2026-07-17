@@ -6,6 +6,7 @@ import type { InboxImage } from '@/lib/types'
 import { formatRelative } from '@/lib/utils'
 import { AlertTriangle, Pause } from 'lucide-react'
 import ImageModal from './ImageModal'
+import VaultImage from '@/components/shared/VaultImage'
 
 const AGENT_COLORS: Record<string, string> = {
   done: 'bg-success',
@@ -22,7 +23,6 @@ interface InboxImageCardProps {
 export default function InboxImageCard({ item }: InboxImageCardProps) {
   const [modalOpen, setModalOpen] = useState(false)
   const router = useRouter()
-  const src = `/api/image?path=${encodeURIComponent(item.path)}`
 
   return (
     <div
@@ -46,17 +46,13 @@ export default function InboxImageCard({ item }: InboxImageCardProps) {
         }}
         title="Click to enlarge"
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={`${src}&thumb=1`}
+        <VaultImage
+          path={item.path}
+          thumb
           alt={item.filename}
           loading="lazy"
           decoding="async"
           className="block max-w-full h-auto"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement
-            target.style.display = 'none'
-          }}
         />
         {item.isStuck && (
           <div className="absolute top-2 right-2 flex items-center gap-1 bg-danger/90 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded">
@@ -98,7 +94,7 @@ export default function InboxImageCard({ item }: InboxImageCardProps) {
       </div>
 
       <ImageModal
-        src={src}
+        src={`/api/image?path=${encodeURIComponent(item.path)}`}
         alt={item.filename}
         open={modalOpen}
         onClose={() => setModalOpen(false)}

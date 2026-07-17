@@ -10,11 +10,12 @@ import { useRouter } from 'next/navigation'
 import type { ReviewItem } from '@/lib/types'
 import PageHeader from '@/components/widgets/PageHeader'
 import QualityBar from '@/components/widgets/QualityBar'
+import VaultImage from '@/components/shared/VaultImage'
 import { Tip } from './Tip'
 import {
   Gem, Plus, Sparkles, ChevronDown, ChevronRight, Star, Loader2,
   Check, Flag, Archive, XCircle, ExternalLink, LayoutGrid, Table as TableIcon,
-  Search, HelpCircle,
+  Search,
 } from 'lucide-react'
 
 export type TreasureItem = ReviewItem & {
@@ -180,11 +181,6 @@ export default function TreasuresCollection({ items }: { items: TreasureItem[] }
 
   const cardHref = (i: TreasureItem) => `/gm/view/${i.uuid || encodeURIComponent(i.id)}`
 
-  const tokenSrc = (i: TreasureItem) => {
-    const path = i.tokenPath || i.source[0]
-    return path ? `/api/image?path=${encodeURIComponent(path)}` : null
-  }
-
   return (
     <div className="p-4 md:p-6">
       <PageHeader
@@ -341,18 +337,10 @@ export default function TreasuresCollection({ items }: { items: TreasureItem[] }
           {filtered.map((i) => {
             const hoverBorder = isLore(i) ? 'hover:border-teal-500/30' : 'hover:border-orange-500/30'
             const hoverText = isLore(i) ? 'group-hover:text-teal-400' : 'group-hover:text-orange-400'
-            const src = tokenSrc(i)
             return (
               <div key={i.id} className={`panel border border-surface-3 ${hoverBorder} transition-colors flex flex-col group overflow-hidden`}>
                 <Link href={cardHref(i)} className="flex-1 p-3 flex gap-3">
-                  {src ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={src} alt="" className="w-14 h-14 rounded-lg object-cover bg-surface-3 flex-shrink-0" />
-                  ) : (
-                    <span className={`w-14 h-14 rounded-lg flex items-center justify-center flex-shrink-0 ${chipCls(i.type)}`}>
-                      {isLore(i) ? <HelpCircle size={20} /> : <Gem size={20} />}
-                    </span>
-                  )}
+                  <VaultImage path={i.tokenPath || i.source[0]} type={i.type} className="w-14 h-14 rounded-lg object-cover bg-surface-3 flex-shrink-0" alt="" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
                       <span className={`text-xs font-mono text-zinc-100 truncate ${hoverText}`}>{i.id}</span>
@@ -414,18 +402,10 @@ export default function TreasuresCollection({ items }: { items: TreasureItem[] }
             </thead>
             <tbody>
               {filtered.map((i) => {
-                const src = tokenSrc(i)
                 return (
                 <tr key={i.id} className="border-b border-surface-3/40 hover:bg-surface-2">
                   <td className="p-2">
-                    {src ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={src} alt="" className="w-7 h-7 rounded-full object-cover bg-surface-3" />
-                    ) : (
-                      <span className={`w-7 h-7 rounded-full flex items-center justify-center ${chipCls(i.type)}`}>
-                        {isLore(i) ? <HelpCircle size={12} /> : <Gem size={12} />}
-                      </span>
-                    )}
+                    <VaultImage path={i.tokenPath || i.source[0]} type={i.type} className="w-7 h-7 rounded-full object-cover bg-surface-3" alt="" />
                   </td>
                   <td className="p-2"><span className={`px-1.5 py-0.5 rounded text-[10px] uppercase font-semibold ${chipCls(i.type)}`}>{i.type}</span></td>
                   <td className="p-2">

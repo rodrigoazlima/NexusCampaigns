@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react'
 import { PILLARS } from '@/lib/pillars'
 import type { ReviewItem } from '@/lib/types'
+import VaultImage from '@/components/shared/VaultImage'
 
 type Entry = ReviewItem & { origin: 'draft' | 'canon' }
 
@@ -13,25 +14,18 @@ const AUTO_ADVANCE_MS = 3000
 const RING_CIRCUMFERENCE = 2 * Math.PI * 16
 
 function Poster({ e }: { e: Entry }) {
-  const src = e.tokenPath || e.source[0]
   const href = `/gm/view/${e.uuid || encodeURIComponent(e.id)}`
   return (
     <Link
       href={href}
       className="group/card relative flex-shrink-0 w-32 sm:w-36 aspect-[2/3] rounded-lg overflow-hidden bg-surface-3 border border-surface-3 hover:border-primary/40 transition-colors"
     >
-      {src ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={`/api/image?path=${encodeURIComponent(src)}`}
-          alt=""
-          className="w-full h-full object-cover transition-transform duration-300 group-hover/card:scale-105"
-        />
-      ) : (
-        <div className="w-full h-full flex items-center justify-center text-2xl font-bold uppercase text-zinc-600">
-          {e.type.slice(0, 3)}
-        </div>
-      )}
+      <VaultImage
+        path={e.tokenPath || e.source[0]}
+        type={e.type}
+        className="w-full h-full object-cover transition-transform duration-300 group-hover/card:scale-105"
+        alt=""
+      />
       <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/90 via-black/50 to-transparent">
         <div className="text-xs font-mono text-white truncate">{e.id}</div>
         <div className="flex items-center gap-1.5 mt-0.5">
