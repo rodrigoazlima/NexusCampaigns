@@ -1,5 +1,6 @@
-"""runner._load_agent_dispatch falls back to registry.yaml's default_dispatch
-when an agent has no agent.json (or no entry for the requested task_id)."""
+"""nexus.runtime.dispatch_config.load_agent_dispatch falls back to
+registry.yaml's default_dispatch when an agent has no agent.json (or no
+entry for the requested task_id)."""
 from __future__ import annotations
 
 import importlib.util
@@ -11,25 +12,28 @@ import pytest
 
 from nexus.shared.models import AgentRegistryEntry, DefaultDispatchConfig, RegistryConfig
 
-_RUNNER_PATH = (
-    Path(__file__).resolve().parents[1] / "system" / "src" / "nexus" / "runner.py"
+_MODULE_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "system" / "src" / "nexus" / "runtime" / "dispatch_config.py"
 )
 
 
-def _load_runner_module():
-    spec = importlib.util.spec_from_file_location("runner_under_test", _RUNNER_PATH)
+def _load_dispatch_config_module():
+    spec = importlib.util.spec_from_file_location(
+        "nexus.runtime._dispatch_config_under_test", _MODULE_PATH
+    )
     mod = importlib.util.module_from_spec(spec)
-    sys.modules["runner_under_test"] = mod
+    sys.modules["nexus.runtime._dispatch_config_under_test"] = mod
     spec.loader.exec_module(mod)
     return mod
 
 
 @pytest.fixture
 def runner(tmp_path):
-    mod = _load_runner_module()
-    mod._AGENTS_DIR = tmp_path / "agents"
-    mod._PROJECT_ROOT = tmp_path
-    (mod._AGENTS_DIR / "someagent").mkdir(parents=True)
+    mod = _load_dispatch_config_module()
+    mod.AGENTS_DIR = tmp_path / "agents"
+    mod.PROJECT_ROOT = tmp_path
+    (mod.AGENTS_DIR / "someagent").mkdir(parents=True)
     return mod
 
 
@@ -57,7 +61,7 @@ def test_falls_back_to_default_dispatch_when_agent_json_missing(runner, monkeypa
     monkeypatch.setattr(runner, "load_registry", lambda project_root: _fake_registry())
     log = MagicMock()
 
-    dispatch = runner._load_agent_dispatch("someagent-agent", log)
+    dispatch = runner.load_agent_dispatch("someagent-agent", log)
 
     assert dispatch is not None
     assert dispatch.type == "lm-studio"
@@ -69,7 +73,7 @@ def test_returns_none_when_registry_has_no_tools_for_agent(runner, monkeypatch):
     monkeypatch.setattr(runner, "load_registry", lambda project_root: _fake_registry(tools=()))
     log = MagicMock()
 
-    dispatch = runner._load_agent_dispatch("someagent-agent", log)
+    dispatch = runner.load_agent_dispatch("someagent-agent", log)
 
     assert dispatch is None
 
@@ -80,6 +84,6 @@ def test_returns_none_when_registry_has_no_default_dispatch(runner, monkeypatch)
     monkeypatch.setattr(runner, "load_registry", lambda project_root: registry)
     log = MagicMock()
 
-    dispatch = runner._load_agent_dispatch("someagent-agent", log)
+    dispatch = runner.load_agent_dispatch("someagent-agent", log)
 
     assert dispatch is None
