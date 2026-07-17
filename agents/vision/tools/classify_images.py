@@ -32,6 +32,7 @@ from nexus.shared import (  # noqa: E402
     LLMResponseError,
     SignalEmitter,
     VisionClassification,
+    build_entity_slug,
     image_tag,
     locked_update_queue_entry,
     sha256_of_file,
@@ -74,6 +75,20 @@ Choose the MOST SPECIFIC type. Prefer dungeon over location for a tomb/cave, cre
 _MIN_TAGS_TARGET = 6
 _MAX_CONVERSATION_MESSAGES = 10
 _VISION_SYSTEM_PROMPT = "You are a Pathfinder 2e image classifier. Return ONLY valid JSON."
+
+# Every prompt that asks the LLM for tags asks for "short (1-3 word)" concrete
+# tags, but nothing enforced that — a full visual_analysis sentence (e.g. "a
+# large sword with a black blade and hilt, featuring white geometric
+# patterns...") could slip straight into frontmatter tags as if it were one
+# tag. Guard at the single append point every tag-collection site shares.
+_MAX_TAG_WORDS = 6
+
+
+def _is_concrete_tag(tag: str) -> bool:
+    """Reject sentence-length strings the LLM sometimes returns instead of a
+    short tag — keeps frontmatter `tags:` scannable/searchable rather than
+    carrying paragraph-length prose."""
+    return bool(tag) and 1 <= len(tag.split()) <= _MAX_TAG_WORDS
 
 # Vision-model token budgets — generous on purpose (assertive over cost-
 # efficient): cycle 1's classify-image.txt asks for a large visual_analysis
@@ -345,11 +360,45 @@ def _inherit_clf_from_state(entry: dict) -> VisionClassification:
 # Slug builders
 # ---------------------------------------------------------------------------
 
+# Entity types that can never legitimately BE a scene/battlemap themselves —
+# always a standalone physical object, not a place, creature, or character
+# that might reasonably appear within one. classify-image.txt's STEP 1 only
+# offers 4 structural types (portrait/body/battlemap/scene) — there is no
+# "isolated object" option — so a photographed weapon/artifact with little
+# visible environment gets forced into "scene" by elimination. Deliberately
+# narrow (not "everything except place-like types"): a scene/battlemap
+# landing on entity_type "creature" or "npc" is an accepted, expected
+# disagreement (a monster or character standing in an environment shot is
+# still genuinely a scene) — only item/artifact are unambiguous.
+_OBJECT_ENTITY_TYPES: frozenset[str] = frozenset({"item", "artifact"})
+
+
+def _is_object_in_scene_bucket(clf: VisionClassification) -> bool:
+    """True when the structural type (scene/battlemap) and the grounded
+    entity_type disagree in a way that means this is really a photographed
+    object, not an environment (or a creature/character within one)."""
+    return clf.type.value in ("scene", "battlemap") and clf.entity_type in _OBJECT_ENTITY_TYPES
+
+
+def _object_slug_descriptor(clf: VisionClassification) -> Optional[str]:
+    """Most concrete single descriptor for an object-in-scene-bucket image:
+    the first candidate tag that survives slugification, else the
+    environment (still better than nothing), else None."""
+    for tag in clf.candidate_tags:
+        slugged = to_slug(tag)
+        if slugged:
+            return slugged
+    if clf.environment and clf.environment.value != "none":
+        return clf.environment.value
+    return None
+
+
 def _image_filename_slug(clf: VisionClassification) -> str:
     """Canonical image filename slug per agent-vision.spec.md.
 
-    portrait / body / token : {ancestry}-{class}-{element}.{type}
-    battlemap / scene       : {type}-{environment}
+    portrait / body / token       : {ancestry}-{class}-{element}.{type}
+    battlemap / scene             : {type}-{environment}
+    battlemap / scene (as object) : {entity_type}-{descriptor}
     """
     t = clf.type.value
     if t in ("portrait", "body", "token"):
@@ -363,6 +412,8 @@ def _image_filename_slug(clf: VisionClassification) -> str:
         if clf.element and clf.element.value != "none":
             parts.append(clf.element.value)
         return ("-".join(parts) if parts else "unknown") + f".{t}"
+    elif _is_object_in_scene_bucket(clf):
+        return build_entity_slug(clf.entity_type, _object_slug_descriptor(clf) or "")
     else:
         env = clf.environment.value if clf.environment.value != "none" else "unknown"
         return f"{t}-{env}"
@@ -371,8 +422,8 @@ def _image_filename_slug(clf: VisionClassification) -> str:
 def _entity_slug(clf: VisionClassification) -> str:
     """Entity slug for the MD file per data-contracts.spec.md: {type}-{descriptors}."""
     t = clf.type.value
-    parts = [t]
     if t in ("portrait", "body", "token"):
+        parts = [t]
         if clf.ancestry and clf.ancestry != "none":
             parts.append(to_slug(clf.ancestry))
         elif clf.creature_type and clf.creature_type != "none":
@@ -381,10 +432,14 @@ def _entity_slug(clf: VisionClassification) -> str:
             parts.append(to_slug(clf.char_class))
         if clf.element and clf.element.value != "none":
             parts.append(clf.element.value)
+        return "-".join(parts)
+    elif _is_object_in_scene_bucket(clf):
+        return build_entity_slug(clf.entity_type, _object_slug_descriptor(clf) or "")
     else:
+        parts = [t]
         if clf.environment and clf.environment.value != "none":
             parts.append(clf.environment.value)
-    return "-".join(parts)
+        return "-".join(parts)
 
 
 def _resolve_image_target(src: Path, img_slug: str) -> Path:
@@ -692,6 +747,29 @@ def _portrait_body(clf: VisionClassification) -> str:
     )
 
 
+def _item_body(clf: VisionClassification, entity_type: str) -> str:
+    """Body for an object-in-scene-bucket image (see _is_object_in_scene_bucket):
+    structurally 'scene'/'battlemap' (no dedicated isolated-object image type
+    exists) but entity_type says this is really a photographed item/artifact/
+    creature/etc, not a place. Scene's Atmosphere/Story-Hooks template would
+    misleadingly describe an object photo as an establishing shot; this is a
+    minimal, honest body instead — same spirit as _portrait_body."""
+    concrete_tags = [t for t in clf.candidate_tags if t not in (clf.type.value, clf.environment.value)]
+    return (
+        f"\n## Description\n\n{clf.description}\n\n"
+        f"## Visual Details\n\n"
+        + "".join(f"- {t}\n" for t in concrete_tags[:8])
+        + "\n"
+        f"## DM Notes\n\n"
+        f"- Detected as **{entity_type}** from an image the vision model could not "
+        f"place in a specific environment — confirm type/name on review\n\n"
+        f"## Details\n\n"
+        f"- **Type**: {entity_type.capitalize()}\n"
+        f"- **Element**: {clf.element.value}\n\n"
+        f"## Related\n\n"
+    )
+
+
 def _write_draft(
     path: Path,
     clf: VisionClassification,
@@ -769,7 +847,9 @@ def _write_draft(
             frontmatter["originalSource"] = [orig_rel]
 
     t = clf.type.value
-    if t == "battlemap":
+    if _is_object_in_scene_bucket(clf):
+        body = _item_body(clf, entity_type)
+    elif t == "battlemap":
         body = _battlemap_body(clf)
     elif t == "scene":
         body = _scene_body(clf)
@@ -824,7 +904,7 @@ def _extract_candidate_tags(raw: dict) -> list[str]:
                 if not isinstance(item, str):
                     continue
                 norm = item.strip().lower()
-                if norm:
+                if norm and _is_concrete_tag(norm):
                     seen.setdefault(norm, None)
         return list(seen)
     except Exception:
@@ -950,7 +1030,18 @@ def refine_tags_with_library(
         resp = _parse_json_response(raw_text)
         candidate = resp.get("final_tags")
         if isinstance(candidate, list) and candidate:
-            final_tags = [t.strip().lower() for t in candidate if isinstance(t, str) and t.strip()]
+            # Merge, never replace: cycle 4 asks the LLM to "finalize the
+            # complete tag list", and a model that just repeats a subset of
+            # what it was given (or rephrases "weapon" as "stylized sword")
+            # would otherwise silently erase tags earlier cycles already
+            # grounded in the image's own visual_analysis.
+            merged = list(current_tags)
+            for t in candidate:
+                if isinstance(t, str) and t.strip():
+                    norm = t.strip().lower()
+                    if norm not in merged and _is_concrete_tag(norm):
+                        merged.append(norm)
+            final_tags = merged
         et = resp.get("entity_type")
         if isinstance(et, str) and et in _ENTITY_TYPES:
             entity_type = et
@@ -1007,7 +1098,7 @@ def classify_image_full(
         for t in resp.get("additional_tags") or []:
             if isinstance(t, str) and t.strip():
                 norm = t.strip().lower()
-                if norm not in tags:
+                if norm not in tags and _is_concrete_tag(norm):
                     tags.append(norm)
     except (LLMOfflineError, LLMResponseError, Exception):
         pass  # keep cycle 1's type/tags — never fail the image over this
@@ -1025,7 +1116,7 @@ def classify_image_full(
         for t in resp.get("additional_tags") or []:
             if isinstance(t, str) and t.strip():
                 norm = t.strip().lower()
-                if norm not in tags:
+                if norm not in tags and _is_concrete_tag(norm):
                     tags.append(norm)
     except (LLMOfflineError, LLMResponseError, Exception):
         pass

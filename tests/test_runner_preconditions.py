@@ -65,3 +65,42 @@ def test_valid_entry_still_counts_alongside_a_stale_one(runner):
     })
 
     assert runner._inbox_has_slot("vision") is True
+
+
+def test_vision_skips_non_image_extension(runner):
+    """A mislabeled/misrouted queue entry pointing at a non-image file must
+    not trigger a vision dispatch — vision can never do anything with it."""
+    doc = runner._PROJECT_ROOT / "00-Inbox" / "docs" / "notes.txt"
+    doc.parent.mkdir(parents=True)
+    doc.write_bytes(b"not an image")
+    _write_queue(runner, {
+        "00-Inbox/docs/notes.txt": {"agents": {"vision": "pending"}},
+    })
+
+    assert runner._inbox_has_slot("vision") is False
+
+
+def test_vision_skips_zero_byte_file(runner):
+    """A zero-byte placeholder (e.g. mid-copy) must not trigger a dispatch
+    that would feed the vision LLM an empty/undecodable image."""
+    img = runner._PROJECT_ROOT / "00-Inbox" / "images" / "empty.jpg"
+    img.parent.mkdir(parents=True)
+    img.write_bytes(b"")
+    _write_queue(runner, {
+        "00-Inbox/images/empty.jpg": {"agents": {"vision": "pending"}},
+    })
+
+    assert runner._inbox_has_slot("vision") is False
+
+
+def test_non_vision_slot_counts_non_image_document(runner):
+    """lore/classification/wiki entries legitimately point at documents too
+    (state-files.spec.md) — the extension filter is vision-only."""
+    doc = runner._PROJECT_ROOT / "00-Inbox" / "docs" / "notes.txt"
+    doc.parent.mkdir(parents=True)
+    doc.write_bytes(b"lore fodder")
+    _write_queue(runner, {
+        "00-Inbox/docs/notes.txt": {"agents": {"classification": "pending"}},
+    })
+
+    assert runner._inbox_has_slot("classification") is True

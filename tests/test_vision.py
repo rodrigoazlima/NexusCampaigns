@@ -132,6 +132,40 @@ class TestExtractCandidateTags:
         raw = {"visual_analysis": {"lighting": {"rim_lighting": True}, "composition": {"shot_type": "wide"}}}
         assert _mod._extract_candidate_tags(raw) == []
 
+    def test_drops_sentence_length_pseudo_tag(self):
+        """The LLM sometimes ignores the '1-3 word tag' instruction and
+        returns a full descriptive sentence as one array item — that must
+        not land in frontmatter tags: as if it were a real tag."""
+        sentence = (
+            "a large sword with a black blade and hilt, featuring white "
+            "geometric patterns on the blade and a rectangular guard"
+        )
+        raw = {"visual_analysis": {"equipment": {"weapons": [sentence, "black blade"]}}}
+        tags = _mod._extract_candidate_tags(raw)
+        assert sentence not in tags
+        assert "black blade" in tags
+
+
+class TestIsConcreteTag:
+    def test_accepts_short_tags(self):
+        assert _mod._is_concrete_tag("sword")
+        assert _mod._is_concrete_tag("stylized sword")
+        assert _mod._is_concrete_tag("rectangular guard")
+
+    def test_rejects_empty(self):
+        assert not _mod._is_concrete_tag("")
+
+    def test_rejects_sentence_length(self):
+        assert not _mod._is_concrete_tag(
+            "a large sword with a black blade and hilt, featuring white geometric patterns"
+        )
+
+    def test_boundary_at_max_words(self):
+        six = "one two three four five six"
+        seven = six + " seven"
+        assert _mod._is_concrete_tag(six)
+        assert not _mod._is_concrete_tag(seven)
+
 
 # ---------------------------------------------------------------------------
 # _classify_one
@@ -319,6 +353,41 @@ class TestRefineTagsWithLibrary:
         _, et = _mod.refine_tags_with_library(img, client, ["axe"], "item", self._LIBRARY)
         assert et == "item"  # unrecognized value keeps the hint
 
+    def test_final_tags_merge_not_replace(self, tmp_path):
+        """Cycle 4 must never silently drop a tag an earlier cycle already
+        grounded in the image's own visual_analysis — a model that rephrases
+        ("weapon" -> "stylized sword") instead of listing both would
+        otherwise erase "weapon" from the note entirely."""
+        img = tmp_path / "sword.jpg"
+        _write_real_jpg(img)
+
+        client = MagicMock()
+        client.chat.return_value = json.dumps(
+            {"final_tags": ["stylized sword"], "entity_type": "item"}
+        )
+
+        tags, et = _mod.refine_tags_with_library(
+            img, client, ["weapon", "black blade"], "item", self._LIBRARY
+        )
+        assert "weapon" in tags
+        assert "black blade" in tags
+        assert "stylized sword" in tags
+        assert et == "item"
+
+    def test_final_tags_drop_sentence_length_candidate(self, tmp_path):
+        img = tmp_path / "sword.jpg"
+        _write_real_jpg(img)
+
+        sentence = "a large sword with a black blade and hilt featuring white geometric patterns"
+        client = MagicMock()
+        client.chat.return_value = json.dumps(
+            {"final_tags": [sentence, "weapon"], "entity_type": "item"}
+        )
+
+        tags, _ = _mod.refine_tags_with_library(img, client, ["axe"], "item", self._LIBRARY)
+        assert sentence not in tags
+        assert "weapon" in tags
+
 
 # ---------------------------------------------------------------------------
 # _is_token
@@ -432,6 +501,29 @@ class TestImageFilenameSlug:
         slug = _mod._image_filename_slug(c)
         assert " " not in slug
 
+    def test_scene_with_item_entity_type_uses_entity_slug(self):
+        """A sword closeup with no readable environment: type=scene (no
+        'isolated object' option exists), entity_type=item. Must not fall
+        into the generic scene-{environment} bucket."""
+        c = _clf(type_="scene", environment="interior", candidate_tags=["stylized sword", "weapon"])
+        c = c.model_copy(update={"entity_type": "item"})
+        slug = _mod._image_filename_slug(c)
+        assert slug == "item-stylized-sword"
+
+    def test_scene_with_place_entity_type_keeps_environment_slug(self):
+        """entity_type=location is place-like — the scene bucket is correct
+        here, no override should trigger."""
+        c = _clf(type_="scene", environment="forest")
+        c = c.model_copy(update={"entity_type": "location"})
+        slug = _mod._image_filename_slug(c)
+        assert slug == "scene-forest"
+
+    def test_scene_object_with_no_tags_falls_back_to_environment(self):
+        c = _clf(type_="scene", environment="interior", candidate_tags=[])
+        c = c.model_copy(update={"entity_type": "artifact"})
+        slug = _mod._image_filename_slug(c)
+        assert slug == "artifact-interior"
+
 
 # ---------------------------------------------------------------------------
 # _entity_slug
@@ -461,6 +553,22 @@ class TestEntitySlug:
     def test_type_only_when_no_descriptors(self):
         c = _clf(type_="portrait", ancestry="none", char_class="none", element="none")
         assert _mod._entity_slug(c) == "portrait"
+
+    def test_battlemap_object_entity_type_uses_entity_slug(self):
+        c = _clf(type_="battlemap", environment="dungeon", candidate_tags=["ancient statue"])
+        c = c.model_copy(update={"entity_type": "artifact"})
+        assert _mod._entity_slug(c) == "artifact-ancient-statue"
+
+    def test_two_unrelated_object_photos_do_not_collide(self):
+        """The bug this whole override exists to fix: two different sword
+        photos, same type=scene/environment=interior, must not resolve to
+        the same slug (which would collision-bump into a meaningless
+        scene-interior/-01/-02 family instead of reflecting either image)."""
+        a = _clf(type_="scene", environment="interior", candidate_tags=["black blade sword"])
+        a = a.model_copy(update={"entity_type": "item"})
+        b = _clf(type_="scene", environment="interior", candidate_tags=["trident blade sword"])
+        b = b.model_copy(update={"entity_type": "item"})
+        assert _mod._entity_slug(a) != _mod._entity_slug(b)
 
 
 # ---------------------------------------------------------------------------
@@ -841,6 +949,35 @@ class TestWriteDraft:
         _mod._write_draft(out, _clf(type_="scene", environment="interior"), img)
         fm = yaml.safe_load(out.read_text(encoding="utf-8").split("---")[1])
         assert fm["type"] == "location"
+
+    def test_draft_uses_item_body_for_object_in_scene_bucket(self, patch_roots, vault, tmp_path):
+        """A sword photographed with no readable environment lands on
+        type=scene/entity_type=item — the body must not claim '**Type**:
+        Scene' (the old bug: frontmatter said item, body said Scene) and
+        must use the item body's own sections instead of scene's Atmosphere/
+        Story Hooks template."""
+        img = vault / "00-Inbox" / "images" / "sword.jpg"
+        img.touch()
+        out = vault / "01-Processing" / "item-sword.md"
+        c = _clf(type_="scene", environment="interior", candidate_tags=["stylized sword", "weapon"])
+        c = c.model_copy(update={"entity_type": "item"})
+        _mod._write_draft(out, c, img)
+        body = out.read_text(encoding="utf-8")
+        assert "**Type**: Scene" not in body
+        assert "**Type**: Item" in body
+        assert "## Visual Details" in body
+        assert "stylized sword" in body
+
+    def test_draft_uses_scene_body_when_entity_type_is_place_like(self, patch_roots, vault, tmp_path):
+        img = vault / "00-Inbox" / "images" / "dungeon.jpg"
+        img.touch()
+        out = vault / "01-Processing" / "scene-dungeon.md"
+        c = _clf(type_="scene", environment="dungeon")
+        c = c.model_copy(update={"entity_type": "location"})
+        _mod._write_draft(out, c, img)
+        body = out.read_text(encoding="utf-8")
+        assert "**Type**: Scene" in body
+        assert "## Story Hooks" in body
 
 
 # ---------------------------------------------------------------------------

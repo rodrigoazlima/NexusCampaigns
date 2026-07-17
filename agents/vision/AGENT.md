@@ -38,7 +38,9 @@ responsibilities:
   - Call Qwen3-VL with base64-encoded image (resize to max 1024px on longest side, JPEG 85%)
   - Validate LLM JSON response against PF2e vocabulary (see models.py PF2E_* constants)
   - Harvest visual_analysis arrays (equipment/clothing/fantasy_features/environment_details)
-    into candidate_tags — free-form, never validated against a vocabulary
+    into candidate_tags — free-form (never validated against a vocabulary), but every
+    appended tag must pass _is_concrete_tag (1-6 words) so a full sentence can't land
+    in tags: as if it were one tag
   - classify_image_full() (public — importable by other agents/system code) runs three
     more follow-up turns in the SAME conversation (image stays in context, ≤10 messages
     total): confirm image type + more tags, infer entity type (18-value taxonomy, same
@@ -49,7 +51,12 @@ responsibilities:
     rather than spending a message on a retry — no budget for corrective turns
   - Final tags (candidate_tags) and entity_type land directly in the note's frontmatter
     via _write_draft — no longer state-only once the multi-cycle conversation finishes
-  - Build target filename slug; bump existing same-named file to counter suffix (e.g. -01, -02)
+  - Build target filename slug; bump existing same-named file to counter suffix (e.g. -01, -02).
+    Scene/battlemap images whose entity_type resolves to item or artifact (never legitimately
+    the scene itself — unlike creature/npc, which can genuinely appear within one) slug off
+    entity_type + a content tag instead of {type}-{environment}, and get an item-style draft
+    body — otherwise unrelated object photos collapse into one generic scene-interior-NN name
+    family (see _is_object_in_scene_bucket)
   - Write AGENTS.md-compliant draft to 01-Processing/ (status: draft, quality: 0, reviewed: false)
   - Append row to Images Index.md
   - Save result to processed-images.json after each classified image (not at batch end)
