@@ -316,6 +316,26 @@ def _generated_token_paths() -> set[str]:
     return {v["tokenPath"] for v in gen.values() if isinstance(v, dict) and v.get("tokenPath")}
 
 
+def _is_token_file(path: Path) -> bool:
+    """Filename-convention fallback for _generated_token_paths().
+
+    Same predicate as nexus.workers.ingestion._is_token_file (and token.py's
+    own _is_token_stem) - ingestion already uses it to keep generated tokens
+    out of inbox-queue.json in the first place. Vision's candidate scan walks
+    00-Inbox directly, independent of that queue, and until now only trusted
+    generated-tokens.json's path index to exclude them here - an index keyed
+    by whatever path token.py wrote at generation time. A worker output_dir
+    change (token.py moved its default from 00-Inbox to 01-Processing, see
+    that module's _DEFAULT_CFG comment) orphans any token generated under the
+    old location: the index no longer lists it, so the lookup above silently
+    stops excluding it and it gets reclassified as a "new" source image.
+    Checking the filename convention directly - like ingestion already does -
+    catches those orphans regardless of index state.
+    """
+    stem = path.stem
+    return stem.endswith("-token") or ".token" in stem
+
+
 def _candidate_images(state: dict, queue: dict) -> list[Path]:
     """Return unprocessed images, non-PNG first (tokens last per spec)."""
     path_index: set[str] = set(state.get("pathIndex", {}).keys())
@@ -328,6 +348,8 @@ def _candidate_images(state: dict, queue: dict) -> list[Path]:
         if rel in path_index:
             continue
         if rel in gen_tokens:
+            continue
+        if _is_token_file(path):
             continue
         agents = queue.get(rel, {}).get("agents", {})
         if isinstance(agents, dict) and agents.get("vision") in ("done", "paused"):
