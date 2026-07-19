@@ -122,6 +122,24 @@ def _host_gateway_name(runtime_bin: str) -> str:
     return "host.docker.internal" if runtime_bin == "docker" else "host.containers.internal"
 
 
+def _podman_wsl_gateway_ip() -> Optional[str]:
+    """Podman Desktop's WSL machine is a second hop: `--add-host ...:host-gateway`
+    resolves to the WSL VM's own loopback, not Windows, so a container can
+    open TCP to the VM but never reaches a Windows-side server (e.g. LM
+    Studio) - refused, not timed out, since something local answers on that
+    address. The VM's own default route already points at the real Windows
+    host, so ask it directly and use that concrete IP instead of the magic
+    keyword."""
+    result = subprocess.run(
+        ["podman", "machine", "ssh", "--", "ip", "route", "show", "default"],
+        capture_output=True, text=True, encoding="utf-8", errors="replace", check=False,
+    )
+    if result.returncode != 0:
+        return None
+    match = re.search(r"default via (\S+)", result.stdout)
+    return match.group(1) if match else None
+
+
 # ---------------------------------------------------------------------------
 # Scope resolution - reuse existing parsers, don't reinvent them
 # ---------------------------------------------------------------------------
@@ -368,7 +386,8 @@ def _run_container(
 ) -> tuple[int, str]:
     cmd = [runtime_bin, "run", "--name", run_id]
     if runtime_bin == "podman":
-        cmd.append("--add-host=host.containers.internal:host-gateway")
+        gateway_target = _podman_wsl_gateway_ip() or "host-gateway"
+        cmd.append(f"--add-host=host.containers.internal:{gateway_target}")
     for key, val in env_forward.items():
         cmd += ["-e", f"{key}={val}"]
     cmd.append(image_tag)
