@@ -10,7 +10,7 @@ podman run -d `
   --replace `
   -p 127.0.0.1:5672:5672 `
   -p 127.0.0.1:15672:15672 `
-  -v nexus-rabbitmq-data:/var/lib/rabbitmq `
+  -v nexus-rabbitmq-data:/var/lib/rabbitmq:U `
   nexus-rabbitmq:latest
 
 Write-Host "RabbitMQ up. AMQP: 127.0.0.1:5672  Management UI: http://127.0.0.1:15672 (guest/guest)"

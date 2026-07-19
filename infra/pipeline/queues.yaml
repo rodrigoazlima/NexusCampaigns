@@ -7,6 +7,11 @@
 # work consumer) and agents with status: planned (relationship, deduplication,
 # canon, curator, search, adventure-builder, session-builder,
 # encounter-builder) — no code yet, add their queue when they ship.
+#
+# This exchange is provisioned but NOT wired into nexus.runner — see
+# docs/refactor/rabbitmq-queue-integration/README.md for the necessity
+# review (verdict: only worker.token + worker.thumbnails are conditionally
+# justified; the rest wait on a concrete trigger before any code changes).
 exchange: nexus.pipeline
 type: topic
 
