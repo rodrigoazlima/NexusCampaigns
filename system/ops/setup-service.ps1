@@ -461,6 +461,29 @@ function Find-Node {
     return $null
 }
 
+function Find-Podman {
+    $podman = Get-Command podman -ErrorAction SilentlyContinue
+    if ($podman) { return $podman.Source }
+    foreach ($p in @(
+        "$env:ProgramFiles\RedHat\Podman\podman.exe",
+        "$env:LOCALAPPDATA\Programs\Podman\podman.exe"
+    )) {
+        if (Test-Path $p) { return $p }
+    }
+    return $null
+}
+
+function Find-Docker {
+    $docker = Get-Command docker -ErrorAction SilentlyContinue
+    if ($docker) { return $docker.Source }
+    foreach ($p in @(
+        "$env:ProgramFiles\Docker\Docker\resources\bin\docker.exe"
+    )) {
+        if (Test-Path $p) { return $p }
+    }
+    return $null
+}
+
 # Produce the canonical env config at system\.env.local, derived from global.json.
 # Does not clobber an existing file unless -Force is given.
 # Callers that need the file in the dashboard dir must copy it there explicitly.
@@ -1026,6 +1049,24 @@ try {
     Log "Python not found at '$Python'. Install Python 3.11+ and add to PATH." "ERROR"
     exit 1
 }
+
+# vision-agent's sandboxed dispatch (nexus.tasks.sandbox_run) shells out to
+# podman/docker by bare name. That only resolves under whatever PATH the
+# runner process has - the NSSM service doesn't inherit this installer's
+# (possibly per-user) PATH, so Machine PATH edits alone aren't reliable.
+# Record whatever we find here so sandbox_run.py can fall back to it.
+$podmanPath = Find-Podman
+$dockerPath = Find-Docker
+if ($podmanPath) { Log "Podman: $podmanPath" } else { Log "Podman not found (checked PATH + common install dirs)." "WARN" }
+if ($dockerPath) { Log "Docker: $dockerPath" } else { Log "Docker not found (checked PATH + common install dirs)." "WARN" }
+if (-not $podmanPath -and -not $dockerPath) {
+    Log "No container runtime found - vision-agent's sandboxed dispatch will fail until Podman or Docker is installed." "WARN"
+}
+$containerStateDir = "$ProjectRoot\system\state"
+New-Item -ItemType Directory -Force $containerStateDir | Out-Null
+[ordered]@{ podman = $podmanPath; docker = $dockerPath } |
+    ConvertTo-Json | Set-Content "$containerStateDir\container-runtime.json" -Encoding UTF8
+Log "Wrote container runtime fallback: $containerStateDir\container-runtime.json"
 
 Step-Progress "Installing Python dependencies..." 25
 Log "Installing pip dependencies..."

@@ -130,6 +130,32 @@ class TestHostGatewayName:
         assert sr._host_gateway_name("podman") == "host.containers.internal"
 
 
+class TestDetectRuntime:
+    def test_found_on_path_skips_state_file(self, monkeypatch):
+        monkeypatch.setattr(sr.shutil, "which", lambda name: f"/usr/bin/{name}")
+        monkeypatch.setattr(sr, "_RUNTIME_STATE_PATH", sr.Path("does-not-exist.json"))
+        assert sr._detect_runtime(None) == "podman"
+
+    def test_falls_back_to_state_file_and_widens_path(self, monkeypatch, tmp_path):
+        exe = tmp_path / "podman.exe"
+        exe.write_text("", encoding="utf-8")
+        state_file = tmp_path / "container-runtime.json"
+        state_file.write_text(json.dumps({"podman": str(exe)}), encoding="utf-8")
+
+        monkeypatch.setattr(sr, "_RUNTIME_STATE_PATH", state_file)
+        monkeypatch.setattr(sr.shutil, "which", lambda name: None)
+        monkeypatch.setenv("PATH", "/usr/bin")
+
+        assert sr._detect_runtime(None) == "podman"
+        assert str(exe.parent) in sr.os.environ["PATH"]
+
+    def test_raises_when_nothing_found(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(sr, "_RUNTIME_STATE_PATH", tmp_path / "missing.json")
+        monkeypatch.setattr(sr.shutil, "which", lambda name: None)
+        with pytest.raises(sr.SandboxPreflightError):
+            sr._detect_runtime(None)
+
+
 class TestPodmanWslGatewayIp:
     def test_parses_default_route(self, monkeypatch):
         monkeypatch.setattr(

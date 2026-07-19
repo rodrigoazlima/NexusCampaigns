@@ -60,6 +60,11 @@ _LOGS_DIR      = _SANDBOX_STATE / "logs"
 _MASTER_LOG    = _PROJECT_ROOT / "agents" / "runtime" / "state" / "logs" / "automation.log"
 _APPLY_LOCK    = _PROJECT_ROOT / "agents" / "runtime" / "state" / "sandbox-apply"
 
+# Written by setup-service.ps1 (Find-Podman/Find-Docker) - the NSSM service
+# process doesn't inherit whatever PATH found podman/docker at install time,
+# so it's persisted here as a fallback instead of trusting PATH alone.
+_RUNTIME_STATE_PATH = _SYSTEM_STATE / "container-runtime.json"
+
 _DIFF_TRUNCATE_LINES = 400
 _CONTAINER_LOG_TAIL_LINES = 200
 _SKIP_DIRNAMES = {"__pycache__"}
@@ -89,14 +94,39 @@ def _make_logger() -> Logger:
 # Container runtime detection
 # ---------------------------------------------------------------------------
 
+def _runtime_fallback_path(name: str) -> Optional[str]:
+    """Look up name's exe path from container-runtime.json, if setup-service.ps1
+    recorded one and it still exists on disk."""
+    if not _RUNTIME_STATE_PATH.exists():
+        return None
+    try:
+        data = json.loads(_RUNTIME_STATE_PATH.read_text(encoding="utf-8").lstrip("﻿"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    path = data.get(name)
+    return path if path and Path(path).is_file() else None
+
+
 def _detect_runtime(preferred: Optional[str]) -> str:
     candidates = [preferred] if preferred else ["podman", "docker"]
     for name in candidates:
-        if name and shutil.which(name):
+        if not name:
+            continue
+        if shutil.which(name):
+            return name
+        fallback = _runtime_fallback_path(name)
+        if fallback:
+            # Not on this process's PATH - widen it with the fallback's own
+            # dir so every `subprocess.run([name, ...])` call below still
+            # resolves `name` by bare command.
+            os.environ["PATH"] = os.pathsep.join(
+                [str(Path(fallback).parent), os.environ.get("PATH", "")]
+            )
             return name
     raise SandboxPreflightError(
-        "No container runtime found on PATH (checked: podman, docker). "
-        "Install Podman or Docker to use nexus.tasks.sandbox_run."
+        "No container runtime found on PATH or in system/state/container-runtime.json "
+        "(checked: podman, docker). Install Podman or Docker, or re-run setup-service.ps1 "
+        "to refresh the fallback path."
     )
 
 
