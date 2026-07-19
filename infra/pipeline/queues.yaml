@@ -1,0 +1,51 @@
+# Source of truth for infra/config/definitions.json queue provisioning.
+# Mirrors nexus.workers.* (in-process, no LLM) and the active LLM agents
+# from agents/registry.yaml. Not consumed at runtime — edit here, then
+# hand-sync definitions.json if queues change.
+#
+# Excluded: registry.yaml's "runtime" entry (the scheduler itself, not a
+# work consumer) and agents with status: planned (relationship, deduplication,
+# canon, curator, search, adventure-builder, session-builder,
+# encounter-builder) — no code yet, add their queue when they ship.
+exchange: nexus.pipeline
+type: topic
+
+workers:
+  - name: worker.ingestion
+    module: nexus.workers.ingestion
+    kind: queue
+  - name: worker.thumbnails
+    module: nexus.workers.thumbnails
+    kind: queue
+  - name: worker.token
+    module: nexus.workers.token
+    kind: queue
+  - name: worker.wikilink
+    module: nexus.workers.wikilink
+    kind: queue
+  - name: worker.shortfiles
+    module: nexus.workers.shortfiles
+    kind: queue
+  - name: worker.report
+    module: nexus.workers.report
+    kind: scheduled
+  - name: worker.cleanup
+    module: nexus.workers.cleanup
+    kind: scheduled
+  - name: worker.maintenance
+    module: nexus.workers.maintenance
+    kind: scheduled
+
+agents:
+  - name: agent.vision
+    task_id: vision-agent
+    llm: vision_llm
+  - name: agent.lore
+    task_id: lore-agent
+    llm: vision_llm
+  - name: agent.classification
+    task_id: classification-agent
+    llm: local_router
+  - name: agent.wiki
+    task_id: wiki-agent
+    llm: local_router
