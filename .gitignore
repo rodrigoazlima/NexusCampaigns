@@ -285,6 +285,8 @@ agents/*/.system/
 Thumbs.db
 desktop.ini
 ehthumbs.db
+NUL
+nul
 
 # Editor temp files
 *.swp
