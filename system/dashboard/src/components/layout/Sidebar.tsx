@@ -32,6 +32,7 @@ import {
   PanelLeftOpen,
   Archive,
   Settings,
+  History,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -105,6 +106,7 @@ const nav: NavSection[] = [
         children: [
           { href: '/executive', label: 'Executive', icon: LayoutDashboard },
           { href: '/errors', label: 'Errors', icon: Zap },
+          { href: '/log/changes', label: 'Change Log', icon: History },
           { href: '/prompt', label: 'Prompts', icon: FileText },
         ],
       },

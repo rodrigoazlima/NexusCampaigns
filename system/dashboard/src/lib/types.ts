@@ -378,3 +378,50 @@ export interface CampaignFrame {
   player_buyin: string
   active: boolean
 }
+
+// ---------------------------------------------------------------------------
+// Sandbox agent runs (nexus.tasks.sandbox_run, system/state/sandbox/runs/*.json)
+// ---------------------------------------------------------------------------
+
+export type SandboxChangeClass = 'knowledge-base' | 'state' | 'other'
+export type SandboxChangeStatus = 'applied' | 'dropped' | 'would-apply' | 'would-drop'
+
+export interface SandboxFileChange {
+  path: string
+  class: SandboxChangeClass
+  status: SandboxChangeStatus
+  reason: string | null
+  binary: boolean
+  bytesBefore: number
+  bytesAfter: number
+  diff: string
+}
+
+// registry.yaml agents.<name>.sandbox
+export interface AgentSandboxSettings {
+  enabled: boolean
+  allowDeletes: boolean
+}
+
+export interface SandboxRun {
+  runId: string
+  agent: string
+  taskId: string
+  runtime: string
+  runtimeVersion: string
+  baseImage: string
+  image: string
+  dispatchType: string
+  startedAt: string
+  finishedAt: string
+  buildMs: number
+  runMs: number
+  containerExitCode: number
+  dryRun: boolean
+  allowDeletes: boolean
+  commitScope: string[]
+  stateAllowlist: string[]
+  summary: { changed: number; applied: number; dropped: number }
+  changes: SandboxFileChange[]
+  containerLog: string
+}

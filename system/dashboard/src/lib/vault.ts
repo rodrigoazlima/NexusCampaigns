@@ -3,7 +3,7 @@ import path from 'path'
 import { execSync } from 'child_process'
 import { randomUUID } from 'crypto'
 import matter from 'gray-matter'
-import { parse as parseYaml } from 'yaml'
+import { parse as parseYaml, parseDocument } from 'yaml'
 import type {
   AgentInfo,
   AgentRun,
@@ -25,6 +25,8 @@ import type {
   AgentDoc,
   IntelligenceConfig,
   CampaignFrame,
+  SandboxRun,
+  AgentSandboxSettings,
 } from './types'
 import { addSeconds } from './utils'
 import { resolveStatus } from './queue-status'
@@ -38,6 +40,7 @@ const AGENTS_DIR = path.join(PROJECT_ROOT, 'agents')
 const STATE_DIR = path.join(PROJECT_ROOT, 'agents', 'runtime', 'state')
 const SHARED_DIR = path.join(PROJECT_ROOT, 'system', 'state')
 const REPORTS_DIR = path.join(PROJECT_ROOT, 'system', 'state', 'review', 'reports')
+const SANDBOX_RUNS_DIR = path.join(PROJECT_ROOT, 'system', 'state', 'sandbox', 'runs')
 const LOGS_DIR = path.join(PROJECT_ROOT, 'agents', 'runtime', 'state', 'logs')
 const REGISTRY_PATH = path.join(PROJECT_ROOT, 'agents', 'registry.yaml')
 
@@ -796,6 +799,24 @@ export function readAllReports(): Record<string, DailyReport> {
     // ignore
   }
   return result
+}
+
+export function readSandboxRuns(): SandboxRun[] {
+  try {
+    const files = fs
+      .readdirSync(SANDBOX_RUNS_DIR)
+      .filter((f) => f.startsWith('run-') && f.endsWith('.json'))
+      .sort()
+      .reverse()
+    const runs: SandboxRun[] = []
+    for (const file of files) {
+      const run = readJson<SandboxRun>(path.join(SANDBOX_RUNS_DIR, file))
+      if (run) runs.push(run)
+    }
+    return runs
+  } catch {
+    return []
+  }
 }
 
 // ---------------------------------------------------------------------------

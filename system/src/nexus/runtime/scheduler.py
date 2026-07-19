@@ -8,6 +8,7 @@ off to the worker loop for in-process static work.
 
 from __future__ import annotations
 
+import time
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -71,6 +72,10 @@ class Runtime(IOrchestrator):
             self._log.error(f"Task not found in any agent.json: {task_id}")
             return 1, _empty
 
+        agent_name = dispatch_config.agent_name_from_task_id(task_id)
+        if dispatch_config.agent_is_sandboxed(agent_name) and not dispatch_config.running_inside_sandbox():
+            return self._dispatch_sandboxed(agent_name, task_id)
+
         dispatch_cfg = dispatch_config.load_agent_dispatch(task_id, self._log)
         if dispatch_cfg is None:
             return 1, _empty
@@ -116,6 +121,29 @@ class Runtime(IOrchestrator):
             except Exception as exc:
                 log.error(f"Fallback dispatch failed: {exc}")
 
+        log.done(t0, key="processed", count=1 if exit_code == 0 else 0, failed=0 if exit_code == 0 else 1)
+        return exit_code, result
+
+    def _dispatch_sandboxed(self, agent_name: str, task_id: str) -> tuple[int, RunResult]:
+        """Run this task via nexus.tasks.sandbox_run instead of the normal
+        get_runner() path - registry.yaml's agents.<name>.sandbox.enabled.
+
+        sandbox_run.run() already applies knowledge-base/state changes
+        straight to their real host paths and forwards the container's own
+        automation.log lines onto ours (so metrics parsing below still
+        works); commit_changes() afterward is unaffected - it commits
+        whatever landed at the real commit_scope paths either way.
+        """
+        log = make_logger(task_id)
+        t0 = log.start()
+        log.info(f"Sandboxed dispatch: routing {task_id} through nexus.tasks.sandbox_run")
+        try:
+            from nexus.tasks import sandbox_run  # lazy: pulls in the full runtime/shared stack
+            exit_code = sandbox_run.run(agent_name)
+        except Exception as exc:
+            log.error(f"Sandboxed dispatch failed: {exc}")
+            exit_code = 1
+        result = RunResult(exit_code=exit_code, duration_ms=int((time.monotonic() - t0) * 1000))
         log.done(t0, key="processed", count=1 if exit_code == 0 else 0, failed=0 if exit_code == 0 else 1)
         return exit_code, result
 

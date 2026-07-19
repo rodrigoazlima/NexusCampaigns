@@ -741,6 +741,17 @@ class AgentSharedStateSpec(BaseModel):
     updates: list[str] = Field(default_factory=list)
 
 
+class SandboxConfig(BaseModel):
+    """registry.yaml agents.<name>.sandbox - controls nexus.tasks.sandbox_run's
+    apply step, and (via `enabled`) whether the runtime routes this agent's
+    normal dispatch through the sandbox instead of running it directly.
+    allow_deletes=false (default) means an in-scope file present before a
+    sandboxed run but missing after it is dropped, not applied - a rename's
+    new file still lands, the stale original is left in place."""
+    enabled:       bool = False
+    allow_deletes: bool = False
+
+
 class AgentRegistryEntry(BaseModel):
     """One entry under registry.yaml agents."""
     status:           Literal["active", "planned", "deprecated"]
@@ -752,6 +763,7 @@ class AgentRegistryEntry(BaseModel):
     prompts:          list[str]                     = Field(default_factory=list)
     shared_state:     Optional[AgentSharedStateSpec] = None
     dependencies:     list[str]                     = Field(default_factory=list)
+    sandbox:          Optional[SandboxConfig]        = None
 
 
 class SharedStateFileSpec(BaseModel):

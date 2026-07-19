@@ -149,6 +149,7 @@ from .models import (
     ReviewItem,
     RunMetrics,
     RunResult,
+    SandboxConfig,
     ScenarioEntry,
     SearchEntry,
     SearchIndex,
@@ -220,7 +221,7 @@ __all__ = [
     "RunMetrics", "AgentMetricsEntry", "AgentMetrics",
     # Models - registry
     "AgentRegistryEntry", "AgentSharedStateSpec", "LLMEndpointSpec",
-    "RegistryConfig", "SharedStateFileSpec",
+    "RegistryConfig", "SandboxConfig", "SharedStateFileSpec",
     # Models - reports
     "AgentLogSummary", "CanonReport", "CanonViolation", "CleanupReport",
     "CuratorReport", "CuratorSuggestion", "DailyReport", "DedupCandidate",

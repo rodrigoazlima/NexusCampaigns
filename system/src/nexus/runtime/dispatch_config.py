@@ -8,6 +8,7 @@ and unwrapping the type-specific dispatch sub-config.
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 from typing import Optional
@@ -125,6 +126,34 @@ def read_agent_commit_scope(task_id: str) -> list[str]:
         return [item.strip() for item in _SCOPE_ITEM_RE.findall(m.group(1)) if item.strip()]
     except Exception:
         return []
+
+
+# Set by nexus.tasks.sandbox_run's generated Dockerfile inside a sandboxed
+# container - guards against sandbox-in-sandbox recursion when the
+# sandboxed agent's own staged registry.yaml copy still says
+# agents.<name>.sandbox.enabled: true (the container has no docker/podman
+# to actually build another sandbox with, so recursing would just fail).
+SANDBOXED_ENV_VAR = "NEXUS_SANDBOXED"
+
+
+def agent_is_sandboxed(agent_name: str) -> bool:
+    """True if registry.yaml's agents.<name>.sandbox.enabled is set - the
+    runtime should route this agent's dispatch through
+    nexus.tasks.sandbox_run instead of running it directly."""
+    try:
+        registry = load_registry(PROJECT_ROOT)
+    except Exception:
+        return False
+    entry = registry.agents.get(agent_name)
+    if entry is None or entry.sandbox is None:
+        return False
+    return bool(entry.sandbox.enabled)
+
+
+def running_inside_sandbox() -> bool:
+    """True when this process is itself executing inside a
+    nexus.tasks.sandbox_run container."""
+    return os.environ.get(SANDBOXED_ENV_VAR) == "1"
 
 
 def extract_dispatch_sub(dispatch: AgentDispatchConfig) -> dict:
