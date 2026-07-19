@@ -197,17 +197,71 @@ export default function AgentQueueTable({ items, agent, byType }: Props) {
   const selectedCanPause = selectedItems.some((i) => resolveAgentStatus(i, agent) === 'pending' || resolveAgentStatus(i, agent) === 'stuck')
   const selectedCanResume = selectedItems.some((i) => resolveAgentStatus(i, agent) === 'paused')
 
+  const renderActions = (item: QueueItem, status: AgentStatus, size: 'sm' | 'lg') => {
+    const btnSize = size === 'lg' ? 'w-8 h-8' : 'w-6 h-6'
+    const iconSize = size === 'lg' ? 14 : 12
+    return (
+      <div className="flex items-center gap-1">
+        {(status === 'pending' || status === 'stuck') && (
+          <button
+            type="button"
+            title="Pause processing for this item"
+            onClick={() => pauseAgent([item.path])}
+            disabled={busy.has(item.path)}
+            className={`flex items-center justify-center ${btnSize} rounded text-zinc-500 hover:text-warning hover:bg-warning/10 transition-colors disabled:opacity-50`}
+          >
+            {busy.has(item.path) ? <Loader2 size={iconSize} className="animate-spin" /> : <Pause size={iconSize} />}
+          </button>
+        )}
+        {status === 'paused' && (
+          <button
+            type="button"
+            title="Continue processing for this item"
+            onClick={() => resumeAgent([item.path])}
+            disabled={busy.has(item.path)}
+            className={`flex items-center justify-center ${btnSize} rounded text-zinc-500 hover:text-neutral hover:bg-neutral/10 transition-colors disabled:opacity-50`}
+          >
+            {busy.has(item.path) ? <Loader2 size={iconSize} className="animate-spin" /> : <Play size={iconSize} />}
+          </button>
+        )}
+        {status !== 'skip' && (
+          <button
+            type="button"
+            title="Force this item to reprocess"
+            onClick={() => reprocessAgent([item.path])}
+            disabled={busy.has(item.path)}
+            className={`flex items-center justify-center ${btnSize} rounded text-zinc-500 hover:text-primary hover:bg-primary/10 transition-colors disabled:opacity-50`}
+          >
+            {busy.has(item.path) ? <Loader2 size={iconSize} className="animate-spin" /> : <RotateCcw size={iconSize} />}
+          </button>
+        )}
+        <button
+          type="button"
+          title={confirming.has(item.path) ? 'Click again to permanently delete' : 'Delete this item - source, generated token, and thumbnail'}
+          onClick={() => handleDeleteClick(item.path, [item.path])}
+          disabled={busy.has(item.path)}
+          className={`flex items-center justify-center h-6 px-1.5 rounded transition-colors disabled:opacity-50 ${size === 'lg' ? 'h-8' : 'h-6'} ${
+            confirming.has(item.path) ? 'text-danger bg-danger/15 border border-danger/40' : 'text-zinc-500 hover:text-danger hover:bg-danger/10'
+          }`}
+        >
+          {busy.has(item.path) ? <Loader2 size={iconSize} className="animate-spin" /> : <Trash2 size={iconSize} />}
+          {confirming.has(item.path) && <span className="ml-1 text-[11px] font-semibold whitespace-nowrap">Confirm?</span>}
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div>
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2 mb-4">
-        <div className="relative">
+        <div className="relative w-full sm:w-56">
           <Search size={13} className="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-600" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by filename…"
-            className="text-xs bg-surface-3 border border-surface-3 text-zinc-300 pl-7 pr-2 py-1.5 rounded outline-none focus:border-primary/40 transition-colors w-56"
+            className="text-xs bg-surface-3 border border-surface-3 text-zinc-300 pl-7 pr-2 py-1.5 rounded outline-none focus:border-primary/40 transition-colors w-full"
           />
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
@@ -244,10 +298,10 @@ export default function AgentQueueTable({ items, agent, byType }: Props) {
       </div>
 
       <div className="panel overflow-hidden">
-        <div className="px-4 py-3 border-b border-surface-3 flex items-center justify-between gap-3 min-h-[45px]">
+        <div className="px-4 py-3 border-b border-surface-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 min-h-[45px]">
           <span className="text-sm font-semibold text-zinc-200">Items ({items.length})</span>
           {selected.size > 0 && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               {selectedCanPause && (
                 <button
                   type="button"
@@ -296,7 +350,8 @@ export default function AgentQueueTable({ items, agent, byType }: Props) {
           <div className="p-6 text-center text-zinc-500 text-sm">No items match the current filters</div>
         ) : (
           <>
-            <div className="overflow-x-auto">
+            {/* Desktop/tablet: full table */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-surface-3 text-zinc-500">
@@ -337,55 +392,7 @@ export default function AgentQueueTable({ items, agent, byType }: Props) {
                         <td className="px-4 py-2 text-zinc-400">{formatRelative(item.ingestedAt)}</td>
                         <td className="px-4 py-2 text-zinc-400">{formatRelative(item.updatedAt)}</td>
                         <td className="px-4 py-2 text-right text-zinc-500 font-mono">{reruns || '-'}</td>
-                        <td className="px-4 py-2">
-                          <div className="flex items-center gap-1">
-                            {(status === 'pending' || status === 'stuck') && (
-                              <button
-                                type="button"
-                                title="Pause processing for this item"
-                                onClick={() => pauseAgent([item.path])}
-                                disabled={busy.has(item.path)}
-                                className="flex items-center justify-center w-6 h-6 rounded text-zinc-500 hover:text-warning hover:bg-warning/10 transition-colors disabled:opacity-50"
-                              >
-                                {busy.has(item.path) ? <Loader2 size={12} className="animate-spin" /> : <Pause size={12} />}
-                              </button>
-                            )}
-                            {status === 'paused' && (
-                              <button
-                                type="button"
-                                title="Continue processing for this item"
-                                onClick={() => resumeAgent([item.path])}
-                                disabled={busy.has(item.path)}
-                                className="flex items-center justify-center w-6 h-6 rounded text-zinc-500 hover:text-neutral hover:bg-neutral/10 transition-colors disabled:opacity-50"
-                              >
-                                {busy.has(item.path) ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
-                              </button>
-                            )}
-                            {status !== 'skip' && (
-                              <button
-                                type="button"
-                                title="Force this item to reprocess"
-                                onClick={() => reprocessAgent([item.path])}
-                                disabled={busy.has(item.path)}
-                                className="flex items-center justify-center w-6 h-6 rounded text-zinc-500 hover:text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
-                              >
-                                {busy.has(item.path) ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              title={confirming.has(item.path) ? 'Click again to permanently delete' : 'Delete this item - source, generated token, and thumbnail'}
-                              onClick={() => handleDeleteClick(item.path, [item.path])}
-                              disabled={busy.has(item.path)}
-                              className={`flex items-center justify-center h-6 px-1.5 rounded transition-colors disabled:opacity-50 ${
-                                confirming.has(item.path) ? 'text-danger bg-danger/15 border border-danger/40' : 'text-zinc-500 hover:text-danger hover:bg-danger/10'
-                              }`}
-                            >
-                              {busy.has(item.path) ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-                              {confirming.has(item.path) && <span className="ml-1 text-[11px] font-semibold whitespace-nowrap">Confirm?</span>}
-                            </button>
-                          </div>
-                        </td>
+                        <td className="px-4 py-2">{renderActions(item, status, 'sm')}</td>
                       </tr>
                     )
                   })}
@@ -393,7 +400,40 @@ export default function AgentQueueTable({ items, agent, byType }: Props) {
               </table>
             </div>
 
-            <div className="px-4 py-2.5 border-t border-surface-3 flex items-center justify-between gap-3 text-xs text-zinc-500">
+            {/* Mobile: card list - a 7-column table doesn't fit a phone screen */}
+            <div className="md:hidden divide-y divide-surface-3/50">
+              {pageItems.map((item) => {
+                const status = resolveAgentStatus(item, agent)
+                const meta = STATUS_META[status]
+                const reruns = item.reruns[agent] ?? 0
+                return (
+                  <div key={item.path} className="p-3 flex gap-3">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(item.path)}
+                      onChange={() => toggleSelect(item.path)}
+                      className="cursor-pointer mt-1 shrink-0 w-4 h-4"
+                    />
+                    <div className="shrink-0"><QueueThumb path={item.path} /></div>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-mono text-zinc-300 text-xs break-all">{filename(item.path)}</div>
+                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded-full border font-medium ${meta.badge}`}>{meta.label}</span>
+                        <span className="text-zinc-600 text-xs">{item.type}</span>
+                        {reruns > 0 && <span className="text-zinc-500 text-xs font-mono">· {reruns} reruns</span>}
+                      </div>
+                      <div className="flex items-center gap-2.5 mt-1 text-[10px] text-zinc-500">
+                        <span>In {formatRelative(item.ingestedAt)}</span>
+                        <span>Upd {formatRelative(item.updatedAt)}</span>
+                      </div>
+                      <div className="mt-2">{renderActions(item, status, 'lg')}</div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="px-4 py-2.5 border-t border-surface-3 flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-500">
               <div className="flex items-center gap-2">
                 <span>Rows</span>
                 <select

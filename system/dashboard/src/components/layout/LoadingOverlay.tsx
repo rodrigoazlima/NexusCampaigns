@@ -38,15 +38,21 @@ export default function LoadingOverlay() {
   }
 
   // Initial page load - wait for assets, then reveal.
+  // Safety-net timeout: a blocked/slow cross-origin resource (e.g. the
+  // Google Fonts @import in globals.css on a network with no outbound
+  // internet) can delay or suppress the `load` event indefinitely.
   useEffect(() => {
     if (document.readyState === 'complete') {
       hide()
-    } else {
-      const onLoad = () => hide()
-      window.addEventListener('load', onLoad)
-      return () => window.removeEventListener('load', onLoad)
+      return undefined
     }
-    return undefined
+    const onLoad = () => hide()
+    const fallback = setTimeout(onLoad, 3000)
+    window.addEventListener('load', onLoad)
+    return () => {
+      clearTimeout(fallback)
+      window.removeEventListener('load', onLoad)
+    }
   }, [])
 
   // Route change finished (pathname committed) - reveal shortly after.
@@ -90,8 +96,8 @@ export default function LoadingOverlay() {
   return (
     <div
       className={`fixed inset-0 z-[100] flex flex-col items-center justify-center gap-4 bg-surface transition-opacity duration-500 ${
-        fading ? 'opacity-0' : 'opacity-100'
-      }`}
+        fading ? 'opacity-0 pointer-events-none' : 'opacity-100'
+      } loading-overlay`}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img

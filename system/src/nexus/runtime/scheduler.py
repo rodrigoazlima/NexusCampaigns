@@ -148,6 +148,13 @@ class Runtime(IOrchestrator):
         return exit_code, result
 
     def commit_changes(self, task_id: str) -> None:
+        if dispatch_config.running_inside_sandbox():
+            # This container copy has no .git (and no git binary) - it's
+            # discarded on cleanup regardless. The host-side
+            # _dispatch_sandboxed() caller commits the real repo after
+            # extracting applied changes; committing here would only ever
+            # fail with a doomed FileNotFoundError.
+            return
         scope = dispatch_config.read_agent_commit_scope(task_id)
         if not scope:
             self._log.warning(

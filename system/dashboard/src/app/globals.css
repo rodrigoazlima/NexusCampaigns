@@ -33,6 +33,16 @@ body {
 .animate-drawer-in { animation: drawer-in 0.2s ease-out; }
 .animate-fade-in { animation: fade-in 0.2s ease-out; }
 
+/* Emergency reveal for the loading overlay: if its JS never runs (hydration
+   failure - seen on some mobile browsers) no React timer ever fires, so the
+   kill-switch has to be pure CSS. Step (not interpolated) so it never fights
+   the JS-driven opacity transition, which always finishes well before 8s. */
+@keyframes force-reveal {
+  0%, 99.9% { opacity: 1; pointer-events: auto; }
+  100% { opacity: 0; pointer-events: none; }
+}
+.loading-overlay { animation: force-reveal 8s forwards; }
+
 /* iOS Safari auto-zooms into inputs with font-size < 16px */
 @media (max-width: 767px) {
   input, select, textarea {
