@@ -81,16 +81,16 @@ workers_enabled: true
 workers:
   ingestion:
     kind: queue
-    batch_size: 25                # files per cycle; inbox dumps can be large
-    commit_scope: [".knowledge-base/00-Inbox"]   # renames + docx conversions
+    batch_size: 25 # files per cycle; inbox dumps can be large
+    commit_scope: [".knowledge-base/00-Inbox"] # renames + docx conversions
   thumbnails:
     kind: queue
     batch_size: 10
-    commit_scope: []              # everything gitignored
+    commit_scope: [] # everything gitignored
   token:
     kind: queue
     batch_size: 10
-    commit_scope: [".knowledge-base/00-Inbox/images"]   # tokens written next to sources
+    commit_scope: [".knowledge-base/00-Inbox/images"] # tokens written next to sources
     options:
       moldura_by_type: {}
   wikilink:
@@ -99,12 +99,12 @@ workers:
     commit_scope: [".knowledge-base/02-Library"]
   shortfiles:
     kind: queue
-    batch_size: 50                # cheap per-item work
+    batch_size: 50 # cheap per-item work
     commit_scope: [".knowledge-base/01-Processing"]
   report:
     kind: scheduled
     interval_seconds: 300
-    commit_scope: [".knowledge-base/01-Processing"]     # suggestedQuality writes
+    commit_scope: [".knowledge-base/01-Processing"] # suggestedQuality writes
   cleanup:
     kind: scheduled
     interval_seconds: 1560
@@ -113,7 +113,7 @@ workers:
       retention_days: 90
   maintenance:
     kind: scheduled
-    interval_seconds: 86400       # daily; worker-error signals force earlier runs
+    interval_seconds: 86400 # daily; worker-error signals force earlier runs
     commit_scope: []
 
 shared_state_files:
@@ -160,7 +160,7 @@ agents:
       batch_size: 10
       min_tags_target: 6
       max_conversation_messages: 20
-      step_max_retries: 2                # + 1 initial attempt = 3 tries per required step
+      step_max_retries: 2 # + 1 initial attempt = 3 tries per required step
       step_retry_backoff_seconds: 3
       followup_max_tokens: 1024
       face_similarity_threshold: 0.85

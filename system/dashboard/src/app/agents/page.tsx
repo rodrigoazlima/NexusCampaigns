@@ -6,7 +6,7 @@ import AgentCard from '@/components/widgets/AgentCard'
 import ActivityFeed from '@/components/widgets/ActivityFeed'
 import AutoRefresh from '@/components/AutoRefresh'
 import { AgentConfigButton } from '@/components/agents/AgentConfigButton'
-import { Bot } from 'lucide-react'
+import { Bot, Box } from 'lucide-react'
 import Link from 'next/link'
 import { agentDisplayName, formatDateTime, formatDuration } from '@/lib/utils'
 
@@ -106,7 +106,16 @@ export default async function AgentsPage() {
                     {agent.totalFailed}
                   </td>
                   <td className="px-4 py-2 text-right">
-                    <AgentConfigButton agent={agent} />
+                    <div className="flex items-center justify-end gap-1">
+                      <Link
+                        href={`/agents/${agent.name}/sandbox`}
+                        title={`Sandbox settings for ${agentDisplayName(agent.name)}`}
+                        className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-surface-2 transition-colors"
+                      >
+                        <Box size={13} />
+                      </Link>
+                      <AgentConfigButton agent={agent} />
+                    </div>
                   </td>
                 </tr>
               ))}

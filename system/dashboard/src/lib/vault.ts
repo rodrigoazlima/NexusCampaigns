@@ -801,6 +801,39 @@ export function readAllReports(): Record<string, DailyReport> {
   return result
 }
 
+export function readAgentSandbox(agent: string): AgentSandboxSettings {
+  try {
+    const raw = fs.readFileSync(REGISTRY_PATH, 'utf-8')
+    const doc = parseYaml(raw) as {
+      agents?: Record<string, { sandbox?: { enabled?: boolean; allow_deletes?: boolean } }>
+    }
+    const cfg = doc.agents?.[agent]?.sandbox
+    return { enabled: cfg?.enabled ?? false, allowDeletes: cfg?.allow_deletes ?? false }
+  } catch {
+    return { enabled: false, allowDeletes: false }
+  }
+}
+
+// Edits registry.yaml via yaml's Document (CST) API rather than
+// parse+JSON.stringify - the file is hand-authored with load-bearing
+// comments above each agent's sandbox: block, which a plain re-serialize
+// would silently strip.
+export function writeAgentSandbox(agent: string, settings: AgentSandboxSettings): void {
+  const raw = fs.readFileSync(REGISTRY_PATH, 'utf-8')
+  const doc = parseDocument(raw)
+  if (doc.getIn(['agents', agent]) === undefined) {
+    throw new Error(`Unknown agent in registry.yaml: ${agent}`)
+  }
+  doc.setIn(['agents', agent, 'sandbox', 'enabled'], settings.enabled)
+  doc.setIn(['agents', agent, 'sandbox', 'allow_deletes'], settings.allowDeletes)
+  // lineWidth:0 / flowCollectionPadding:false - the stringifier reformats
+  // the WHOLE document, not just the touched keys; these two options keep
+  // unrelated long lines and `[x]`-style flow arrays from being rewrapped
+  // on every save (comment text/position survive regardless of these).
+  const out = doc.toString({ lineWidth: 0, flowCollectionPadding: false })
+  fs.writeFileSync(REGISTRY_PATH, out, 'utf-8')
+}
+
 export function readSandboxRuns(): SandboxRun[] {
   try {
     const files = fs
