@@ -8,7 +8,7 @@ import type { QueueItem, QueueAgentStat } from '@/lib/types'
 import { formatRelative, agentDisplayName } from '@/lib/utils'
 
 // Pipeline order from registry execution_order (per-file agents only).
-const PIPELINE: string[] = [
+export const PIPELINE: string[] = [
   'ingestion', 'vision', 'lore', 'token', 'wiki', 'classification', 'review', 'wikilink',
 ]
 

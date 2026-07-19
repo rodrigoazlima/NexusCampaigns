@@ -35,6 +35,7 @@ import {
   History,
   type LucideIcon,
 } from 'lucide-react'
+import PipelineProgress from './PipelineProgress'
 
 interface NavItem {
   href: string
@@ -304,6 +305,7 @@ export default function Sidebar() {
           <Logo collapsed={collapsed} />
         </div>
         <NavLinks collapsed={collapsed} />
+        <PipelineProgress collapsed={collapsed} />
         <BottomBar collapsed={collapsed} onToggle={toggleCollapsed} />
       </aside>
 
@@ -348,6 +350,7 @@ export default function Sidebar() {
               </button>
             </div>
             <NavLinks onNavigate={() => setOpen(false)} />
+            <PipelineProgress />
             <div className="flex items-center px-3 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] border-t border-surface-3">
               <span className="inline-block w-2 h-2 rounded-full bg-success animate-pulse" title="Live · 30s refresh" />
               <span className="ml-2 text-xs text-zinc-500">Live · 30s refresh</span>
