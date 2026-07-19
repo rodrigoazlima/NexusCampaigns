@@ -140,6 +140,61 @@ def _podman_wsl_gateway_ip() -> Optional[str]:
     return match.group(1) if match else None
 
 
+_LOCALHOST_PORT_RE = re.compile(r"(?:localhost|127\.0\.0\.1):(\d+)")
+
+
+def _registry_localhost_ports(registry_text: str) -> list[int]:
+    """Distinct ports registry.yaml points at localhost - these are exactly
+    what _rewrite_localhost() will retarget at the container's host gateway,
+    so they're what's worth probing before spending ~90s on a build+run that
+    will silently no-op if none of them are actually reachable."""
+    return sorted({int(p) for p in _LOCALHOST_PORT_RE.findall(registry_text)})
+
+
+def _probe_wsl_tcp(gateway_ip: str, port: int, timeout: float = 3.0) -> bool:
+    """Cheap TCP reachability check run from inside the Podman WSL VM itself
+    (not the Windows host) - the same network hop the sandboxed container's
+    gvproxy networking takes, so a refused/unreachable result here means the
+    container will hit it too, without paying for a full image build+run.
+
+    The probe script is piped over stdin (`python3 -`), not passed as a
+    `-c` argument: `podman machine ssh` joins argv with spaces for the
+    remote shell without re-quoting, so a `-c` string containing spaces or
+    parens gets corrupted into a shell syntax error - which subprocess
+    reports as a plain nonzero exit indistinguishable from "port closed",
+    a false positive."""
+    script = (
+        f"import socket,sys\n"
+        f"s = socket.socket()\n"
+        f"s.settimeout({timeout})\n"
+        f"sys.exit(0 if s.connect_ex(('{gateway_ip}', {port})) == 0 else 1)\n"
+    )
+    result = subprocess.run(
+        ["podman", "machine", "ssh", "--", "python3", "-"],
+        input=script, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False,
+    )
+    return result.returncode == 0
+
+
+def _warn_unreachable_llm_ports(registry_text: str, gateway_ip: Optional[str], log: Logger) -> None:
+    """Best-effort: only runs when the WSL gateway IP was resolved. A dead
+    port doesn't necessarily mean this agent's run will fail (it may not hit
+    that endpoint), so this warns loudly rather than aborting the run."""
+    if not gateway_ip:
+        return
+    for port in _registry_localhost_ports(registry_text):
+        if not _probe_wsl_tcp(gateway_ip, port):
+            msg = (
+                f"local LLM endpoint at localhost:{port} is not reachable from the Podman VM "
+                f"(gateway {gateway_ip}) - the sandboxed agent will likely run to completion "
+                f"with 0 changes instead of failing. Verify with: podman run --rm "
+                f"--add-host=host.containers.internal:{gateway_ip} curlimages/curl "
+                f"curl -sf http://host.containers.internal:{port}/v1/models"
+            )
+            log.warning(msg)
+            print(f"warning: {msg}", file=sys.stderr)
+
+
 # ---------------------------------------------------------------------------
 # Scope resolution - reuse existing parsers, don't reinvent them
 # ---------------------------------------------------------------------------
@@ -382,12 +437,11 @@ def _build_run_image(runtime_bin: str, staging_dir: Path, tag: str) -> None:
 # ---------------------------------------------------------------------------
 
 def _run_container(
-    runtime_bin: str, run_id: str, image_tag: str, env_forward: dict[str, str]
+    runtime_bin: str, run_id: str, image_tag: str, env_forward: dict[str, str], gateway_ip: Optional[str]
 ) -> tuple[int, str]:
     cmd = [runtime_bin, "run", "--name", run_id]
     if runtime_bin == "podman":
-        gateway_target = _podman_wsl_gateway_ip() or "host-gateway"
-        cmd.append(f"--add-host=host.containers.internal:{gateway_target}")
+        cmd.append(f"--add-host=host.containers.internal:{gateway_ip or 'host-gateway'}")
     for key, val in env_forward.items():
         cmd += ["-e", f"{key}={val}"]
     cmd.append(image_tag)
@@ -441,11 +495,45 @@ def _forward_container_log(after_dir: Path, log: Logger) -> None:
         fh.write(content)
 
 
-def _cleanup(runtime_bin: str, run_id: str, image_tag: str, keep_image: bool) -> None:
+def _cleanup(runtime_bin: str, container_name: str, image_tag: str, keep_image: bool) -> None:
     if keep_image:
         return
-    subprocess.run([runtime_bin, "rm", run_id], capture_output=True)
+    subprocess.run([runtime_bin, "rm", container_name], capture_output=True)
     subprocess.run([runtime_bin, "rmi", image_tag], capture_output=True)
+
+
+def _processed_item_uuid8(changes: list[dict], after_dir: Path, fm_io: FrontmatterIO) -> Optional[str]:
+    """First 8 chars of the uuid: frontmatter field on the first changed
+    knowledge-base markdown file - identifies which vault item this run
+    actually processed, so the container's name is legible in `podman ps -a`
+    without cross-referencing the run record."""
+    for change in sorted(changes, key=lambda c: c["path"]):
+        if change["class"] != "knowledge-base" or not change["path"].endswith(".md"):
+            continue
+        source = after_dir / change["path"]
+        if not source.exists():
+            continue
+        try:
+            fm, _ = fm_io.read(source)
+        except Exception:
+            continue
+        uuid = fm.get("uuid")
+        if uuid:
+            return str(uuid)[:8]
+    return None
+
+
+def _rename_container(runtime_bin: str, run_id: str, new_name: str, log: Logger) -> str:
+    """Best-effort: renames the running/finished container to new_name and
+    returns whichever name is now correct to use for extract/cleanup."""
+    result = subprocess.run(
+        [runtime_bin, "rename", run_id, new_name], capture_output=True, text=True,
+        encoding="utf-8", errors="replace", check=False,
+    )
+    if result.returncode != 0:
+        log.warning(f"container rename {run_id} -> {new_name} failed: {result.stderr.strip()}")
+        return run_id
+    return new_name
 
 
 # ---------------------------------------------------------------------------
@@ -647,6 +735,12 @@ def run(
     runtime_version = _runtime_version(runtime_bin)
     host_gateway = _host_gateway_name(runtime_bin)
 
+    gateway_ip = _podman_wsl_gateway_ip() if runtime_bin == "podman" else None
+    if runtime_bin == "podman":
+        _warn_unreachable_llm_ports(
+            (_AGENTS_DIR / "registry.yaml").read_text(encoding="utf-8"), gateway_ip, log
+        )
+
     commit_scope, state_allowlist, state_readonly = _resolve_scopes(agent, task_id)
     if not commit_scope:
         log.warning(f"{agent} has an empty commit_scope - no knowledge-base changes will ever apply")
@@ -685,7 +779,7 @@ def run(
         build_ms = int((time.monotonic() - t_build0) * 1000)
 
         t_run0 = time.monotonic()
-        exit_code, container_log = _run_container(runtime_bin, run_id, image_tag, env_forward)
+        exit_code, container_log = _run_container(runtime_bin, run_id, image_tag, env_forward, gateway_ip)
         run_ms = int((time.monotonic() - t_run0) * 1000)
         log.info(f"{run_id}: container exited {exit_code} ({run_ms}ms)")
 
@@ -696,6 +790,10 @@ def run(
             staging_dir, after_dir, commit_scope, state_allowlist, state_readonly, allow_deletes
         )
 
+        uuid8 = _processed_item_uuid8(changes, after_dir, FrontmatterIO())
+        container_name = _rename_container(runtime_bin, run_id, f"agent-{agent}-{uuid8}", log) \
+            if uuid8 else run_id
+
         should_apply = (not dry_run) and (exit_code == 0 or apply_on_failure)
         if should_apply:
             _apply_changes(changes, after_dir, log)
@@ -703,7 +801,7 @@ def run(
         else:
             _relabel_no_apply(changes, exit_code, dry_run)
 
-        _cleanup(runtime_bin, run_id, image_tag, keep_image)
+        _cleanup(runtime_bin, container_name, image_tag, keep_image)
 
     finished_at = datetime.now(timezone.utc)
     applied = sum(1 for c in changes if c["status"] == "applied")
@@ -715,6 +813,7 @@ def run(
 
     record = {
         "runId": run_id,
+        "containerName": container_name,
         "agent": agent,
         "taskId": task_id,
         "runtime": runtime_bin,

@@ -130,6 +130,89 @@ class TestHostGatewayName:
         assert sr._host_gateway_name("podman") == "host.containers.internal"
 
 
+class TestPodmanWslGatewayIp:
+    def test_parses_default_route(self, monkeypatch):
+        monkeypatch.setattr(
+            sr.subprocess, "run",
+            lambda *a, **k: MagicMock(returncode=0, stdout="default via 172.18.208.1 dev eth0 proto kernel \n"),
+        )
+        assert sr._podman_wsl_gateway_ip() == "172.18.208.1"
+
+    def test_returns_none_when_ssh_fails(self, monkeypatch):
+        monkeypatch.setattr(sr.subprocess, "run", lambda *a, **k: MagicMock(returncode=1, stdout=""))
+        assert sr._podman_wsl_gateway_ip() is None
+
+    def test_returns_none_when_no_default_route_in_output(self, monkeypatch):
+        monkeypatch.setattr(sr.subprocess, "run", lambda *a, **k: MagicMock(returncode=0, stdout="\n"))
+        assert sr._podman_wsl_gateway_ip() is None
+
+
+class TestRegistryLocalhostPorts:
+    def test_finds_localhost_and_loopback_ports(self):
+        text = 'url: "http://localhost:1234/v1"\nother: "http://127.0.0.1:8080/v1"\n'
+        assert sr._registry_localhost_ports(text) == [1234, 8080]
+
+    def test_dedupes_repeated_ports(self):
+        text = "http://localhost:1234/a\nhttp://localhost:1234/b\n"
+        assert sr._registry_localhost_ports(text) == [1234]
+
+    def test_no_matches_returns_empty(self):
+        assert sr._registry_localhost_ports("no ports here") == []
+
+
+class TestProbeWslTcp:
+    def test_true_on_zero_exit(self, monkeypatch):
+        monkeypatch.setattr(sr.subprocess, "run", lambda *a, **k: MagicMock(returncode=0))
+        assert sr._probe_wsl_tcp("172.18.208.1", 1234) is True
+
+    def test_false_on_nonzero_exit(self, monkeypatch):
+        monkeypatch.setattr(sr.subprocess, "run", lambda *a, **k: MagicMock(returncode=1))
+        assert sr._probe_wsl_tcp("172.18.208.1", 1234) is False
+
+    def test_script_sent_via_stdin_not_dash_c_arg(self, monkeypatch):
+        # podman machine ssh space-joins argv for the remote shell without
+        # re-quoting, so a `-c "code with spaces/parens"` argument gets
+        # corrupted into a syntax error indistinguishable from "port
+        # closed" - the fix must pipe the script over stdin instead.
+        captured = {}
+
+        def fake_run(cmd, **kwargs):
+            captured["cmd"] = cmd
+            captured["kwargs"] = kwargs
+            return MagicMock(returncode=0)
+
+        monkeypatch.setattr(sr.subprocess, "run", fake_run)
+        sr._probe_wsl_tcp("172.18.208.1", 1234)
+
+        assert "-c" not in captured["cmd"]
+        assert captured["cmd"][-1] == "-"
+        assert "172.18.208.1" in captured["kwargs"]["input"]
+        assert "1234" in captured["kwargs"]["input"]
+
+
+class TestWarnUnreachableLlmPorts:
+    def test_noop_when_gateway_ip_missing(self, monkeypatch):
+        called = []
+        monkeypatch.setattr(sr, "_probe_wsl_tcp", lambda *a, **k: called.append(a))
+        sr._warn_unreachable_llm_ports("http://localhost:1234/v1", None, MagicMock())
+        assert called == []
+
+    def test_warns_for_each_unreachable_port(self, monkeypatch):
+        monkeypatch.setattr(sr, "_probe_wsl_tcp", lambda ip, port, **k: port == 8080)
+        log = MagicMock()
+        sr._warn_unreachable_llm_ports(
+            'http://localhost:1234/a\nhttp://localhost:8080/b\n', "172.18.208.1", log
+        )
+        assert log.warning.call_count == 1
+        assert "1234" in log.warning.call_args[0][0]
+
+    def test_no_warning_when_all_reachable(self, monkeypatch):
+        monkeypatch.setattr(sr, "_probe_wsl_tcp", lambda *a, **k: True)
+        log = MagicMock()
+        sr._warn_unreachable_llm_ports("http://localhost:1234/a\n", "172.18.208.1", log)
+        log.warning.assert_not_called()
+
+
 class TestRelabelNoApply:
     def test_dry_run_relabels_applied_as_would_apply(self):
         changes = [{"status": "applied"}]
@@ -520,6 +603,67 @@ class TestApplyChanges:
         project_root, vault_root = apply_env
         sr._apply_changes([], tmp_path / "after", MagicMock())
         assert not sr._APPLY_LOCK.with_name(sr._APPLY_LOCK.name + ".lock").exists()
+
+
+class TestProcessedItemUuid8:
+    def test_returns_first_8_chars_of_uuid(self, tmp_path):
+        after_dir = tmp_path / "after"
+        relpath = ".knowledge-base/01-Processing/npc-test.md"
+        (after_dir / relpath).parent.mkdir(parents=True, exist_ok=True)
+        (after_dir / relpath).write_text(
+            _draft_md({"uuid": "550e8400-e29b-41d4-a716-446655440000"}), encoding="utf-8"
+        )
+        changes = [{"path": relpath, "class": "knowledge-base", "status": "applied"}]
+
+        assert sr._processed_item_uuid8(changes, after_dir, sr.FrontmatterIO()) == "550e8400"
+
+    def test_ignores_non_knowledge_base_and_non_markdown_changes(self, tmp_path):
+        changes = [
+            {"path": "agents/vision/state/processed.json", "class": "state", "status": "applied"},
+            {"path": ".knowledge-base/01-Processing/img.png", "class": "knowledge-base", "status": "applied"},
+        ]
+        assert sr._processed_item_uuid8(changes, tmp_path / "after", sr.FrontmatterIO()) is None
+
+    def test_returns_none_when_no_changes(self, tmp_path):
+        assert sr._processed_item_uuid8([], tmp_path / "after", sr.FrontmatterIO()) is None
+
+    def test_returns_none_when_file_has_no_uuid_field(self, tmp_path):
+        after_dir = tmp_path / "after"
+        relpath = ".knowledge-base/01-Processing/npc-test.md"
+        (after_dir / relpath).parent.mkdir(parents=True, exist_ok=True)
+        (after_dir / relpath).write_text(_draft_md({"status": "draft"}), encoding="utf-8")
+        changes = [{"path": relpath, "class": "knowledge-base", "status": "applied"}]
+
+        assert sr._processed_item_uuid8(changes, after_dir, sr.FrontmatterIO()) is None
+
+
+class TestRenameContainer:
+    def test_returns_new_name_on_success(self, monkeypatch):
+        monkeypatch.setattr(sr.subprocess, "run", lambda *a, **k: MagicMock(returncode=0, stderr=""))
+        assert sr._rename_container("podman", "run-x", "agent-vision-550e8400", MagicMock()) == "agent-vision-550e8400"
+
+    def test_falls_back_to_old_name_on_failure(self, monkeypatch):
+        monkeypatch.setattr(sr.subprocess, "run", lambda *a, **k: MagicMock(returncode=1, stderr="no such container"))
+        log = MagicMock()
+        assert sr._rename_container("podman", "run-x", "agent-vision-550e8400", log) == "run-x"
+        log.warning.assert_called_once()
+
+
+class TestCleanup:
+    def test_removes_container_and_image_by_given_name(self, monkeypatch):
+        calls = []
+        monkeypatch.setattr(sr.subprocess, "run", lambda cmd, **k: calls.append(cmd) or MagicMock())
+        sr._cleanup("podman", "agent-vision-550e8400", "some-tag", keep_image=False)
+        assert calls == [
+            ["podman", "rm", "agent-vision-550e8400"],
+            ["podman", "rmi", "some-tag"],
+        ]
+
+    def test_keep_image_skips_removal(self, monkeypatch):
+        calls = []
+        monkeypatch.setattr(sr.subprocess, "run", lambda cmd, **k: calls.append(cmd) or MagicMock())
+        sr._cleanup("podman", "agent-vision-550e8400", "some-tag", keep_image=True)
+        assert calls == []
 
 
 # ---------------------------------------------------------------------------
