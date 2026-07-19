@@ -11,6 +11,13 @@ const DEFAULT_IMAGE_TYPES = new Set([
 
 const GENERIC_DEFAULT = '/defaults/lore.jpg'
 
+// Mirrors the MIME map in src/app/api/image/route.ts. `source`/`tokenPath`
+// can point at non-image files (e.g. a lore entry sourced from a .md doc) -
+// filtering here skips a doomed /api/image round-trip instead of depending
+// on the <img> onError handler, which can miss a same-tick SSR failure
+// (fs-read 404 resolves before React hydration attaches the listener).
+const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.svg'])
+
 /** Per-type placeholder for a missing/failed vault image. Unknown or absent
  *  type (e.g. pre-classification queue/inbox items) falls back to the
  *  generic "lore" icon. */
@@ -26,6 +33,8 @@ export function imageUrl(
   opts?: { thumb?: boolean; cacheBust?: string | number | null },
 ): string | null {
   if (!path) return null
+  const ext = path.slice(path.lastIndexOf('.')).toLowerCase()
+  if (!IMAGE_EXTENSIONS.has(ext)) return null
   let url = `/api/image?path=${encodeURIComponent(path)}`
   if (opts?.thumb) url += '&thumb=1'
   if (opts?.cacheBust) url += `&v=${encodeURIComponent(opts.cacheBust)}`

@@ -44,4 +44,13 @@ describe('imageUrl', () => {
   it('combines thumb and cacheBust', () => {
     expect(imageUrl('a.png', { thumb: true, cacheBust: 42 })).toBe('/api/image?path=a.png&thumb=1&v=42')
   })
+
+  it('returns null for a non-image source (e.g. a lore entry sourced from a .md doc)', () => {
+    expect(imageUrl('.knowledge-base/00-Inbox/docs/DOC_123.md')).toBeNull()
+    expect(imageUrl('notes.pdf')).toBeNull()
+  })
+
+  it('is case-insensitive on extension', () => {
+    expect(imageUrl('ART.PNG')).toBe('/api/image?path=ART.PNG')
+  })
 })
