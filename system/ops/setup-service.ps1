@@ -502,6 +502,48 @@ function Find-Docker {
     return $null
 }
 
+# vision-agent is the only agent with sandbox.enabled: true in registry.yaml - its LLM
+# call runs from inside a Podman container on Windows' WSL utility VM. Windows 11's
+# per-VM "Hyper-V firewall" for WSL (separate from classic Windows Defender Firewall -
+# a normal "Allow" rule for LM Studio's exe does NOT cover this layer) blocks that
+# outbound TCP by default; only ICMP passes out of the box, which is why classification
+# silently no-ops with 0 changes instead of failing loudly. See
+# docs/qa/feedback/03-sandbox-vision-agent-lm-studio-unreachable.md for the full
+# diagnosis. Scoped to the WSL VM + vision's own LLM port only - doesn't touch classic
+# Windows Firewall or any other WSL distro.
+function Ensure-VisionSandboxFirewallRule([string]$ProjectRoot) {
+    $ruleName = "NexusVisionSandbox-LLMOut"
+    if (-not (Get-Command Get-NetFirewallHyperVRule -ErrorAction SilentlyContinue)) {
+        Log "Hyper-V firewall cmdlets unavailable (older Windows) - skipping vision sandbox firewall rule." "WARN"
+        return
+    }
+    if (Get-NetFirewallHyperVRule -Name $ruleName -ErrorAction SilentlyContinue) {
+        Log "Vision sandbox firewall rule already present."
+        return
+    }
+    $vmCreatorId = Get-NetFirewallHyperVVMCreator -ErrorAction SilentlyContinue |
+        Where-Object FriendlyName -eq "WSL" | Select-Object -First 1 -ExpandProperty VMCreatorId
+    if (-not $vmCreatorId) {
+        Log "Could not resolve WSL Hyper-V VM creator id - skipping vision sandbox firewall rule (add manually if vision sandbox stays offline)." "WARN"
+        return
+    }
+    $port = "1234"
+    $registryPath = Join-Path $ProjectRoot "agents\registry.yaml"
+    if (Test-Path $registryPath) {
+        $registryText = Get-Content $registryPath -Raw
+        if ($registryText -match 'vision_llm:\s*\r?\n\s*url:\s*"http://localhost:(\d+)') { $port = $Matches[1] }
+    }
+    try {
+        New-NetFirewallHyperVRule -Name $ruleName `
+            -DisplayName "Nexus vision-agent sandbox - LLM outbound (TCP $port)" `
+            -Direction Outbound -VMCreatorId $vmCreatorId `
+            -Protocol TCP -RemotePorts $port -Action Allow -Enabled True -ErrorAction Stop | Out-Null
+        Log "Added WSL Hyper-V firewall rule for vision sandbox -> host LLM (TCP $port)."
+    } catch {
+        Log "Failed to add vision sandbox firewall rule: $($_.Exception.Message)" "WARN"
+    }
+}
+
 # Produce the canonical env config at system\.env.local, derived from global.json.
 # Does not clobber an existing file unless -Force is given.
 # Callers that need the file in the dashboard dir must copy it there explicitly.
@@ -1080,6 +1122,7 @@ if ($dockerPath) { Log "Docker: $dockerPath" } else { Log "Docker not found (che
 if (-not $podmanPath -and -not $dockerPath) {
     Log "No container runtime found - vision-agent's sandboxed dispatch will fail until Podman or Docker is installed." "WARN"
 }
+if ($podmanPath) { Ensure-VisionSandboxFirewallRule $ProjectRoot }
 $containerStateDir = "$ProjectRoot\system\state"
 New-Item -ItemType Directory -Force $containerStateDir | Out-Null
 [ordered]@{ podman = $podmanPath; docker = $dockerPath } |
