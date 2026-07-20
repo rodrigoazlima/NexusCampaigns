@@ -103,7 +103,7 @@ workers:
     commit_scope: [".knowledge-base/01-Processing"]
   report:
     kind: scheduled
-    interval_seconds: 300
+    interval_seconds: 150
     commit_scope: [".knowledge-base/01-Processing"] # suggestedQuality writes
   cleanup:
     kind: scheduled
@@ -139,7 +139,7 @@ agents:
   vision:
     status: active
     task_id: vision-agent
-    interval_seconds: 300
+    interval_seconds: 90
     llm: vision_llm
     tools:
       - tools/classify_images.py
@@ -188,7 +188,7 @@ agents:
   lore:
     status: active
     task_id: lore-agent
-    interval_seconds: 300
+    interval_seconds: 150
     llm: vision_llm
     tools:
       - tools/generate_npcs.py
@@ -207,7 +207,7 @@ agents:
   classification:
     status: active
     task_id: classification-agent
-    interval_seconds: 300
+    interval_seconds: 150
     llm: local_router
     tools:
       - tools/enrich_tags.py
@@ -224,7 +224,7 @@ agents:
   wiki:
     status: active
     task_id: wiki-agent
-    interval_seconds: 300
+    interval_seconds: 150
     llm: local_router
     tools:
       - tools/compile_wiki.py
