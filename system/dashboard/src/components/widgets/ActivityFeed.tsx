@@ -1,9 +1,13 @@
+'use client'
+
 import type { LogLine } from '@/lib/types'
 import { severityColor } from '@/lib/utils'
+import { useLogPolling, type LogPollingOptions } from '@/lib/useLogPolling'
 
 interface ActivityFeedProps {
   logs: LogLine[]
   maxHeight?: string
+  poll?: LogPollingOptions
 }
 
 const severityBadge = (s: string) => {
@@ -15,7 +19,9 @@ const severityBadge = (s: string) => {
   }
 }
 
-export default function ActivityFeed({ logs, maxHeight = '320px' }: ActivityFeedProps) {
+export default function ActivityFeed({ logs: initialLogs, maxHeight = '320px', poll }: ActivityFeedProps) {
+  const logs = useLogPolling(initialLogs, poll ?? {})
+
   if (logs.length === 0) {
     return (
       <div className="text-sm text-zinc-500 text-center py-8">No log entries</div>

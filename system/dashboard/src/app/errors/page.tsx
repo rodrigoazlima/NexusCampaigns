@@ -203,7 +203,7 @@ export default async function ErrorsPage() {
         {errorLogs.length === 0 ? (
           <div className="p-8 text-center text-success text-sm">No errors in log tail</div>
         ) : (
-          <ActivityFeed logs={errorLogs} maxHeight="400px" />
+          <ActivityFeed logs={errorLogs} maxHeight="400px" poll={{ severity: 'ERROR', limit: 500 }} />
         )}
       </div>
     </div>

@@ -110,7 +110,7 @@ export default async function ExecutivePage() {
         <div>
           <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-3">Activity Feed</div>
           <div className="panel overflow-hidden">
-            <ActivityFeed logs={logs} maxHeight="500px" />
+            <ActivityFeed logs={logs} maxHeight="500px" poll={{ limit: 50 }} />
           </div>
         </div>
       </div>

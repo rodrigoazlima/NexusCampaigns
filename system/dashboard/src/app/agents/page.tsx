@@ -144,7 +144,7 @@ export default async function AgentsPage() {
         <div className="px-4 py-3 border-b border-surface-3">
           <div className="text-sm font-semibold text-zinc-200">Live Log</div>
         </div>
-        <ActivityFeed logs={logs} maxHeight="400px" />
+        <ActivityFeed logs={logs} maxHeight="400px" poll={{ limit: 80 }} />
       </div>
     </div>
   )

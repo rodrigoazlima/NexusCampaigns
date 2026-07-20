@@ -234,7 +234,7 @@ export default async function VisionAgentPage() {
         <div className="px-4 py-3 border-b border-surface-3">
           <div className="text-sm font-semibold text-zinc-200">Latest Logs</div>
         </div>
-        <ActivityFeed logs={logs} maxHeight="400px" />
+        <ActivityFeed logs={logs} maxHeight="400px" poll={{ task: agent.id, limit: 150 }} />
       </div>
     </div>
   )
