@@ -2,11 +2,13 @@
 #
 # Installs pip deps, registers and starts the agent pipeline service, and registers
 # and starts the Next.js dashboard (via `next dev` - hot deploy - by default) on
-# port 48080. Run once from elevated shell.
+# port 48080. Requires an elevated shell (Admin) for every action except -Status.
+# The agent service itself runs as the invoking user (see -ServiceAccount), not
+# LocalSystem/Admin, so it can reach a per-user Podman/Docker setup.
 #
 # Supported methods (auto-detected):
-#   nssm      - NSSM service manager (requires Admin; recommended for production)
-#   schtasks  - HKCU Run key (works without Admin; starts at logon)
+#   nssm      - NSSM service manager (recommended for production)
+#   schtasks  - HKCU Run key (starts at logon)
 #
 # Usage (requires pwsh / PowerShell 7+):
 #   # Install and start everything (run as Administrator):
@@ -52,6 +54,8 @@ param(
     [switch] $Status,
     [switch] $RunPreFlight,
     [switch] $CleanInstall,
+    [string] $ServiceAccount  = "$env:COMPUTERNAME\$env:USERNAME",  # account the agent service runs as - needs to be the invoking user, not LocalSystem, so it can see per-user Podman/Docker setup
+    [securestring] $ServicePassword,  # password for -ServiceAccount; omit to be prompted interactively, or set $env:NEXUS_SERVICE_PASSWORD for unattended installs
     [switch] $Help
 )
 
@@ -73,15 +77,21 @@ PARAMETERS
                             vault-appropriate .gitignore and an initial commit). Never touches
                             a vault dir that's already a git repo.
   -Python        <cmd>    Python executable to use. Default: python
-  -Method        <str>    Install method: auto | nssm | schtasks. Default: auto
-                            auto     - picks nssm when admin + NSSM installed, else schtasks
-                            nssm     - Windows service via NSSM (requires Admin + NSSM)
-                            schtasks - HKCU Run key; no admin needed, starts at logon
+  -Method        <str>    Install method: auto | nssm | schtasks. Default: auto (whole script
+                            requires Admin regardless of method)
+                            auto     - picks nssm when NSSM installed, else schtasks
+                            nssm     - Windows service via NSSM
+                            schtasks - HKCU Run key; starts at logon
   -DashboardPort <int>    Next.js dashboard port. Default: read from global.json, else 48080
   -NoDashboard            Skip dashboard build and start entirely
   -Release                Use a production `next build`+`next start` instead of `next dev`.
                             Hot deploy (`next dev`, live reload on save) is ON by default.
   -Force                  Overwrite existing .env.local config (default: keep existing)
+  -ServiceAccount <str>   Account the agent service runs as. Default: invoking user (DOMAIN\user).
+                            Must be the invoking user, not LocalSystem, so vision-agent's sandboxed
+                            dispatch can reach your user-level Podman/Docker setup.
+  -ServicePassword <str>  Password for -ServiceAccount. Omit to be prompted interactively, or set
+                            `$env:NEXUS_SERVICE_PASSWORD for unattended installs.
   -RunPreFlight           Run runner --once before installing (~60s pre-flight check)
   -Status                 Check if agent service and dashboard are running, then exit
   -Uninstall              Remove both services and all Run keys, kill lingering processes
@@ -190,6 +200,14 @@ function Is-Admin {
     ([Security.Principal.WindowsPrincipal]::new(
         [Security.Principal.WindowsIdentity]::GetCurrent()
     )).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+# Install/uninstall/clean actions all touch services and HKLM-adjacent state -
+# require elevation up front instead of failing cryptically deep inside NSSM
+# calls. -Status is read-only and stays available unelevated.
+if (-not $Status -and -not (Is-Admin)) {
+    Write-Host "ERROR: setup-service.ps1 requires an elevated (Administrator) PowerShell session. Re-run from an elevated prompt." -ForegroundColor Red
+    exit 1
 }
 
 # Catches the state that bit us before: a leftover .git\index.lock (stale or
@@ -1122,16 +1140,11 @@ $nssmPath = Find-NSSM
 $isAdmin  = Is-Admin
 
 if ($Method -eq "auto") {
-    if ($nssmPath -and $isAdmin) {
+    if ($nssmPath) {
         $Method = "nssm"
     } else {
-        if ($nssmPath -and -not $isAdmin) {
-            Log "NSSM found but not running as Administrator - falling back to Task Scheduler." "WARN"
-            Log "Re-run as Administrator for NSSM installation." "WARN"
-        } elseif (-not $nssmPath) {
-            Log "NSSM not found - using Task Scheduler." "WARN"
-            Log "Install NSSM for production installs: winget install NSSM.NSSM" "WARN"
-        }
+        Log "NSSM not found - using Task Scheduler." "WARN"
+        Log "Install NSSM for production installs: winget install NSSM.NSSM" "WARN"
         $Method = "schtasks"
     }
 }
@@ -1169,6 +1182,27 @@ if ($Method -eq "nssm") {
     $envExtra = "GIT_AUTHOR_NAME=Vault Bot GIT_AUTHOR_EMAIL=bot@localhost"
     if ($auth) { $envExtra += " $($auth.Var)=$($auth.Value)" }
     & $nssmPath set         $ServiceName AppEnvironmentExtra $envExtra                       2>&1 | Out-File $nssmLog -Append -Encoding UTF8
+
+    # Default NSSM account is LocalSystem, which has no user profile and can't see
+    # a per-user Podman/Docker setup (podman machine connections live under the
+    # invoking user's profile) - vision-agent's sandboxed dispatch fails with
+    # "Cannot connect to Podman" under the service even though it works in an
+    # interactive shell. Run the service as the invoking user instead.
+    $svcPassword = $ServicePassword
+    if (-not $svcPassword -and $env:NEXUS_SERVICE_PASSWORD) {
+        $svcPassword = ConvertTo-SecureString $env:NEXUS_SERVICE_PASSWORD -AsPlainText -Force
+    }
+    if (-not $svcPassword -and [Environment]::UserInteractive) {
+        $svcPassword = Read-Host -AsSecureString "Password for $ServiceAccount (service must run as your account to reach your Podman/Docker setup)"
+    }
+    if ($svcPassword) {
+        $plainPassword = [System.Net.NetworkCredential]::new("", $svcPassword).Password
+        Log "Running '$ServiceName' as $ServiceAccount (not LocalSystem)..."
+        & $nssmPath set $ServiceName ObjectName $ServiceAccount $plainPassword 2>&1 | Out-File $nssmLog -Append -Encoding UTF8
+        $plainPassword = $null
+    } else {
+        Log "No service account password available (pass -ServicePassword, set `$env:NEXUS_SERVICE_PASSWORD, or run interactively) - '$ServiceName' will run as LocalSystem. Sandboxed vision-agent dispatch (podman/docker) will fail if your container runtime is set up per-user." "WARN"
+    }
 
     Log "Starting service '$ServiceName'..."
     & $nssmPath start $ServiceName 2>&1 | Out-File $nssmLog -Append -Encoding UTF8
