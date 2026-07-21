@@ -58,7 +58,8 @@ _BAD_DOCS    = _AGENT_STATE / "bad-wiki-docs.txt"
 _PROMPT_FILE = _AGENTS_DIR / "wiki" / "prompts" / "compile-entity.txt"
 _INBOX_QUEUE = _PROJECT_ROOT / "system" / "state" / "inbox-queue.json"
 
-_FENCE_RE    = re.compile(r"^---[ \t]*\r?\n(.*?)\r?\n---[ \t]*\r?\n?", re.DOTALL)
+_FENCE_RE      = re.compile(r"^---[ \t]*\r?\n(.*?)\r?\n---[ \t]*\r?\n?", re.DOTALL)
+_CODE_FENCE_RE = re.compile(r"^```[\w-]*[ \t]*\r?\n(.*?)\r?\n```", re.DOTALL)
 _HTML_RE     = re.compile(r"<[^>]+>", re.DOTALL)
 _MIN_CHARS   = 100
 _MAX_CHARS   = 6000
@@ -136,6 +137,23 @@ def _strip_html(text: str) -> str:
     return _HTML_RE.sub("", text).strip()
 
 
+def _strip_code_fence(text: str) -> str:
+    """Unwrap a Markdown code fence wrapping the LLM's entire reply.
+
+    The LLM sometimes replies with the whole frontmatter+body wrapped in a
+    ```yaml ... ``` fence instead of raw text. _FENCE_RE below is anchored at
+    string start, so an unstripped fence makes it fall back to fm={} and the
+    entire fenced blob becomes the note body (see docs/bugs/02-*). Only
+    triggers when the reply *starts* with a fence, so a ``` appearing later
+    inside a normal, unfenced body is left alone.
+    """
+    stripped = text.strip()
+    if not stripped.startswith("```"):
+        return stripped
+    m = _CODE_FENCE_RE.match(stripped)
+    return m.group(1).strip() if m else stripped
+
+
 def _unique_output(slug: str) -> Path:
     _PROCESSING.mkdir(parents=True, exist_ok=True)
     p = _PROCESSING / f"{slug}.md"
@@ -165,6 +183,8 @@ def _enforce_and_write(
       status=draft, reviewed=false, quality=0, source=[source_name]
     """
     today = date.today().isoformat()
+
+    llm_output = _strip_code_fence(llm_output)
 
     m = _FENCE_RE.match(llm_output)
     if m:

@@ -193,6 +193,40 @@ class TestLLMClientChatJson:
             with pytest.raises(LLMResponseError):
                 client.chat_json([], max_tokens=50)
 
+    def test_unwraps_json_code_fence(self, client):
+        """Regression: same fence-wrap bug class as docs/bugs/02-*, JSON side.
+
+        Some models (LocalRouter 'auto') wrap chat_json replies in a
+        ```json fence; previously this hit json.JSONDecodeError and raised
+        LLMResponseError even though the payload was otherwise valid.
+        """
+        body = _make_response('```json\n{"type": "portrait", "ancestry": "elf"}\n```')
+
+        class MockResp:
+            def read(self): return body
+            def __enter__(self): return self
+            def __exit__(self, *a): pass
+
+        with patch("urllib.request.urlopen", return_value=MockResp()):
+            result = client.chat_json([], max_tokens=50)
+
+        assert result["type"] == "portrait"
+        assert result["ancestry"] == "elf"
+
+    def test_unwraps_bare_code_fence(self, client):
+        """Fence with no ```json language tag still unwraps."""
+        body = _make_response('```\n{"type": "battlemap"}\n```')
+
+        class MockResp:
+            def read(self): return body
+            def __enter__(self): return self
+            def __exit__(self, *a): pass
+
+        with patch("urllib.request.urlopen", return_value=MockResp()):
+            result = client.chat_json([], max_tokens=50)
+
+        assert result["type"] == "battlemap"
+
 
 def _make_valid_png(tmp_path, name="img.png", size=(100, 100)) -> Path:
     """Create a real PIL-valid PNG image."""

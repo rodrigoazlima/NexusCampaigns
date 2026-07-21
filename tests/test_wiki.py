@@ -204,6 +204,76 @@ class TestEnforceAndWrite:
         assert isinstance(fm["tags"], list)
         assert isinstance(fm["relationships"], list)
 
+    def test_unwraps_yaml_code_fence(self, vault, patch_roots):
+        """Regression: docs/bugs/02-wiki-agent-fence-wrapped-llm-output.md.
+
+        LLM wraps its whole reply in a ```yaml fence -> real id/type/tags
+        must still be parsed, not silently dropped to a generic lore-doc-*.
+        """
+        from nexus.shared import FrontmatterIO
+        fio = FrontmatterIO()
+        out = vault / "01-Processing" / "test-fenced.md"
+        llm_output = (
+            "```yaml\n"
+            "---\n"
+            "id: artifact-sunken-bell-of-annun\n"
+            "type: artifact\n"
+            "tags: [artifact, lore, harbor]\n"
+            "relationships: []\n"
+            "---\n\n"
+            "## Description\n"
+            "The Sunken Bell of Annun is a bronze bell...\n"
+            "```\n"
+        )
+        _mod._enforce_and_write(llm_output, "doc.md", out, fio)
+        fm, body = fio.read(out)
+        assert fm["id"]   == "artifact-sunken-bell-of-annun"
+        assert fm["type"] == "artifact"
+        assert fm["tags"] == ["artifact", "lore", "harbor"]
+        assert "```" not in body
+        assert "Sunken Bell of Annun" in body
+
+    def test_unwraps_bare_code_fence(self, vault, patch_roots):
+        """Fence with no language tag (```` ``` ```` not ```` ```yaml ````) still unwraps."""
+        from nexus.shared import FrontmatterIO
+        fio = FrontmatterIO()
+        out = vault / "01-Processing" / "test-fenced-bare.md"
+        llm_output = "```\n---\nid: npc-fenced\ntype: npc\n---\nbody text\n```"
+        _mod._enforce_and_write(llm_output, "doc.md", out, fio)
+        fm, _ = fio.read(out)
+        assert fm["id"]   == "npc-fenced"
+        assert fm["type"] == "npc"
+
+    def test_unwraps_fence_with_trailing_commentary(self, vault, patch_roots):
+        """LLM chatter after the closing fence must not defeat the unwrap."""
+        from nexus.shared import FrontmatterIO
+        fio = FrontmatterIO()
+        out = vault / "01-Processing" / "test-fenced-trailing.md"
+        llm_output = (
+            "```yaml\n---\nid: npc-trail\ntype: npc\n---\nbody\n```\n"
+            "\nLet me know if you'd like any changes!"
+        )
+        _mod._enforce_and_write(llm_output, "doc.md", out, fio)
+        fm, _ = fio.read(out)
+        assert fm["id"]   == "npc-trail"
+        assert fm["type"] == "npc"
+
+    def test_fence_inside_unfenced_body_left_alone(self, vault, patch_roots):
+        """A ``` appearing inside a normal (unfenced) reply's body must not
+        trigger the unwrap heuristic - only a reply that *starts* with a
+        fence is a wrapped reply."""
+        from nexus.shared import FrontmatterIO
+        fio = FrontmatterIO()
+        out = vault / "01-Processing" / "test-fence-in-body.md"
+        llm_output = (
+            "---\nid: npc-coded\ntype: npc\n---\n"
+            "## Notes\nThe rune reads:\n```\nancient text\n```\n"
+        )
+        _mod._enforce_and_write(llm_output, "doc.md", out, fio)
+        fm, body = fio.read(out)
+        assert fm["id"] == "npc-coded"
+        assert "ancient text" in body
+
 
 # ---------------------------------------------------------------------------
 # _mark_wiki_done

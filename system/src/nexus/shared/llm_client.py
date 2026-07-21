@@ -13,6 +13,7 @@ from __future__ import annotations
 import base64
 import io
 import json
+import re
 import time
 import urllib.error
 import urllib.request
@@ -25,6 +26,22 @@ from .interfaces import ILLMClient, LLMOfflineError, LLMResponseError
 _MAX_RETRIES   = 3
 _RETRY_DELAY_S = 3.0
 _MAX_IMAGE_PX  = 1024
+
+_JSON_FENCE_RE = re.compile(r"^```(?:json)?[ \t]*\r?\n(.*?)\r?\n```", re.DOTALL)
+
+
+def _strip_code_fence(text: str) -> str:
+    """Unwrap a ```json ... ``` fence some models wrap JSON replies in.
+
+    Only triggers when the reply *starts* with a fence, so a plain
+    "not JSON at all" reply still reaches json.loads and raises
+    LLMResponseError as before.
+    """
+    stripped = text.strip()
+    if not stripped.startswith("```"):
+        return stripped
+    m = _JSON_FENCE_RE.match(stripped)
+    return m.group(1).strip() if m else stripped
 
 
 # ---------------------------------------------------------------------------
@@ -95,7 +112,7 @@ class LLMClient(ILLMClient):
     ) -> dict[str, Any]:
         raw = self.chat(messages, max_tokens=max_tokens)
         try:
-            return json.loads(raw)
+            return json.loads(_strip_code_fence(raw))
         except json.JSONDecodeError as exc:
             raise LLMResponseError(
                 f"Non-JSON LLM response: {raw[:300]}"
