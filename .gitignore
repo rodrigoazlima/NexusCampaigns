@@ -280,6 +280,11 @@ knowledge-base/
 .agents/
 agents/*/.system/
 
+# nc-vision-agent - externally cloned repo (see setup-service.ps1's
+# Ensure-VisionAgentRepo); code + history live at
+# https://github.com/rodrigoazlima/nc-vision-agent, not here.
+agents/vision/
+
 # OS artifacts
 .DS_Store
 Thumbs.db
