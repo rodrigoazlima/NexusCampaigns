@@ -2,8 +2,10 @@
 #
 # `nexus.*` (runner, shared, tasks) resolves via the editable install
 # (`pip install -e ".[test]"`). The single sys.path insert below exists only
-# for the LLM agents still living under agents/ (e.g. `vision.tools.*`),
-# which are not part of the installed package.
+# for the LLM agents still living under agents/ (e.g. `lore.tools.*`), which
+# are not part of the installed package. vision now dispatches via its own
+# externally-cloned container (agents/vision - see shared/runners/docker.py)
+# and is no longer importable in-process here at all.
 #
 # Legacy numbered tests (test_01…test_15) predate the agents pipeline and
 # skip at module level when their SCRIPT_PATH no longer exists.

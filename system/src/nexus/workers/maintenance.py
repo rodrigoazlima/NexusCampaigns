@@ -168,19 +168,15 @@ def _remove_stale_lock(log: Logger) -> int:
 
 _AGENT_JSON_SPECS: dict[str, list[dict]] = {
     "vision": [
-        {"task_id": "vision-agent", "model": "claude-sonnet-4-6",
-         "tools_module": "vision.tools.classify_images", "interval": 900,
-         "description": "Image classification via local vision LLM.",
-         # Mirrors registry.yaml agents.vision.options (the shared default) -
-         # scaffolded here too so a fresh clone's agent.json has the override
-         # path ready to edit, not just the registry default. Keep both in
-         # sync if a default changes.
-         "pipeline": {
-             "batch_size": 10, "min_tags_target": 6, "max_conversation_messages": 20,
-             "step_max_retries": 2, "step_retry_backoff_seconds": 3,
-             "followup_max_tokens": 1024, "face_similarity_threshold": 0.85,
-             "step_max_tokens": {"type": 256, "visual": 4096, "pf2e": 512, "description": 512},
-         }},
+        # Code lives externally (https://github.com/rodrigoazlima/nc-vision-agent,
+        # cloned into agents/vision by setup-service.ps1) and dispatches via the
+        # docker runner (shared/runners/docker.py) - not claude-api like the
+        # other specs below. See registry.yaml agents.vision.sandbox for why
+        # this replaced the old sandbox.enabled: true special case.
+        {"task_id": "vision-agent", "type": "docker", "interval": 90,
+         "description": "Image classification via local vision LLM (docker dispatch).",
+         "docker": {"image": "nc-vision-agent:local", "dockerfile": "dockerfile",
+                     "timeout_seconds": 1800}},
     ],
     "lore": [
         {"task_id": "lore-agent", "model": "claude-sonnet-4-6",
@@ -210,14 +206,18 @@ def _generate_missing_agent_configs(log: Logger) -> int:
             continue
         payload: dict[str, Any] = {"tasks": {}}
         for t in tasks:
-            dispatch = {
-                "type": "claude-api",
-                "claude_api": {
-                    "model": t["model"],
-                    "tools_module": t["tools_module"],
-                    "prompt_file": t.get("prompt_file", "prompts/system.md"),
-                },
-            }
+            dispatch_type = t.get("type", "claude-api")
+            if dispatch_type == "docker":
+                dispatch = {"type": "docker", "docker": t["docker"]}
+            else:
+                dispatch = {
+                    "type": "claude-api",
+                    "claude_api": {
+                        "model": t["model"],
+                        "tools_module": t["tools_module"],
+                        "prompt_file": t.get("prompt_file", "prompts/system.md"),
+                    },
+                }
             task_payload: dict[str, Any] = {
                 "intervalSeconds": t["interval"],
                 "description": t["description"],
@@ -252,13 +252,18 @@ def _create_missing_dirs(log: Logger) -> int:
 
 def _ensure_agent_scaffold(log: Logger) -> int:
     """LLM agents get a real prompts/ and state/ dir. Creates only what's
-    missing - never touches an existing one."""
+    missing - never touches an existing one.
+
+    "vision" only gets state/ (the docker runner's bind-mount target) - its
+    prompts/ now live inside the externally-cloned nc-vision-agent repo at
+    agents/vision/src/nc_vision_agent/prompts, not agents/vision/prompts."""
     created = 0
     for agent_name in _AGENT_JSON_SPECS:
         agent_root = _AGENTS_DIR / agent_name
         if not agent_root.is_dir():
             continue
-        for sub in ("prompts", "state"):
+        subs = ("state",) if agent_name == "vision" else ("prompts", "state")
+        for sub in subs:
             p = agent_root / sub
             if not p.exists():
                 p.mkdir(parents=True, exist_ok=True)
@@ -290,7 +295,11 @@ _AGENT_RELATIONS: dict[str, list[str]] = {
     "relationship":      [".knowledge-base/02-Library", ".knowledge-base/04-Relationships"],
     "search":            [".knowledge-base/01-Processing", ".knowledge-base/02-Library"],
     "session-builder":   [".knowledge-base/03-Campaigns", "agents/adventure-builder"],
-    "vision":            [".knowledge-base/00-Inbox", ".knowledge-base/01-Processing", "system/state"],
+    # "vision" intentionally absent: it runs in its own container now (docker
+    # dispatch, shared/runners/docker.py bind-mounts .knowledge-base/system/state
+    # directly), so it no longer needs the in-process sys.path junction trick
+    # these links exist for. "lore"'s own entry above still references
+    # agents/vision for its cross-agent state read - that's unaffected.
     "wiki":              [".knowledge-base/01-Processing", ".knowledge-base/02-Library", "system/state"],
 }
 

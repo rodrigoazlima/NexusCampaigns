@@ -45,6 +45,7 @@ from nexus.shared import (
     VaultWriteError,
     load_registry,
 )
+from nexus.shared import container_runtime
 from nexus.shared.loaders import _find_project_root
 
 TASK_ID         = "sandbox"
@@ -63,7 +64,10 @@ _APPLY_LOCK    = _PROJECT_ROOT / "agents" / "runtime" / "state" / "sandbox-apply
 # Written by setup-service.ps1 (Find-Podman/Find-Docker) - the NSSM service
 # process doesn't inherit whatever PATH found podman/docker at install time,
 # so it's persisted here as a fallback instead of trusting PATH alone.
-_RUNTIME_STATE_PATH = _SYSTEM_STATE / "container-runtime.json"
+# Module-level (not a direct alias) so tests can monkeypatch it per-case;
+# the runtime-detection implementation itself lives in
+# nexus.shared.container_runtime, shared with shared/runners/docker.py.
+_RUNTIME_STATE_PATH = container_runtime.RUNTIME_STATE_PATH
 
 _DIFF_TRUNCATE_LINES = 400
 _CONTAINER_LOG_TAIL_LINES = 200
@@ -94,80 +98,35 @@ def _make_logger() -> Logger:
 # Container runtime detection
 # ---------------------------------------------------------------------------
 
-def _runtime_fallback_path(name: str) -> Optional[str]:
-    """Look up name's exe path from container-runtime.json, if setup-service.ps1
-    recorded one and it still exists on disk."""
-    if not _RUNTIME_STATE_PATH.exists():
-        return None
-    try:
-        data = json.loads(_RUNTIME_STATE_PATH.read_text(encoding="utf-8").lstrip("﻿"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    path = data.get(name)
-    return path if path and Path(path).is_file() else None
-
+# Thin wrappers around nexus.shared.container_runtime: keep sandbox_run's own
+# names/exception type (SandboxPreflightError, not ContainerRuntimeError) and
+# read _RUNTIME_STATE_PATH from this module's own namespace at call time (not
+# baked in at import time) so tests can still monkeypatch it per-case.
 
 def _detect_runtime(preferred: Optional[str]) -> str:
-    candidates = [preferred] if preferred else ["podman", "docker"]
-    for name in candidates:
-        if not name:
-            continue
-        if shutil.which(name):
-            return name
-        fallback = _runtime_fallback_path(name)
-        if fallback:
-            # Not on this process's PATH - widen it with the fallback's own
-            # dir so every `subprocess.run([name, ...])` call below still
-            # resolves `name` by bare command.
-            os.environ["PATH"] = os.pathsep.join(
-                [str(Path(fallback).parent), os.environ.get("PATH", "")]
-            )
-            return name
-    raise SandboxPreflightError(
-        "No container runtime found on PATH or in system/state/container-runtime.json "
-        "(checked: podman, docker). Install Podman or Docker, or re-run setup-service.ps1 "
-        "to refresh the fallback path."
-    )
+    try:
+        return container_runtime.detect_runtime(preferred, state_path=_RUNTIME_STATE_PATH)
+    except container_runtime.ContainerRuntimeError as exc:
+        raise SandboxPreflightError(str(exc)) from exc
 
 
 def _runtime_version(binary: str) -> str:
-    result = subprocess.run(
-        [binary, "--version"], capture_output=True, text=True, encoding="utf-8", errors="replace", check=False
-    )
-    return (result.stdout or result.stderr or "").strip()
+    return container_runtime.runtime_version(binary)
 
 
 def _preflight(binary: str) -> None:
-    result = subprocess.run(
-        [binary, "info"], capture_output=True, text=True, encoding="utf-8", errors="replace", check=False
-    )
-    if result.returncode != 0:
-        raise SandboxPreflightError(
-            f"`{binary} info` failed (exit {result.returncode}): {result.stderr.strip()}\n"
-            f"Hint: is the {binary} machine/daemon running? (this tool will not auto-start it)"
-        )
+    try:
+        container_runtime.preflight(binary)
+    except container_runtime.ContainerRuntimeError as exc:
+        raise SandboxPreflightError(str(exc)) from exc
 
 
 def _host_gateway_name(runtime_bin: str) -> str:
-    return "host.docker.internal" if runtime_bin == "docker" else "host.containers.internal"
+    return container_runtime.host_gateway_name(runtime_bin)
 
 
 def _podman_wsl_gateway_ip() -> Optional[str]:
-    """Podman Desktop's WSL machine is a second hop: `--add-host ...:host-gateway`
-    resolves to the WSL VM's own loopback, not Windows, so a container can
-    open TCP to the VM but never reaches a Windows-side server (e.g. LM
-    Studio) - refused, not timed out, since something local answers on that
-    address. The VM's own default route already points at the real Windows
-    host, so ask it directly and use that concrete IP instead of the magic
-    keyword."""
-    result = subprocess.run(
-        ["podman", "machine", "ssh", "--", "ip", "route", "show", "default"],
-        capture_output=True, text=True, encoding="utf-8", errors="replace", check=False,
-    )
-    if result.returncode != 0:
-        return None
-    match = re.search(r"default via (\S+)", result.stdout)
-    return match.group(1) if match else None
+    return container_runtime.podman_wsl_gateway_ip()
 
 
 _LOCALHOST_PORT_RE = re.compile(r"(?:localhost|127\.0\.0\.1):(\d+)")
@@ -297,7 +256,7 @@ def _agent_json_dispatch_type(agent: str, task_id: str) -> Optional[str]:
 # ---------------------------------------------------------------------------
 
 def _rewrite_localhost(text: str, host_gateway: str) -> str:
-    return text.replace("localhost", host_gateway).replace("127.0.0.1", host_gateway)
+    return container_runtime.rewrite_localhost(text, host_gateway)
 
 
 def _copy_scope_dir(rel: str, staging_dir: Path) -> None:

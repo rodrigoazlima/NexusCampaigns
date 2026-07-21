@@ -453,8 +453,21 @@ class CodexCliConfig(BaseModel):
     env:             dict[str, str]       = Field(default_factory=dict)
 
 
+class DockerDispatchConfig(BaseModel):
+    """Runs the agent's own Dockerfile in a container, bind-mounting the
+    shared nexus.shared library (system/), the vault (.knowledge-base/), and
+    the agent's own state/ dir straight through - no copy-in/diff/apply, the
+    container writes directly to the real host paths. For agents whose code
+    lives in an external repo (e.g. nc-vision-agent) cloned into their agent
+    folder rather than in-tree."""
+    image:           str
+    dockerfile:      str                  = "dockerfile"
+    timeout_seconds: int                  = 1800
+    env:             dict[str, str]       = Field(default_factory=dict)
+
+
 class AgentDispatchConfig(BaseModel):
-    type:           Literal["cli", "openai-api", "claude-api", "gemini-api", "openrouter-api", "claude-code", "lm-studio", "codex-cli"]
+    type:           Literal["cli", "openai-api", "claude-api", "gemini-api", "openrouter-api", "claude-code", "lm-studio", "codex-cli", "docker"]
     cli:            Optional[CliDispatchConfig]      = None
     openai_api:     Optional[OpenAIApiConfig]        = None
     claude_api:     Optional[ClaudeApiConfig]        = None
@@ -463,6 +476,7 @@ class AgentDispatchConfig(BaseModel):
     claude_code:    Optional[ClaudeCodeConfig]       = None
     lm_studio:      Optional[LmStudioConfig]         = None
     codex_cli:      Optional[CodexCliConfig]         = None
+    docker:         Optional[DockerDispatchConfig]   = None
 
 
 class TaskDispatchEntry(BaseModel):

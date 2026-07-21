@@ -65,4 +65,5 @@ DISPATCH_TYPE_FIELD: dict[str, str] = {
     "claude-code":    "claude_code",
     "lm-studio":      "lm_studio",
     "codex-cli":      "codex_cli",
+    "docker":         "docker",
 }

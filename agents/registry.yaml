@@ -141,6 +141,23 @@ agents:
     task_id: vision-agent
     interval_seconds: 90
     llm: vision_llm
+    # Code lives externally now (https://github.com/rodrigoazlima/nc-vision-agent,
+    # cloned into agents/vision by setup-service.ps1's Ensure-VisionAgentRepo;
+    # tools/prompts below now live at agents/vision/src/nc_vision_agent/*).
+    # `dispatch:` below is read directly by
+    # nexus.runtime.registry_yaml.synthesize_agent_json (the code path
+    # `nexus.runner --ensure-config` / setup-service.ps1 actually calls) in
+    # place of the generic per-tool `cli` synthesis every other agent gets -
+    # this is what makes a fresh clone's regenerated agent.json come back as
+    # "type": "docker" instead of "type": "cli". `tools:` is otherwise only
+    # read by dispatch_config.build_default_dispatch's separate, rarely-hit
+    # registry-fallback path.
+    dispatch:
+      type: docker
+      docker:
+        image: nc-vision-agent:local
+        dockerfile: dockerfile
+        timeout_seconds: 1800
     tools:
       - tools/classify_images.py
     prompts:
@@ -174,15 +191,15 @@ agents:
         - system/state/inbox-queue.json
       updates:
         - system/state/inbox-queue.json
-    # enabled: true - the runtime routes vision-agent dispatch through
-    # nexus.tasks.sandbox_run (system/src/nexus/runtime/scheduler.py
-    # Runtime.dispatch) instead of running classify_images.py directly.
-    # allow_deletes=false means renames (delete old filename + add new one,
-    # both inside 00-Inbox/images) apply only the add - the pre-rename
-    # original is left in place, logged as dropped. Flip to true to let
-    # sandboxed vision runs propagate the delete half too.
+    # enabled: false - vision now dispatches via agent.json's "type": "docker"
+    # (shared/runners/docker.py), which bind-mounts system/, .knowledge-base/,
+    # and agents/vision/state/ straight into the container built from the
+    # externally-cloned nc-vision-agent repo. The container writes directly to
+    # the real host paths, so nexus.tasks.sandbox_run's copy-in/diff/apply
+    # flow (what sandbox.enabled: true would route through) isn't needed here
+    # anymore - it stays available for any other agent that wants it.
     sandbox:
-      enabled: true
+      enabled: false
       allow_deletes: false
 
   lore:

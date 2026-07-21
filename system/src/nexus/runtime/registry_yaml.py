@@ -43,19 +43,31 @@ def load_pipeline_mode() -> str:
 def synthesize_agent_json(agent_name: str, entry: dict) -> Optional[dict]:
     """Build a default agent.json payload for `agent_name` from its registry.yaml entry.
 
-    Every active agent in this codebase is a self-contained CLI script (it reads
-    its own LLM endpoint/config internally), so the synthesized dispatch is
-    always `cli: python <tool>`. Returns None if the entry has no task_id/tools
-    (e.g. the static runtime, or a "planned" agent).
+    Most active agents in this codebase are self-contained CLI scripts (each
+    reads its own LLM endpoint/config internally), so the synthesized dispatch
+    is `cli: python <tool>` by default. An agent whose code lives elsewhere
+    (e.g. vision, dispatched via its own externally-cloned Docker image - see
+    shared/runners/docker.py) declares its own `dispatch:` block directly in
+    registry.yaml, which is used as-is instead of the generic per-tool cli
+    synthesis. Returns None if the entry has no task_id and no tools/dispatch
+    override (e.g. the static runtime, or a "planned" agent).
     """
     task_id = entry.get("task_id")
+    dispatch_override = entry.get("dispatch")
     tools = entry.get("tools") or []
-    if not task_id or not tools:
+    if not task_id or not (tools or dispatch_override):
         return None
 
     interval    = int(entry.get("interval_seconds", 3600))
     description = entry.get("description") or f"{agent_name} agent"
     is_llm_bound = str(entry.get("llm", "none")) != "none"
+
+    if dispatch_override:
+        return {"tasks": {task_id: {
+            "intervalSeconds": interval,
+            "description": description,
+            "dispatch": dict(dispatch_override),
+        }}}
 
     tasks: dict = {}
     for i, tool in enumerate(tools):

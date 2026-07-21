@@ -30,6 +30,7 @@ _TYPE_TO_MODULE: dict[str, str] = {
     "claude-code":    ".claude_code",
     "lm-studio":      ".openai_compat",   # OpenAI-compatible endpoint
     "codex-cli":      ".codex_cli",
+    "docker":         ".docker",
 }
 
 _TYPE_TO_CLASS: dict[str, str] = {
@@ -41,6 +42,7 @@ _TYPE_TO_CLASS: dict[str, str] = {
     "claude-code":    "ClaudeCodeRunner",
     "lm-studio":      "OpenAICompatRunner",
     "codex-cli":      "CodexCliRunner",
+    "docker":         "DockerRunner",
 }
 
 

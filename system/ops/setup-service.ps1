@@ -44,6 +44,9 @@ param(
     [string] $ProjectRoot    = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path,
     [string] $VaultRoot      = "",        # knowledge base dir; may live outside ProjectRoot
     [switch] $VaultGitInit,               # git init the vault dir if it isn't a repo yet
+    [string] $VisionAgentRepoUrl = "https://github.com/rodrigoazlima/nc-vision-agent.git",
+    [string] $VisionAgentBranch  = "master",
+    [switch] $NoVisionAgentClone,         # skip cloning agents/vision entirely
     [string] $Python         = "python",
     [string] $Method         = "auto",    # "auto" | "nssm" | "schtasks"
     [int]    $DashboardPort  = 48080,
@@ -76,6 +79,10 @@ PARAMETERS
   -VaultGitInit           If -VaultRoot isn't already a git repo, run git init there (plus a
                             vault-appropriate .gitignore and an initial commit). Never touches
                             a vault dir that's already a git repo.
+  -VisionAgentRepoUrl <url> Git URL for the externally-hosted vision agent, cloned into
+                            agents\vision if not already present. Default: nc-vision-agent.
+  -VisionAgentBranch <str> Branch to clone. Default: master.
+  -NoVisionAgentClone      Skip cloning agents\vision entirely.
   -Python        <cmd>    Python executable to use. Default: python
   -Method        <str>    Install method: auto | nssm | schtasks. Default: auto (whole script
                             requires Admin regardless of method)
@@ -293,8 +300,12 @@ function Ensure-Junction([string]$LinkPath, [string]$TargetPath) {
 # scaffolded: static task code lives in system/src/nexus/tasks, and LLM
 # agents track their tools\ in git.
 function Ensure-AgentScaffold([string]$ProjectRoot) {
+    # "vision" excluded from the general loop below: its prompts\ now live
+    # inside the externally-cloned nc-vision-agent repo at
+    # agents\vision\src\nc_vision_agent\prompts, not agents\vision\prompts -
+    # Ensure-VisionAgentRepo already makes sure agents\vision\state\ exists.
     $agentDirs = Get-ChildItem "$ProjectRoot\agents" -Directory -ErrorAction SilentlyContinue |
-        Where-Object { $_.Name -notin @("tests", "shared") }
+        Where-Object { $_.Name -notin @("tests", "shared", "vision") }
     foreach ($a in $agentDirs) {
         foreach ($sub in @("prompts", "state")) {
             $p = Join-Path $a.FullName $sub
@@ -326,7 +337,11 @@ $script:AgentRelations = @{
     "relationship"      = @(".knowledge-base/02-Library", ".knowledge-base/04-Relationships")
     "search"            = @(".knowledge-base/01-Processing", ".knowledge-base/02-Library")
     "session-builder"   = @(".knowledge-base/03-Campaigns", "agents/adventure-builder")
-    "vision"            = @(".knowledge-base/00-Inbox", ".knowledge-base/01-Processing", "system/state")
+    # "vision" intentionally absent: it runs in its own container now (docker
+    # dispatch, shared/runners/docker.py bind-mounts .knowledge-base/system/state
+    # directly), so it no longer needs the in-process sys.path junction trick
+    # these links exist for. "lore"'s own entry above still references
+    # agents/vision for its cross-agent state read - that's unaffected.
     "wiki"              = @(".knowledge-base/01-Processing", ".knowledge-base/02-Library", "system/state")
 }
 
@@ -451,6 +466,34 @@ function Ensure-VaultGitRepo([string]$VaultPath) {
     } finally {
         Pop-Location
     }
+}
+
+# Clones the externally-hosted vision agent (nc-vision-agent) into
+# agents\vision if it isn't there yet. Idempotent and non-destructive like
+# Ensure-VaultGitRepo above: only acts when agents\vision has no .git yet -
+# never force-pulls over a developer's local edits in an existing clone.
+# Always ensures agents\vision\state\ exists afterward - that's the docker
+# runner's (shared/runners/docker.py) bind-mount target for agent state.
+function Ensure-VisionAgentRepo([string]$ProjectRoot, [string]$RepoUrl, [string]$Branch) {
+    $visionDir = Join-Path $ProjectRoot "agents\vision"
+
+    if (Test-Path (Join-Path $visionDir ".git")) {
+        Log "vision agent repo already present: $visionDir (leaving as-is - fetch/pull manually for updates)"
+    } elseif (Test-Path $visionDir) {
+        $hasContent = @(Get-ChildItem -LiteralPath $visionDir -Force -ErrorAction SilentlyContinue).Count -gt 0
+        if ($hasContent) {
+            throw "'$visionDir' exists and is not a git repo - refusing to clone over it. Move its contents aside, then re-run."
+        }
+        Log "Cloning nc-vision-agent ($Branch) into empty $visionDir ..."
+        git clone --branch $Branch --single-branch $RepoUrl $visionDir
+        if ($LASTEXITCODE -ne 0) { throw "git clone failed for $RepoUrl" }
+    } else {
+        Log "Cloning nc-vision-agent ($Branch) into $visionDir ..."
+        git clone --branch $Branch --single-branch $RepoUrl $visionDir
+        if ($LASTEXITCODE -ne 0) { throw "git clone failed for $RepoUrl" }
+    }
+
+    New-Item -ItemType Directory -Force (Join-Path $visionDir "state") | Out-Null
 }
 
 function Find-NSSM {
@@ -1079,6 +1122,17 @@ if ($VaultRootAbs.TrimEnd('\') -ine $VaultLinkPath.TrimEnd('\')) {
 
 if ($VaultGitInit) {
     Ensure-VaultGitRepo -VaultPath $VaultRootAbs
+}
+
+if ($NoVisionAgentClone) {
+    Log "Vision agent clone skipped (-NoVisionAgentClone)."
+} else {
+    try {
+        Ensure-VisionAgentRepo -ProjectRoot $ProjectRoot -RepoUrl $VisionAgentRepoUrl -Branch $VisionAgentBranch
+    } catch {
+        Log "Vision agent clone failed: $_" "ERROR"
+        exit 1
+    }
 }
 
 Log "Ensuring vault folder structure at $VaultRootAbs ..."

@@ -38,7 +38,7 @@ from nexus.shared import (  # noqa: E402
 )
 from nexus.shared.config import LLMEndpointConfig  # noqa: E402
 from nexus.shared.loaders import load_llm_endpoint  # noqa: E402
-from vision.tools.classify_images import refine_tags_with_library  # noqa: E402
+from nexus.shared.tag_refinement import refine_tags_with_library  # noqa: E402
 
 TASK_ID         = "classification-agent"
 SCRIPT_BASENAME = "enrich_tags.py"
